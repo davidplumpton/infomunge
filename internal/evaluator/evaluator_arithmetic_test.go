@@ -1,0 +1,240 @@
+package evaluator
+
+import (
+	"testing"
+)
+
+func TestEvaluate_Arithmetic(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected interface{}
+	}{
+		{"int addition", "2 + 3", 5},
+		{"int subtraction", "10 - 4", 6},
+		{"int multiplication", "3 * 4", 12},
+		{"int division", "15 / 3", 5},
+		{"float addition", "1.5 + 2.5", 4.0},
+		{"float subtraction", "5.0 - 2.0", 3.0},
+		{"float multiplication", "2.0 * 3.0", 6.0},
+		{"float division", "10.0 / 4.0", 2.5},
+		{"int + float", "2 + 3.5", 5.5},
+		{"float + int", "2.5 + 3", 5.5},
+		{"string concat", `"hello" + " world"`, "hello world"},
+		{"complex expression", "(2 + 3) * 4", 20},
+	}
+
+	ctx := make(map[string]interface{})
+	mapping := make([]int, 100)
+	for i := range mapping {
+		mapping[i] = i
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(tt.expr, ctx, mapping, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("expected %v (%T), got %v (%T)", tt.expected, tt.expected, result, result)
+			}
+		})
+	}
+}
+
+func TestEvaluate_ArithmeticErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		expr string
+	}{
+		{"division by zero int", "5 / 0"},
+		{"division by zero float", "5.0 / 0.0"},
+	}
+
+	ctx := make(map[string]interface{})
+	mapping := make([]int, 100)
+	for i := range mapping {
+		mapping[i] = i
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Evaluate(tt.expr, ctx, mapping, 0, tt.expr)
+			if err == nil {
+				t.Error("expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestEvaluate_MathFunctions(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected interface{}
+	}{
+		{"ceil positive", "ceil(2.3)", 3.0},
+		{"ceil integer", "ceil(5.0)", 5.0},
+		{"floor positive", "floor(2.7)", 2.0},
+		{"round up", "round(2.6)", 3.0},
+		{"round down", "round(2.4)", 2.0},
+		{"round half even", "round(1.5)", 2.0},
+		{"sqrt", "sqrt(16.0)", 4.0},
+		{"sqrt small", "sqrt(0.25)", 0.5},
+		{"abs positive", "abs(5.0)", 5.0},
+		{"abs zero", "abs(0.0)", 0.0},
+		{"max two", "max(3, 7)", 7.0},
+		{"max multiple", "max(1, 5, 3, 9, 2)", 9.0},
+		{"min two", "min(3, 7)", 3.0},
+		{"min multiple", "min(5, 2, 8, 1, 9)", 1.0},
+		{"pow", "pow(2, 8)", 256.0},
+		{"pow fractional", "pow(4, 0.5)", 2.0},
+		{"pow with ints", "pow(3, 2)", 9.0},
+	}
+
+	ctx := make(map[string]interface{})
+	mapping := make([]int, 100)
+	for i := range mapping {
+		mapping[i] = i
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(tt.expr, ctx, mapping, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("expected %v (%T), got %v (%T)", tt.expected, tt.expected, result, result)
+			}
+		})
+	}
+}
+
+func TestEvaluate_MathFunctionsErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		expr string
+	}{
+		{"ceil no args", "ceil()"},
+		{"ceil too many args", "ceil(1, 2)"},
+		{"floor no args", "floor()"},
+		{"sqrt negative", "sqrt(-1)"},
+		{"max no args", "max()"},
+		{"min no args", "min()"},
+		{"pow one arg", "pow(2)"},
+		{"pow three args", "pow(2, 3, 4)"},
+	}
+
+	ctx := make(map[string]interface{})
+	mapping := make([]int, 100)
+	for i := range mapping {
+		mapping[i] = i
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Evaluate(tt.expr, ctx, mapping, 0, tt.expr)
+			if err == nil {
+				t.Error("expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestEvaluate_MathEdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected interface{}
+	}{
+		{"mod 10 3", "mod(10, 3)", 1.0},
+		{"mod 7 2", "mod(7, 2)", 1.0},
+		{"isEven 4", "isEven(4)", true},
+		{"isEven 5", "isEven(5)", false},
+		{"isOdd 5", "isOdd(5)", true},
+		{"isOdd 4", "isOdd(4)", false},
+	}
+
+	ctx := make(map[string]interface{})
+	mapping := make([]int, 100)
+	for i := range mapping {
+		mapping[i] = i
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(tt.expr, ctx, mapping, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestEvaluate_LogicalOperations(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected interface{}
+	}{
+		{"and true true", "true && true", true},
+		{"and true false", "true && false", false},
+		{"and false true", "false && true", false},
+		{"and false false", "false && false", false},
+		{"equality int", "5 == 5", true},
+		{"equality string", `"a" == "a"`, true},
+		{"inequality", "5 == 6", false},
+	}
+
+	ctx := make(map[string]interface{})
+	mapping := make([]int, 100)
+	for i := range mapping {
+		mapping[i] = i
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(tt.expr, ctx, mapping, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestEvaluate_ComparisonErrors(t *testing.T) {
+	ctx := map[string]interface{}{
+		"str": "hello",
+		"arr": []interface{}{1, 2, 3},
+	}
+	mapping := make([]int, 100)
+	for i := range mapping {
+		mapping[i] = i
+	}
+
+	tests := []struct {
+		name string
+		expr string
+	}{
+		{"compare string with <", `"a" < "b"`},
+		{"compare array with >", "arr > 5"},
+		{"compare different types", `"hello" < 5`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Evaluate(tt.expr, ctx, mapping, 0, tt.expr)
+			if err == nil {
+				t.Error("expected error, got nil")
+			}
+		})
+	}
+}

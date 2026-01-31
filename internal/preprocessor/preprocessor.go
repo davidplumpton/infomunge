@@ -1,0 +1,298 @@
+package preprocessor
+
+import (
+	unifiederrors "infomunge/internal/errors"
+	"strings"
+)
+
+// MaxRecursionDepth limits how deeply nested if-else expressions can be.
+const MaxRecursionDepth = 100
+
+const (
+	MaxRewriteIterations   = 10000
+	MaxTransformIterations = 100
+)
+
+// Options holds configuration for the preprocessor
+type Options struct {
+	// AllowMultilineIfElse enables multiline if/else branch parsing.
+	AllowMultilineIfElse bool
+}
+
+// PrepareForParsing transforms InfoMunge syntax into Go-compatible syntax for the parser.
+// Returns an error if the expression exceeds recursion depth limits.
+func PrepareForParsing(body string, opts Options) (string, []int, error) {
+	// Strip // line comments before any other processing, since the Go
+	// expression parser does not support them.
+	body = stripLineComments(body)
+
+	// Process regex literals first, before any other transformations,
+	// to prevent /[a-z]+/ from being interpreted as an array literal.
+	body = replaceRegexLiterals(body)
+	body = wrapImplicitObjectLiteralBodies(body)
+	input, wrapped := wrapTopLevelObjectLiteral(body)
+	rewriter := newRewriter(input, opts)
+	result, mapping, err := rewriter.RewriteWithDepth(0)
+	if wrapped && len(mapping) > 0 {
+		origLen := len(body)
+		closingPos := origLen + 1
+		for i, pos := range mapping {
+			if pos == 0 {
+				continue
+			}
+			if pos == closingPos {
+				if origLen > 0 {
+					mapping[i] = origLen - 1
+				} else {
+					mapping[i] = 0
+				}
+				continue
+			}
+			if pos > 0 {
+				mapping[i] = pos - 1
+			}
+		}
+	}
+	return result, mapping, err
+}
+
+// Internal implementation of the rewriter
+type rewriter struct {
+	input        string
+	result       []byte
+	mapping      []int
+	stack        []byte
+	inString     bool
+	stringEscape bool
+	pos          int
+	opts         Options
+	err          error
+}
+
+func newRewriter(input string, opts Options) *rewriter {
+	return &rewriter{
+		input:   input,
+		result:  make([]byte, 0, len(input)*2),
+		mapping: make([]int, 0, len(input)*2),
+		stack:   make([]byte, 0, 8),
+		opts:    opts,
+	}
+}
+
+func (r *rewriter) append(char byte, originalPos int) {
+	r.result = append(r.result, char)
+	r.mapping = append(r.mapping, originalPos)
+}
+
+func (r *rewriter) appendString(s string, originalPos int) {
+	for i := 0; i < len(s); i++ {
+		r.append(s[i], originalPos)
+	}
+}
+
+func (r *rewriter) updateStringEscape(ch byte) {
+	if !r.inString {
+		return
+	}
+	if r.stringEscape {
+		r.stringEscape = false
+		return
+	}
+	if ch == '\\' {
+		r.stringEscape = true
+	}
+}
+
+func (r *rewriter) Rewrite() (string, []int, error) {
+	return r.RewriteWithDepth(0)
+}
+
+// RewriteWithDepth is the internal rewrite function that tracks recursion depth.
+func (r *rewriter) RewriteWithDepth(depth int) (string, []int, error) {
+	if depth > MaxRecursionDepth {
+		r.err = unifiederrors.ParseErrorf("expression exceeds maximum recursion depth of %d", MaxRecursionDepth)
+		return string(r.result), r.mapping, r.err
+	}
+
+	iterCount := 0
+	maxIterations := MaxRewriteIterations
+	if scaled := len(r.input) * 4; scaled > maxIterations {
+		maxIterations = scaled
+	}
+	for r.pos = 0; r.pos < len(r.input); r.pos++ {
+		iterCount++
+		if iterCount > maxIterations {
+			r.err = unifiederrors.ParseErrorf(
+				"rewriter iteration limit exceeded at pos %d (limit %d, input %d)",
+				r.pos,
+				maxIterations,
+				len(r.input),
+			)
+			return string(r.result), r.mapping, r.err
+		}
+		if r.err != nil {
+			return string(r.result), r.mapping, r.err
+		}
+		char := r.input[r.pos]
+
+		// Handle double-quoted strings
+		if r.handleDoubleQuote(char) {
+			continue
+		}
+
+		// Handle single-quoted strings (convert to double-quoted)
+		if r.handleSingleQuote(char) {
+			continue
+		}
+
+		// Inside string, just append and continue
+		if r.inString {
+			r.updateStringEscape(char)
+			r.append(char, r.pos)
+			continue
+		}
+
+		// Handle transformations outside of strings
+		if r.handleBreak() {
+			continue
+		}
+
+		if r.handleContinue() {
+			continue
+		}
+
+		if r.handleWhileLoop() {
+			continue
+		}
+
+		if r.handleIfElse() {
+			continue
+		}
+
+		if r.handleAndOr() {
+			continue
+		}
+
+		if r.handleNot() {
+			continue
+		}
+
+		if r.handleCoerceEquals() {
+			continue
+		}
+
+		if r.handleRangeBuiltin() {
+			continue
+		}
+
+		if r.handleUsing() {
+			continue
+		}
+
+		if r.handleNewline(char) {
+			continue
+		}
+
+		if r.handleDoBlock() {
+			continue
+		}
+
+		if r.handleUpdateExprBlock() {
+			continue
+		}
+
+		if r.handleOpenBrace(char) {
+			continue
+		}
+
+		if r.handleCloseBrace(char) {
+			continue
+		}
+
+		if r.handleUnquotedKey(char) {
+			continue
+		}
+
+		r.append(char, r.pos)
+	}
+
+	result := string(r.result)
+	if containsIfKeywordOutsideStrings(result) {
+		if depth+1 > MaxRecursionDepth {
+			r.err = unifiederrors.ParseErrorf("expression exceeds maximum recursion depth of %d", MaxRecursionDepth)
+			return result, r.mapping, r.err
+		}
+		newRewriter := newRewriter(result, r.opts)
+		var err error
+		result, r.mapping, err = newRewriter.RewriteWithDepth(depth + 1)
+		if err != nil {
+			return result, r.mapping, err
+		}
+	}
+
+	pipeline := CreateModularPostProcessingPipeline()
+	result, err := pipeline.Execute(result)
+	if err != nil {
+		return result, r.mapping, err
+	}
+
+	if r.err != nil {
+		return result, r.mapping, r.err
+	}
+
+	return result, r.mapping, nil
+}
+
+// stripLineComments removes // line comments from each line, respecting
+// string literals. Line count is preserved for diagnostics.
+func stripLineComments(body string) string {
+	lines := strings.Split(body, "\n")
+	result := make([]string, 0, len(lines))
+	for _, line := range lines {
+		stripped := stripSingleLineComment(line)
+		result = append(result, stripped)
+	}
+	return strings.Join(result, "\n")
+}
+
+// stripSingleLineComment removes a // comment from a single line,
+// respecting string literals.
+func stripSingleLineComment(line string) string {
+	inString := false
+	stringChar := byte(0)
+	escaped := false
+
+	for i := 0; i < len(line); i++ {
+		ch := line[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if ch == '\\' && inString {
+			escaped = true
+			continue
+		}
+		if !inString && (ch == '"' || ch == '\'') {
+			inString = true
+			stringChar = ch
+			continue
+		}
+		if inString && ch == stringChar {
+			inString = false
+			continue
+		}
+		if !inString && ch == '/' {
+			if i+1 < len(line) && line[i+1] == '/' {
+				return line[:i] + strings.Repeat(" ", len(line)-i)
+			}
+			if isRegexContext(line, i, line[:i]) {
+				regexEnd, _, _ := parseRegexLiteral(line, i)
+				if regexEnd > i {
+					i = regexEnd - 1
+					continue
+				}
+			}
+		}
+	}
+	return line
+}

@@ -1,0 +1,4 @@
+%im 0.1
+output application/json
+---
+[{"id": 3}, {"id": 1}, {"id": 2}] sort $.id

@@ -1,0 +1,23 @@
+Feature: Java Properties Reading
+  In order to process Java properties data
+  As a developer
+  I want to read and parse Java properties content
+
+  Scenario: Read a simple Java properties string
+    Given the following properties input:
+      """
+      name=Alice
+      age=30
+      """
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"age":"30","name":"Alice"}
+      """

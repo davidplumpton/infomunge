@@ -1,0 +1,514 @@
+package runner
+
+import (
+	"fmt"
+	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/evaluator"
+	"infomunge/internal/preprocessor"
+	"infomunge/pkg/formats"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// RunnerOptions holds configuration for execution
+type RunnerOptions struct {
+	BaseDir string
+	Lazy    bool
+}
+
+// Run executes the infomunge process on the given file.
+func Run(filePath string) error {
+	return RunWithConfig(filePath, RunnerOptions{})
+}
+
+// RunWithConfig executes the infomunge process on the given file with options.
+func RunWithConfig(filePath string, opts RunnerOptions) error {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return unifiederrors.WrapIO(err, "error reading file")
+	}
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		absPath = filePath
+	}
+
+	if opts.BaseDir == "" {
+		opts.BaseDir = filepath.Dir(absPath)
+	}
+
+	return runFromStringWithConfig(string(content), nil, opts)
+}
+
+// RunFromString executes an infomunge script from a string and prints formatted output.
+func RunFromString(raw string) error {
+	return RunFromStringWithContext(raw, nil)
+}
+
+// RunFromStringWithContext executes an infomunge script with additional context variables.
+func RunFromStringWithContext(raw string, additionalContext map[string]interface{}) error {
+	baseDir, err := os.Getwd()
+	if err != nil {
+		baseDir = "."
+	}
+	return runFromStringWithConfig(raw, additionalContext, RunnerOptions{BaseDir: baseDir})
+}
+
+// RunFromStringWithContextAndOptions executes an infomunge script with additional context variables and options.
+func RunFromStringWithContextAndOptions(raw string, additionalContext map[string]interface{}, opts RunnerOptions) error {
+	if opts.BaseDir == "" {
+		baseDir, err := os.Getwd()
+		if err != nil {
+			opts.BaseDir = "."
+		} else {
+			opts.BaseDir = baseDir
+		}
+	}
+	return runFromStringWithConfig(raw, additionalContext, opts)
+}
+
+// runFromStringWithConfig executes an infomunge script with configuration.
+func runFromStringWithConfig(raw string, additionalContext map[string]interface{}, opts RunnerOptions) error {
+	_, _, bodyOffset := preprocessor.ExtractHeaderAndBody(raw)
+	if bodyOffset == 0 {
+		return unifiederrors.ParseError("script must have a header with '---' separator")
+	}
+
+	result, hasHeader, outputMimeType, context, err := evaluateWithContext(raw, additionalContext, opts)
+	if err != nil {
+		return err
+	}
+
+	result, err = ResolveResult(result)
+	if err != nil {
+		return err
+	}
+
+	return formatOutputWithContext(result, hasHeader, outputMimeType, context)
+}
+
+// RunString executes an infomunge script from a string with optional additional context.
+// The additionalContext map allows injecting variables (like "payload") into the evaluation context.
+func RunString(script string, additionalContext map[string]interface{}) (interface{}, error) {
+	baseDir, err := os.Getwd()
+	if err != nil {
+		baseDir = "."
+	}
+	result, _, _, err := evaluate(script, additionalContext, RunnerOptions{BaseDir: baseDir})
+	if err != nil {
+		return nil, err
+	}
+	return ResolveResult(result)
+}
+
+// RunStringWithContextAndOptionsWithOutput executes a script and returns result plus output metadata.
+func RunStringWithContextAndOptionsWithOutput(script string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, map[string]interface{}, error) {
+	if opts.BaseDir == "" {
+		baseDir, err := os.Getwd()
+		if err != nil {
+			opts.BaseDir = "."
+		} else {
+			opts.BaseDir = baseDir
+		}
+	}
+	return evaluateWithContext(script, additionalContext, opts)
+}
+
+// evaluate is the core evaluation logic shared by all runner functions.
+func evaluate(raw string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, error) {
+	result, hasHeader, outputMimeType, _, err := evaluateWithContext(raw, additionalContext, opts)
+	return result, hasHeader, outputMimeType, err
+}
+
+// evaluateWithContext is the core evaluation logic that also returns the parsed context.
+func evaluateWithContext(raw string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, map[string]interface{}, error) {
+	header, body, bodyOffset := preprocessor.ExtractHeaderAndBody(raw)
+	hasHeader := bodyOffset != 0
+
+	loader := NewModuleLoader(opts.BaseDir)
+	context, outputMimeType, err := parseHeader(header, hasHeader, raw, loader)
+	if err != nil {
+		return nil, hasHeader, outputMimeType, nil, err
+	}
+
+	// Inject additional context (e.g., payload from -i flags)
+	for k, v := range additionalContext {
+		context[k] = v
+	}
+
+	prepOpts := preprocessor.Options{}
+	if strings.ContainsAny(body, "\n\r") {
+		prepOpts.AllowMultilineIfElse = true
+	}
+	parseableExpr, mapping, err := preprocessor.PrepareForParsing(body, prepOpts)
+	if err != nil {
+		return nil, hasHeader, outputMimeType, nil, err
+	}
+	result, err := evaluator.Evaluate(parseableExpr, context, mapping, bodyOffset, raw)
+	if err != nil {
+		return nil, hasHeader, outputMimeType, nil, err
+	}
+
+	return result, hasHeader, outputMimeType, context, nil
+}
+
+// handleOutputDecl processes output directive
+func handleOutputDecl(trimmedLine string, outputMimeType *string) {
+	*outputMimeType = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "output "))
+}
+
+// handleInputDecl processes input directive.
+func handleInputDecl(trimmedLine string, context map[string]interface{}) {
+	inputMimeType := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "input "))
+	if inputMimeType != "" {
+		context["__input_mime__"] = inputMimeType
+	}
+}
+
+// handleNamespaceDecl processes namespace declaration
+func handleNamespaceDecl(trimmedLine string, namespaces map[string]string) error {
+	prefix, uri, err := parseNamespaceDecl(trimmedLine)
+	if err != nil {
+		return err
+	}
+	namespaces[prefix] = uri
+	return nil
+}
+
+// handleVariableDecl processes variable declaration
+func handleVariableDecl(line, trimmedLine string, headerOffset int, context map[string]interface{}, fullRaw string) error {
+	val, varName, err := parseVarDecl(line, trimmedLine, headerOffset, context, fullRaw)
+	if err != nil {
+		return err
+	}
+	if varName != "" {
+		context[varName] = val
+	}
+	return nil
+}
+
+// handleFunctionDecl processes function declaration
+func handleFunctionDecl(trimmedLine string, context map[string]interface{}) error {
+	fn, fnName, err := parseFunDecl(trimmedLine, nil)
+	if err != nil {
+		return err
+	}
+	if fnName != "" {
+		context[fnName] = fn
+	}
+	return nil
+}
+
+// handleTypeDecl processes type declaration
+func handleTypeDecl(trimmedLine string, context map[string]interface{}) error {
+	typeDef, typeName, err := parseTypeDecl(trimmedLine)
+	if err != nil {
+		return err
+	}
+	if typeName != "" {
+		context[typeName] = typeDef
+	}
+	return nil
+}
+
+// parseState holds the state during header parsing
+type parseState struct {
+	context        map[string]interface{}
+	namespaces     map[string]string
+	outputMimeType *string
+	headerOffset   int
+	fullRaw        string
+	loader         *ModuleLoader
+}
+
+// directiveHandler pairs a prefix with its handler function
+type directiveHandler struct {
+	prefix  string
+	handler func(line, trimmedLine string, state *parseState) error
+}
+
+// directiveHandlers defines all header directive handlers
+var directiveHandlers = []directiveHandler{
+	{"output ", func(_, trimmed string, state *parseState) error {
+		handleOutputDecl(trimmed, state.outputMimeType)
+		return nil
+	}},
+	{"input ", func(_, trimmed string, state *parseState) error {
+		handleInputDecl(trimmed, state.context)
+		return nil
+	}},
+	{"%dw ", func(_, _ string, _ *parseState) error { return nil }},
+	{"%im ", func(_, _ string, _ *parseState) error { return nil }},
+	{"ns ", func(_, trimmed string, state *parseState) error {
+		return handleNamespaceDecl(trimmed, state.namespaces)
+	}},
+	{"import ", func(_, trimmed string, state *parseState) error {
+		return handleImport(trimmed, state.context, state.loader)
+	}},
+	{"var ", func(line, trimmed string, state *parseState) error {
+		return handleVariableDecl(line, trimmed, state.headerOffset, state.context, state.fullRaw)
+	}},
+	{"fun ", func(_, trimmed string, state *parseState) error {
+		return handleFunctionDecl(trimmed, state.context)
+	}},
+	{"type ", func(_, trimmed string, state *parseState) error {
+		return handleTypeDecl(trimmed, state.context)
+	}},
+}
+
+// directiveKeywords are the keywords that start header directives.
+var directiveKeywords = []string{"%im ", "%dw ", "output ", "input ", "var ", "fun ", "ns ", "import ", "type "}
+
+// normalizeHeader converts a single-line header into multi-line format by inserting
+// newlines before directive keywords, being careful to skip keywords inside brackets or strings.
+func normalizeHeader(header string) string {
+	// If already multi-line, return as-is
+	if strings.Contains(header, "\n") {
+		return header
+	}
+
+	var result strings.Builder
+	i := 0
+	depth := 0 // bracket depth
+	inString := false
+	stringChar := byte(0)
+
+	for i < len(header) {
+		ch := header[i]
+
+		// Track string state
+		if !inString && (ch == '"' || ch == '\'') {
+			inString = true
+			stringChar = ch
+		} else if inString && ch == stringChar && !isEscaped(header, i) {
+			inString = false
+		}
+
+		// Track bracket depth
+		if !inString {
+			if ch == '(' || ch == '[' || ch == '{' {
+				depth++
+			} else if ch == ')' || ch == ']' || ch == '}' {
+				depth--
+			}
+		}
+
+		// Check for directive keywords at depth 0, outside strings
+		if depth == 0 && !inString {
+			for _, kw := range directiveKeywords {
+				if i+len(kw) <= len(header) && header[i:i+len(kw)] == kw {
+					// Check word boundary before keyword
+					if i > 0 && !isWordBoundaryChar(header[i-1]) {
+						continue
+					}
+					// Insert newline before keyword (unless at start)
+					if result.Len() > 0 {
+						// Trim trailing space from result before adding newline
+						s := result.String()
+						result.Reset()
+						result.WriteString(strings.TrimRight(s, " "))
+						result.WriteByte('\n')
+					}
+					break
+				}
+			}
+		}
+
+		result.WriteByte(ch)
+		i++
+	}
+
+	return result.String()
+}
+
+// isWordBoundaryChar returns true if ch is a word boundary character.
+func isWordBoundaryChar(ch byte) bool {
+	return !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_')
+}
+
+// isEscaped checks if the character at position i is escaped by counting
+// consecutive backslashes before it. An odd number of backslashes means escaped.
+// Example: "hello\"" -> quote at end is escaped (1 backslash)
+// Example: "hello\\"  -> quote at end is NOT escaped (2 backslashes = escaped backslash)
+func isEscaped(s string, i int) bool {
+	backslashCount := 0
+	for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
+		backslashCount++
+	}
+	return backslashCount%2 == 1
+}
+
+func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLoader) (map[string]interface{}, string, error) {
+	context := make(map[string]interface{})
+	outputMimeType := "application/json"
+
+	if !hasHeader {
+		return context, outputMimeType, nil
+	}
+
+	// Normalize single-line headers to multi-line format
+	header = normalizeHeader(header)
+
+	state := &parseState{
+		context:        context,
+		namespaces:     make(map[string]string),
+		outputMimeType: &outputMimeType,
+		fullRaw:        fullRaw,
+		loader:         loader,
+	}
+
+	lines := strings.Split(header, "\n")
+	headerOffset := 0
+
+	for i := 0; i < len(lines); {
+		line := lines[i]
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "//") {
+			headerOffset += len(line) + 1
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(trimmedLine, "fun ") {
+			state.headerOffset = headerOffset
+			fn, fnName, consumed, err := parseFunDeclFromLines(lines, i, state.context)
+			if err != nil {
+				lineOffset := headerOffset + leadingWhitespaceOffset(line)
+				return nil, "", attachLineContext(err, fullRaw, lineOffset, line)
+			}
+			if fnName != "" {
+				state.context[fnName] = fn
+			}
+			for j := 0; j < consumed; j++ {
+				headerOffset += len(lines[i+j]) + 1
+			}
+			i += consumed
+			continue
+		}
+
+		if strings.HasPrefix(trimmedLine, "var ") {
+			state.headerOffset = headerOffset
+			val, varName, consumed, err := parseVarDeclFromLines(lines, i, state.headerOffset, state.context, state.fullRaw)
+			if err != nil {
+				lineOffset := headerOffset + leadingWhitespaceOffset(line)
+				return nil, "", attachLineContext(err, fullRaw, lineOffset, line)
+			}
+			if varName != "" {
+				state.context[varName] = val
+			}
+			for j := 0; j < consumed; j++ {
+				headerOffset += len(lines[i+j]) + 1
+			}
+			i += consumed
+			continue
+		}
+
+		// Try each handler to see if it can handle this line
+		parsed := false
+		for _, h := range directiveHandlers {
+			if strings.HasPrefix(trimmedLine, h.prefix) {
+				state.headerOffset = headerOffset
+				if err := h.handler(line, trimmedLine, state); err != nil {
+					lineOffset := headerOffset + leadingWhitespaceOffset(line)
+					return nil, "", attachLineContext(err, fullRaw, lineOffset, line)
+				}
+				parsed = true
+				break
+			}
+		}
+		if !parsed {
+			lineOffset := headerOffset + leadingWhitespaceOffset(line)
+			return nil, "", attachLineContext(unifiederrors.ParseErrorf("unrecognized header directive: %s", trimmedLine), fullRaw, lineOffset, line)
+		}
+
+		headerOffset += len(line) + 1
+		i++
+	}
+
+	// Store namespaces in context if any were declared
+	if len(state.namespaces) > 0 {
+		state.context["__namespaces__"] = state.namespaces
+	}
+
+	return state.context, *state.outputMimeType, nil
+}
+
+func formatOutput(result interface{}, hasHeader bool, mimeType string) error {
+	return formatOutputWithContext(result, hasHeader, mimeType, nil)
+}
+
+func ResolveResult(result interface{}) (interface{}, error) {
+	switch r := result.(type) {
+	case *evaluator.LazyValue:
+		resolved, err := r.GetValue()
+		if err != nil {
+			return nil, err
+		}
+		return ResolveResult(resolved)
+	case *evaluator.StreamWithError:
+		var values []interface{}
+		for val := range r.Stream {
+			values = append(values, val)
+		}
+		if err := r.WaitError(); err != nil {
+			return nil, err
+		}
+		return values, nil
+	case chan evaluator.Value:
+		var values []interface{}
+		for val := range r {
+			values = append(values, val)
+		}
+		return values, nil
+	default:
+		return result, nil
+	}
+}
+
+// formatOutputWithContext formats output with optional context (for namespaces, etc).
+func formatOutputWithContext(result interface{}, hasHeader bool, mimeType string, context map[string]interface{}) error {
+	// Check if result is a stream (lazy evaluation result)
+	switch r := result.(type) {
+	case *evaluator.StreamWithError:
+		var values []interface{}
+		for val := range r.Stream {
+			values = append(values, val)
+		}
+		if err := r.WaitError(); err != nil {
+			return err
+		}
+		result = values
+	case chan evaluator.Value:
+		var values []interface{}
+		for val := range r {
+			values = append(values, val)
+		}
+		result = values
+	}
+
+	if !hasHeader {
+		fmt.Print(result)
+		return nil
+	}
+
+	var output string
+	var err error
+
+	// If XML output and namespaces are declared in context, use them
+	if mimeType == "application/xml" && context != nil {
+		if nsMap, ok := context["__namespaces__"].(map[string]string); ok {
+			output, err = formats.FormatXMLWithNamespaces(result, nsMap)
+		} else {
+			output, err = formats.Format(result, mimeType)
+		}
+	} else {
+		output, err = formats.Format(result, mimeType)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Print(output)
+	return nil
+}

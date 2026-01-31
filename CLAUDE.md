@@ -1,0 +1,53 @@
+# AGENTS.md
+
+# Agent Instructions
+
+This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+
+## Quick Reference
+
+```bash
+bd ready              # Find available work
+bd show <id>          # View issue details
+bd update <id> --status in_progress  # Claim work
+bd close <id>         # Complete work
+bd sync               # Sync with git
+```
+
+## Landing the Plane (Session Completion)
+
+**MANDATORY WORKFLOW:**
+
+Important: use jj for version control. Never use git commands. Always commit with an appropriate message, don't call `jj new` with a message.
+
+1. **File issues for remaining work** - Create issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+3. **Update issue status** - Close finished work, update in-progress items
+4. **Run bd sync** - Ensure VCS captures issue updates
+5. **Only work on one task at a time before committing to VCS**
+6. **Clean up**
+7. **Verify** - Create an appropriate jj description and then run `jj commit -m <description>`
+8. **Hand off** - Provide context for next session
+
+### Best Practices
+
+- Check `bd ready` at session start to find available work
+- Update status as you work (in_progress → closed)
+- Create new issues with `bd create` when you discover tasks
+- Use descriptive titles and set appropriate priority/type, and dependencies between related items
+- Always `bd sync` before committing
+- Commit between finishing one beads issue and starting another
+- Use jj commit with a description, don't use jj new with a description
+- Use a 5 minute timeout when running cucumber tests
+- Do not install new software
+- Use golang only
+- Always verify new features or changes by adding a cucumber test
+- Stay within the infomunge directory, put temp files in tmp
+
+## Repo Tour
+
+- CLI entrypoint: `cmd/infomunge/main.go`, `internal/cli/app.go`
+- Runner + header parsing: `internal/runner/runner.go`
+- Preprocessor (syntax transforms): `internal/preprocessor/*`
+- Evaluator (AST + builtins + lazy): `internal/evaluator/*`
+- Formats (read/write): `pkg/formats/*`

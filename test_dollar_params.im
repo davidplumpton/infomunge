@@ -1,0 +1,4 @@
+%im 0.1
+output application/json
+---
+[1, 2, 3] map $ * 2

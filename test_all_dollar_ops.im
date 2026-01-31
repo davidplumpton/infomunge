@@ -1,0 +1,11 @@
+%im 0.1
+output application/json
+---
+{
+  "map": [1, 2, 3] map $ * 2,
+  "filter": [1, 2, 3, 4, 5] filter $ > 2,
+  "groupBy": [{"name": "A", "val": 1}, {"name": "B", "val": 1}, {"name": "C", "val": 2}] groupBy $.val,
+  "sort": [{"id": 3}, {"id": 1}, {"id": 2}] sort $.id,
+  "distinct": [1, 2, 2, 3] distinctBy $,
+  "map_with_index": [10, 20, 30] map {idx: $$, val: $}
+}

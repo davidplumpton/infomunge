@@ -1,0 +1,7 @@
+%im 0.1
+
+fun addOne(x) = do {
+  var y = x + 1
+  ---
+  y
+}

@@ -1,0 +1,788 @@
+package test
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"regexp"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/cucumber/godog"
+	"infomunge/internal/cli"
+	"infomunge/internal/runner"
+	"infomunge/pkg/formats"
+)
+
+type testContext struct {
+	lastOutput     string
+	inputContent   string
+	payloadContent string
+	payloadMime    string
+	scriptContent  string
+	serverURL      string
+	serverClose    func()
+	lastHTTPStatus int
+	timeout        time.Duration // Timeout for script execution to prevent infinite loops
+}
+
+func TestFeatures(t *testing.T) {
+	// Support filtering via environment variables:
+	//   GODOG_PATHS - comma-separated feature file paths (default: "features")
+	//   GODOG_TAGS  - tag expression to filter scenarios (e.g., "@fast", "@slow and not @wip")
+	//   GODOG_FORMAT - output format (default: "progress", options: "pretty", "cucumber", "junit")
+	//
+	// Examples:
+	//   GODOG_PATHS=features/date_time_functions.feature go test -v
+	//   GODOG_TAGS=@fast go test -v
+	//   GODOG_PATHS=features/string_functions.feature,features/array_functions.feature go test -v
+
+	paths := []string{"features"}
+	if envPaths := os.Getenv("GODOG_PATHS"); envPaths != "" {
+		paths = strings.Split(envPaths, ",")
+		for i := range paths {
+			paths[i] = strings.TrimSpace(paths[i])
+		}
+	}
+
+	format := "progress"
+	if envFormat := os.Getenv("GODOG_FORMAT"); envFormat != "" {
+		format = envFormat
+	}
+
+	opts := &godog.Options{
+		Format:   format,
+		Paths:    paths,
+		Output:   os.Stdout, // Direct output to stdout for immediate feedback
+		TestingT: t,         // Integrate with go test for real-time progress output
+	}
+
+	if tags := os.Getenv("GODOG_TAGS"); tags != "" {
+		opts.Tags = tags
+	}
+
+	suite := godog.TestSuite{
+		ScenarioInitializer: InitializeScenario,
+		Options:             opts,
+	}
+
+	if suite.Run() != 0 {
+		t.Fatal("non-zero status returned, failed to run feature tests")
+	}
+}
+
+func InitializeScenario(ctx *godog.ScenarioContext) {
+	tc := &testContext{
+		timeout: 5 * time.Second, // Default 5-second timeout for all script executions
+	}
+
+	ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
+		os.Remove("input.txt")
+		if tc.serverClose != nil {
+			tc.serverClose()
+			tc.serverClose = nil
+			tc.serverURL = ""
+		}
+		return ctx, nil
+	})
+
+	// Steps for read_file.feature
+	ctx.Step(`^a file named "([^"]*)" with content "([^"]*)"$`, tc.aFileNamedWithContent)
+	ctx.Step(`^I run the application with "([^"]*)"$`, tc.iRunTheApplicationWith)
+	ctx.Step(`^the output should contain "((?:[^"\\]|\\.)*)"$`, tc.theOutputShouldContain)
+
+	// Steps for docstring_input.feature
+	ctx.Step(`^the following input content:$`, tc.theFollowingInputContent)
+	ctx.Step(`^a script with (\d+) repeated lines$`, tc.aScriptWithRepeatedLines)
+	ctx.Step(`^I run the application with this content$`, tc.iRunTheApplicationWithThisContent)
+	ctx.Step(`^I run the application and it fails$`, tc.iRunTheApplicationAndItFails)
+	ctx.Step(`^the output should be:$`, tc.theOutputShouldBe)
+	ctx.Step(`^the error should contain "([^"]*)"$`, tc.theOutputShouldContain)
+	ctx.Step(`^the application should fail with error containing "([^"]*)"$`, tc.theApplicationShouldFailWithErrorContaining)
+
+	// Steps for typed input data (xr3 refactoring)
+	ctx.Step(`^the following XML input:$`, tc.theFollowingXMLInput)
+	ctx.Step(`^the following JSON input:$`, tc.theFollowingJSONInput)
+	ctx.Step(`^the following CSV input:$`, tc.theFollowingCSVInput)
+	ctx.Step(`^the following YAML input:$`, tc.theFollowingYAMLInput)
+	ctx.Step(`^the following properties input:$`, tc.theFollowingPropertiesInput)
+	ctx.Step(`^the following script:$`, tc.theFollowingScript)
+	ctx.Step(`^I run the script$`, tc.iRunTheScript)
+	ctx.Step(`^running the script should fail with error containing "([^"]*)"$`, tc.runningTheScriptShouldFailWithErrorContaining)
+
+	// Additional step for JSON input with script from input content
+	ctx.Step(`^I run the application with this JSON input:$`, tc.iRunTheApplicationWithThisJSONInput)
+
+	// Steps for lambda expressions
+	ctx.Step(`^the output should contain a lambda function$`, tc.theOutputShouldContainLambda)
+
+	// Steps for optional "run" subcommand
+	ctx.Step(`^I run the application with the run subcommand$`, tc.iRunTheApplicationWithRunSubcommand)
+
+	// Steps for filter operator
+	ctx.Step(`^the output should be valid JSON$`, tc.theOutputShouldBeValidJSON)
+	ctx.Step(`^the output should be valid JSON with array length of (\d+)$`, tc.theOutputShouldBeValidJSONWithArrayLength)
+	ctx.Step(`^the output should be valid JSON with (\d+) keys$`, tc.theOutputShouldBeValidJSONWithKeys)
+	ctx.Step(`^the output should not contain "((?:[^"\\]|\\.)*)"$`, tc.theOutputShouldNotContain)
+	ctx.Step(`^the output should contain an error$`, tc.theOutputShouldContainError)
+	ctx.Step(`^the output should be valid JSON with number: (\d+)$`, tc.theOutputShouldBeValidJSONWithNumber)
+	ctx.Step(`^the output should be valid JSON with number close to (-?\d+(?:\.\d+)?)$`, tc.theOutputShouldBeValidJSONWithNumberCloseTo)
+	ctx.Step(`^the output should be valid JSON boolean$`, tc.theOutputShouldBeValidJSONBoolean)
+	ctx.Step(`^the output should be true$`, tc.theOutputShouldBeTrue)
+	ctx.Step(`^the output should be false$`, tc.theOutputShouldBeFalse)
+	ctx.Step(`^the output should be null$`, tc.theOutputShouldBeNull)
+	ctx.Step(`^the output should be "([^"]*)"$`, tc.theOutputShouldBeString)
+
+	// Steps for namespace support
+	ctx.Step(`^the output should contain:$`, tc.theOutputShouldContainDocstring)
+
+	// Step for setting timeout
+	ctx.Step(`^I set the execution timeout to (\d+) seconds$`, tc.iSetTheExecutionTimeoutToSeconds)
+
+	// Steps for quick evaluation (date_formatting.feature)
+	ctx.Step(`^the input "([^"]*)"$`, tc.theInputString)
+	ctx.Step(`^the input (-?\d+(?:\.\d+)?)$`, tc.theInputNumber)
+	ctx.Step(`^I evaluate "([^"]*)"$`, tc.iEvaluate)
+	ctx.Step(`^the result should be "([^"]*)"$`, tc.theOutputShouldBeString)
+	ctx.Step(`^the result should be (\d+)$`, tc.theOutputShouldBeValidJSONWithNumber)
+	ctx.Step(`^the result should match "([^"]*)"$`, tc.theOutputShouldMatchRegex)
+	ctx.Step(`^the script:$`, tc.theFollowingScript)
+	ctx.Step(`^I execute the script$`, tc.iRunTheScript)
+
+	// Steps for server playground
+	ctx.Step(`^the server is running$`, tc.theServerIsRunning)
+	ctx.Step(`^I request the playground page$`, tc.iRequestThePlaygroundPage)
+	ctx.Step(`^the response status should be (\d+)$`, tc.theResponseStatusShouldBe)
+	ctx.Step(`^I run the server script without specifying output$`, tc.iRunTheServerScriptWithoutOutput)
+	ctx.Step(`^I run the server script with output "([^"]*)"$`, tc.iRunTheServerScriptWithOutput)
+}
+
+// Existing steps
+func (tc *testContext) aFileNamedWithContent(fileName, content string) error {
+	return os.WriteFile(fileName, []byte(content), 0644)
+}
+
+func (tc *testContext) iRunTheApplicationWith(arg string) error {
+	// Build the application
+	buildCmd := exec.Command("go", "build", "-o", "infomunge", "../cmd/infomunge/main.go")
+	if err := buildCmd.Run(); err != nil {
+		return fmt.Errorf("failed to build app: %v", err)
+	}
+
+	cmd := exec.Command("./infomunge", "-f", arg)
+	output, err := cmd.CombinedOutput()
+	tc.lastOutput = string(output)
+	if err != nil {
+		return fmt.Errorf("app failed: %v, output: %s", err, tc.lastOutput)
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldContain(expected string) error {
+	// Unquote if the string contains escaped quotes (common in Gherkin steps)
+	if strings.Contains(expected, `\"`) {
+		unquoted, err := strconv.Unquote(`"` + expected + `"`)
+		if err == nil {
+			expected = unquoted
+		}
+	}
+
+	if !strings.Contains(tc.lastOutput, expected) {
+		return fmt.Errorf("expected output to contain %q, but got %q", expected, tc.lastOutput)
+	}
+	return nil
+}
+
+// New steps for docstrings
+func (tc *testContext) theFollowingInputContent(content *godog.DocString) error {
+	tc.inputContent = content.Content
+	return nil
+}
+
+func (tc *testContext) aScriptWithRepeatedLines(count int) error {
+	if count <= 0 {
+		return fmt.Errorf("line count must be positive, got %d", count)
+	}
+	builder := strings.Builder{}
+	builder.WriteString("%im 0.1\n")
+	builder.WriteString("output application/json\n")
+	builder.WriteString("---\n")
+	for i := 0; i < count; i++ {
+		builder.WriteString("1 + 1\n")
+	}
+	tc.inputContent = builder.String()
+	return nil
+}
+
+func (tc *testContext) iRunTheApplicationWithThisContent() error {
+	// Write inputContent to a temp file
+	if err := os.WriteFile("input.txt", []byte(tc.inputContent), 0644); err != nil {
+		return err
+	}
+	return tc.iRunTheApplicationWith("input.txt")
+}
+
+func (tc *testContext) iRunTheApplicationAndItFails() error {
+	if err := os.WriteFile("input.txt", []byte(tc.inputContent), 0644); err != nil {
+		return err
+	}
+	// Build the application
+	buildCmd := exec.Command("go", "build", "-o", "infomunge", "../cmd/infomunge/main.go")
+	if err := buildCmd.Run(); err != nil {
+		return fmt.Errorf("failed to build app: %v", err)
+	}
+
+	cmd := exec.Command("./infomunge", "-f", "input.txt")
+	output, _ := cmd.CombinedOutput()
+	tc.lastOutput = string(output)
+	return nil
+}
+
+func (tc *testContext) iRunTheApplicationWithRunSubcommand() error {
+	if err := os.WriteFile("input.txt", []byte(tc.inputContent), 0644); err != nil {
+		return err
+	}
+	// Build the application
+	buildCmd := exec.Command("go", "build", "-o", "infomunge", "../cmd/infomunge/main.go")
+	if err := buildCmd.Run(); err != nil {
+		return fmt.Errorf("failed to build app: %v", err)
+	}
+
+	cmd := exec.Command("./infomunge", "run", "-f", "input.txt")
+	output, err := cmd.CombinedOutput()
+	tc.lastOutput = string(output)
+	if err != nil {
+		return fmt.Errorf("app failed: %v, output: %s", err, tc.lastOutput)
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldBe(expected *godog.DocString) error {
+	if tc.lastOutput != expected.Content {
+		return fmt.Errorf("expected output:\n%s\n\nbut got:\n%s", expected.Content, tc.lastOutput)
+	}
+	return nil
+}
+
+func (tc *testContext) theApplicationShouldFailWithErrorContaining(expected string) error {
+	if err := os.WriteFile("input.txt", []byte(tc.inputContent), 0644); err != nil {
+		return err
+	}
+	buildCmd := exec.Command("go", "build", "-o", "infomunge", "../cmd/infomunge/main.go")
+	if err := buildCmd.Run(); err != nil {
+		return fmt.Errorf("failed to build app: %v", err)
+	}
+
+	cmd := exec.Command("./infomunge", "-f", "input.txt")
+	output, err := cmd.CombinedOutput()
+	tc.lastOutput = string(output)
+	if err == nil {
+		return fmt.Errorf("expected application to fail, but it succeeded with output: %s", tc.lastOutput)
+	}
+	if !strings.Contains(tc.lastOutput, expected) {
+		return fmt.Errorf("expected error to contain %q, but got: %s", expected, tc.lastOutput)
+	}
+	return nil
+}
+
+// Typed input step definitions for xr3 refactoring
+func (tc *testContext) theFollowingXMLInput(content *godog.DocString) error {
+	tc.payloadContent = content.Content
+	tc.payloadMime = "application/xml"
+	return nil
+}
+
+func (tc *testContext) theFollowingJSONInput(content *godog.DocString) error {
+	tc.payloadContent = content.Content
+	tc.payloadMime = "application/json"
+	return nil
+}
+
+func (tc *testContext) theFollowingCSVInput(content *godog.DocString) error {
+	tc.payloadContent = content.Content
+	tc.payloadMime = "application/csv"
+	return nil
+}
+
+func (tc *testContext) theFollowingYAMLInput(content *godog.DocString) error {
+	tc.payloadContent = content.Content
+	tc.payloadMime = "application/yaml"
+	return nil
+}
+
+func (tc *testContext) theFollowingPropertiesInput(content *godog.DocString) error {
+	tc.payloadContent = content.Content
+	tc.payloadMime = "text/x-java-properties"
+	return nil
+}
+
+func (tc *testContext) theFollowingScript(content *godog.DocString) error {
+	tc.scriptContent = content.Content
+	return nil
+}
+
+func (tc *testContext) iRunTheScript() error {
+	// Build context with payload
+	ctx := make(map[string]interface{})
+
+	// Parse and inject payload if mime type was set (input step was called)
+	if tc.payloadMime != "" {
+		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
+		if err != nil {
+			return fmt.Errorf("failed to parse payload: %v", err)
+		}
+		ctx["payload"] = payload
+	}
+
+	// Run the script with timeout protection
+	return tc.runScriptWithTimeout(tc.scriptContent, ctx)
+}
+
+func (tc *testContext) runningTheScriptShouldFailWithErrorContaining(expected string) error {
+	// Build context with payload
+	ctx := make(map[string]interface{})
+
+	// Parse and inject payload if mime type was set (input step was called)
+	if tc.payloadMime != "" {
+		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
+		if err != nil {
+			// If parsing fails with expected error, that's the error we're looking for
+			if strings.Contains(err.Error(), expected) {
+				return nil
+			}
+			return fmt.Errorf("payload parsing failed with unexpected error: %v", err)
+		}
+		ctx["payload"] = payload
+	}
+
+	// Inject deadline into context for while loop timeout detection
+	ctx["__deadline"] = time.Now().Add(tc.timeout)
+
+	// Run the script with injected context
+	_, err := runner.RunString(tc.scriptContent, ctx)
+	if err == nil {
+		return fmt.Errorf("expected script to fail, but it succeeded")
+	}
+
+	if !strings.Contains(err.Error(), expected) {
+		return fmt.Errorf("expected error to contain %q, but got: %v", expected, err)
+	}
+
+	return nil
+}
+
+func (tc *testContext) iRunTheApplicationWithThisJSONInput(jsonInput *godog.DocString) error {
+	// Build context with payload
+	ctx := make(map[string]interface{})
+
+	// Parse JSON input as payload
+	payload, err := formats.Read(jsonInput.Content, "application/json")
+	if err != nil {
+		return fmt.Errorf("failed to parse JSON input: %v", err)
+	}
+	ctx["payload"] = payload
+
+	// Run the script with timeout protection
+	return tc.runScriptWithTimeout(tc.inputContent, ctx)
+}
+
+func (tc *testContext) theOutputShouldContainLambda() error {
+	trimmed := strings.TrimSpace(tc.lastOutput)
+	if trimmed == "" {
+		return fmt.Errorf("expected lambda expression output, but got empty output")
+	}
+	if strings.Contains(trimmed, "error") || strings.Contains(trimmed, "Error") {
+		return fmt.Errorf("expected lambda expression to evaluate without error, but got: %s", tc.lastOutput)
+	}
+
+	// Lambda functions are often serialized as a JSON string like: "(lambda: [x] => x + 1)"
+	decoded := trimmed
+	if strings.HasPrefix(decoded, "\"") && strings.HasSuffix(decoded, "\"") {
+		if unquoted, err := strconv.Unquote(decoded); err == nil {
+			decoded = unquoted
+		}
+	}
+
+	if strings.Contains(decoded, "(lambda:") && strings.Contains(decoded, "=>") {
+		return nil
+	}
+
+	// Some outputs fall back to Go's default struct formatting for lambdas.
+	if strings.HasPrefix(trimmed, "&{[") && strings.Contains(trimmed, "map[") {
+		return nil
+	}
+
+	if !strings.Contains(decoded, "(lambda:") || !strings.Contains(decoded, "=>") {
+		return fmt.Errorf("expected output to contain lambda representation, but got: %s", tc.lastOutput)
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldBeValidJSON() error {
+	// Parse output as JSON to verify it's valid
+	var result interface{}
+	if err := json.Unmarshal([]byte(tc.lastOutput), &result); err != nil {
+		return fmt.Errorf("expected valid JSON, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldBeValidJSONWithArrayLength(lengthStr string) error {
+	// Parse output as JSON to verify it's valid and is an array of expected length
+	var arr []interface{}
+	if err := json.Unmarshal([]byte(tc.lastOutput), &arr); err != nil {
+		return fmt.Errorf("expected valid JSON array, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
+	}
+
+	expectedLen, err := strconv.Atoi(lengthStr)
+	if err != nil {
+		return fmt.Errorf("invalid expected length: %v", err)
+	}
+
+	if len(arr) != expectedLen {
+		return fmt.Errorf("expected array of length %d, but got %d", expectedLen, len(arr))
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldNotContain(notExpected string) error {
+	// Unquote if the string contains escaped quotes
+	if strings.Contains(notExpected, `\"`) {
+		unquoted, err := strconv.Unquote(`"` + notExpected + `"`)
+		if err == nil {
+			notExpected = unquoted
+		}
+	}
+
+	if strings.Contains(tc.lastOutput, notExpected) {
+		return fmt.Errorf("expected output to not contain %q, but it did. Output: %s", notExpected, tc.lastOutput)
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldBeValidJSONWithKeys(keysStr string) error {
+	var obj map[string]interface{}
+	if err := json.Unmarshal([]byte(tc.lastOutput), &obj); err != nil {
+		return fmt.Errorf("expected valid JSON object, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
+	}
+
+	expectedKeys, err := strconv.Atoi(keysStr)
+	if err != nil {
+		return fmt.Errorf("invalid expected key count: %v", err)
+	}
+
+	if len(obj) != expectedKeys {
+		return fmt.Errorf("expected object with %d keys, but got %d", expectedKeys, len(obj))
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldContainError() error {
+	// Check if the output contains an error message (when the app fails)
+	// The application should have failed and produced an error
+	if !strings.Contains(tc.lastOutput, "error") && !strings.Contains(tc.lastOutput, "Error") {
+		return fmt.Errorf("expected output to contain an error, but got: %s", tc.lastOutput)
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldContainDocstring(content *godog.DocString) error {
+	if !strings.Contains(tc.lastOutput, content.Content) {
+		return fmt.Errorf("expected output to contain:\n%s\n\nbut got:\n%s", content.Content, tc.lastOutput)
+	}
+	return nil
+}
+
+// iSetTheExecutionTimeoutToSeconds sets the timeout for script execution
+func (tc *testContext) iSetTheExecutionTimeoutToSeconds(seconds string) error {
+	secInt, err := strconv.Atoi(seconds)
+	if err != nil {
+		return fmt.Errorf("invalid timeout value: %v", err)
+	}
+	tc.timeout = time.Duration(secInt) * time.Second
+	return nil
+}
+
+// theOutputShouldBeValidJSONWithNumber validates that the output is a specific JSON number
+func (tc *testContext) theOutputShouldBeValidJSONWithNumber(numStr string) error {
+	var num interface{}
+	if err := json.Unmarshal([]byte(tc.lastOutput), &num); err != nil {
+		return fmt.Errorf("expected valid JSON number, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
+	}
+
+	expectedNum, err := strconv.Atoi(numStr)
+	if err != nil {
+		return fmt.Errorf("invalid expected number: %v", err)
+	}
+
+	switch v := num.(type) {
+	case float64:
+		if int(v) != expectedNum {
+			return fmt.Errorf("expected number %d, but got %v", expectedNum, v)
+		}
+		return nil
+	default:
+		return fmt.Errorf("expected JSON number, but got %T: %v", num, num)
+	}
+}
+
+func (tc *testContext) theOutputShouldBeValidJSONWithNumberCloseTo(numStr string) error {
+	var num interface{}
+	if err := json.Unmarshal([]byte(tc.lastOutput), &num); err != nil {
+		return fmt.Errorf("expected valid JSON number, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
+	}
+
+	expectedNum, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		return fmt.Errorf("invalid expected number: %v", err)
+	}
+
+	switch v := num.(type) {
+	case float64:
+		const tol = 1e-9
+		diff := math.Abs(v - expectedNum)
+		if diff > tol && diff > math.Abs(expectedNum)*tol {
+			return fmt.Errorf("expected number close to %v, but got %v", expectedNum, v)
+		}
+		return nil
+	default:
+		return fmt.Errorf("expected JSON number, but got %T: %v", num, num)
+	}
+}
+
+func (tc *testContext) theOutputShouldBeValidJSONBoolean() error {
+	var value interface{}
+	if err := json.Unmarshal([]byte(tc.lastOutput), &value); err != nil {
+		return fmt.Errorf("expected valid JSON boolean, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
+	}
+
+	if _, ok := value.(bool); !ok {
+		return fmt.Errorf("expected JSON boolean, but got %T: %v", value, value)
+	}
+	return nil
+}
+
+// runScriptWithTimeout runs a script with the configured timeout
+func (tc *testContext) runScriptWithTimeout(scriptContent string, additionalContext map[string]interface{}) error {
+	type runResult struct {
+		result    interface{}
+		hasHeader bool
+		mimeType  string
+		context   map[string]interface{}
+	}
+	resultChan := make(chan runResult, 1)
+	errChan := make(chan error, 1)
+
+	// Inject deadline into context for while loop timeout detection
+	if additionalContext == nil {
+		additionalContext = make(map[string]interface{})
+	}
+	additionalContext["__deadline"] = time.Now().Add(tc.timeout)
+
+	// Run script in a goroutine
+	go func() {
+		result, hasHeader, mimeType, context, err := runner.RunStringWithContextAndOptionsWithOutput(scriptContent, additionalContext, runner.RunnerOptions{})
+		if err != nil {
+			errChan <- err
+		} else {
+			resolved, err := runner.ResolveResult(result)
+			if err != nil {
+				errChan <- err
+			} else {
+				resultChan <- runResult{resolved, hasHeader, mimeType, context}
+			}
+		}
+	}()
+
+	// Wait for result with timeout
+	select {
+	case res := <-resultChan:
+		var output string
+		var err error
+
+		// If XML output and namespaces are declared in context, use them
+		if res.mimeType == "application/xml" && res.context != nil {
+			if nsMap, ok := res.context["__namespaces__"].(map[string]string); ok {
+				output, err = formats.FormatXMLWithNamespaces(res.result, nsMap)
+			} else {
+				output, err = formats.Format(res.result, res.mimeType)
+			}
+		} else {
+			output, err = formats.Format(res.result, res.mimeType)
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to format output: %v", err)
+		}
+		tc.lastOutput = output
+		return nil
+	case err := <-errChan:
+		return err
+	case <-time.After(tc.timeout):
+		return fmt.Errorf("script execution timed out after %v (possible infinite loop)", tc.timeout)
+	}
+}
+
+func (tc *testContext) theOutputShouldBeTrue() error {
+	trimmed := strings.TrimSpace(tc.lastOutput)
+	if trimmed != "true" {
+		return fmt.Errorf("expected output to be 'true', but got '%s'", trimmed)
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldBeFalse() error {
+	trimmed := strings.TrimSpace(tc.lastOutput)
+	if trimmed != "false" {
+		return fmt.Errorf("expected output to be 'false', but got '%s'", trimmed)
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldBeNull() error {
+	trimmed := strings.TrimSpace(tc.lastOutput)
+	if trimmed != "null" {
+		return fmt.Errorf("expected output to be 'null', but got '%s'", trimmed)
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldBeString(expected string) error {
+	trimmed := strings.TrimSpace(tc.lastOutput)
+	// The output might be JSON-quoted, so check both raw and quoted forms
+	if trimmed == expected || trimmed == fmt.Sprintf("%q", expected) {
+		return nil
+	}
+	return fmt.Errorf("expected output to be %q, but got '%s'", expected, trimmed)
+}
+
+func (tc *testContext) theInputString(input string) error {
+	tc.payloadContent = input
+	tc.payloadMime = "text/plain"
+	return nil
+}
+
+func (tc *testContext) theInputNumber(input string) error {
+	tc.payloadContent = input
+	tc.payloadMime = "application/json" // Numbers are valid JSON
+	return nil
+}
+
+func (tc *testContext) iEvaluate(expression string) error {
+	tc.scriptContent = fmt.Sprintf("%%dw 2.0\noutput application/json\n---\n%s", expression)
+	return tc.iRunTheScript()
+}
+
+func (tc *testContext) theOutputShouldMatchRegex(pattern string) error {
+	trimmed := strings.TrimSpace(tc.lastOutput)
+	// Unquote if it's a JSON string
+	if strings.HasPrefix(trimmed, "\"") && strings.HasSuffix(trimmed, "\"") {
+		if unquoted, err := strconv.Unquote(trimmed); err == nil {
+			trimmed = unquoted
+		}
+	}
+
+	matched, err := regexp.MatchString(pattern, trimmed)
+	if err != nil {
+		return fmt.Errorf("invalid regex pattern %q: %v", pattern, err)
+	}
+	if !matched {
+		return fmt.Errorf("expected output %q to match pattern %q", trimmed, pattern)
+	}
+	return nil
+}
+
+func (tc *testContext) theServerIsRunning() error {
+	if tc.serverClose != nil {
+		return nil
+	}
+	app := cli.NewApp()
+	config := &cli.Config{
+		Lazy: false,
+	}
+	server := httptest.NewServer(app.ServerHandler(config))
+	tc.serverURL = server.URL
+	tc.serverClose = server.Close
+	return nil
+}
+
+func (tc *testContext) iRunTheServerScriptWithoutOutput() error {
+	return tc.runServerScript(nil)
+}
+
+func (tc *testContext) iRunTheServerScriptWithOutput(output string) error {
+	return tc.runServerScript(&output)
+}
+
+func (tc *testContext) runServerScript(output *string) error {
+	if tc.serverURL == "" {
+		return fmt.Errorf("server is not running")
+	}
+	if strings.TrimSpace(tc.scriptContent) == "" {
+		return fmt.Errorf("script is not set")
+	}
+
+	payload := map[string]interface{}{
+		"script": tc.scriptContent,
+	}
+	if output != nil {
+		payload["output"] = *output
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	resp, err := http.Post(tc.serverURL+"/run", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to request /run: %v", err)
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %v", err)
+	}
+	tc.lastHTTPStatus = resp.StatusCode
+	tc.lastOutput = string(responseBody)
+	return nil
+}
+
+func (tc *testContext) iRequestThePlaygroundPage() error {
+	if tc.serverURL == "" {
+		return fmt.Errorf("server is not running")
+	}
+	resp, err := http.Get(tc.serverURL + "/")
+	if err != nil {
+		return fmt.Errorf("failed to request playground page: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %v", err)
+	}
+	tc.lastHTTPStatus = resp.StatusCode
+	tc.lastOutput = string(body)
+	return nil
+}
+
+func (tc *testContext) theResponseStatusShouldBe(statusCode string) error {
+	expected, err := strconv.Atoi(statusCode)
+	if err != nil {
+		return fmt.Errorf("invalid status code: %v", err)
+	}
+	if tc.lastHTTPStatus != expected {
+		return fmt.Errorf("expected status %d, got %d", expected, tc.lastHTTPStatus)
+	}
+	return nil
+}

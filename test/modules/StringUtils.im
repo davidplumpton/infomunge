@@ -1,0 +1,6 @@
+%im 0.1
+
+var prefix = "Hello, "
+
+fun greet(name) = prefix + name
+fun shout(msg) = toUpper(msg)

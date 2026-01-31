@@ -1,0 +1,4 @@
+%im 0.1
+output application/json
+---
+"hello".name

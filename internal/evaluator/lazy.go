@@ -1,0 +1,195 @@
+package evaluator
+
+import (
+	"context"
+	unifiederrors "infomunge/internal/errors"
+)
+
+// Stream represents a lazy stream of values.
+type Stream chan Value
+
+// StreamWithError wraps a stream with an error channel for lazy evaluation.
+type StreamWithError struct {
+	Stream chan Value
+	Err    chan error
+}
+
+// WaitError drains the error channel and returns the first error found, if any.
+func (s *StreamWithError) WaitError() error {
+	if s == nil || s.Err == nil {
+		return nil
+	}
+	for err := range s.Err {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func streamFromValue(val Value) (chan Value, <-chan error, bool) {
+	switch v := val.(type) {
+	case Stream:
+		return chan Value(v), nil, true
+	case chan Value:
+		return v, nil, true
+	case *StreamWithError:
+		if v == nil {
+			return nil, nil, false
+		}
+		return v.Stream, v.Err, true
+	default:
+		return nil, nil, false
+	}
+}
+
+func sendErrOnce(errCh chan error, err error) {
+	if err == nil || errCh == nil {
+		return
+	}
+	select {
+	case errCh <- err:
+	default:
+	}
+}
+
+// LazyMap applies a lambda function to each element of a lazy stream, returning a new lazy stream.
+func LazyMap(input *LazyValue, lambda *Lambda, evalCtx Context) *LazyValue {
+	return NewLazyValue(func(ctx context.Context) (Value, error) {
+		inputVal, err := input.GetValue()
+		if err != nil {
+			return nil, err
+		}
+		inputStream, inputErr, ok := streamFromValue(inputVal)
+		if !ok {
+			return nil, unifiederrors.EvalError("lazyMap input must be a stream")
+		}
+
+		output := make(chan Value)
+		errCh := make(chan error, 1)
+		go func() {
+			defer close(output)
+			defer close(errCh)
+			for val := range inputStream {
+				// Apply lambda to the value
+				result, err := applyLambda(lambda, val, evalCtx, 0)
+				if err != nil {
+					sendErrOnce(errCh, err)
+					for range inputStream {
+					}
+					break
+				}
+				select {
+				case output <- result:
+				case <-ctx.Done():
+					return
+				}
+			}
+			if inputErr != nil {
+				for err := range inputErr {
+					if err != nil {
+						sendErrOnce(errCh, err)
+						break
+					}
+				}
+			}
+		}()
+		return &StreamWithError{Stream: output, Err: errCh}, nil
+	}, GetGoContext(evalCtx))
+}
+
+// LazyFilter filters elements of a lazy stream using a predicate lambda, returning a new lazy stream.
+func LazyFilter(input *LazyValue, lambda *Lambda, evalCtx Context) *LazyValue {
+	return NewLazyValue(func(ctx context.Context) (Value, error) {
+		inputVal, err := input.GetValue()
+		if err != nil {
+			return nil, err
+		}
+		inputStream, inputErr, ok := streamFromValue(inputVal)
+		if !ok {
+			return nil, unifiederrors.EvalError("lazyFilter input must be a stream")
+		}
+
+		output := make(chan Value)
+		errCh := make(chan error, 1)
+		go func() {
+			defer close(output)
+			defer close(errCh)
+			for val := range inputStream {
+				// Apply predicate
+				predVal, err := applyLambda(lambda, val, evalCtx, 0)
+				if err != nil {
+					sendErrOnce(errCh, err)
+					for range inputStream {
+					}
+					break
+				}
+				pred, ok := predVal.(bool)
+				if !ok || !pred {
+					continue
+				}
+				select {
+				case output <- val:
+				case <-ctx.Done():
+					return
+				}
+			}
+			if inputErr != nil {
+				for err := range inputErr {
+					if err != nil {
+						sendErrOnce(errCh, err)
+						break
+					}
+				}
+			}
+		}()
+		return &StreamWithError{Stream: output, Err: errCh}, nil
+	}, GetGoContext(evalCtx))
+}
+
+// LazyReduce aggregates a lazy stream using a lambda function and an initial value.
+func LazyReduce(input *LazyValue, lambda *Lambda, initial Value, evalCtx Context) *LazyValue {
+	return NewLazyValue(func(ctx context.Context) (Value, error) {
+		inputVal, err := input.GetValue()
+		if err != nil {
+			return nil, err
+		}
+		inputStream, inputErr, ok := streamFromValue(inputVal)
+		if !ok {
+			return nil, unifiederrors.EvalError("lazyReduce input must be a stream")
+		}
+
+		acc := initial
+		for val := range inputStream {
+			// Apply lambda(acc, val)
+			result, err := applyLambdaReduce(lambda, acc, val, evalCtx, 0)
+			if err != nil {
+				return nil, err
+			}
+			acc = result
+		}
+		if inputErr != nil {
+			for err := range inputErr {
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+		return acc, nil
+	}, GetGoContext(evalCtx))
+}
+
+// applyLambda applies a lambda to a single argument.
+func applyLambda(lambda *Lambda, arg Value, ctx Context, depth int) (Value, error) {
+	lambdaContext := copyContext(ctx)
+	lambdaContext[lambda.ParamName(0)] = arg
+	return evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+}
+
+// applyLambdaReduce applies a lambda to accumulator and current value for reduce.
+func applyLambdaReduce(lambda *Lambda, acc Value, val Value, ctx Context, depth int) (Value, error) {
+	lambdaContext := copyContext(ctx)
+	lambdaContext[lambda.ParamName(0)] = acc
+	lambdaContext[lambda.ParamName(1)] = val
+	return evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+}

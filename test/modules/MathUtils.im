@@ -1,0 +1,15 @@
+%im 0.1
+
+var scale = 10
+var offset = 5
+var settings =
+  {
+    scale: 10,
+    offset: 5
+  }
+
+fun double(x) = x * 2
+fun triple(x) = x * 3
+fun addOffset(x) = x + offset
+fun scaleAndAdd(x) = (x * scale) + offset
+fun scaleAndAddSettings(x) = (x * settings.scale) + settings.offset
