@@ -21,9 +21,9 @@ Feature: Playground webapp
     When I request the playground page
     Then the response status should be 200
     And the output should contain "example-picker"
-    And the output should contain "Group totals by type"
-    And the output should contain "Filter active users"
-    And the output should contain "Combine two inputs"
+    And the output should contain "Revenue dashboard"
+    And the output should contain "Inventory export to CSV"
+    And the output should contain "Customer 360"
 
   Scenario: Run endpoint defaults to header output when output is omitted
     Given the server is running

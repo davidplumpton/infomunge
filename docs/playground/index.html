@@ -208,23 +208,27 @@ payload</textarea>
 
       const examples = [
         {
-          id: "group-report",
-          name: "Group totals by type",
+          id: "revenue-dashboard",
+          name: "Revenue dashboard (grouping + maxBy)",
           output: "",
           script:
             "%im 0.1\n" +
             "fun sum(nums) = nums reduce (acc, n) -> acc + n\n" +
-            "output application/xml\n" +
+            "output application/json\n" +
             "---\n" +
             "{\n" +
-            "  report @(generated: \"true\"): {\n" +
-            "    types: payload\n" +
-            "      groupBy (t) -> t.type\n" +
-            "      mapObject (v, k) -> [k, {\n" +
-            "        count: sizeOf(v),\n" +
-            "        total: sum(v map (e) -> e.amount)\n" +
-            "      }]\n" +
-            "  }\n" +
+            "  totals: {\n" +
+            "    orders: sizeOf(payload),\n" +
+            "    revenue: sum(payload map (o) -> o.total)\n" +
+            "  },\n" +
+            "  byRegion: payload\n" +
+            "    groupBy (o) -> o.region\n" +
+            "    mapObject (v, k) -> [k, {\n" +
+            "      orders: sizeOf(v),\n" +
+            "      revenue: sum(v map (o) -> o.total),\n" +
+            "      topSku: (v maxBy (o) -> o.total).sku\n" +
+            "    }],\n" +
+            "  flagged: payload filter (o) -> o.total > 1000\n" +
             "}\n",
           inputs: [
             {
@@ -232,61 +236,76 @@ payload</textarea>
               format: "json",
               content:
                 "[\n" +
-                "  {\"type\": \"A\", \"amount\": 10},\n" +
-                "  {\"type\": \"B\", \"amount\": 4},\n" +
-                "  {\"type\": \"A\", \"amount\": 6},\n" +
-                "  {\"type\": \"B\", \"amount\": 1}\n" +
+                "  {\"id\": \"A100\", \"region\": \"North\", \"sku\": \"BK-42\", \"total\": 2200},\n" +
+                "  {\"id\": \"A101\", \"region\": \"North\", \"sku\": \"BK-17\", \"total\": 180},\n" +
+                "  {\"id\": \"B200\", \"region\": \"West\", \"sku\": \"GL-55\", \"total\": 1250},\n" +
+                "  {\"id\": \"C300\", \"region\": \"West\", \"sku\": \"GL-55\", \"total\": 480},\n" +
+                "  {\"id\": \"D400\", \"region\": \"East\", \"sku\": \"ST-01\", \"total\": 640}\n" +
                 "]\n",
             },
           ],
         },
         {
-          id: "active-users",
-          name: "Filter active users",
+          id: "inventory-csv",
+          name: "Inventory export to CSV",
           output: "",
           script:
             "%im 0.1\n" +
-            "output application/json\n" +
+            "output text/csv\n" +
             "---\n" +
-            "payload\n" +
-            "  filter (u) -> u.active\n" +
-            "  map (u) -> {id: u.id, email: u.email}\n",
+            "payload map (p) -> {\n" +
+            "  sku: p.sku,\n" +
+            "  status: if (p.onHand > p.reorderPoint) \"ok\" else \"reorder\",\n" +
+            "  value: p.onHand * p.unitCost\n" +
+            "}\n",
           inputs: [
             {
               name: "payload",
               format: "json",
               content:
                 "[\n" +
-                "  {\"id\": 1, \"email\": \"a@example.com\", \"active\": true},\n" +
-                "  {\"id\": 2, \"email\": \"b@example.com\", \"active\": false},\n" +
-                "  {\"id\": 3, \"email\": \"c@example.com\", \"active\": true}\n" +
+                "  {\"sku\": \"BK-42\", \"onHand\": 120, \"reorderPoint\": 50, \"unitCost\": 12.5},\n" +
+                "  {\"sku\": \"GL-55\", \"onHand\": 20, \"reorderPoint\": 35, \"unitCost\": 48.0},\n" +
+                "  {\"sku\": \"ST-01\", \"onHand\": 8, \"reorderPoint\": 10, \"unitCost\": 210.0}\n" +
                 "]\n",
             },
           ],
         },
         {
-          id: "join-inputs",
-          name: "Combine two inputs",
+          id: "customer-merge",
+          name: "Customer 360 (merge two inputs)",
           output: "",
           script:
             "%im 0.1\n" +
             "output application/json\n" +
             "---\n" +
-            "payload map (item) -> item ++ {totalUSD: item.amount * rates.usd}\n",
+            "profiles map (p) ->\n" +
+            "  p ++ {\n" +
+            "    lastLogin: (activity filter (a) -> a.userId == p.id)[0].lastLogin,\n" +
+            "    events: sizeOf(activity filter (a) -> a.userId == p.id)\n" +
+            "  }\n",
           inputs: [
             {
-              name: "payload",
+              name: "profiles",
               format: "json",
               content:
                 "[\n" +
-                "  {\"sku\": \"A-100\", \"amount\": 12},\n" +
-                "  {\"sku\": \"B-200\", \"amount\": 5}\n" +
+                "  {\"id\": 101, \"name\": \"Ava\", \"tier\": \"gold\"},\n" +
+                "  {\"id\": 102, \"name\": \"Noah\", \"tier\": \"silver\"},\n" +
+                "  {\"id\": 103, \"name\": \"Mia\", \"tier\": \"gold\"}\n" +
                 "]\n",
             },
             {
-              name: "rates",
+              name: "activity",
               format: "json",
-              content: "{\n  \"usd\": 1.09\n}\n",
+              content:
+                "[\n" +
+                "  {\"userId\": 101, \"lastLogin\": \"2026-01-30T09:12:00Z\"},\n" +
+                "  {\"userId\": 101, \"lastLogin\": \"2026-01-31T10:44:00Z\"},\n" +
+                "  {\"userId\": 102, \"lastLogin\": \"2026-01-25T08:05:00Z\"},\n" +
+                "  {\"userId\": 103, \"lastLogin\": \"2026-01-29T16:32:00Z\"},\n" +
+                "  {\"userId\": 103, \"lastLogin\": \"2026-02-01T18:20:00Z\"}\n" +
+                "]\n",
             },
           ],
         },
