@@ -10,6 +10,21 @@ Feature: Playground webapp
     And the output should contain "Add input"
     And the output should contain "Run Script"
 
+  Scenario: Playground page supports standalone runner hook
+    Given the server is running
+    When I request the playground page
+    Then the response status should be 200
+    And the output should contain "infomungeRun"
+
+  Scenario: Playground page lists examples
+    Given the server is running
+    When I request the playground page
+    Then the response status should be 200
+    And the output should contain "example-picker"
+    And the output should contain "Group totals by type"
+    And the output should contain "Filter active users"
+    And the output should contain "Combine two inputs"
+
   Scenario: Run endpoint defaults to header output when output is omitted
     Given the server is running
     And the following script:

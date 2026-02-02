@@ -1,6 +1,4 @@
-package cli
-
-const playgroundHTML = `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -155,7 +153,7 @@ const playgroundHTML = `<!DOCTYPE html>
           <h1>InfoMunge Playground</h1>
           <p>Draft inputs, write scripts, and see results instantly.</p>
         </div>
-        <p>Server mode • /run endpoint</p>
+        <p>Standalone mode • Local JS runner</p>
       </header>
       <div class="toolbar">
         <button id="run-script" type="button">Run Script</button>
@@ -199,6 +197,7 @@ payload</textarea>
         </section>
       </main>
     </div>
+    <script src="infomunge.js"></script>
     <script>
       const inputsList = document.getElementById("inputs-list");
       const status = document.getElementById("status");
@@ -408,17 +407,7 @@ payload</textarea>
             }
             return;
           }
-          const response = await fetch("/run", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          const text = await response.text();
-          result.value = text;
-          status.textContent = response.ok ? "Success" : "Error";
-          if (!response.ok) {
-            status.textContent += " " + response.status;
-          }
+          status.textContent = "Error: infomunge.js not loaded";
         } catch (err) {
           status.textContent = "Error: " + err;
         }
@@ -431,4 +420,4 @@ payload</textarea>
       addInputCard();
     </script>
   </body>
-</html>`
+</html>
