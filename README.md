@@ -63,6 +63,16 @@ Notes:
 - If `format` is omitted, inputs are treated as `text/plain`.
 - `output` can be a format like `json` or a MIME type like `application/json`.
 
+### Standalone Playground (JS)
+
+Build a standalone browser bundle with gopherjs (requires gopherjs installed):
+
+```bash
+gopherjs build ./cmd/infomunge-js -o docs/playground/infomunge.js
+```
+
+Then open `docs/playground/index.html` in a browser. The page uses a local JS runner and does not require the server.
+
 ## How It Works
 
 InfoMunge runs a small pipeline: parse CLI inputs, parse header directives, rewrite
