@@ -285,7 +285,7 @@ func stripSingleLineComment(line string) string {
 			if i+1 < len(line) && line[i+1] == '/' {
 				return line[:i] + strings.Repeat(" ", len(line)-i)
 			}
-			if isRegexContext(line, i, line[:i]) {
+			if isRegexContext(line, i) {
 				regexEnd, _, _ := parseRegexLiteral(line, i)
 				if regexEnd > i {
 					i = regexEnd - 1

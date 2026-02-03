@@ -199,6 +199,20 @@ Feature: Regex Literals
       "Regex"
       """
 
+  Scenario: Division operator after array indexing
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2, 3][1] / 2
+      """
+    When I run the script
+    Then the output should be:
+      """
+      1
+      """
+
   Scenario: Is Regex type check
     Given the following script:
       """

@@ -6,6 +6,35 @@ import (
 	"unicode/utf8"
 )
 
+type regexTokenKind int
+
+const (
+	regexTokenNone regexTokenKind = iota
+	regexTokenValue
+	regexTokenOperator
+)
+
+var regexPrefixKeywords = map[string]struct{}{
+	"and":      {},
+	"case":     {},
+	"contains": {},
+	"else":     {},
+	"find":     {},
+	"if":       {},
+	"in":       {},
+	"match":    {},
+	"matches":  {},
+	"not":      {},
+	"or":       {},
+	"replace":  {},
+	"return":   {},
+	"scan":     {},
+	"splitBy":  {},
+	"then":     {},
+	"using":    {},
+	"while":    {},
+}
+
 // replaceRegexLiterals converts /pattern/ regex literals to string literals "pattern".
 // This must run early in the pipeline before other operators try to parse the slashes.
 //
@@ -20,6 +49,7 @@ func replaceRegexLiterals(s string) string {
 	i := 0
 	inString := false
 	inSingleQuoteString := false
+	lastKind := regexTokenNone
 
 	for i < len(s) {
 		ch := s[i]
@@ -28,6 +58,9 @@ func replaceRegexLiterals(s string) string {
 		if ch == '"' && !inSingleQuoteString && (i == 0 || s[i-1] != '\\') {
 			inString = !inString
 			result.WriteByte(ch)
+			if !inString {
+				lastKind = regexTokenValue
+			}
 			i++
 			continue
 		}
@@ -35,6 +68,9 @@ func replaceRegexLiterals(s string) string {
 		if ch == '\'' && !inString && (i == 0 || s[i-1] != '\\') {
 			inSingleQuoteString = !inSingleQuoteString
 			result.WriteByte(ch)
+			if !inSingleQuoteString {
+				lastKind = regexTokenValue
+			}
 			i++
 			continue
 		}
@@ -46,10 +82,57 @@ func replaceRegexLiterals(s string) string {
 			continue
 		}
 
+		if isWhitespace(ch) {
+			result.WriteByte(ch)
+			i++
+			continue
+		}
+
+		if IsIdentifierStart(ch) {
+			start := i
+			i++
+			for i < len(s) && IsIdentifierPart(s[i]) {
+				i++
+			}
+			ident := s[start:i]
+			result.WriteString(ident)
+			if isRegexPrefixKeyword(ident) {
+				lastKind = regexTokenOperator
+			} else {
+				lastKind = regexTokenValue
+			}
+			continue
+		}
+
+		if ch >= '0' && ch <= '9' {
+			start := i
+			i++
+			for i < len(s) && ((s[i] >= '0' && s[i] <= '9') || s[i] == '.') {
+				i++
+			}
+			result.WriteString(s[start:i])
+			lastKind = regexTokenValue
+			continue
+		}
+
+		if IsOpeningBracket(ch) || isRegexOperatorChar(ch) {
+			result.WriteByte(ch)
+			lastKind = regexTokenOperator
+			i++
+			continue
+		}
+
+		if IsClosingBracket(ch) {
+			result.WriteByte(ch)
+			lastKind = regexTokenValue
+			i++
+			continue
+		}
+
 		// Check for regex literal starting with /
 		if ch == '/' {
 			// Check if this is a regex literal based on context
-			if isRegexContext(s, i, result.String()) {
+			if canStartRegexAfter(lastKind) {
 				// Parse the regex literal
 				regexEnd, pattern, flags := parseRegexLiteral(s, i)
 				if regexEnd > i {
@@ -67,6 +150,7 @@ func replaceRegexLiterals(s string) string {
 					}
 					
 					result.WriteByte(')')
+					lastKind = regexTokenValue
 					
 					i = regexEnd
 					continue
@@ -75,6 +159,9 @@ func replaceRegexLiterals(s string) string {
 		}
 
 		result.WriteByte(ch)
+		if ch == '/' || isRegexOperatorChar(ch) {
+			lastKind = regexTokenOperator
+		}
 		i++
 	}
 
@@ -82,57 +169,18 @@ func replaceRegexLiterals(s string) string {
 }
 
 // IsRegexContext exposes regex context detection for comment stripping.
-func IsRegexContext(s string, i int, resultSoFar string) bool {
-	return isRegexContext(s, i, resultSoFar)
+func IsRegexContext(s string, i int) bool {
+	return isRegexContext(s, i)
 }
 
 // isRegexContext determines if a slash at position i should be interpreted as
 // the start of a regex literal based on the preceding context.
-func isRegexContext(s string, i int, resultSoFar string) bool {
-	// Find the last non-whitespace character before position i
-	prevIdx := i - 1
-	for prevIdx >= 0 && unicode.IsSpace(rune(s[prevIdx])) {
-		prevIdx--
-	}
-
-	if prevIdx < 0 {
-		// Start of input → regex
+func isRegexContext(s string, i int) bool {
+	if i <= 0 {
 		return true
 	}
-
-	prevChar := s[prevIdx]
-
-	// After these characters, we expect a regex
-	regexStarters := "([{,;:=<>!&|+-*%^~?"
-	if strings.ContainsRune(regexStarters, rune(prevChar)) {
-		return true
-	}
-
-	// Check for word operators that precede regex
-	// Look at the result so far to check for keywords
-	trimmed := strings.TrimRightFunc(resultSoFar, unicode.IsSpace)
-	wordOperators := []string{
-		"contains", "find", "match", "matches", "scan", "splitBy", "replace",
-		"return", "if", "else", "then", "and", "or", "not",
-	}
-
-	for _, op := range wordOperators {
-		if strings.HasSuffix(trimmed, op) {
-			// Make sure it's a word boundary
-			opStart := len(trimmed) - len(op)
-			if opStart == 0 || !isIdentChar(trimmed[opStart-1]) {
-				return true
-			}
-		}
-	}
-
-	// After identifier or closing bracket → division
-	if isIdentChar(prevChar) || prevChar == ')' || prevChar == ']' || prevChar == '}' || prevChar == '"' || prevChar == '\'' {
-		return false
-	}
-
-	// Default to regex for safety
-	return true
+	lastKind := scanRegexPrefixKind(s, i)
+	return canStartRegexAfter(lastKind)
 }
 
 // ParseRegexLiteral exposes regex literal parsing for comment stripping.
@@ -233,6 +281,105 @@ func escapeRegexForString(pattern string) string {
 	}
 
 	return result.String()
+}
+
+func isRegexPrefixKeyword(word string) bool {
+	_, ok := regexPrefixKeywords[word]
+	return ok
+}
+
+func isRegexOperatorChar(ch byte) bool {
+	switch ch {
+	case '(', '[', '{', ',', ';', ':', '=', '<', '>', '!', '&', '|', '+', '-', '*', '%', '^', '~', '?':
+		return true
+	default:
+		return false
+	}
+}
+
+func canStartRegexAfter(kind regexTokenKind) bool {
+	return kind == regexTokenNone || kind == regexTokenOperator
+}
+
+func scanRegexPrefixKind(s string, end int) regexTokenKind {
+	if end > len(s) {
+		end = len(s)
+	}
+	i := 0
+	lastKind := regexTokenNone
+	for i < end {
+		ch := s[i]
+		if isWhitespace(ch) {
+			i++
+			continue
+		}
+		if ch == '"' || ch == '\'' {
+			i = scanStringLiteral(s, i, ch)
+			lastKind = regexTokenValue
+			continue
+		}
+		if IsIdentifierStart(ch) {
+			start := i
+			i++
+			for i < end && IsIdentifierPart(s[i]) {
+				i++
+			}
+			if isRegexPrefixKeyword(s[start:i]) {
+				lastKind = regexTokenOperator
+			} else {
+				lastKind = regexTokenValue
+			}
+			continue
+		}
+		if ch >= '0' && ch <= '9' {
+			i++
+			for i < end && ((s[i] >= '0' && s[i] <= '9') || s[i] == '.') {
+				i++
+			}
+			lastKind = regexTokenValue
+			continue
+		}
+		if ch == '/' {
+			if canStartRegexAfter(lastKind) {
+				regexEnd, _, _ := parseRegexLiteral(s, i)
+				if regexEnd > i && regexEnd <= end {
+					i = regexEnd
+					lastKind = regexTokenValue
+					continue
+				}
+			}
+			i++
+			lastKind = regexTokenOperator
+			continue
+		}
+		if IsOpeningBracket(ch) || isRegexOperatorChar(ch) {
+			i++
+			lastKind = regexTokenOperator
+			continue
+		}
+		if IsClosingBracket(ch) {
+			i++
+			lastKind = regexTokenValue
+			continue
+		}
+		i++
+	}
+	return lastKind
+}
+
+func scanStringLiteral(s string, start int, quote byte) int {
+	i := start + 1
+	for i < len(s) {
+		if s[i] == '\\' {
+			i += 2
+			continue
+		}
+		if s[i] == quote {
+			return i + 1
+		}
+		i++
+	}
+	return len(s)
 }
 
 // replaceReplaceOperator converts "str replace pattern with replacement" to "replace(str, pattern, replacement)"
