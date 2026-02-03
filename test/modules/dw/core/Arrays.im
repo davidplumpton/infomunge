@@ -45,16 +45,25 @@ fun outerJoin(left, right, leftKey, rightKey) =
       map (r) -> { l: null, r: r })
 
 fun partition(array, criteria) =
-  [array filter (item) -> criteria(item), array filter (item) -> not criteria(item)]
+  {
+    success: array filter (item) -> criteria(item),
+    failure: array filter (item) -> not criteria(item)
+  }
 
 fun slice(array, start, end) = slice(array, start, end)
 fun some(array, criteria) = some(array, criteria)
 
 fun splitAt(array, index) =
-  [take(array, index), drop(array, index)]
+  {
+    l: take(array, index),
+    r: drop(array, index)
+  }
 
 fun splitWhere(array, criteria) =
-  [takeWhile(array, criteria), dropWhile(array, criteria)]
+  {
+    l: takeWhile(array, (item) -> not criteria(item)),
+    r: dropWhile(array, (item) -> not criteria(item))
+  }
 
 fun sumBy(array, mapper) =
   sum(array map (item) -> mapper(item))
