@@ -10,6 +10,7 @@ import (
 	"time"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/formats"
 )
 
 // TypeDef represents a custom type definition declared with the 'type' keyword.
@@ -49,6 +50,8 @@ func getTypeName(v Value) string {
 		return "Regex"
 	case *TypeDef:
 		return "Type"
+	case formats.Namespace:
+		return "Namespace"
 	default:
 		return "Unknown"
 	}
@@ -122,6 +125,8 @@ func coerceToTypeWithVisited(value Value, typeName string, context Context, pos 
 			return nil, nil
 		}
 		return nil, newCoercionTypeError(value, "Null", pos)
+	case "Namespace":
+		return coerceToNamespace(value, pos)
 	}
 
 	// Check for cycles in custom type definitions
@@ -219,6 +224,9 @@ func matchesTypeExactly(value Value, typeName string, context Context) bool {
 	case "Boolean":
 		_, ok := value.(bool)
 		return ok
+	case "Namespace":
+		_, ok := value.(formats.Namespace)
+		return ok
 	case "Null":
 		return value == nil
 	case "Array":
@@ -243,6 +251,33 @@ func matchesTypeExactly(value Value, typeName string, context Context) bool {
 	}
 
 	return false
+}
+
+func coerceToNamespace(value Value, pos token.Pos) (Value, error) {
+	switch v := value.(type) {
+	case formats.Namespace:
+		return v, nil
+	case map[string]interface{}:
+		uriVal, ok := v["uri"]
+		if !ok {
+			return nil, newPosError("Namespace requires a uri field", pos)
+		}
+		uri, ok := uriVal.(string)
+		if !ok || strings.TrimSpace(uri) == "" {
+			return nil, newPosError("Namespace uri must be a non-empty string", pos)
+		}
+		prefix := ""
+		if prefixVal, exists := v["prefix"]; exists && prefixVal != nil {
+			prefixStr, ok := prefixVal.(string)
+			if !ok {
+				return nil, newPosError("Namespace prefix must be a string", pos)
+			}
+			prefix = prefixStr
+		}
+		return formats.Namespace{Prefix: prefix, URI: uri}, nil
+	default:
+		return nil, newCoercionTypeError(value, "Namespace", pos)
+	}
 }
 
 // mergeProperties merges type properties, with child properties overriding parent.
@@ -335,18 +370,19 @@ func parseDateOrTime(s string) (time.Time, error) {
 
 // convertJavaDatePatternToGo converts a Java SimpleDateFormat pattern to a Go time layout.
 // Supported Java tokens:
-//   yyyy, yy
-//   MMMM, MMM, MM, M
-//   dd, d
-//   EEEE, EEE, EE, E
-//   HH, H, hh, h
-//   mm, m, ss, s
-//   SSS, SS, S
-//   a
-//   z, Z, XXX, XX, X
+//
+//	yyyy, yy
+//	MMMM, MMM, MM, M
+//	dd, d
+//	EEEE, EEE, EE, E
+//	HH, H, hh, h
+//	mm, m, ss, s
+//	SSS, SS, S
+//	a
+//	z, Z, XXX, XX, X
 //
 // Notes:
-//   - Single quotes escape literals; doubled quotes '' emit a single quote.
+//   - Single quotes escape literals; doubled quotes ” emit a single quote.
 //   - Unsupported tokens are passed through unchanged.
 //   - This is a pragmatic subset for DataWeave-style formats, not a full SimpleDateFormat implementation.
 func convertJavaDatePatternToGo(pattern string) string {

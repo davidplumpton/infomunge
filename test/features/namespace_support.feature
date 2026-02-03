@@ -17,5 +17,22 @@ Feature: Namespace Support
     When I run the script
     Then the output should contain:
       """
-      <root xmlns:ns0="http://example.com/ns0"><ns0:child attr="val">content</ns0:child></root>
+      <root><ns0:child xmlns:ns0="http://example.com/ns0" attr="val">content</ns0:child></root>
+      """
+
+  Scenario: Namespace type variable in element and attribute
+    Given the following script:
+      """
+      %im 0.1
+      output application/xml
+      var myNS = { uri: "http://example.com/dyn", prefix: "ns-0" } as Namespace
+      ---
+      root: {
+        myNS#child @(myNS#attr: "yes"): "content"
+      }
+      """
+    When I run the script
+    Then the output should contain:
+      """
+      <ns-0:child xmlns:ns-0="http://example.com/dyn" ns-0:attr="yes">content</ns-0:child>
       """

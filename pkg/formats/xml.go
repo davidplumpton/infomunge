@@ -78,12 +78,29 @@ func readXML(content string) (interface{}, error) {
 }
 
 func formatXML(result interface{}) (string, error) {
-	return formatXMLWithNamespaces(result, nil)
+	return formatXMLWithOptions(result, XMLOutputOptions{WriteDeclaration: true})
 }
 
 // formatXMLWithNamespaces formats result to XML, optionally applying declared namespaces.
 func formatXMLWithNamespaces(result interface{}, declaredNs map[string]string) (string, error) {
-	return toXMLWithNamespaces(result, "", declaredNs), nil
+	return formatXMLWithOptions(result, XMLOutputOptions{
+		DeclaredNamespaces: declaredNs,
+		WriteDeclaration:   true,
+	})
+}
+
+// formatXMLWithOptions formats result to XML using the supplied options.
+func formatXMLWithOptions(result interface{}, opts XMLOutputOptions) (string, error) {
+	renderOpts, err := normalizeXMLOptions(opts)
+	if err != nil {
+		return "", unifiederrors.ValidationErrorf("invalid XML output options: %v", err)
+	}
+
+	xml := toXMLWithOptions(result, "", renderOpts)
+	if renderOpts.writeDeclaration {
+		xml = "<?xml version='1.0' encoding='UTF-8'?>\n" + xml
+	}
+	return xml, nil
 }
 
 // Note: The old validateXMLBrackets and helper functions (handleClosingTag, handleOpeningTag,
@@ -270,16 +287,14 @@ func simplifyXML(input interface{}) interface{} {
 
 // toXML converts an internal representation to XML.
 func toXML(v interface{}, name string) string {
-	return toXMLWithNamespaces(v, name, nil)
+	return toXMLWithOptions(v, name, xmlRenderOptions{})
 }
 
-// toXMLWithNamespaces converts an internal representation to XML with optional declared namespaces.
-// declaredNs maps namespace prefixes to URIs (e.g., {"ns0": "http://www.abc.com"}).
-func toXMLWithNamespaces(v interface{}, name string, declaredNs map[string]string) string {
-	return toXMLWithNamespacesRecursive(v, name, declaredNs, false)
+func toXMLWithOptions(v interface{}, name string, opts xmlRenderOptions) string {
+	return toXMLWithOptionsRecursive(v, name, opts, false)
 }
 
-func toXMLWithNamespacesRecursive(v interface{}, name string, declaredNs map[string]string, isChild bool) string {
+func toXMLWithOptionsRecursive(v interface{}, name string, opts xmlRenderOptions, isChild bool) string {
 	switch val := v.(type) {
 	case Object:
 		if name == "" {
@@ -293,34 +308,65 @@ func toXMLWithNamespacesRecursive(v interface{}, name string, declaredNs map[str
 			if len(keys) > 0 {
 				sort.Strings(keys)
 				k := keys[0]
-				tagName := normalizeTagName(k)
-				return fmt.Sprintf("<%s%s</%s>", tagName, toXMLWithNamespacesRecursive(val[k], k, declaredNs, false), tagName)
+				return buildXMLElement(k, val[k], opts, false)
 			}
 			return ""
 		}
-
-		// Non-root element
-		xmlnsDecls, attrs := buildXMLAttributesWithNamespaces(val, declaredNs, isChild)
-		content := buildXMLContentWithNamespaces(val, declaredNs)
-		openingTag := buildXMLOpeningTag(xmlnsDecls, attrs)
-
-		return openingTag + content
-
+		return buildElementContent(name, val, opts, isChild)
 	default:
-		return ">" + fmt.Sprintf("%v", val)
+		if name == "" {
+			return fmt.Sprintf("%v", v)
+		}
+		return buildElementContent(name, v, opts, isChild)
 	}
+}
+
+func buildXMLElement(name string, value interface{}, opts xmlRenderOptions, isChild bool) string {
+	if value == nil && opts.skipNullOnElements {
+		return ""
+	}
+	content := buildElementContent(name, value, opts, isChild)
+	if content == "" {
+		return ""
+	}
+	resolvedName, _, _, _ := resolveName(name, opts.namespaceVars)
+	tagName := normalizeTagName(resolvedName)
+	return fmt.Sprintf("<%s%s</%s>", tagName, content, tagName)
+}
+
+func buildElementContent(name string, value interface{}, opts xmlRenderOptions, isChild bool) string {
+	valObj, isObj := value.(Object)
+	if !isObj {
+		valObj = Object{}
+	}
+	elementIsNil := value == nil
+
+	xmlnsDecls, attrs, _ := buildXMLAttributesWithOptions(valObj, name, opts, isChild, elementIsNil)
+	openingTag := buildXMLOpeningTag(xmlnsDecls, attrs)
+
+	if elementIsNil {
+		return openingTag
+	}
+
+	if isObj {
+		return openingTag + buildXMLContentWithOptions(valObj, opts)
+	}
+
+	return openingTag + fmt.Sprintf("%v", value)
 }
 
 // buildXMLAttributes builds XML namespace declarations and attribute strings.
 func buildXMLAttributes(val Object) ([]string, []string) {
-	return buildXMLAttributesWithNamespaces(val, nil, false)
+	xmlnsDecls, attrs, _ := buildXMLAttributesWithOptions(val, "", xmlRenderOptions{}, false, false)
+	return xmlnsDecls, attrs
 }
 
-// buildXMLAttributesWithNamespaces builds XML namespace declarations and attribute strings,
-// optionally applying declared namespaces from the ns keyword.
-func buildXMLAttributesWithNamespaces(val Object, declaredNs map[string]string, isChild bool) ([]string, []string) {
-	var xmlnsDecls []string
+// buildXMLAttributesWithOptions builds XML namespace declarations and attribute strings.
+func buildXMLAttributesWithOptions(val Object, elementName string, opts xmlRenderOptions, isChild bool, elementIsNil bool) ([]string, []string, string) {
 	var attrs []string
+	xmlnsMap := make(map[string]string)
+
+	resolvedElement, elementPrefix, elementURI, elementHasPrefix := resolveName(elementName, opts.namespaceVars)
 
 	// Extract and sort attribute-related keys
 	keys := extractAndSortAttributeKeys(val)
@@ -329,26 +375,60 @@ func buildXMLAttributesWithNamespaces(val Object, declaredNs map[string]string, 
 	for _, k := range keys {
 		if k == XMLNamespaceKey {
 			if nsMap, ok := val[k].(Object); ok {
-				xmlnsDecls = append(xmlnsDecls, buildNamespaceDeclsFromMap(nsMap)...)
+				for prefix, uri := range nsMap {
+					p := prefix
+					if p == "#default" {
+						p = ""
+					}
+					xmlnsMap[p] = fmt.Sprintf("%v", uri)
+				}
 			}
 		} else if strings.HasPrefix(k, XMLAttrPrefix) {
-			attrName := normalizeTagName(k[len(XMLAttrPrefix):])
-			attrs = append(attrs, fmt.Sprintf(`%s="%v"`, attrName, val[k]))
+			if opts.skipNullOnAttributes && val[k] == nil {
+				continue
+			}
+			attrName := k[len(XMLAttrPrefix):]
+			resolvedAttr, attrPrefix, attrURI, attrHasPrefix := resolveName(attrName, opts.namespaceVars)
+			if attrHasPrefix {
+				if attrURI == "" && opts.declaredNamespaces != nil {
+					attrURI = opts.declaredNamespaces[attrPrefix]
+				}
+				if attrURI != "" {
+					ensureNamespace(xmlnsMap, attrPrefix, attrURI)
+				}
+			}
+			attrs = append(attrs, fmt.Sprintf(`%s="%s"`, normalizeTagName(resolvedAttr), formatXMLAttrValue(val[k])))
 		}
 	}
 
-	// Apply declared namespaces if no explicit @xmlns in the element AND we are at the root
-	if declaredNs != nil && len(declaredNs) > 0 && !isChild {
-		if _, hasExplicitNs := val[XMLNamespaceKey]; !hasExplicitNs {
-			xmlnsDecls = append(xmlnsDecls, buildNamespaceDeclsFromStringMap(declaredNs)...)
+	// Root declared namespaces based on writeDeclaredNamespaces
+	if !isChild {
+		for prefix, uri := range opts.rootDeclaredNames {
+			ensureNamespace(xmlnsMap, prefix, uri)
 		}
 	}
 
-	// Sort for consistent output
+	// Namespaces needed for element name
+	if elementHasPrefix {
+		uri := elementURI
+		if uri == "" && opts.declaredNamespaces != nil {
+			uri = opts.declaredNamespaces[elementPrefix]
+		}
+		if uri != "" {
+			ensureNamespace(xmlnsMap, elementPrefix, uri)
+		}
+	}
+
+	if elementIsNil && opts.writeNilOnNull {
+		attrs = append(attrs, `xsi:nil="true"`)
+		ensureNamespace(xmlnsMap, "xsi", XMLSchemaInstanceURI)
+	}
+
+	xmlnsDecls := buildNamespaceDeclsFromStringMap(xmlnsMap)
 	sort.Strings(xmlnsDecls)
 	sort.Strings(attrs)
 
-	return xmlnsDecls, attrs
+	return xmlnsDecls, attrs, resolvedElement
 }
 
 // extractAndSortAttributeKeys extracts keys that represent XML attributes and namespaces.
@@ -390,30 +470,43 @@ func buildNamespaceDeclsFromStringMap(nsMap map[string]string) []string {
 
 // buildXMLChildren builds child element strings from a map.
 func buildXMLChildren(val Object) []string {
-	return buildXMLChildrenWithNamespaces(val, nil)
+	return buildXMLChildrenWithOptions(val, xmlRenderOptions{})
 }
 
-// buildXMLChildrenWithNamespaces builds child element strings from a map,
-// with optional declared namespaces passed to children.
-func buildXMLChildrenWithNamespaces(val Object, declaredNs map[string]string) []string {
+// buildXMLChildrenWithOptions builds child element strings from a map.
+func buildXMLChildrenWithOptions(val Object, opts xmlRenderOptions) []string {
 	// Extract and sort child element keys (non-special keys)
 	keys := extractAndSortChildKeys(val)
 
 	children := make([]string, 0, len(keys))
 	for _, k := range keys {
 		v := val[k]
-		tagName := normalizeTagName(k)
 		switch arr := v.(type) {
 		case XMLMultiValue:
 			for _, item := range arr {
-				children = append(children, fmt.Sprintf("<%s%s</%s>", tagName, toXMLWithNamespacesRecursive(item, k, declaredNs, true), tagName))
+				if item == nil && opts.skipNullOnElements {
+					continue
+				}
+				if child := buildXMLElement(k, item, opts, true); child != "" {
+					children = append(children, child)
+				}
 			}
 		case Array:
 			for _, item := range arr {
-				children = append(children, fmt.Sprintf("<%s%s</%s>", tagName, toXMLWithNamespacesRecursive(item, k, declaredNs, true), tagName))
+				if item == nil && opts.skipNullOnElements {
+					continue
+				}
+				if child := buildXMLElement(k, item, opts, true); child != "" {
+					children = append(children, child)
+				}
 			}
 		default:
-			children = append(children, fmt.Sprintf("<%s%s</%s>", tagName, toXMLWithNamespacesRecursive(v, k, declaredNs, true), tagName))
+			if v == nil && opts.skipNullOnElements {
+				continue
+			}
+			if child := buildXMLElement(k, v, opts, true); child != "" {
+				children = append(children, child)
+			}
 		}
 	}
 
@@ -435,25 +528,62 @@ func extractAndSortChildKeys(val Object) []string {
 
 // buildXMLContent builds the inner content (children + text) of an element.
 func buildXMLContent(val Object) string {
-	return buildXMLContentWithNamespaces(val, nil)
+	return buildXMLContentWithOptions(val, xmlRenderOptions{})
 }
 
-// buildXMLContentWithNamespaces builds the inner content (children + text) of an element,
-// with optional declared namespaces.
-func buildXMLContentWithNamespaces(val Object, declaredNs map[string]string) string {
+// buildXMLContentWithOptions builds the inner content (children + text) of an element.
+func buildXMLContentWithOptions(val Object, opts xmlRenderOptions) string {
 	var sb strings.Builder
 
 	// Add child elements
-	for _, child := range buildXMLChildrenWithNamespaces(val, declaredNs) {
+	for _, child := range buildXMLChildrenWithOptions(val, opts) {
 		sb.WriteString(child)
 	}
 
 	// Add text content if present
-	if text, ok := val[XMLTextKey]; ok {
+	if text, ok := val[XMLTextKey]; ok && text != nil {
 		sb.WriteString(fmt.Sprintf("%v", text))
 	}
 
 	return sb.String()
+}
+
+func resolveName(name string, nsVars map[string]Namespace) (resolvedName string, usedPrefix string, usedURI string, hasPrefix bool) {
+	if name == "" {
+		return name, "", "", false
+	}
+	idx := strings.Index(name, "#")
+	if idx == -1 {
+		return name, "", "", false
+	}
+	prefix := name[:idx]
+	local := name[idx+1:]
+	if nsVars != nil {
+		if ns, ok := nsVars[prefix]; ok {
+			if ns.Prefix == "" {
+				return local, "", ns.URI, true
+			}
+			return ns.Prefix + "#" + local, ns.Prefix, ns.URI, true
+		}
+	}
+	return name, prefix, "", true
+}
+
+func ensureNamespace(xmlns map[string]string, prefix string, uri string) {
+	if uri == "" {
+		return
+	}
+	if _, exists := xmlns[prefix]; exists {
+		return
+	}
+	xmlns[prefix] = uri
+}
+
+func formatXMLAttrValue(value interface{}) string {
+	if value == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", value)
 }
 
 // buildXMLOpeningTag builds the opening tag attributes string.

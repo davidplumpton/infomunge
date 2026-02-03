@@ -59,12 +59,12 @@ func TestFormat_XML(t *testing.T) {
 		{
 			"simple object",
 			Object{"root": "value"},
-			"<root>value</root>",
+			"<?xml version='1.0' encoding='UTF-8'?>\n<root>value</root>",
 		},
 		{
 			"nested object",
 			Object{"root": Object{"child": "value"}},
-			"<root><child>value</child></root>",
+			"<?xml version='1.0' encoding='UTF-8'?>\n<root><child>value</child></root>",
 		},
 	}
 

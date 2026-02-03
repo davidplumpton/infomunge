@@ -43,6 +43,15 @@ func validateFormatInput(result interface{}) error {
 // FormatXMLWithNamespaces formats result as XML with declared namespaces.
 // declaredNs maps namespace prefixes to URIs (e.g., {"ns0": "http://www.abc.com"}).
 func FormatXMLWithNamespaces(result interface{}, declaredNs map[string]string) (string, error) {
+	opts := XMLOutputOptions{
+		DeclaredNamespaces: declaredNs,
+		WriteDeclaration:   true,
+	}
+	return FormatXMLWithOptions(result, opts)
+}
+
+// FormatXMLWithOptions formats result as XML with custom options.
+func FormatXMLWithOptions(result interface{}, opts XMLOutputOptions) (string, error) {
 	if result == nil {
 		return "", unifiederrors.ValidationError("result cannot be nil")
 	}
@@ -51,7 +60,7 @@ func FormatXMLWithNamespaces(result interface{}, declaredNs map[string]string) (
 		return "", unifiederrors.ValidationErrorf("invalid input for formatting: %v", err)
 	}
 
-	return formatXMLWithNamespaces(result, declaredNs)
+	return formatXMLWithOptions(result, opts)
 }
 
 // FormatResult formats the result and returns a Result[string].

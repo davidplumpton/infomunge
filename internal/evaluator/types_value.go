@@ -55,6 +55,7 @@ const (
 	KindObject
 	KindLambda
 	KindTypeDef
+	KindNamespace
 	KindControlFlow
 	KindLazy
 	KindRegex
@@ -82,6 +83,8 @@ func (k ValueKind) String() string {
 		return "Lambda"
 	case KindTypeDef:
 		return "TypeDef"
+	case KindNamespace:
+		return "Namespace"
 	case KindControlFlow:
 		return "ControlFlow"
 	case KindLazy:
@@ -169,6 +172,8 @@ func KindOf(v Value) ValueKind {
 		return KindLambda
 	case *TypeDef:
 		return KindTypeDef
+	case formats.Namespace:
+		return KindNamespace
 	case *ControlFlowSignal:
 		return KindControlFlow
 	case *LazyValue:

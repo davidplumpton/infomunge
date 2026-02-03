@@ -609,13 +609,27 @@ func (tc *testContext) runScriptWithTimeout(scriptContent string, additionalCont
 		var output string
 		var err error
 
-		// If XML output and namespaces are declared in context, use them
-		if res.mimeType == "application/xml" && res.context != nil {
-			if nsMap, ok := res.context["__namespaces__"].(map[string]string); ok {
-				output, err = formats.FormatXMLWithNamespaces(res.result, nsMap)
-			} else {
-				output, err = formats.Format(res.result, res.mimeType)
+		// If XML output, apply DataWeave-compatible options.
+		if res.mimeType == "application/xml" {
+			var nsMap map[string]string
+			if res.context != nil {
+				if declared, ok := res.context["__namespaces__"].(map[string]string); ok {
+					nsMap = declared
+				}
 			}
+			xmlOpts := formats.XMLOutputOptions{
+				DeclaredNamespaces: nsMap,
+				NamespaceVars:      extractNamespaceVars(res.context),
+				WriteDeclaration:   true,
+			}
+			if res.context != nil {
+				if rawOpts, ok := res.context["__output_options__"].(map[string]string); ok {
+					if err := applyXMLOutputOptions(&xmlOpts, rawOpts); err != nil {
+						return fmt.Errorf("failed to apply xml output options: %v", err)
+					}
+				}
+			}
+			output, err = formats.FormatXMLWithOptions(res.result, xmlOpts)
 		} else {
 			output, err = formats.Format(res.result, res.mimeType)
 		}
@@ -630,6 +644,46 @@ func (tc *testContext) runScriptWithTimeout(scriptContent string, additionalCont
 	case <-time.After(tc.timeout):
 		return fmt.Errorf("script execution timed out after %v (possible infinite loop)", tc.timeout)
 	}
+}
+
+func extractNamespaceVars(context map[string]interface{}) map[string]formats.Namespace {
+	if context == nil {
+		return nil
+	}
+	vars := make(map[string]formats.Namespace)
+	for k, v := range context {
+		if ns, ok := v.(formats.Namespace); ok {
+			vars[k] = ns
+		}
+	}
+	if len(vars) == 0 {
+		return nil
+	}
+	return vars
+}
+
+func applyXMLOutputOptions(opts *formats.XMLOutputOptions, raw map[string]string) error {
+	for key, value := range raw {
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "writedeclaration":
+			parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+			if err != nil {
+				return fmt.Errorf("output option writeDeclaration: %v", err)
+			}
+			opts.WriteDeclaration = parsed
+		case "writedeclarednamespaces":
+			opts.WriteDeclaredNamespaces = value
+		case "writenilonnull":
+			parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+			if err != nil {
+				return fmt.Errorf("output option writeNilOnNull: %v", err)
+			}
+			opts.WriteNilOnNull = parsed
+		case "skipnullon":
+			opts.SkipNullOn = value
+		}
+	}
+	return nil
 }
 
 func (tc *testContext) theOutputShouldBeTrue() error {

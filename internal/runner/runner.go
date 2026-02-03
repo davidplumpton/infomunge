@@ -8,6 +8,7 @@ import (
 	"infomunge/pkg/formats"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -152,9 +153,29 @@ func evaluateWithContext(raw string, additionalContext map[string]interface{}, o
 	return result, hasHeader, outputMimeType, context, nil
 }
 
-// handleOutputDecl processes output directive
-func handleOutputDecl(trimmedLine string, outputMimeType *string) {
-	*outputMimeType = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "output "))
+// handleOutputDecl processes output directive and captures output options.
+func handleOutputDecl(trimmedLine string, outputMimeType *string, context map[string]interface{}) error {
+	rest := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "output "))
+	if rest == "" {
+		*outputMimeType = ""
+		return nil
+	}
+
+	mimeType, options := splitFirstToken(rest)
+	*outputMimeType = mimeType
+
+	if options == "" {
+		return nil
+	}
+
+	parsed, err := parseOutputOptions(options)
+	if err != nil {
+		return err
+	}
+	if len(parsed) > 0 {
+		context["__output_options__"] = parsed
+	}
+	return nil
 }
 
 // handleInputDecl processes input directive.
@@ -163,6 +184,107 @@ func handleInputDecl(trimmedLine string, context map[string]interface{}) {
 	if inputMimeType != "" {
 		context["__input_mime__"] = inputMimeType
 	}
+}
+
+func splitFirstToken(s string) (string, string) {
+	for i, r := range s {
+		if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+			return s[:i], strings.TrimSpace(s[i:])
+		}
+	}
+	return s, ""
+}
+
+func parseOutputOptions(input string) (map[string]string, error) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return nil, nil
+	}
+	if strings.HasPrefix(trimmed, "{") {
+		if !strings.HasSuffix(trimmed, "}") {
+			return nil, unifiederrors.ParseError("output options missing closing brace")
+		}
+		trimmed = strings.TrimSpace(trimmed[1 : len(trimmed)-1])
+	}
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	parts := splitOptions(trimmed)
+	options := make(map[string]string, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		idx := strings.IndexAny(part, "=:")
+		if idx == -1 {
+			return nil, unifiederrors.ParseErrorf("invalid output option %q", part)
+		}
+		key := strings.TrimSpace(part[:idx])
+		value := strings.TrimSpace(part[idx+1:])
+		if key == "" {
+			return nil, unifiederrors.ParseErrorf("invalid output option %q", part)
+		}
+		if unquoted, ok := unquoteOptionValue(value); ok {
+			value = unquoted
+		}
+		options[key] = value
+	}
+	return options, nil
+}
+
+func splitOptions(input string) []string {
+	var parts []string
+	inString := false
+	escape := false
+	quote := byte(0)
+	start := 0
+
+	for i := 0; i < len(input); i++ {
+		ch := input[i]
+		if escape {
+			escape = false
+			continue
+		}
+		if inString {
+			if ch == '\\' {
+				escape = true
+				continue
+			}
+			if ch == quote {
+				inString = false
+			}
+			continue
+		}
+		if ch == '"' || ch == '\'' {
+			inString = true
+			quote = ch
+			continue
+		}
+		if ch == ',' {
+			parts = append(parts, input[start:i])
+			start = i + 1
+		}
+	}
+	if start <= len(input) {
+		parts = append(parts, input[start:])
+	}
+	return parts
+}
+
+func unquoteOptionValue(value string) (string, bool) {
+	if len(value) < 2 {
+		return value, false
+	}
+	if (value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'') {
+		unquoted, err := strconv.Unquote(value)
+		if err != nil {
+			return value, false
+		}
+		return unquoted, true
+	}
+	return value, false
 }
 
 // handleNamespaceDecl processes namespace declaration
@@ -230,8 +352,7 @@ type directiveHandler struct {
 // directiveHandlers defines all header directive handlers
 var directiveHandlers = []directiveHandler{
 	{"output ", func(_, trimmed string, state *parseState) error {
-		handleOutputDecl(trimmed, state.outputMimeType)
-		return nil
+		return handleOutputDecl(trimmed, state.outputMimeType, state.context)
 	}},
 	{"input ", func(_, trimmed string, state *parseState) error {
 		handleInputDecl(trimmed, state.context)
@@ -495,12 +616,26 @@ func formatOutputWithContext(result interface{}, hasHeader bool, mimeType string
 	var err error
 
 	// If XML output and namespaces are declared in context, use them
-	if mimeType == "application/xml" && context != nil {
-		if nsMap, ok := context["__namespaces__"].(map[string]string); ok {
-			output, err = formats.FormatXMLWithNamespaces(result, nsMap)
-		} else {
-			output, err = formats.Format(result, mimeType)
+	if mimeType == "application/xml" {
+		var nsMap map[string]string
+		if context != nil {
+			if declared, ok := context["__namespaces__"].(map[string]string); ok {
+				nsMap = declared
+			}
 		}
+		xmlOpts := formats.XMLOutputOptions{
+			DeclaredNamespaces: nsMap,
+			NamespaceVars:      extractNamespaceVars(context),
+			WriteDeclaration:   true,
+		}
+		if context != nil {
+			if rawOpts, ok := context["__output_options__"].(map[string]string); ok {
+				if err := applyXMLOutputOptions(&xmlOpts, rawOpts); err != nil {
+					return err
+				}
+			}
+		}
+		output, err = formats.FormatXMLWithOptions(result, xmlOpts)
 	} else {
 		output, err = formats.Format(result, mimeType)
 	}
@@ -511,4 +646,52 @@ func formatOutputWithContext(result interface{}, hasHeader bool, mimeType string
 
 	fmt.Print(output)
 	return nil
+}
+
+func extractNamespaceVars(context map[string]interface{}) map[string]formats.Namespace {
+	if context == nil {
+		return nil
+	}
+	vars := make(map[string]formats.Namespace)
+	for k, v := range context {
+		if ns, ok := v.(formats.Namespace); ok {
+			vars[k] = ns
+		}
+	}
+	if len(vars) == 0 {
+		return nil
+	}
+	return vars
+}
+
+func applyXMLOutputOptions(opts *formats.XMLOutputOptions, raw map[string]string) error {
+	for key, value := range raw {
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "writedeclaration":
+			parsed, err := parseBoolOption(value)
+			if err != nil {
+				return unifiederrors.ParseErrorf("output option writeDeclaration: %v", err)
+			}
+			opts.WriteDeclaration = parsed
+		case "writedeclarednamespaces":
+			opts.WriteDeclaredNamespaces = value
+		case "writenilonnull":
+			parsed, err := parseBoolOption(value)
+			if err != nil {
+				return unifiederrors.ParseErrorf("output option writeNilOnNull: %v", err)
+			}
+			opts.WriteNilOnNull = parsed
+		case "skipnullon":
+			opts.SkipNullOn = value
+		}
+	}
+	return nil
+}
+
+func parseBoolOption(value string) (bool, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return false, fmt.Errorf("empty value")
+	}
+	return strconv.ParseBool(trimmed)
 }

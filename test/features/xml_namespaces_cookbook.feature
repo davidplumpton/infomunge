@@ -21,5 +21,6 @@ Feature: XML Namespaces Cookbook
     When I run the script
     Then the output should be:
       """
-      <root xmlns:orders="http://www.acme.com/shemas/Orders" xmlns:stores="http://www.acme.com/shemas/Stores"><orders:orders><stores:shipNodeId>SF01</stores:shipNodeId><stores:shipNodeId shipsVia="LA01">NY03</stores:shipNodeId></orders:orders></root>
+      <?xml version='1.0' encoding='UTF-8'?>
+      <root><orders:orders xmlns:orders="http://www.acme.com/shemas/Orders"><stores:shipNodeId xmlns:stores="http://www.acme.com/shemas/Stores">SF01</stores:shipNodeId><stores:shipNodeId xmlns:stores="http://www.acme.com/shemas/Stores" shipsVia="LA01">NY03</stores:shipNodeId></orders:orders></root>
       """

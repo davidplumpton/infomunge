@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
@@ -190,9 +191,61 @@ func buildRunContext(inputs []runInput) (map[string]interface{}, error) {
 
 func formatRunResult(result interface{}, mimeType string, evalCtx map[string]interface{}) (string, error) {
 	if mimeType == "application/xml" {
+		var nsMap map[string]string
 		if namespaces, ok := evalCtx["__namespaces__"].(map[string]string); ok {
-			return formats.FormatXMLWithNamespaces(result, namespaces)
+			nsMap = namespaces
 		}
+		xmlOpts := formats.XMLOutputOptions{
+			DeclaredNamespaces: nsMap,
+			NamespaceVars:      extractNamespaceVars(evalCtx),
+			WriteDeclaration:   true,
+		}
+		if rawOpts, ok := evalCtx["__output_options__"].(map[string]string); ok {
+			if err := applyXMLOutputOptions(&xmlOpts, rawOpts); err != nil {
+				return "", err
+			}
+		}
+		return formats.FormatXMLWithOptions(result, xmlOpts)
 	}
 	return formats.Format(result, mimeType)
+}
+
+func extractNamespaceVars(context map[string]interface{}) map[string]formats.Namespace {
+	if context == nil {
+		return nil
+	}
+	vars := make(map[string]formats.Namespace)
+	for k, v := range context {
+		if ns, ok := v.(formats.Namespace); ok {
+			vars[k] = ns
+		}
+	}
+	if len(vars) == 0 {
+		return nil
+	}
+	return vars
+}
+
+func applyXMLOutputOptions(opts *formats.XMLOutputOptions, raw map[string]string) error {
+	for key, value := range raw {
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "writedeclaration":
+			parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+			if err != nil {
+				return unifiederrors.ParseErrorf("output option writeDeclaration: %v", err)
+			}
+			opts.WriteDeclaration = parsed
+		case "writedeclarednamespaces":
+			opts.WriteDeclaredNamespaces = value
+		case "writenilonnull":
+			parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+			if err != nil {
+				return unifiederrors.ParseErrorf("output option writeNilOnNull: %v", err)
+			}
+			opts.WriteNilOnNull = parsed
+		case "skipnullon":
+			opts.SkipNullOn = value
+		}
+	}
+	return nil
 }

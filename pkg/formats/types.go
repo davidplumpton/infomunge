@@ -13,6 +13,13 @@ type Array = []interface{}
 // between a natural array and repeated elements.
 type XMLMultiValue []interface{}
 
+// Namespace represents an XML namespace with an optional prefix.
+// Prefix "" indicates the default namespace.
+type Namespace struct {
+	Prefix string
+	URI    string
+}
+
 // Result represents either a successful value of type T or an error.
 // Similar to Rust's Result type, it provides a more explicit way to handle
 // operations that can fail, with support for method chaining.

@@ -14,5 +14,6 @@ Feature: XML Output
     When I run the application with this content
     Then the output should be:
       """
+      <?xml version='1.0' encoding='UTF-8'?>
       <user><age>30</age><name>Alice</name></user>
       """
