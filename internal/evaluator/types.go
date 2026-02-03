@@ -334,25 +334,43 @@ func parseDateOrTime(s string) (time.Time, error) {
 }
 
 // convertJavaDatePatternToGo converts a Java SimpleDateFormat pattern to a Go time layout.
+// Supported Java tokens:
+//   yyyy, yy
+//   MMMM, MMM, MM, M
+//   dd, d
+//   EEEE, EEE, EE, E
+//   HH, H, hh, h
+//   mm, m, ss, s
+//   SSS, SS, S
+//   a
+//   z, Z, XXX, XX, X
+//
+// Notes:
+//   - Single quotes escape literals; doubled quotes '' emit a single quote.
+//   - Unsupported tokens are passed through unchanged.
+//   - This is a pragmatic subset for DataWeave-style formats, not a full SimpleDateFormat implementation.
 func convertJavaDatePatternToGo(pattern string) string {
 	// Common replacements sorted by length (longest first) to prevent partial matches
 	replacements := []struct {
 		java string
 		goOp string
 	}{
-		{"yyyy", "2006"},
 		{"MMMM", "January"},
+		{"EEEE", "Monday"},
+		{"SSS", "000"},
+		{"XXX", "Z07:00"},
+		{"yyyy", "2006"},
 		{"MMM", "Jan"},
 		{"MM", "01"},
-		{"EEEE", "Monday"},
 		{"EEE", "Mon"},
 		{"EE", "Mon"},
 		{"HH", "15"},
 		{"hh", "03"},
 		{"mm", "04"},
 		{"ss", "05"},
-		{"SSS", "000"},
+		{"SS", "00"},
 		{"yy", "06"},
+		{"XX", "Z0700"},
 		{"M", "1"},
 		{"dd", "02"},
 		{"d", "2"},
@@ -360,6 +378,7 @@ func convertJavaDatePatternToGo(pattern string) string {
 		{"h", "3"},
 		{"m", "4"},
 		{"s", "5"},
+		{"S", "0"},
 		{"E", "Mon"},
 		{"a", "PM"},
 		{"z", "MST"},

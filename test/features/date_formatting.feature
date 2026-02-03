@@ -23,6 +23,11 @@ Feature: Date Formatting
     When I evaluate "payload as String {format: 'hh:mm a'}"
     Then the result should be "03:30 PM"
 
+  Scenario: Format DateTime with fractional seconds and ISO timezone
+    Given the input "2023-01-01T12:00:00Z"
+    When I evaluate "payload as String {format: 'yyyy-MM-dd HH:mm:ss.SSSXXX'}"
+    Then the result should be "2023-01-01 12:00:00.000Z"
+
   Scenario: Format number with format (existing functionality check)
     Given the input 123.456
     When I evaluate "payload as String {format: '#.0'}"
