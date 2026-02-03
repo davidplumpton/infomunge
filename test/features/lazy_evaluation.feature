@@ -19,6 +19,18 @@ Feature: Lazy Evaluation
     When I execute the script
     Then the result should be 42
 
+  Scenario: Lazy value caches evaluation
+    Given the script:
+      """
+      %im 0.1
+      output application/json
+      var value = lazy_eval(uuid())
+      ---
+      force_eval(value) == force_eval(value)
+      """
+    When I execute the script
+    Then the output should be true
+
   Scenario: Lazy map on stream
     Given the script:
       """

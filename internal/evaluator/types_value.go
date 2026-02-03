@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"infomunge/pkg/formats"
+	"sync"
 )
 
 // Value is a generic value type that represents any value that can be evaluated in expressions.
@@ -97,6 +98,7 @@ func (k ValueKind) String() string {
 type LazyValue struct {
 	Eval        func(ctx context.Context) (Value, error)
 	ctx         context.Context
+	mu          sync.Mutex
 	cachedValue Value
 	hasValue    bool
 }
@@ -112,6 +114,8 @@ func NewLazyValue(eval func(ctx context.Context) (Value, error), ctx context.Con
 
 // GetValue returns the evaluated value, evaluating it if necessary.
 func (lv *LazyValue) GetValue() (Value, error) {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
 	if !lv.hasValue {
 		val, err := lv.Eval(lv.ctx)
 		if err != nil {
