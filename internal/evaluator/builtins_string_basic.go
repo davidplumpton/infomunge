@@ -149,6 +149,50 @@ func callBuiltinCharAt(args []interface{}, e *ast.CallExpr) (interface{}, error)
 	return string(str[idx]), nil
 }
 
+// callBuiltinCharCodeAt implements the charCodeAt(string, index) function.
+// Uses rune (Unicode code point) indices.
+func callBuiltinCharCodeAt(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, newPosError("charCodeAt requires exactly 2 arguments: string, index", e.Pos())
+	}
+
+	str, err := assertStringArg(args[0], 1, "charCodeAt", e)
+	if err != nil {
+		return nil, err
+	}
+
+	idx, err := assertIntArg(args[1], 2, "charCodeAt", e)
+	if err != nil {
+		return nil, err
+	}
+
+	runes := []rune(str)
+	if idx < 0 || idx >= len(runes) {
+		return nil, newPosError(fmt.Sprintf("charCodeAt index %d out of range", idx), e.Pos())
+	}
+
+	return int(runes[idx]), nil
+}
+
+// callBuiltinFromCharCode implements the fromCharCode(code) function.
+func callBuiltinFromCharCode(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+	if len(args) != 1 {
+		return nil, newPosError("fromCharCode requires exactly 1 argument: code", e.Pos())
+	}
+
+	code, err := assertIntArg(args[0], 1, "fromCharCode", e)
+	if err != nil {
+		return nil, err
+	}
+
+	r := rune(code)
+	if code < 0 || code > utf8.MaxRune || !utf8.ValidRune(r) {
+		return nil, newPosError(fmt.Sprintf("fromCharCode invalid code point %d", code), e.Pos())
+	}
+
+	return string(r), nil
+}
+
 // callBuiltinIndexOf implements the indexOf(source, value) function.
 // Supports strings (substring search) and arrays (value search).
 func callBuiltinIndexOf(args []interface{}, e *ast.CallExpr) (interface{}, error) {
@@ -229,4 +273,30 @@ func callBuiltinToLower(args []interface{}, e *ast.CallExpr) (interface{}, error
 	}
 
 	return strings.ToLower(str), nil
+}
+
+// callBuiltinAppendIfMissing implements appendIfMissing(text, suffix).
+func callBuiltinAppendIfMissing(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+	strs, err := assertStringArgs(args, 2, "appendIfMissing", e)
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.HasSuffix(strs[0], strs[1]) {
+		return strs[0], nil
+	}
+	return strs[0] + strs[1], nil
+}
+
+// callBuiltinPrependIfMissing implements prependIfMissing(text, prefix).
+func callBuiltinPrependIfMissing(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+	strs, err := assertStringArgs(args, 2, "prependIfMissing", e)
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.HasPrefix(strs[0], strs[1]) {
+		return strs[0], nil
+	}
+	return strs[1] + strs[0], nil
 }

@@ -4,7 +4,7 @@ import "strings"
 
 var standardModuleSources = map[string]string{
 	"dw::core::Arrays":  standardModuleArrays,
-	"dw::core::Strings": `%dw 2.0`,
+	"dw::core::Strings": standardModuleStrings,
 }
 
 const standardModuleArrays = `%dw 2.0
@@ -79,6 +79,14 @@ fun sumBy(array, mapper) =
 
 fun take(array, amount) = take(array, amount)
 fun takeWhile(array, criteria) = takeWhile(array, criteria)
+`
+
+const standardModuleStrings = `%dw 2.0
+
+fun appendIfMissing(text, suffix) = appendIfMissing(text, suffix)
+fun prependIfMissing(text, prefix) = prependIfMissing(text, prefix)
+fun charCodeAt(text, index) = charCodeAt(text, index)
+fun fromCharCode(code) = fromCharCode(code)
 `
 
 func isStandardModule(moduleSpec string) bool {
