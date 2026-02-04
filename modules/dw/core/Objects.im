@@ -1,0 +1,9 @@
+%dw 2.0
+
+fun entrySet(object) = entriesOf(object)
+
+fun keySet(object) = keysOf(object)
+
+fun valueSet(object) = valuesOf(object)
+
+fun mergeWith(left, right) = left ++ right
