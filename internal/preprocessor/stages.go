@@ -181,6 +181,8 @@ func CreateSelectorProcessingStage() PipelineStage {
 	return &basicStage{
 		name: "Selector Processing",
 		handlers: []transformHandler{
+			replaceFilterSelectors,
+			replaceMetadataSelectors,
 			replaceRecursiveDescent,
 		},
 	}

@@ -580,18 +580,31 @@ func evalIndex(obj Value, idx Value, pos token.Pos) (Value, error) {
 		case string:
 			if strings.HasSuffix(i, "?") {
 				key := strings.TrimSuffix(i, "?")
-				// Safe access: extract field from all elements, return nil if not map or field missing
+				// Presence selector: return boolean presence for each array item.
 				result := make([]interface{}, 0, len(arr))
 				for _, item := range arr {
 					if itemMap, ok := item.(map[string]interface{}); ok {
-						if val, ok := itemMap[key]; ok {
-							result = append(result, val)
-						} else {
-							result = append(result, nil)
-						}
+						_, exists := getObjectValue(itemMap, key)
+						result = append(result, exists)
 					} else {
-						result = append(result, nil)
+						result = append(result, false)
 					}
+				}
+				return result, nil
+			}
+			if strings.HasSuffix(i, "!") {
+				key := strings.TrimSuffix(i, "!")
+				result := make([]interface{}, 0, len(arr))
+				for idx, item := range arr {
+					itemMap, ok := item.(map[string]interface{})
+					if !ok {
+						return nil, newPosError(fmt.Sprintf("assert selector failed: expected object at index %d", idx), pos)
+					}
+					val, exists := getObjectValue(itemMap, key)
+					if !exists {
+						return nil, newPosError(fmt.Sprintf("assert selector failed: missing key %q at index %d", key, idx), pos)
+					}
+					result = append(result, val)
 				}
 				return result, nil
 			}
@@ -599,7 +612,8 @@ func evalIndex(obj Value, idx Value, pos token.Pos) (Value, error) {
 			result := make([]interface{}, 0, len(arr))
 			for _, item := range arr {
 				if itemMap, ok := item.(map[string]interface{}); ok {
-					result = append(result, itemMap[i])
+					val, _ := getObjectValue(itemMap, i)
+					result = append(result, val)
 				} else {
 					result = append(result, nil)
 				}
@@ -624,6 +638,9 @@ func evalIndex(obj Value, idx Value, pos token.Pos) (Value, error) {
 	case map[string]interface{}:
 		switch i := idx.(type) {
 		case string:
+			if i == "#" {
+				return extractNamespaceValue(v), nil
+			}
 			if i == "@" {
 				// Return all attributes (keys starting with @)
 				attrs := make(map[string]interface{})
@@ -636,12 +653,19 @@ func evalIndex(obj Value, idx Value, pos token.Pos) (Value, error) {
 			}
 			if strings.HasSuffix(i, "?") {
 				key := strings.TrimSuffix(i, "?")
-				if val, ok := v[key]; ok {
-					return val, nil
-				}
-				return nil, nil
+				_, exists := getObjectValue(v, key)
+				return exists, nil
 			}
-			return v[i], nil
+			if strings.HasSuffix(i, "!") {
+				key := strings.TrimSuffix(i, "!")
+				val, exists := getObjectValue(v, key)
+				if !exists {
+					return nil, newPosError(fmt.Sprintf("assert selector failed: missing key %q", key), pos)
+				}
+				return val, nil
+			}
+			val, _ := getObjectValue(v, i)
+			return val, nil
 		case int:
 			// Support ordinal indexing on objects
 			keys := make([]string, 0, len(v))
@@ -659,6 +683,40 @@ func evalIndex(obj Value, idx Value, pos token.Pos) (Value, error) {
 	default:
 		return nil, newPosError(fmt.Sprintf("cannot index into %T", obj), pos)
 	}
+}
+
+// getObjectValue retrieves a key from an object, with namespace fallback (# -> :).
+func getObjectValue(obj map[string]interface{}, key string) (interface{}, bool) {
+	if val, ok := obj[key]; ok {
+		return val, true
+	}
+	if strings.Contains(key, "#") {
+		if val, ok := obj[strings.ReplaceAll(key, "#", ":")]; ok {
+			return val, true
+		}
+	}
+	return nil, false
+}
+
+// extractNamespaceValue returns a best-effort namespace URI for an XML-like object.
+func extractNamespaceValue(obj map[string]interface{}) interface{} {
+	nsVal, ok := obj["@xmlns"]
+	if !ok {
+		return nil
+	}
+	nsMap, ok := nsVal.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	if def, ok := nsMap["#default"]; ok {
+		return def
+	}
+	if len(nsMap) == 1 {
+		for _, v := range nsMap {
+			return v
+		}
+	}
+	return nil
 }
 
 // CoerceEquals implements the ~= coercion equality operator

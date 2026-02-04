@@ -40,6 +40,8 @@ func TestReplaceDotNotation(t *testing.T) {
 		{"simple dot", "obj.field", `obj["field"]`},
 		{"chained dot", "obj.a.b", `obj["a"]["b"]`},
 		{"dot with @", "obj.@attr", `obj["@attr"]`},
+		{"dot with #", "obj.#", `obj["#"]`},
+		{"dot assert", "obj.field!", `obj["field!"]`},
 		{"no replacement in string", `"obj.field"`, `"obj.field"`},
 	}
 
@@ -66,6 +68,45 @@ func TestReplaceRecursiveDescent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := replaceRecursiveDescent(tt.input)
+			if got != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestReplaceFilterSelectors(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"simple filter selector", "items[?($ > 1)]", `__filter_selector(items, __lambda("__arg, __idx", __arg > 1))`},
+		{"filter selector with index", "items[?($$ > 0)]", `__filter_selector(items, __lambda("__arg, __idx", __idx > 0))`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := replaceFilterSelectors(tt.input)
+			if got != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestReplaceMetadataSelectors(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"simple metadata", "payload.^size", `__metadata(payload, "size")`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := replaceMetadataSelectors(tt.input)
 			if got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
@@ -131,7 +172,7 @@ func TestScannerStringStateTracking(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
-		checkPos    int  // number of Next() calls
+		checkPos    int // number of Next() calls
 		wantInStr   bool
 		description string
 	}{

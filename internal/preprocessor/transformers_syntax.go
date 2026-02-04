@@ -229,31 +229,134 @@ func replaceRecursiveDescent(s string) string {
 	return string(result)
 }
 
+// replaceFilterSelectors converts "obj[?(expr)]" to "__filter_selector(obj, __lambda(\"__arg, __idx\", expr))".
+func replaceFilterSelectors(s string) string {
+	var result []rune
+	sc := NewScanner(s)
+
+	for sc.Pos() < len(s) {
+		if !sc.IsInString() && sc.Peek() == '[' && sc.Pos()+2 < len(s) && s[sc.Pos()+1] == '?' && s[sc.Pos()+2] == '(' {
+			leftExpr, newResult, ok := extractLeftOperand(result)
+			if !ok {
+				result = append(result, sc.NextRune())
+				continue
+			}
+
+			openParen := sc.Pos() + 2
+			sc.SetPos(openParen)
+			closeParen := sc.FindMatchingCloseBracket(sc.Pos())
+			if closeParen == -1 {
+				sc.SetPos(openParen - 2)
+				result = append(result, sc.NextRune())
+				continue
+			}
+
+			closeBracket := closeParen + 1
+			for closeBracket < len(s) && unicode.IsSpace(rune(s[closeBracket])) {
+				closeBracket++
+			}
+			if closeBracket >= len(s) || s[closeBracket] != ']' {
+				sc.SetPos(openParen - 2)
+				result = append(result, sc.NextRune())
+				continue
+			}
+
+			predicate := strings.TrimSpace(s[openParen+1 : closeParen])
+			if predicate == "" {
+				predicate = "false"
+			}
+			predicate = replaceImplicitParam(predicate, "$$", "__idx")
+			predicate = replaceImplicitParam(predicate, "$", "__arg")
+
+			result = newResult
+			result = append(result, []rune("__filter_selector(")...)
+			result = append(result, []rune(leftExpr)...)
+			result = append(result, []rune(", __lambda(\"__arg, __idx\", ")...)
+			result = append(result, []rune(predicate)...)
+			result = append(result, []rune("))")...)
+
+			sc.SetPos(closeBracket + 1)
+			continue
+		}
+		result = append(result, sc.NextRune())
+	}
+
+	return string(result)
+}
+
+// replaceMetadataSelectors converts "obj.^meta" to "__metadata(obj, \"meta\")".
+func replaceMetadataSelectors(s string) string {
+	var result []rune
+	sc := NewScanner(s)
+
+	for sc.Pos() < len(s) {
+		if !sc.IsInString() && sc.Peek2() == ".^" {
+			metaStart := sc.Pos() + 2
+			if metaStart < len(s) && IsIdentifierStart(s[metaStart]) {
+				metaEnd := metaStart + 1
+				for metaEnd < len(s) && IsIdentifierPart(s[metaEnd]) {
+					metaEnd++
+				}
+
+				leftExpr, newResult, ok := extractLeftOperand(result)
+				if !ok {
+					result = append(result, sc.NextRune())
+					continue
+				}
+				metaName := s[metaStart:metaEnd]
+
+				result = newResult
+				result = append(result, []rune("__metadata(")...)
+				result = append(result, []rune(leftExpr)...)
+				result = append(result, []rune(", \"")...)
+				result = append(result, []rune(metaName)...)
+				result = append(result, []rune("\")")...)
+				sc.SetPos(metaEnd)
+				continue
+			}
+		}
+		result = append(result, sc.NextRune())
+	}
+
+	return string(result)
+}
+
 // replaceDotNotation converts "obj.field" to "obj[\"field\"]"
 func replaceDotNotation(s string) string {
 	var result []rune
 	sc := NewScanner(s)
 
 	for sc.Pos() < len(s) {
-		if !sc.IsInString() && sc.Peek() == '.' && sc.Pos()+1 < len(s) && (IsIdentifierStart(s[sc.Pos()+1]) || s[sc.Pos()+1] == '@') {
+		if !sc.IsInString() && sc.Peek() == '.' && sc.Pos()+1 < len(s) && (IsIdentifierStart(s[sc.Pos()+1]) || s[sc.Pos()+1] == '@' || s[sc.Pos()+1] == '#') {
 			if len(result) > 0 {
 				lastChar := result[len(result)-1]
 				lastCharByte := byte(lastChar)
 				if IsIdentifierPart(lastCharByte) || lastChar == ')' || lastChar == ']' || lastChar == '"' || lastChar == '}' {
 					sc.Next()
 					isAt := false
+					isNamespace := false
 					if sc.Peek() == '@' {
 						isAt = true
 						sc.Next()
+					} else if sc.Peek() == '#' {
+						isNamespace = true
+						sc.Next()
 					}
-					fieldStart := sc.Pos()
-					for sc.Pos() < len(s) && IsIdentifierPart(s[sc.Pos()]) {
-						sc.Advance(1)
+					fieldName := "#"
+					if !isNamespace {
+						fieldStart := sc.Pos()
+						for sc.Pos() < len(s) && IsIdentifierPart(s[sc.Pos()]) {
+							sc.Advance(1)
+						}
+						fieldName = s[fieldStart:sc.Pos()]
 					}
-					fieldName := s[fieldStart:sc.Pos()]
 					isOptional := false
-					if sc.Pos() < len(s) && s[sc.Pos()] == '?' {
+					isAssert := false
+					if !isNamespace && sc.Pos() < len(s) && s[sc.Pos()] == '?' {
 						isOptional = true
+						sc.Advance(1)
+					} else if !isNamespace && sc.Pos() < len(s) && s[sc.Pos()] == '!' {
+						isAssert = true
 						sc.Advance(1)
 					}
 					if isOptional {
@@ -266,6 +369,18 @@ func replaceDotNotation(s string) string {
 							result = append(result, ch)
 						}
 						result = append(result, '?')
+						result = append(result, '"')
+						result = append(result, ']')
+					} else if isAssert {
+						result = append(result, '[')
+						result = append(result, '"')
+						if isAt {
+							result = append(result, '@')
+						}
+						for _, ch := range fieldName {
+							result = append(result, ch)
+						}
+						result = append(result, '!')
 						result = append(result, '"')
 						result = append(result, ']')
 					} else {

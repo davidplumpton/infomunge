@@ -137,18 +137,18 @@ Feature: Error Messages
       "h"
       """
 
-  Scenario: Optional selector
+  Scenario: Presence selector
     Given the following input content:
       """
       %im 0.1
       output application/json
       ---
-      {"user": {"name": "Alice"}}.user?.name
+      {"user": {"name": "Alice"}}.user?
       """
     When I run the application with this content
     Then the output should be:
       """
-      "Alice"
+      true
       """
 
   Scenario: Cannot index into unsupported type
@@ -470,4 +470,3 @@ Feature: Error Messages
       """
     When I run the application and it fails
     Then the error should contain "no case matched the value"
-

@@ -38,6 +38,141 @@ func executeLambdaOnArrayElements(
 	return nil
 }
 
+// callBuiltinFilterSelector implements DataWeave-style selector filter: source[?(expr)].
+func callBuiltinFilterSelector(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+	if len(e.Args) != 2 {
+		return nil, newPosError("selector filter requires exactly 2 arguments: source, lambda", e.Pos())
+	}
+
+	source, err := evalASTWithDepth(e.Args[0], context, depth)
+	if err != nil {
+		return nil, err
+	}
+	lambdaVal, err := evalASTWithDepth(e.Args[1], context, depth)
+	if err != nil {
+		return nil, err
+	}
+	lambda, ok := lambdaVal.(*Lambda)
+	if !ok {
+		return nil, newPosError(fmt.Sprintf("selector filter expects a lambda function, got %T", lambdaVal), e.Args[1].Pos())
+	}
+	if lambda.ParamCount() < 1 || lambda.ParamCount() > 2 {
+		return nil, newPosError(fmt.Sprintf("selector filter lambda must have 1 or 2 parameters, got %d", lambda.ParamCount()), e.Args[1].Pos())
+	}
+
+	if arr, ok := AsArray(source); ok {
+		result := make([]interface{}, 0, len(arr))
+		err := executeLambdaOnArrayElements(arr, lambda, context, depth, func(elem interface{}, _ int, cond interface{}) error {
+			condBool, ok := cond.(bool)
+			if !ok {
+				return newPosError(fmt.Sprintf("selector filter lambda must return a boolean, got %T", cond), e.Args[1].Pos())
+			}
+			if condBool {
+				result = append(result, elem)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	obj, ok := AsObject(source)
+	if !ok {
+		if source == nil {
+			return nil, nil
+		}
+		return nil, nil
+	}
+
+	keys := make([]string, 0, len(obj))
+	for k := range obj {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	result := make(map[string]interface{})
+	for idx, key := range keys {
+		val := obj[key]
+		lambdaContext := copyContext(context)
+		lambdaContext[lambda.ParamName(0)] = val
+		if lambda.ParamCount() > 1 {
+			lambdaContext[lambda.ParamName(1)] = idx
+		}
+		condVal, err := evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+		if err != nil {
+			return nil, err
+		}
+		condBool, ok := condVal.(bool)
+		if !ok {
+			return nil, newPosError(fmt.Sprintf("selector filter lambda must return a boolean, got %T", condVal), e.Args[1].Pos())
+		}
+		if condBool {
+			result[key] = val
+		}
+	}
+
+	return result, nil
+}
+
+// callBuiltinMetadata implements DataWeave-style metadata selector: value.^meta.
+func callBuiltinMetadata(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, newPosError("metadata selector requires exactly 2 arguments: value, metadata", e.Pos())
+	}
+
+	metaName, ok := args[1].(string)
+	if !ok {
+		return nil, newPosError(fmt.Sprintf("metadata selector name must be a string, got %T", args[1]), e.Pos())
+	}
+
+	value := args[0]
+	switch metaName {
+	case "class", "type":
+		return getTypeName(value), nil
+	case "size":
+		switch v := value.(type) {
+		case string:
+			return len(v), nil
+		case []interface{}:
+			return len(v), nil
+		case XMLMultiValue:
+			return len(v), nil
+		case map[string]interface{}:
+			return len(v), nil
+		default:
+			return nil, nil
+		}
+	case "attributes":
+		obj, ok := value.(map[string]interface{})
+		if !ok {
+			return nil, nil
+		}
+		attrs := make(map[string]interface{})
+		for k, v := range obj {
+			if strings.HasPrefix(k, "@") && k != "@xmlns" {
+				attrs[k] = v
+			}
+		}
+		return attrs, nil
+	case "namespaces":
+		obj, ok := value.(map[string]interface{})
+		if !ok {
+			return nil, nil
+		}
+		return obj["@xmlns"], nil
+	case "text":
+		obj, ok := value.(map[string]interface{})
+		if !ok {
+			return nil, nil
+		}
+		return obj["#text"], nil
+	default:
+		return nil, nil
+	}
+}
+
 // findExtremumByLambda evaluates a lambda on each array element and returns the element
 // that satisfies the comparison predicate. The predicate receives (newValue, currentValue)
 // and returns true if newValue should replace currentValue.
