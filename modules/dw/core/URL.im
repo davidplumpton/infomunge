@@ -1,0 +1,8 @@
+%dw 2.0
+
+fun parseURI(uri) = parseURI(uri)
+fun compose(parts) = compose(parts)
+fun encodeURI(uri) = encodeURI(uri)
+fun decodeURI(uri) = decodeURI(uri)
+fun encodeURIComponent(component) = encodeURIComponent(component)
+fun decodeURIComponent(component) = decodeURIComponent(component)

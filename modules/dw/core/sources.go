@@ -15,6 +15,7 @@ var standardModuleFileBySpec = map[string]string{
 	"dw::core::Numbers":  "Numbers.im",
 	"dw::core::Objects":  "Objects.im",
 	"dw::core::Strings":  "Strings.im",
+	"dw::core::URL":      "URL.im",
 }
 
 // IsStandardModule reports whether the provided import spec references a built-in dw::core module.
