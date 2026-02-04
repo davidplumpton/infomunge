@@ -1,0 +1,5 @@
+%dw 2.0
+
+fun concatWith(elements, separator) = joinBy(elements, separator)
+fun readLinesWith(content, separator) = splitBy(content, separator)
+fun writeLinesWith(lines, separator) = joinBy(lines, separator)

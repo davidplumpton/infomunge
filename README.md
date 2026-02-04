@@ -93,7 +93,7 @@ Key entrypoint: `internal/runner/runner.go`.
 - Preprocessor (syntax transforms): `internal/preprocessor/*`
 - Evaluator (AST + builtins + lazy): `internal/evaluator/*`
 - Formats (read/write): `pkg/formats/*`
-- Core module scripts: `modules/dw/core/*.im` (for example `Arrays.im`, `Strings.im`, `Objects.im`, `Numbers.im`)
+- Core module scripts: `modules/dw/core/*.im` (for example `Arrays.im`, `Binaries.im`, `Strings.im`, `Objects.im`, `Numbers.im`)
 
 ### Where To Add Things
 

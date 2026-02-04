@@ -4,7 +4,7 @@
 
 [1] **Project Overview** - InfoMunge is a Go-based tool for transforming text data with a DataWeave-inspired syntax; it parses inputs, headers, rewrites syntax, evaluates an AST, and formats output [3][2]. It supports multiple inputs and multiple formats (JSON, XML, CSV, YAML, Java properties) [6][10].
 
-[2] **Repo Map** - Key entrypoints and modules: CLI `cmd/infomunge/main.go`, JS build `cmd/infomunge-js/main.go`, CLI app `internal/cli/app.go`, inputs `internal/io/input.go`, runner `internal/runner/runner.go`, preprocessor `internal/preprocessor/*`, evaluator `internal/evaluator/*`, formats `pkg/formats/*`, core module scripts `modules/dw/core/*.im` (Arrays/Strings/Objects/Numbers), standalone playground `docs/playground/index.html` [9][7][8][6][10][21].
+[2] **Repo Map** - Key entrypoints and modules: CLI `cmd/infomunge/main.go`, JS build `cmd/infomunge-js/main.go`, CLI app `internal/cli/app.go`, inputs `internal/io/input.go`, runner `internal/runner/runner.go`, preprocessor `internal/preprocessor/*`, evaluator `internal/evaluator/*`, formats `pkg/formats/*`, core module scripts `modules/dw/core/*.im` (Arrays/Binaries/Strings/Objects/Numbers), standalone playground `docs/playground/index.html` [9][7][8][6][10][21].
 
 [3] **Execution Pipeline** - Flow: CLI -> Inputs -> Header -> Preprocess -> Evaluate -> Format output [2]. Header directives are parsed in the runner, preprocessing rewrites DataWeave-like syntax, evaluation executes the AST with builtins, then output formatting occurs [7][8][9][6].
 
