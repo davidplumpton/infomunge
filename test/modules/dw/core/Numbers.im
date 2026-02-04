@@ -1,0 +1,6 @@
+%dw 2.0
+
+fun toRadix(number, radix) = toRadix(number, radix)
+fun fromRadix(text, radix) = fromRadix(text, radix)
+fun toBinary(number) = toRadix(number, 2)
+fun fromBinary(text) = fromRadix(text, 2)

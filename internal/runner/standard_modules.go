@@ -4,6 +4,7 @@ import "strings"
 
 var standardModuleSources = map[string]string{
 	"dw::core::Arrays":  standardModuleArrays,
+	"dw::core::Numbers": standardModuleNumbers,
 	"dw::core::Strings": standardModuleStrings,
 }
 
@@ -87,6 +88,14 @@ fun appendIfMissing(text, suffix) = appendIfMissing(text, suffix)
 fun prependIfMissing(text, prefix) = prependIfMissing(text, prefix)
 fun charCodeAt(text, index) = charCodeAt(text, index)
 fun fromCharCode(code) = fromCharCode(code)
+`
+
+const standardModuleNumbers = `%dw 2.0
+
+fun toRadix(number, radix) = toRadix(number, radix)
+fun fromRadix(text, radix) = fromRadix(text, radix)
+fun toBinary(number) = toRadix(number, 2)
+fun fromBinary(text) = fromRadix(text, 2)
 `
 
 func isStandardModule(moduleSpec string) bool {
