@@ -184,3 +184,19 @@ Feature: Import Directive
       """
       "HELLO"
       """
+
+  Scenario: Import functions from multiple dw core modules
+    Given the following input content:
+      """
+      %im 0.1
+      import keySet from dw::core::Objects
+      import concatWith from dw::core::Binaries
+      output application/json
+      ---
+      {keys: keySet({b: 2, a: 1}), joined: concatWith(["x", "y"], ":")}
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"joined":"x:y","keys":["a","b"]}
+      """

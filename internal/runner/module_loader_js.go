@@ -128,7 +128,10 @@ func (l *ModuleLoader) Load(moduleSpec string) (*Module, error) {
 	l.loading[moduleSpec] = true
 	defer delete(l.loading, moduleSpec)
 
-	content := standardModuleSources[moduleSpec]
+	content, err := standardModuleSource(moduleSpec)
+	if err != nil {
+		return nil, unifiederrors.WrapParsef(err, "failed to load standard module %s", moduleSpec)
+	}
 	ns, err := parseModuleContent(content, l)
 	if err != nil {
 		return nil, unifiederrors.WrapParsef(err, "failed to parse standard module %s", moduleSpec)
