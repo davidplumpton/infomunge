@@ -18,6 +18,21 @@ Feature: Arrays Module
       2
       """
 
+  Scenario: Import module and call with namespace
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      import dw::core::Arrays
+      ---
+      Arrays::countBy([1, 2, 3, 4, 5], (x) -> x > 3)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      2
+      """
+
   Scenario: divideBy splits arrays into chunks
     Given the following input content:
       """
