@@ -105,7 +105,7 @@ func (r *rewriter) handleIfElse() bool {
 		return false
 	}
 
-	trueStartPos, trueEndPos, falseBranchStart, falseBranchEnd, ok := r.findBranches(condEndPos)
+	branches, ok := r.findBranches(condEndPos)
 	if !ok {
 		return false
 	}
@@ -114,21 +114,21 @@ func (r *rewriter) handleIfElse() bool {
 	if !ok {
 		return true
 	}
-	trueBranch, ok := r.rewriteBranch(r.input[trueStartPos:trueEndPos])
+	trueBranch, ok := r.rewriteBranch(r.input[branches.TrueStart:branches.TrueEnd])
 	if !ok {
 		return true
 	}
 
 	falseBranch := "nil"
-	if falseBranchStart > 0 && falseBranchEnd > 0 {
-		falseBranch, ok = r.rewriteBranch(r.input[falseBranchStart:falseBranchEnd])
+	if branches.FalseStart > 0 && branches.FalseEnd > 0 {
+		falseBranch, ok = r.rewriteBranch(r.input[branches.FalseStart:branches.FalseEnd])
 		if !ok {
 			return true
 		}
 	}
 
 	r.appendIfElse(startPos, condition, trueBranch, falseBranch)
-	r.updatePositionAfterIfElse(trueEndPos, falseBranchStart, falseBranchEnd)
+	r.updatePositionAfterIfElse(branches.TrueEnd, branches.FalseStart, branches.FalseEnd)
 	return true
 }
 
@@ -238,31 +238,36 @@ func (r *rewriter) findMatchingParens(afterIfPos int) (int, int, bool) {
 // The function handles nested brackets/braces and string literals to correctly
 // identify branch boundaries, then stops at the first top-level " else " or
 // newline boundary.
-func (r *rewriter) findBranches(condEndPos int) (int, int, int, int, bool) {
+func (r *rewriter) findBranches(condEndPos int) (BranchPositions, bool) {
 	var trueStartPos int
 	if r.opts.AllowMultilineIfElse {
 		trueStartPos = skipSpaceAndNewlines(r.input, condEndPos+1)
 	} else {
 		trueStartPos = skipHorizontalSpace(r.input, condEndPos+1)
 	}
-	trueEndPos, elseStartPos, errPos, ok := scanBranchEnd(r.input, trueStartPos, r.opts.AllowMultilineIfElse)
-	if !ok {
-		r.setInvariantError("branch scan closed before open at position %d", errPos)
-		return 0, 0, 0, 0, false
+	scan := scanBranchEnd(r.input, trueStartPos, r.opts.AllowMultilineIfElse)
+	if !scan.OK {
+		r.setInvariantError("branch scan closed before open at position %d", scan.ErrPos)
+		return BranchPositions{}, false
 	}
 
-	if elseStartPos < 0 {
-		return trueStartPos, trueEndPos, 0, 0, true
+	if scan.ElsePos < 0 {
+		return BranchPositions{TrueStart: trueStartPos, TrueEnd: scan.BranchEnd}, true
 	}
 
-	falseBranchStart := skipSpaceAndNewlines(r.input, elseStartPos+len("else"))
+	falseBranchStart := skipSpaceAndNewlines(r.input, scan.ElsePos+len("else"))
 	var falseBranchEnd int
 	if r.opts.AllowMultilineIfElse {
 		falseBranchEnd = findExpressionEnd(r.input, falseBranchStart, true)
 	} else {
 		falseBranchEnd = findLineEnd(r.input, falseBranchStart)
 	}
-	return trueStartPos, trueEndPos, falseBranchStart, falseBranchEnd, true
+	return BranchPositions{
+		TrueStart:  trueStartPos,
+		TrueEnd:    scan.BranchEnd,
+		FalseStart: falseBranchStart,
+		FalseEnd:   falseBranchEnd,
+	}, true
 }
 
 func (r *rewriter) handleAndOr() bool {
@@ -675,7 +680,7 @@ func findMatchingDelimited(input string, start int, opener byte, closer byte, al
 // It tracks nesting across (), {}, [] and ignores content inside string literals.
 // Returns the end position, the else position (or -1), and the position of
 // an unmatched closer if the scan fails.
-func scanBranchEnd(input string, start int, allowMultiline bool) (int, int, int, bool) {
+func scanBranchEnd(input string, start int, allowMultiline bool) BranchScanResult {
 	pos := start
 	depth := 0
 	state := stringState{}
@@ -688,7 +693,7 @@ func scanBranchEnd(input string, start int, allowMultiline bool) (int, int, int,
 			} else if isBranchCloser(ch) {
 				depth--
 				if depth < 0 {
-					return 0, -1, pos, false
+					return BranchScanResult{ErrPos: pos}
 				}
 			} else if depth == 0 && isElseKeywordAt(input, pos) {
 				// branchEnd should be before any whitespace leading to else
@@ -696,7 +701,7 @@ func scanBranchEnd(input string, start int, allowMultiline bool) (int, int, int,
 				for branchEnd > start && isWhitespace(input[branchEnd-1]) {
 					branchEnd--
 				}
-				return branchEnd, pos, -1, true
+				return BranchScanResult{BranchEnd: branchEnd, ElsePos: pos, ErrPos: -1, OK: true}
 			} else if allowMultiline && depth == 0 && (ch == '\n' || ch == '\r') {
 				next := pos + 1
 				for next < len(input) && isWhitespace(input[next]) {
@@ -705,20 +710,20 @@ func scanBranchEnd(input string, start int, allowMultiline bool) (int, int, int,
 				if next < len(input) && isElseKeywordAt(input, next) {
 					// allow multiline if/else by continuing until "else"
 				} else {
-					return pos, -1, -1, true
+					return BranchScanResult{BranchEnd: pos, ElsePos: -1, ErrPos: -1, OK: true}
 				}
 			}
 			if !allowMultiline && depth == 0 && (ch == '\n' || pos == len(input)-1) {
 				if ch != '\n' {
 					pos++
 				}
-				return pos, -1, -1, true
+				return BranchScanResult{BranchEnd: pos, ElsePos: -1, ErrPos: -1, OK: true}
 			}
 		}
 		pos++
 	}
 
-	return pos, -1, -1, true
+	return BranchScanResult{BranchEnd: pos, ElsePos: -1, ErrPos: -1, OK: true}
 }
 
 func isElseKeywordAt(input string, pos int) bool {

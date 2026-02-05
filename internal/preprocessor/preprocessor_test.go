@@ -894,15 +894,15 @@ func TestScanBranchEnd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			end, elsePos, _, ok := scanBranchEnd(tt.input, tt.start, false)
-			hasElse := elsePos >= 0
-			if ok != tt.wantOK {
-				t.Errorf("ok = %v, want %v", ok, tt.wantOK)
+			scan := scanBranchEnd(tt.input, tt.start, false)
+			hasElse := scan.ElsePos >= 0
+			if scan.OK != tt.wantOK {
+				t.Errorf("ok = %v, want %v", scan.OK, tt.wantOK)
 			}
-			if ok && end != tt.wantEnd {
-				t.Errorf("end = %d, want %d", end, tt.wantEnd)
+			if scan.OK && scan.BranchEnd != tt.wantEnd {
+				t.Errorf("end = %d, want %d", scan.BranchEnd, tt.wantEnd)
 			}
-			if ok && hasElse != tt.hasElse {
+			if scan.OK && hasElse != tt.hasElse {
 				t.Errorf("hasElse = %v, want %v", hasElse, tt.hasElse)
 			}
 		})

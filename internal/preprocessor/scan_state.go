@@ -95,3 +95,19 @@ func (s *ScanState) Depth() int {
 func (s *ScanState) AtTopLevel() bool {
 	return !s.Str.inString && s.DepthParen == 0 && s.DepthBrack == 0 && s.DepthBrace == 0
 }
+
+// BranchPositions holds the positions of true and false branches in an if-else expression.
+type BranchPositions struct {
+	TrueStart  int // Start of the true branch expression
+	TrueEnd    int // End of the true branch expression (exclusive)
+	FalseStart int // Start of the false branch (0 if no else)
+	FalseEnd   int // End of the false branch (0 if no else)
+}
+
+// BranchScanResult holds the result of scanning for a branch endpoint.
+type BranchScanResult struct {
+	BranchEnd int // End position of the branch expression
+	ElsePos   int // Position of "else" keyword (-1 if none)
+	ErrPos    int // Position of unmatched closer (-1 if no error)
+	OK        bool
+}
