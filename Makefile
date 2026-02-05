@@ -4,13 +4,13 @@
 build:
 	go build -o infomunge ./cmd/infomunge
 
-# Run all tests with real-time progress output
+# Run all tests (quiet on success, shows failures)
 test:
-	go test -v ./test -timeout 10m
+	go test ./test -timeout 10m
 
-# Run tests with pretty format for detailed step output
+# Run tests with each test name printed (use to find hanging/timeout tests)
 test-verbose:
-	GODOG_FORMAT=pretty go test -v ./test -timeout 10m
+	go test -v ./test -timeout 10m
 
 # Run tests with minimal output (failed steps + periodic pass counts)
 test-failures:
@@ -22,7 +22,7 @@ test-feature:
 
 # Run unit tests only (exclude cucumber)
 test-unit:
-	go test -v ./test -run 'Test[^F]'
+	go test ./test -run 'Test[^F]'
 
 # Run the server playground locally at http://localhost:8080
 playground:
