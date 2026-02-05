@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/runner"
 	"infomunge/pkg/formats"
 )
 
@@ -107,7 +108,7 @@ func BuildRunContext(inputs []RunInput) (map[string]interface{}, error) {
 func FormatRunResult(result interface{}, mimeType string, evalCtx map[string]interface{}) (string, error) {
 	if mimeType == "application/xml" {
 		var nsMap map[string]string
-		if namespaces, ok := evalCtx["__namespaces__"].(map[string]string); ok {
+		if namespaces, ok := evalCtx[runner.ContextKeyNamespaces].(map[string]string); ok {
 			nsMap = namespaces
 		}
 		xmlOpts := formats.XMLOutputOptions{
@@ -115,7 +116,7 @@ func FormatRunResult(result interface{}, mimeType string, evalCtx map[string]int
 			NamespaceVars:      ExtractNamespaceVars(evalCtx),
 			WriteDeclaration:   true,
 		}
-		if rawOpts, ok := evalCtx["__output_options__"].(map[string]string); ok {
+		if rawOpts, ok := evalCtx[runner.ContextKeyOutputOptions].(map[string]string); ok {
 			if err := ApplyXMLOutputOptions(&xmlOpts, rawOpts); err != nil {
 				return "", err
 			}

@@ -822,7 +822,7 @@ func (r *rewriter) handleOpenBrace(char byte) bool {
 			r.pos = endPos
 			return true
 		}
-		r.appendString("map[string]interface{}{", r.pos)
+		r.appendString(GoObjectPrefix, r.pos)
 		r.stack = append(r.stack, '}')
 		return true
 	}
@@ -832,7 +832,7 @@ func (r *rewriter) handleOpenBrace(char byte) bool {
 			r.stack = append(r.stack, ']')
 			return true
 		}
-		r.appendString("[]interface{}{", r.pos)
+		r.appendString(GoArrayPrefix, r.pos)
 		r.stack = append(r.stack, '>')
 		return true
 	}
@@ -897,7 +897,7 @@ func (r *rewriter) tryRewriteConditionalObjectLiteral() (string, int, bool) {
 	}
 
 	if len(rewrittenEntries) == 0 {
-		return "map[string]interface{}{}", braceEnd, true
+		return GoEmptyObject, braceEnd, true
 	}
 
 	return "merge(" + strings.Join(rewrittenEntries, ", ") + ")", braceEnd, true

@@ -108,8 +108,8 @@ func findCaseBrace(s string, afterCasePos int) (int, bool) {
 			bracePos++
 			continue
 		}
-		if strings.HasPrefix(s[bracePos:], "map[string]interface{}{") {
-			bracePos += len("map[string]interface{}{") - 1 // Point to the '{'
+		if strings.HasPrefix(s[bracePos:], GoObjectPrefix) {
+			bracePos += len(GoObjectPrefix) - 1 // Point to the '{'
 			break
 		}
 		if s[bracePos] == '{' {

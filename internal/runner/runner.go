@@ -12,6 +12,12 @@ import (
 	"strings"
 )
 
+// Context keys for eval context metadata shared between runner and handlers.
+const (
+	ContextKeyNamespaces    = "__namespaces__"
+	ContextKeyOutputOptions = "__output_options__"
+)
+
 // RunnerOptions holds configuration for execution
 type RunnerOptions struct {
 	BaseDir string
@@ -173,7 +179,7 @@ func handleOutputDecl(trimmedLine string, outputMimeType *string, context map[st
 		return err
 	}
 	if len(parsed) > 0 {
-		context["__output_options__"] = parsed
+		context[ContextKeyOutputOptions] = parsed
 	}
 	return nil
 }
@@ -548,7 +554,7 @@ func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLo
 
 	// Store namespaces in context if any were declared
 	if len(state.namespaces) > 0 {
-		state.context["__namespaces__"] = state.namespaces
+		state.context[ContextKeyNamespaces] = state.namespaces
 	}
 
 	return state.context, *state.outputMimeType, nil
@@ -619,7 +625,7 @@ func formatOutputWithContext(result interface{}, hasHeader bool, mimeType string
 	if mimeType == "application/xml" {
 		var nsMap map[string]string
 		if context != nil {
-			if declared, ok := context["__namespaces__"].(map[string]string); ok {
+			if declared, ok := context[ContextKeyNamespaces].(map[string]string); ok {
 				nsMap = declared
 			}
 		}
@@ -629,7 +635,7 @@ func formatOutputWithContext(result interface{}, hasHeader bool, mimeType string
 			WriteDeclaration:   true,
 		}
 		if context != nil {
-			if rawOpts, ok := context["__output_options__"].(map[string]string); ok {
+			if rawOpts, ok := context[ContextKeyOutputOptions].(map[string]string); ok {
 				if err := applyXMLOutputOptions(&xmlOpts, rawOpts); err != nil {
 					return err
 				}

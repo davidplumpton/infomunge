@@ -107,7 +107,7 @@ func replaceAsOperator(s string) string {
 			}
 
 			var configArg string
-			prefixes := []string{"map[string]interface{}{", "map[string]interface{} {"}
+			prefixes := []string{GoObjectPrefix, GoObjectPrefixSpace}
 			for _, prefix := range prefixes {
 				if configStart+len(prefix) <= len(s) && s[configStart:configStart+len(prefix)] == prefix {
 					bracePos := configStart + len(prefix) - 1

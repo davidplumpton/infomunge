@@ -1,5 +1,13 @@
 package preprocessor
 
+// Go type literal prefixes used as rewrite targets in the preprocessor.
+const (
+	GoObjectPrefix      = "map[string]interface{}{"
+	GoObjectPrefixSpace = "map[string]interface{} {"
+	GoArrayPrefix       = "[]interface{}{"
+	GoEmptyObject       = "map[string]interface{}{}"
+)
+
 // isEscapedAt checks if the character at position i in string s is escaped
 // by counting consecutive backslashes before it. An odd number means escaped.
 // Example: "hello\"" -> quote at end is escaped (1 backslash)
