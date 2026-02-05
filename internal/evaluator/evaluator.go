@@ -7,7 +7,6 @@ import (
 	"go/parser"
 	"go/token"
 	"math"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -559,127 +558,14 @@ func evalIndex(obj Value, idx Value, pos token.Pos) (Value, error) {
 	}
 
 	switch v := obj.(type) {
-	case []interface{}, XMLMultiValue:
-		// Convert to []interface{} if it's XMLMultiValue for uniform processing
-		var arr []interface{}
-		if mv, ok := v.(XMLMultiValue); ok {
-			arr = []interface{}(mv)
-		} else {
-			arr = v.([]interface{})
-		}
-
-		switch i := idx.(type) {
-		case int:
-			if i < 0 {
-				i += len(arr)
-			}
-			if i < 0 || i >= len(arr) {
-				return nil, newPosError(fmt.Sprintf("array index out of bounds: %d", i), pos)
-			}
-			return arr[i], nil
-		case string:
-			if strings.HasSuffix(i, "?") {
-				key := strings.TrimSuffix(i, "?")
-				// Presence selector: return boolean presence for each array item.
-				result := make([]interface{}, 0, len(arr))
-				for _, item := range arr {
-					if itemMap, ok := item.(map[string]interface{}); ok {
-						_, exists := getObjectValue(itemMap, key)
-						result = append(result, exists)
-					} else {
-						result = append(result, false)
-					}
-				}
-				return result, nil
-			}
-			if strings.HasSuffix(i, "!") {
-				key := strings.TrimSuffix(i, "!")
-				result := make([]interface{}, 0, len(arr))
-				for idx, item := range arr {
-					itemMap, ok := item.(map[string]interface{})
-					if !ok {
-						return nil, newPosError(fmt.Sprintf("assert selector failed: expected object at index %d", idx), pos)
-					}
-					val, exists := getObjectValue(itemMap, key)
-					if !exists {
-						return nil, newPosError(fmt.Sprintf("assert selector failed: missing key %q at index %d", key, idx), pos)
-					}
-					result = append(result, val)
-				}
-				return result, nil
-			}
-			// DataWeave compatibility: applying a string index to an array extracts that field from all elements
-			result := make([]interface{}, 0, len(arr))
-			for _, item := range arr {
-				if itemMap, ok := item.(map[string]interface{}); ok {
-					val, _ := getObjectValue(itemMap, i)
-					result = append(result, val)
-				} else {
-					result = append(result, nil)
-				}
-			}
-			return result, nil
-		default:
-			return nil, newPosError(fmt.Sprintf("array index must be an integer or string, got %T", idx), pos)
-		}
+	case []interface{}:
+		return evalArrayIndex(v, idx, pos)
+	case XMLMultiValue:
+		return evalArrayIndex([]interface{}(v), idx, pos)
 	case string:
-		switch i := idx.(type) {
-		case int:
-			if i < 0 {
-				i += len(v)
-			}
-			if i < 0 || i >= len(v) {
-				return nil, newPosError(fmt.Sprintf("string index out of bounds: %d", i), pos)
-			}
-			return v[i : i+1], nil
-		default:
-			return nil, newPosError(fmt.Sprintf("string index must be an integer, got %T", idx), pos)
-		}
+		return evalStringIndex(v, idx, pos)
 	case map[string]interface{}:
-		switch i := idx.(type) {
-		case string:
-			if i == "#" {
-				return extractNamespaceValue(v), nil
-			}
-			if i == "@" {
-				// Return all attributes (keys starting with @)
-				attrs := make(map[string]interface{})
-				for k, val := range v {
-					if strings.HasPrefix(k, "@") {
-						attrs[k] = val
-					}
-				}
-				return attrs, nil
-			}
-			if strings.HasSuffix(i, "?") {
-				key := strings.TrimSuffix(i, "?")
-				_, exists := getObjectValue(v, key)
-				return exists, nil
-			}
-			if strings.HasSuffix(i, "!") {
-				key := strings.TrimSuffix(i, "!")
-				val, exists := getObjectValue(v, key)
-				if !exists {
-					return nil, newPosError(fmt.Sprintf("assert selector failed: missing key %q", key), pos)
-				}
-				return val, nil
-			}
-			val, _ := getObjectValue(v, i)
-			return val, nil
-		case int:
-			// Support ordinal indexing on objects
-			keys := make([]string, 0, len(v))
-			for k := range v {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
-			if i < 0 || i >= len(keys) {
-				return nil, newPosError(fmt.Sprintf("object index out of bounds: %d (object has %d keys)", i, len(keys)), pos)
-			}
-			return v[keys[i]], nil
-		default:
-			return nil, newPosError(fmt.Sprintf("map key must be a string or int, got %T", idx), pos)
-		}
+		return evalObjectIndex(v, idx, pos)
 	default:
 		return nil, newPosError(fmt.Sprintf("cannot index into %T", obj), pos)
 	}
