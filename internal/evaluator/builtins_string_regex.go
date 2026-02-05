@@ -171,15 +171,14 @@ func callBuiltinMatch(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 	if err := assertArg(args[0], beString(), 1, "match", e); err != nil {
 		return nil, err
 	}
-	text := args[0].(string)
+	text, _ := args[0].(string)
 
 	flags := ""
 	if len(args) == 3 {
 		if err := assertArg(args[2], beString(), 3, "match", e); err != nil {
 			return nil, err
 		}
-		f := args[2].(string)
-		flags = f
+		flags, _ = args[2].(string)
 	}
 
 	re, err := getCompiledRegex(args[1], flags, e.Pos())

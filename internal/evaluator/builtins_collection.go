@@ -634,7 +634,7 @@ func callBuiltinFind(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 		if err := assertArg(args[2], beString(), 3, "find", e); err != nil {
 			return nil, err
 		}
-		flags = args[2].(string)
+		flags, _ = args[2].(string)
 	}
 
 	switch s := source.(type) {
