@@ -142,14 +142,11 @@ func TestFormat_CSV_MissingKeys(t *testing.T) {
 	}
 }
 
-func TestFormat_DefaultJSON(t *testing.T) {
-	// Unknown mime types should default to JSON
-	result, err := Format(42, "application/unknown")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result != "42" {
-		t.Errorf("expected '42', got %q", result)
+func TestFormat_UnknownMimeType(t *testing.T) {
+	// Unknown mime types should return an error rather than silently falling back
+	_, err := Format(42, "application/unknown")
+	if err == nil {
+		t.Fatal("expected error for unknown mime type, got nil")
 	}
 }
 
@@ -403,49 +400,6 @@ func TestBuildXMLContent(t *testing.T) {
 			got := buildXMLContent(tt.input)
 			if got != tt.expected {
 				t.Errorf("got %q, want %q", got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestValidateFormatInput(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   interface{}
-		wantErr bool
-	}{
-		{
-			name:    "valid map",
-			input:   Object{"key": "value"},
-			wantErr: false,
-		},
-		{
-			name:    "valid array",
-			input:   Array{1, 2, 3},
-			wantErr: false,
-		},
-		{
-			name:    "valid string",
-			input:   "text",
-			wantErr: false,
-		},
-		{
-			name:    "valid number",
-			input:   42,
-			wantErr: false,
-		},
-		{
-			name:    "nil input",
-			input:   nil,
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateFormatInput(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("validateFormatInput() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

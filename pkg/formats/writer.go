@@ -14,30 +14,12 @@ func Format(result interface{}, mimeType string) (string, error) {
 		return "null", nil
 	}
 
-	if err := validateFormatInput(result); err != nil {
-		return "", unifiederrors.ValidationErrorf("invalid input for formatting: %v", err)
-	}
-
 	writer, err := GetWriter(mimeType)
 	if err != nil {
-		// Default to JSON if no specific writer is registered
-		jsonWriter, jsonErr := GetWriter("application/json")
-		if jsonErr == nil {
-			return jsonWriter(result)
-		}
 		return "", err
 	}
 
 	return writer(result)
-}
-
-// validateFormatInput performs basic validation on input before formatting.
-// Checks for null pointers and basic type compatibility.
-func validateFormatInput(result interface{}) error {
-	if result == nil {
-		return unifiederrors.ValidationError("input cannot be nil")
-	}
-	return nil
 }
 
 // FormatXMLWithNamespaces formats result as XML with declared namespaces.
@@ -54,10 +36,6 @@ func FormatXMLWithNamespaces(result interface{}, declaredNs map[string]string) (
 func FormatXMLWithOptions(result interface{}, opts XMLOutputOptions) (string, error) {
 	if result == nil {
 		return "", unifiederrors.ValidationError("result cannot be nil")
-	}
-
-	if err := validateFormatInput(result); err != nil {
-		return "", unifiederrors.ValidationErrorf("invalid input for formatting: %v", err)
 	}
 
 	return formatXMLWithOptions(result, opts)
