@@ -9,47 +9,6 @@ import (
 	unifiederrors "infomunge/internal/errors"
 )
 
-// isEscapedAt checks if the character at position i in string s is escaped
-// by counting consecutive backslashes before it. An odd number means escaped.
-// Example: "hello\"" -> quote at end is escaped (1 backslash)
-// Example: "hello\\"  -> quote at end is NOT escaped (2 backslashes = escaped backslash)
-func isEscapedAt(s string, i int) bool {
-	backslashCount := 0
-	for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
-		backslashCount++
-	}
-	return backslashCount%2 == 1
-}
-
-type stringState struct {
-	inString bool
-	escaped  bool
-	quote    byte
-}
-
-func (s *stringState) Advance(ch byte) {
-	if s.inString {
-		if s.escaped {
-			s.escaped = false
-			return
-		}
-		if ch == '\\' {
-			s.escaped = true
-			return
-		}
-		if ch == s.quote {
-			s.inString = false
-			s.quote = 0
-		}
-		return
-	}
-	if ch == '"' || ch == '\'' {
-		s.inString = true
-		s.escaped = false
-		s.quote = ch
-	}
-}
-
 // handleDoubleQuote manages double-quoted strings, including escape detection.
 func (r *rewriter) handleDoubleQuote(char byte) bool {
 	if char != '"' {

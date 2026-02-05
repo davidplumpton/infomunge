@@ -258,8 +258,7 @@ func ExtractHeaderAndBody(raw string) (header string, body string, offset int) {
 }
 
 func findLineSeparatorTopLevel(raw string) (int, int, bool) {
-	depth := 0
-	inString := false
+	var state ScanState
 	inLineComment := false
 	lineStart := 0
 	lineStartDepth := 0
@@ -272,32 +271,18 @@ func findLineSeparatorTopLevel(raw string) (int, int, bool) {
 			if ch == '\n' {
 				inLineComment = false
 				lineStart = i + 1
-				lineStartDepth = depth
-				lineStartInString = inString
+				lineStartDepth = state.DepthBrace
+				lineStartInString = state.InString()
 			}
 			continue
 		}
 
-		if !inString && ch == '/' && i+1 < len(raw) && raw[i+1] == '/' {
+		if !state.InString() && ch == '/' && i+1 < len(raw) && raw[i+1] == '/' {
 			inLineComment = true
 			continue
 		}
 
-		if ch == '"' && (i == 0 || raw[i-1] != '\\') {
-			inString = !inString
-			continue
-		}
-
-		if !inString {
-			switch ch {
-			case '{':
-				depth++
-			case '}':
-				if depth > 0 {
-					depth--
-				}
-			}
-		}
+		state.Advance(ch)
 
 		if ch == '\n' {
 			if lineStartDepth == 0 && !lineStartInString {
@@ -307,8 +292,8 @@ func findLineSeparatorTopLevel(raw string) (int, int, bool) {
 				}
 			}
 			lineStart = i + 1
-			lineStartDepth = depth
-			lineStartInString = inString
+			lineStartDepth = state.DepthBrace
+			lineStartInString = state.InString()
 		}
 	}
 
@@ -324,8 +309,7 @@ func findLineSeparatorTopLevel(raw string) (int, int, bool) {
 
 func findInlineSeparatorTopLevel(raw string) (int, int, bool) {
 	const separator = " --- "
-	depth := 0
-	inString := false
+	var state ScanState
 	inLineComment := false
 
 	for i := 0; i < len(raw); i++ {
@@ -338,30 +322,16 @@ func findInlineSeparatorTopLevel(raw string) (int, int, bool) {
 			continue
 		}
 
-		if !inString && ch == '/' && i+1 < len(raw) && raw[i+1] == '/' {
+		if !state.InString() && ch == '/' && i+1 < len(raw) && raw[i+1] == '/' {
 			inLineComment = true
 			continue
 		}
 
-		if depth == 0 && !inString && !inLineComment && strings.HasPrefix(raw[i:], separator) {
+		if state.DepthBrace == 0 && !state.InString() && !inLineComment && strings.HasPrefix(raw[i:], separator) {
 			return i, i + len(separator), true
 		}
 
-		if ch == '"' && (i == 0 || raw[i-1] != '\\') {
-			inString = !inString
-			continue
-		}
-
-		if !inString {
-			switch ch {
-			case '{':
-				depth++
-			case '}':
-				if depth > 0 {
-					depth--
-				}
-			}
-		}
+		state.Advance(ch)
 	}
 
 	return 0, 0, false

@@ -21,24 +21,17 @@ func shouldWrapTopLevelObjectLiteral(input string) bool {
 		return false
 	}
 
-	state := stringState{}
-	depth := 0
+	var state ScanState
 	for i := 0; i < len(input); i++ {
 		ch := input[i]
 		state.Advance(ch)
-		if state.inString {
+		if state.InString() {
 			continue
 		}
 
 		switch ch {
-		case '(', '{', '[':
-			depth++
-		case ')', '}', ']':
-			if depth > 0 {
-				depth--
-			}
 		case ':':
-			if depth != 0 {
+			if state.Depth() != 0 {
 				continue
 			}
 			if i+1 < len(input) && input[i+1] == ':' {
