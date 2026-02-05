@@ -50,6 +50,18 @@ Feature: Error Reporting
     Then the error should contain "2:1:"
     And the error should contain "line: bogus directive"
 
+  Scenario: Malformed header variable reports explicit declaration error
+    Given the following input content:
+      """
+      %im 0.1
+      var x
+      ---
+      1
+      """
+    When I run the application and it fails
+    Then the error should contain "2:1:"
+    And the error should contain "invalid variable declaration: missing '='"
+
   Scenario: Runtime error - division by zero
     Given the following input content:
       """

@@ -11,20 +11,25 @@ import (
 // parseVarDecl parses a variable declaration line and evaluates its value.
 // baseOffset is the offset of the start of this line within fullRaw.
 // Returns the evaluated value, variable name, and any error.
-// Returns empty varName if the line is malformed (not an error, just skip).
 func parseVarDecl(line, trimmedLine string, baseOffset int, context map[string]interface{}, fullRaw string) (interface{}, string, error) {
 	parts := strings.SplitN(trimmedLine, "=", 2)
 	if len(parts) != 2 {
-		return nil, "", nil
+		return nil, "", unifiederrors.ParseErrorf("invalid variable declaration: missing '=' in %q", trimmedLine)
 	}
 
 	declParts := strings.Fields(parts[0])
-	if len(declParts) < 2 {
-		return nil, "", nil
+	if len(declParts) != 2 || declParts[0] != "var" {
+		return nil, "", unifiederrors.ParseErrorf("invalid variable declaration: expected 'var <name> = <expression>' in %q", trimmedLine)
 	}
 
 	varName := declParts[1]
+	if strings.TrimSpace(varName) == "" {
+		return nil, "", unifiederrors.ParseErrorf("invalid variable declaration: missing variable name in %q", trimmedLine)
+	}
 	exprStr := strings.TrimSpace(parts[1])
+	if exprStr == "" {
+		return nil, "", unifiederrors.ParseErrorf("invalid variable declaration: missing expression for %q", varName)
+	}
 
 	parseableVal, mapping, err := preprocessor.PrepareForParsing(exprStr, preprocessor.Options{})
 	if err != nil {
@@ -50,7 +55,6 @@ func parseVarDecl(line, trimmedLine string, baseOffset int, context map[string]i
 // parseVarDeclFromLines parses a variable declaration that may span multiple lines.
 // baseOffset is the offset of the start of lines[start] within fullRaw.
 // Returns the evaluated value, variable name, number of lines consumed, and any error.
-// Returns empty varName if the declaration is malformed (not an error, just skip).
 func parseVarDeclFromLines(lines []string, start int, baseOffset int, context map[string]interface{}, fullRaw string) (interface{}, string, int, error) {
 	if start >= len(lines) {
 		return nil, "", 0, nil
@@ -64,7 +68,7 @@ func parseVarDeclFromLines(lines []string, start int, baseOffset int, context ma
 
 	rest := strings.TrimSpace(strings.TrimPrefix(trimmedFirst, "var "))
 	if rest == "" {
-		return nil, "", 1, nil
+		return nil, "", 1, unifiederrors.ParseErrorf("invalid variable declaration: missing variable name in %q", trimmedFirst)
 	}
 
 	namePart := rest
@@ -72,8 +76,8 @@ func parseVarDeclFromLines(lines []string, start int, baseOffset int, context ma
 		namePart = strings.TrimSpace(rest[:eqIdx])
 	}
 	fields := strings.Fields(namePart)
-	if len(fields) < 1 {
-		return nil, "", 1, nil
+	if len(fields) != 1 {
+		return nil, "", 1, unifiederrors.ParseErrorf("invalid variable declaration: expected a single variable name in %q", trimmedFirst)
 	}
 	varName := fields[0]
 
@@ -98,9 +102,12 @@ func parseVarDeclFromLines(lines []string, start int, baseOffset int, context ma
 	declRaw := strings.Join(declLines, "\n")
 	eqIdx := strings.Index(declRaw, "=")
 	if eqIdx < 0 {
-		return nil, "", len(declLines), nil
+		return nil, "", len(declLines), unifiederrors.ParseErrorf("invalid variable declaration: missing '=' in %q", trimmedFirst)
 	}
 	exprStr := strings.TrimSpace(declRaw[eqIdx+1:])
+	if exprStr == "" {
+		return nil, "", len(declLines), unifiederrors.ParseErrorf("invalid variable declaration: missing expression for %q", varName)
+	}
 	if strings.ContainsAny(exprStr, "\n\r") {
 		exprStr = collapseWhitespaceOutsideStrings(exprStr)
 	}

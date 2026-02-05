@@ -97,6 +97,7 @@ func TestParseVarDecl(t *testing.T) {
 		wantVal  interface{}
 		wantName string
 		wantErr  bool
+		errMatch string
 	}{
 		{
 			name:     "simple integer",
@@ -143,8 +144,8 @@ func TestParseVarDecl(t *testing.T) {
 			line:     "var x",
 			trimmed:  "var x",
 			context:  make(map[string]interface{}),
-			wantVal:  nil,
-			wantName: "", // empty name means skip
+			wantErr:  true,
+			errMatch: "missing '='",
 		},
 	}
 
@@ -154,6 +155,9 @@ func TestParseVarDecl(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("parseVarDecl() expected error, got nil")
+				}
+				if tt.errMatch != "" && !containsString(err.Error(), tt.errMatch) {
+					t.Errorf("parseVarDecl() error = %v, want error containing %q", err, tt.errMatch)
 				}
 				return
 			}
