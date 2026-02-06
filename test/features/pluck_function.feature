@@ -59,6 +59,20 @@ Feature: Pluck Function
       ["a:1","b:2"]
       """
 
+  Scenario: pluck on object with arbitrary parameter names and index uses DataWeave order
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {"a": 1, "b": 2} pluck (left, right, idx) -> right ++ ":" ++ (idx as String) ++ ":" ++ (left as String)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["a:0:1","b:1:2"]
+      """
+
   Scenario: pluck on array with string selector (existing field extraction)
     Given the following input content:
       """

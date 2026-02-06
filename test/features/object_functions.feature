@@ -405,6 +405,18 @@ Feature: Object Functions
     Then the output should contain "\"a_dw\":2"
     And the output should contain "\"b_dw\":3"
 
+  Scenario: mapObject with key-value parameter names keeps legacy order
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      mapObject({"a": 1, "b": 2}, (k, v) -> [k, v + 10])
+      """
+    When I run the application with this content
+    Then the output should contain "\"a\":11"
+    And the output should contain "\"b\":12"
+
   Scenario: mapObject returns object entries from conditional object literal
     Given the following JSON input:
       """
@@ -564,6 +576,20 @@ Feature: Object Functions
     Then the output should contain "\"b\":2"
     And the output should contain "\"c\":3"
     And the output should not contain "\"a\":1"
+
+  Scenario: filterObject with arbitrary parameter names and index uses DataWeave order
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      filterObject({"a": 1, "b": 2, "c": 3}, (left, right, idx) -> right == "b" and left == 2 and idx == 1)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"b":2}
+      """
 
   Scenario: filterObject with no matches
     Given the following input content:
