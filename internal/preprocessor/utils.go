@@ -37,7 +37,7 @@ func extractLeftOperand(result []rune) (leftExpr string, newResult []rune, ok bo
 }
 
 // isPatternMatchKeyword checks if the scanner is at a pattern match keyword position.
-func isPatternMatchKeyword(s string, sc *StringScanner) (int, int, bool) {
+func isPatternMatchKeyword(s string, sc *stringutils.ExpressionScanner) (int, int, bool) {
 	if sc.IsInString() {
 		return -1, 0, false
 	}
@@ -76,7 +76,7 @@ func isPatternMatchKeyword(s string, sc *StringScanner) (int, int, bool) {
 }
 
 func containsIfKeywordOutsideStrings(s string) bool {
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 	for sc.Pos() < len(s) {
 		if sc.IsInString() {
 			sc.Next()
@@ -206,7 +206,7 @@ func extractVariableNameAtPosition(result []rune) (string, int, int, bool) {
 }
 
 // findValueExpressionEnd scans forward to find where the value expression ends.
-func findValueExpressionEnd(s string, sc *StringScanner) int {
+func findValueExpressionEnd(s string, sc *stringutils.ExpressionScanner) int {
 	depth := 0
 	valueEnd := sc.Pos()
 

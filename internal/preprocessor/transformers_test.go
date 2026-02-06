@@ -1,6 +1,7 @@
 package preprocessor
 
 import (
+	"infomunge/internal/stringutils"
 	"testing"
 )
 
@@ -155,7 +156,7 @@ func TestScannerBracketStateTracking(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sc := NewScanner(tt.input)
+			sc := stringutils.NewExpressionScanner(tt.input)
 			for i := 0; i < tt.checkDepth && sc.Pos() < len(tt.input); i++ {
 				sc.Next()
 			}
@@ -188,7 +189,7 @@ func TestScannerStringStateTracking(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sc := NewScanner(tt.input)
+			sc := stringutils.NewExpressionScanner(tt.input)
 			for i := 0; i < tt.checkPos && sc.Pos() < len(tt.input); i++ {
 				sc.Next()
 			}
@@ -220,7 +221,7 @@ func TestScannerFindMatchingCloseBracket(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sc := NewScanner(tt.input)
+			sc := stringutils.NewExpressionScanner(tt.input)
 			got := sc.FindMatchingCloseBracket(tt.startPos)
 			if got != tt.want {
 				t.Errorf("expected %d, got %d", tt.want, got)

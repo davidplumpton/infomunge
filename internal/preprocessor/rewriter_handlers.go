@@ -7,6 +7,7 @@ import (
 	"unicode"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/stringutils"
 )
 
 // handleDoubleQuote manages double-quoted strings, including escape detection.
@@ -241,9 +242,9 @@ func (r *rewriter) findMatchingParens(afterIfPos int) (int, int, bool) {
 func (r *rewriter) findBranches(condEndPos int) (BranchPositions, bool) {
 	var trueStartPos int
 	if r.opts.AllowMultilineIfElse {
-		trueStartPos = skipSpaceAndNewlines(r.input, condEndPos+1)
+		trueStartPos = skipSpace(r.input, condEndPos+1, true)
 	} else {
-		trueStartPos = skipHorizontalSpace(r.input, condEndPos+1)
+		trueStartPos = skipSpace(r.input, condEndPos+1, false)
 	}
 	scan := scanBranchEnd(r.input, trueStartPos, r.opts.AllowMultilineIfElse)
 	if !scan.OK {
@@ -255,7 +256,7 @@ func (r *rewriter) findBranches(condEndPos int) (BranchPositions, bool) {
 		return BranchPositions{TrueStart: trueStartPos, TrueEnd: scan.BranchEnd}, true
 	}
 
-	falseBranchStart := skipSpaceAndNewlines(r.input, scan.ElsePos+len("else"))
+	falseBranchStart := skipSpace(r.input, scan.ElsePos+len("else"), true)
 	var falseBranchEnd int
 	if r.opts.AllowMultilineIfElse {
 		falseBranchEnd = findExpressionEnd(r.input, falseBranchStart, true)
@@ -580,11 +581,17 @@ func (r *rewriter) findKeywordCondition(keyword string) (int, int, int, bool) {
 }
 
 func normalizeCondition(condition string) string {
-	return replaceAndOrOutsideStrings(strings.TrimSpace(condition))
+	return stringutils.ReplaceOperatorsOutsideStrings(strings.TrimSpace(condition), []stringutils.OperatorReplacement{
+		{Pattern: " and ", Replacement: []rune(" && ")},
+		{Pattern: " or ", Replacement: []rune(" || ")},
+	})
 }
 
 func (r *rewriter) rewriteBranch(raw string) (string, bool) {
-	branch := replaceAndOrOutsideStrings(strings.TrimSpace(raw))
+	branch := stringutils.ReplaceOperatorsOutsideStrings(strings.TrimSpace(raw), []stringutils.OperatorReplacement{
+		{Pattern: " and ", Replacement: []rune(" && ")},
+		{Pattern: " or ", Replacement: []rune(" || ")},
+	})
 	branchRewriter := newRewriter(branch, r.opts)
 	rewritten, _, err := branchRewriter.Rewrite()
 	if err != nil {
@@ -621,15 +628,8 @@ func (r *rewriter) updatePositionAfterIfElse(trueEndPos int, falseBranchStart in
 	r.pos = trueEndPos - 1
 }
 
-func skipHorizontalSpace(input string, pos int) int {
-	for pos < len(input) && (input[pos] == ' ' || input[pos] == '\t') {
-		pos++
-	}
-	return pos
-}
-
-func skipSpaceAndNewlines(input string, pos int) int {
-	for pos < len(input) && (input[pos] == ' ' || input[pos] == '\t' || input[pos] == '\n' || input[pos] == '\r') {
+func skipSpace(input string, pos int, includeNewlines bool) int {
+	for pos < len(input) && (input[pos] == ' ' || input[pos] == '\t' || (includeNewlines && (input[pos] == '\n' || input[pos] == '\r'))) {
 		pos++
 	}
 	return pos
@@ -642,9 +642,9 @@ func skipSpaceAndNewlines(input string, pos int) int {
 func findMatchingDelimited(input string, start int, opener byte, closer byte, allowNewlines bool) (int, int, bool) {
 	pos := start
 	if allowNewlines {
-		pos = skipSpaceAndNewlines(input, pos)
+		pos = skipSpace(input, pos, true)
 	} else {
-		pos = skipHorizontalSpace(input, pos)
+		pos = skipSpace(input, pos, false)
 	}
 
 	if pos >= len(input) || input[pos] != opener {
@@ -970,7 +970,7 @@ func splitConditionalEntry(entry string) (string, string, bool) {
 
 			if depth == 0 && entry[i] == ' ' && strings.HasPrefix(entry[i:], " if") {
 				afterIf := i + 3
-				afterIf = skipHorizontalSpace(entry, afterIf)
+				afterIf = skipSpace(entry, afterIf, false)
 				if afterIf < len(entry) && entry[afterIf] == '(' {
 					condStart := afterIf
 					_, condEnd, ok := findMatchingDelimited(entry, condStart, '(', ')', false)

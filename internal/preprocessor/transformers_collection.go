@@ -74,7 +74,7 @@ func replacePluckOperator(s string) string {
 // replaceCollectionOperator handles transformation of "array op lambda" into "func(array, lambda)".
 func replaceCollectionOperator(s string, opKey string, funcName string) string {
 	var result []rune
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 	opLen := len(opKey)
 
 	for sc.Pos() < len(s) {

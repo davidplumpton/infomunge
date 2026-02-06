@@ -1,6 +1,7 @@
 package preprocessor
 
 import (
+	"infomunge/internal/stringutils"
 	"strings"
 	"unicode"
 )
@@ -291,7 +292,7 @@ func replaceImplicitParam(s string, placeholder string, replacement string) stri
 // replaceArrowFunctions converts arrow function syntax.
 func replaceArrowFunctions(s string) string {
 	var result []rune
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		if !sc.IsInString() && sc.Peek() == '(' {

@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+const defaultListenAddr = ":8080"
+
 // Config holds the application configuration
 type Config struct {
 	ScriptFile  string
@@ -77,7 +79,7 @@ func (app *App) parseFlags(args []string) (*Config, error) {
 	stdinFormat := fs.String("s", "", "read stdin as format (e.g., json), shorthand for -i payload=:format for stdin")
 	lazy := fs.Bool("lazy", false, "enable lazy evaluation mode")
 	serverMode := fs.Bool("server", false, "run as an HTTP server")
-	listenAddr := fs.String("listen", ":8080", "address to listen on in server mode")
+	listenAddr := fs.String("listen", defaultListenAddr, "address to listen on in server mode")
 	showVersion := fs.Bool("version", false, "show version information")
 	fs.Var(&inputs, "i", "input source (name=file or name=:format for stdin)")
 

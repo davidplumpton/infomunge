@@ -26,7 +26,7 @@ const (
 func (app *App) serve(config *Config) error {
 	addr := config.Listen
 	if addr == "" {
-		addr = ":8080"
+		addr = defaultListenAddr
 	}
 
 	mux := app.serverMux(config)

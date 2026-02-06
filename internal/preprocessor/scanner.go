@@ -1,18 +1,5 @@
 package preprocessor
 
-import (
-	"infomunge/internal/stringutils"
-)
-
-// StringScanner is an alias for stringutils.ExpressionScanner.
-// It tracks position in a string while respecting string boundaries and bracket depth.
-type StringScanner = stringutils.ExpressionScanner
-
-// NewScanner creates a new StringScanner for the given string starting at position 0.
-func NewScanner(s string) *StringScanner {
-	return stringutils.NewExpressionScanner(s)
-}
-
 // IsOperatorChar returns true if ch is an operator character.
 func IsOperatorChar(ch byte) bool {
 	return ch == '+' || ch == '-' || ch == '*' || ch == '/' ||

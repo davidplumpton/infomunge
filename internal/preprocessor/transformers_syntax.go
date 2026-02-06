@@ -159,7 +159,7 @@ func extractInterpolationExpr(content string, pos int) (expr string, endPos int)
 // replaceRecursiveDescent converts "obj..field" to "__deep(obj, \"field\")"
 func replaceRecursiveDescent(s string) string {
 	var result []rune
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		if !sc.IsInString() && sc.Peek2() == ".*" {
@@ -232,7 +232,7 @@ func replaceRecursiveDescent(s string) string {
 // replaceFilterSelectors converts "obj[?(expr)]" to "__filter_selector(obj, __lambda(\"__arg, __idx\", expr))".
 func replaceFilterSelectors(s string) string {
 	var result []rune
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		if !sc.IsInString() && sc.Peek() == '[' && sc.Pos()+2 < len(s) && s[sc.Pos()+1] == '?' && s[sc.Pos()+2] == '(' {
@@ -287,7 +287,7 @@ func replaceFilterSelectors(s string) string {
 // replaceMetadataSelectors converts "obj.^meta" to "__metadata(obj, \"meta\")".
 func replaceMetadataSelectors(s string) string {
 	var result []rune
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		if !sc.IsInString() && sc.Peek2() == ".^" {
@@ -324,7 +324,7 @@ func replaceMetadataSelectors(s string) string {
 // replaceDotNotation converts "obj.field" to "obj[\"field\"]"
 func replaceDotNotation(s string) string {
 	var result []rune
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		if !sc.IsInString() && sc.Peek() == '.' && sc.Pos()+1 < len(s) && (IsIdentifierStart(s[sc.Pos()+1]) || s[sc.Pos()+1] == '@' || s[sc.Pos()+1] == '#') {
@@ -395,7 +395,7 @@ func appendDotNotationSelector(result []rune, isAt bool, fieldName string, suffi
 // replaceCaseStatements converts case statements.
 func replaceCaseStatements(s string) string {
 	var result []rune
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		casePos, kwLen, isPatternMatchKeywordFound := isPatternMatchKeyword(s, sc)
@@ -411,7 +411,7 @@ func replaceCaseStatements(s string) string {
 }
 
 // processCaseStatement processes a single case statement.
-func processCaseStatement(s string, sc *StringScanner, result []rune, casePos int, kwLen int) ([]rune, bool) {
+func processCaseStatement(s string, sc *stringutils.ExpressionScanner, result []rune, casePos int, kwLen int) ([]rune, bool) {
 	afterCase := casePos + kwLen
 	bracePos, ok := findCaseBrace(s, afterCase)
 	if !ok {
@@ -452,7 +452,7 @@ func parseCaseItems(s string) []string {
 	}
 
 	var items []string
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		sc.SkipWhitespace()
@@ -508,7 +508,7 @@ func parseCaseItems(s string) []string {
 // replaceModuleCall converts module calls.
 func replaceModuleCall(s string) string {
 	var result []rune
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		if sc.IsInString() {
@@ -604,7 +604,7 @@ func replaceMultiStatementSequences(s string) string {
 // replaceAssignmentExpressions converts assignment expressions to __assign calls.
 func replaceAssignmentExpressions(s string) string {
 	var result []rune
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		if sc.IsInString() {
@@ -664,7 +664,7 @@ func replaceAssignmentExpressions(s string) string {
 // replaceKeyAttributes converts "Key @(Attributes): Value" to "Key: __with_attrs(Value, Attributes)"
 func replaceKeyAttributes(s string) string {
 	var result []rune
-	sc := NewScanner(s)
+	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		if !sc.IsInString() && sc.Peek() == '@' && sc.Pos()+1 < len(s) && s[sc.Pos()+1] == '(' {
