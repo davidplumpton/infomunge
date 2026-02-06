@@ -166,6 +166,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the response status should be (\d+)$`, tc.theResponseStatusShouldBe)
 	ctx.Step(`^I run the server script without specifying output$`, tc.iRunTheServerScriptWithoutOutput)
 	ctx.Step(`^I run the server script with output "([^"]*)"$`, tc.iRunTheServerScriptWithOutput)
+	ctx.Step(`^I run the server script with a canceled request context$`, tc.iRunTheServerScriptWithCanceledContext)
 }
 
 // Existing steps
@@ -811,6 +812,35 @@ func (tc *testContext) runServerScript(output *string) error {
 	}
 	tc.lastHTTPStatus = resp.StatusCode
 	tc.lastOutput = string(responseBody)
+	return nil
+}
+
+func (tc *testContext) iRunTheServerScriptWithCanceledContext() error {
+	if strings.TrimSpace(tc.scriptContent) == "" {
+		return fmt.Errorf("script is not set")
+	}
+
+	payload := map[string]interface{}{
+		"script": tc.scriptContent,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/run", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	canceledCtx, cancel := context.WithCancel(req.Context())
+	cancel()
+	req = req.WithContext(canceledCtx)
+
+	rec := httptest.NewRecorder()
+	app := cli.NewApp()
+	config := &cli.Config{Lazy: false}
+	app.ServerHandler(config).ServeHTTP(rec, req)
+
+	tc.lastHTTPStatus = rec.Code
+	tc.lastOutput = rec.Body.String()
 	return nil
 }
 

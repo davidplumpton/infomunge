@@ -50,3 +50,16 @@ Feature: Playground webapp
     When I run the server script with output "json"
     Then the response status should be 200
     And the output should contain "\"name\""
+
+  Scenario: Run endpoint returns timeout when request context is canceled
+    Given the server is running
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "ignored"
+      """
+    When I run the server script with a canceled request context
+    Then the response status should be 408
+    And the output should contain "request canceled"

@@ -1,13 +1,26 @@
 package cli
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
-	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"infomunge/internal/handlers"
 	"infomunge/internal/runner"
+)
+
+const (
+	serverReadHeaderTimeout = 10 * time.Second
+	serverReadTimeout       = 30 * time.Second
+	serverWriteTimeout      = 30 * time.Second
+	serverIdleTimeout       = 60 * time.Second
+	serverShutdownTimeout   = 5 * time.Second
 )
 
 func (app *App) serve(config *Config) error {
@@ -19,11 +32,41 @@ func (app *App) serve(config *Config) error {
 	mux := app.serverMux(config)
 
 	server := &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: serverReadHeaderTimeout,
+		ReadTimeout:       serverReadTimeout,
+		WriteTimeout:      serverWriteTimeout,
+		IdleTimeout:       serverIdleTimeout,
 	}
 
-	return server.ListenAndServe()
+	signalCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopSignals()
+
+	errCh := make(chan error, 1)
+	go func() {
+		err := server.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+		close(errCh)
+	}()
+
+	select {
+	case err, ok := <-errCh:
+		if !ok {
+			return nil
+		}
+		return err
+	case <-signalCtx.Done():
+		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), serverShutdownTimeout)
+		defer cancelShutdown()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			return err
+		}
+		<-errCh
+		return nil
+	}
 }
 
 func (app *App) ServerHandler(config *Config) http.Handler {
@@ -47,7 +90,7 @@ func (app *App) handlePlayground() http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		if _, err := io.WriteString(w, playgroundHTML); err != nil {
-			fmt.Fprintf(os.Stderr, "server write error: %v\n", err)
+			log.Printf("server write error: %v", err)
 		}
 	}
 }
@@ -56,6 +99,10 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if err := r.Context().Err(); err != nil {
+			http.Error(w, fmt.Sprintf("request canceled: %v", err), http.StatusRequestTimeout)
 			return
 		}
 
@@ -68,6 +115,13 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 		context, err := handlers.BuildRunContext(payload.Inputs)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if deadline, ok := r.Context().Deadline(); ok {
+			context["__deadline"] = deadline
+		}
+		if err := r.Context().Err(); err != nil {
+			http.Error(w, fmt.Sprintf("request canceled: %v", err), http.StatusRequestTimeout)
 			return
 		}
 
@@ -91,10 +145,14 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if err := r.Context().Err(); err != nil {
+			http.Error(w, fmt.Sprintf("request canceled: %v", err), http.StatusRequestTimeout)
+			return
+		}
 
 		w.Header().Set("Content-Type", outputMimeType)
 		if _, err := io.WriteString(w, formatted); err != nil {
-			fmt.Fprintf(os.Stderr, "server write error: %v\n", err)
+			log.Printf("server write error: %v", err)
 		}
 	}
 }
