@@ -317,6 +317,26 @@ func TestRead_Properties(t *testing.T) {
 			"  key  =  value  ",
 			Object{"key": "value"},
 		},
+		{
+			"escaped separators",
+			`path\=name\:id=value\=1\:2`,
+			Object{"path=name:id": "value=1:2"},
+		},
+		{
+			"multiline continuation",
+			"key=hello\\\n world",
+			Object{"key": "helloworld"},
+		},
+		{
+			"empty key",
+			"=value",
+			Object{"": "value"},
+		},
+		{
+			"first separator wins when both present",
+			"key:va=lue",
+			Object{"key": "va=lue"},
+		},
 	}
 
 	for _, tt := range tests {

@@ -21,3 +21,24 @@ Feature: Java Properties Reading
       """
       {"age":"30","name":"Alice"}
       """
+
+  Scenario: Read properties with escapes continuation and empty key
+    Given the following properties input:
+      """
+      path\=name\:id=value\=1\:2
+      multiline=hello\
+       world
+      =blank
+      """
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"":"blank","multiline":"helloworld","path=name:id":"value=1:2"}
+      """
