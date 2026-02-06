@@ -359,42 +359,13 @@ func replaceDotNotation(s string) string {
 						isAssert = true
 						sc.Advance(1)
 					}
+					selectorSuffix := rune(0)
 					if isOptional {
-						result = append(result, '[')
-						result = append(result, '"')
-						if isAt {
-							result = append(result, '@')
-						}
-						for _, ch := range fieldName {
-							result = append(result, ch)
-						}
-						result = append(result, '?')
-						result = append(result, '"')
-						result = append(result, ']')
+						selectorSuffix = '?'
 					} else if isAssert {
-						result = append(result, '[')
-						result = append(result, '"')
-						if isAt {
-							result = append(result, '@')
-						}
-						for _, ch := range fieldName {
-							result = append(result, ch)
-						}
-						result = append(result, '!')
-						result = append(result, '"')
-						result = append(result, ']')
-					} else {
-						result = append(result, '[')
-						result = append(result, '"')
-						if isAt {
-							result = append(result, '@')
-						}
-						for _, ch := range fieldName {
-							result = append(result, ch)
-						}
-						result = append(result, '"')
-						result = append(result, ']')
+						selectorSuffix = '!'
 					}
+					result = appendDotNotationSelector(result, isAt, fieldName, selectorSuffix)
 					continue
 				}
 			}
@@ -402,6 +373,23 @@ func replaceDotNotation(s string) string {
 		result = append(result, sc.NextRune())
 	}
 	return string(result)
+}
+
+func appendDotNotationSelector(result []rune, isAt bool, fieldName string, suffix rune) []rune {
+	result = append(result, '[')
+	result = append(result, '"')
+	if isAt {
+		result = append(result, '@')
+	}
+	for _, ch := range fieldName {
+		result = append(result, ch)
+	}
+	if suffix != 0 {
+		result = append(result, suffix)
+	}
+	result = append(result, '"')
+	result = append(result, ']')
+	return result
 }
 
 // replaceCaseStatements converts case statements.

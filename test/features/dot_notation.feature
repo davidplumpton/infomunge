@@ -75,6 +75,24 @@ Feature: Dot Notation for Field Access
       null
       """
 
+  Scenario: Dot notation optional selector returns presence boolean
+    Given the following input content:
+      """
+      %im 0.1
+      input application/json
+      output application/json
+      ---
+      payload.name?
+      """
+    When I run the application with this JSON input:
+      """
+      {"name": "Alice"}
+      """
+    Then the output should be:
+      """
+      true
+      """
+
   Scenario: Bracket notation still works
     Given the following input content:
       """
