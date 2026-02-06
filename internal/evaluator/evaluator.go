@@ -624,19 +624,15 @@ func CoerceEquals(left, right Value) bool {
 
 // tryParseNumber attempts to convert a value to float64 for coercion equality
 func tryParseNumber(v Value) (float64, bool) {
-	switch val := v.(type) {
-	case int:
-		return float64(val), true
-	case float64:
-		return val, true
-	case string:
-		if f, err := strconv.ParseFloat(val, 64); err == nil {
+	if f, ok := ToFloat(v); ok {
+		return f, true
+	}
+	if s, ok := v.(string); ok {
+		if f, err := strconv.ParseFloat(s, 64); err == nil {
 			return f, true
 		}
-		return 0, false
-	default:
-		return 0, false
 	}
+	return 0, false
 }
 
 // numericEquals compares two values for equality, treating int and float64 as comparable
@@ -645,25 +641,12 @@ func numericEquals(left, right Value) bool {
 		return true
 	}
 
-	leftNum, leftIsNum := asNumber(left)
-	rightNum, rightIsNum := asNumber(right)
-	if leftIsNum && rightIsNum {
+	leftNum, rightNum, ok := BothFloats(left, right)
+	if ok {
 		return leftNum == rightNum
 	}
 
 	return false
-}
-
-// asNumber converts int or float64 to float64 for numeric comparison
-func asNumber(v Value) (float64, bool) {
-	switch val := v.(type) {
-	case int:
-		return float64(val), true
-	case float64:
-		return val, true
-	default:
-		return 0, false
-	}
 }
 
 // callUserDefinedFunction calls a user-defined function (Lambda) with the provided arguments

@@ -282,6 +282,20 @@ Feature: Math Functions
       1024
       """
 
+  Scenario: pow coerces boolean inputs to numbers
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      pow(true, 2)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      1
+      """
+
   # sqrt tests
   Scenario: sqrt basic usage
     Given the following input content:

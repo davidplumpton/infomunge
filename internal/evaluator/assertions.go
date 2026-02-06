@@ -386,8 +386,8 @@ func isEqual(a, b interface{}) bool {
 	}
 
 	// For numbers, compare as float64
-	aNum, aIsNum := toNumberForAssertion(a)
-	bNum, bIsNum := toNumberForAssertion(b)
+	aNum, aIsNum := ToFloat(a)
+	bNum, bIsNum := ToFloat(b)
 	if aIsNum && bIsNum {
 		return aNum == bNum
 	}
@@ -440,21 +440,10 @@ func isEqual(a, b interface{}) bool {
 	return false
 }
 
-func toNumberForAssertion(v interface{}) (float64, bool) {
-	switch n := v.(type) {
-	case float64:
-		return n, true
-	case int:
-		return float64(n), true
-	default:
-		return 0, false
-	}
-}
-
 func compareValues(a, b interface{}) (int, error) {
 	// Try numeric comparison first
-	aNum, aIsNum := toNumberForAssertion(a)
-	bNum, bIsNum := toNumberForAssertion(b)
+	aNum, aIsNum := ToFloat(a)
+	bNum, bIsNum := ToFloat(b)
 	if aIsNum && bIsNum {
 		if aNum < bNum {
 			return -1, nil

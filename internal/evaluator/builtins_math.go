@@ -164,11 +164,10 @@ func callBuiltinPow(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // toNumber converts a value to a float64 number for math operations.
 func toNumber(val interface{}, funcName string, e *ast.CallExpr) (float64, error) {
+	if num, ok := ToFloat(val); ok {
+		return num, nil
+	}
 	switch v := val.(type) {
-	case int:
-		return float64(v), nil
-	case float64:
-		return v, nil
 	case bool:
 		if v {
 			return 1, nil
@@ -197,14 +196,9 @@ func callBuiltinSum(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 	var sum float64
 	for i, item := range arr {
-		num, ok := item.(float64)
+		num, ok := ToFloat(item)
 		if !ok {
-			// Try to convert int to float64
-			numInt, ok := item.(int)
-			if !ok {
-				return nil, newElementNotNumberError("sum", i, item, e.Pos())
-			}
-			num = float64(numInt)
+			return nil, newElementNotNumberError("sum", i, item, e.Pos())
 		}
 		sum += num
 	}
@@ -233,14 +227,9 @@ func callBuiltinAvg(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 	var sum float64
 	for i, item := range arr {
-		num, ok := item.(float64)
+		num, ok := ToFloat(item)
 		if !ok {
-			// Try to convert int to float64
-			numInt, ok := item.(int)
-			if !ok {
-				return nil, newElementNotNumberError("avg", i, item, e.Pos())
-			}
-			num = float64(numInt)
+			return nil, newElementNotNumberError("avg", i, item, e.Pos())
 		}
 		sum += num
 	}
