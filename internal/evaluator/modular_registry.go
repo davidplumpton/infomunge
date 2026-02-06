@@ -2,18 +2,25 @@ package evaluator
 
 import (
 	"go/ast"
+	"sync"
 )
+
+type SpecialBuiltinFunc = func(*ast.CallExpr, Context, int) (Value, error)
+type RegularBuiltinFunc = func([]Value, *ast.CallExpr) (Value, error)
 
 // builtinSpecialRegistry maps special builtin function names to their handlers.
 // Special functions need unevaluated arguments and are called via GetBuiltinSpecial.
-var builtinSpecialRegistry map[string]func(*ast.CallExpr, Context, int) (Value, error)
+var builtinSpecialRegistry map[string]SpecialBuiltinFunc
 
 // builtinFunctionRegistry maps regular builtin function names to their handlers.
 // Regular functions receive evaluated arguments and are called via GetBuiltinFunction.
-var builtinFunctionRegistry map[string]func([]Value, *ast.CallExpr) (Value, error)
+var builtinFunctionRegistry map[string]RegularBuiltinFunc
+
+// builtinRegistryMu protects both builtin registries for concurrent reads/writes.
+var builtinRegistryMu sync.RWMutex
 
 func init() {
-	builtinSpecialRegistry = map[string]func(*ast.CallExpr, Context, int) (Value, error){
+	builtinSpecialRegistry = map[string]SpecialBuiltinFunc{
 		"__ifelse":          callBuiltinIfElse,
 		"__default":         callBuiltinDefault,
 		"__lambda":          callBuiltinLambdaAST,
@@ -64,7 +71,7 @@ func init() {
 		"notBe":             callNotBeMatcher,
 	}
 
-	builtinFunctionRegistry = map[string]func([]Value, *ast.CallExpr) (Value, error){
+	builtinFunctionRegistry = map[string]RegularBuiltinFunc{
 		"read":                      callBuiltinRead,
 		"readUrl":                   callBuiltinReadUrl,
 		"write":                     callBuiltinWrite,
@@ -234,15 +241,70 @@ func init() {
 	}
 }
 
+func cloneSpecialRegistry(src map[string]SpecialBuiltinFunc) map[string]SpecialBuiltinFunc {
+	dst := make(map[string]SpecialBuiltinFunc, len(src))
+	for name, fn := range src {
+		dst[name] = fn
+	}
+	return dst
+}
+
+func cloneFunctionRegistry(src map[string]RegularBuiltinFunc) map[string]RegularBuiltinFunc {
+	dst := make(map[string]RegularBuiltinFunc, len(src))
+	for name, fn := range src {
+		dst[name] = fn
+	}
+	return dst
+}
+
+// RegisterBuiltinSpecial registers or overrides a special builtin at runtime.
+func RegisterBuiltinSpecial(name string, fn SpecialBuiltinFunc) {
+	builtinRegistryMu.Lock()
+	defer builtinRegistryMu.Unlock()
+	builtinSpecialRegistry[name] = fn
+}
+
+// RegisterBuiltinFunction registers or overrides a regular builtin at runtime.
+func RegisterBuiltinFunction(name string, fn RegularBuiltinFunc) {
+	builtinRegistryMu.Lock()
+	defer builtinRegistryMu.Unlock()
+	builtinFunctionRegistry[name] = fn
+}
+
+// SetBuiltinRegistriesForTesting swaps builtin registries and returns a restore func.
+// The provided maps are cloned to avoid external mutation races.
+func SetBuiltinRegistriesForTesting(
+	special map[string]SpecialBuiltinFunc,
+	regular map[string]RegularBuiltinFunc,
+) func() {
+	builtinRegistryMu.Lock()
+	prevSpecial := cloneSpecialRegistry(builtinSpecialRegistry)
+	prevRegular := cloneFunctionRegistry(builtinFunctionRegistry)
+	builtinSpecialRegistry = cloneSpecialRegistry(special)
+	builtinFunctionRegistry = cloneFunctionRegistry(regular)
+	builtinRegistryMu.Unlock()
+
+	return func() {
+		builtinRegistryMu.Lock()
+		builtinSpecialRegistry = prevSpecial
+		builtinFunctionRegistry = prevRegular
+		builtinRegistryMu.Unlock()
+	}
+}
+
 // GetBuiltinSpecial returns a special function handler by name
 // This maintains compatibility with existing visitor code
-func GetBuiltinSpecial(name string) (func(*ast.CallExpr, Context, int) (Value, error), bool) {
+func GetBuiltinSpecial(name string) (SpecialBuiltinFunc, bool) {
+	builtinRegistryMu.RLock()
+	defer builtinRegistryMu.RUnlock()
 	fn, ok := builtinSpecialRegistry[name]
 	return fn, ok
 }
 
 // GetBuiltinFunction returns a regular function handler by name
-func GetBuiltinFunction(name string) (func([]Value, *ast.CallExpr) (Value, error), bool) {
+func GetBuiltinFunction(name string) (RegularBuiltinFunc, bool) {
+	builtinRegistryMu.RLock()
+	defer builtinRegistryMu.RUnlock()
 	fn, ok := builtinFunctionRegistry[name]
 	return fn, ok
 }
