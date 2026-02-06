@@ -349,14 +349,15 @@ type parseState struct {
 	loader         *ModuleLoader
 }
 
-// directiveHandler pairs a prefix with its handler function
-type directiveHandler struct {
-	prefix  string
+// directiveRegistration pairs a keyword with its handler function.
+// Some directives (fun/var) are parsed by dedicated multiline handlers.
+type directiveRegistration struct {
+	keyword string
 	handler func(line, trimmedLine string, state *parseState) error
 }
 
-// directiveHandlers defines all header directive handlers
-var directiveHandlers = []directiveHandler{
+// directiveRegistrations defines all known header directives in one place.
+var directiveRegistrations = []directiveRegistration{
 	{"output ", func(_, trimmed string, state *parseState) error {
 		return handleOutputDecl(trimmed, state.outputMimeType, state.context)
 	}},
@@ -372,12 +373,8 @@ var directiveHandlers = []directiveHandler{
 	{"import ", func(_, trimmed string, state *parseState) error {
 		return handleImport(trimmed, state.context, state.loader)
 	}},
-	{"var ", func(line, trimmed string, state *parseState) error {
-		return handleVariableDecl(line, trimmed, state.headerOffset, state.context, state.fullRaw)
-	}},
-	{"fun ", func(_, trimmed string, state *parseState) error {
-		return handleFunctionDecl(trimmed, state.context)
-	}},
+	{"var ", nil},
+	{"fun ", nil},
 	{"type ", func(_, trimmed string, state *parseState) error {
 		return handleTypeDecl(trimmed, state.context)
 	}},
@@ -465,6 +462,74 @@ func isEscaped(s string, i int) bool {
 	return backslashCount%2 == 1
 }
 
+func normalizeHeaderLines(header string) []string {
+	return strings.Split(normalizeHeader(header), "\n")
+}
+
+func parseDirectiveLine(lines []string, index int, headerOffset int, state *parseState) (int, error) {
+	line := lines[index]
+	trimmedLine := strings.TrimSpace(line)
+	if trimmedLine == "" || strings.HasPrefix(trimmedLine, "//") {
+		return 1, nil
+	}
+
+	state.headerOffset = headerOffset
+	if strings.HasPrefix(trimmedLine, "fun ") {
+		fn, fnName, consumed, err := parseFunDeclFromLines(lines, index, state.context)
+		if err != nil {
+			return 0, withHeaderLineContext(err, state, headerOffset, line)
+		}
+		if fnName != "" {
+			state.context[fnName] = fn
+		}
+		return consumed, nil
+	}
+	if strings.HasPrefix(trimmedLine, "var ") {
+		val, varName, consumed, err := parseVarDeclFromLines(lines, index, state.headerOffset, state.context, state.fullRaw)
+		if err != nil {
+			return 0, withHeaderLineContext(err, state, headerOffset, line)
+		}
+		if varName != "" {
+			state.context[varName] = val
+		}
+		return consumed, nil
+	}
+
+	for _, directive := range directiveRegistrations {
+		if strings.HasPrefix(trimmedLine, directive.keyword) {
+			if directive.handler == nil {
+				return 0, withHeaderLineContext(unifiederrors.ParseErrorf("unrecognized header directive: %s", trimmedLine), state, headerOffset, line)
+			}
+			if err := directive.handler(line, trimmedLine, state); err != nil {
+				return 0, withHeaderLineContext(err, state, headerOffset, line)
+			}
+			return 1, nil
+		}
+	}
+
+	return 0, withHeaderLineContext(unifiederrors.ParseErrorf("unrecognized header directive: %s", trimmedLine), state, headerOffset, line)
+}
+
+func parseHeaderLines(lines []string, state *parseState) error {
+	headerOffset := 0
+	for i := 0; i < len(lines); {
+		consumed, err := parseDirectiveLine(lines, i, headerOffset, state)
+		if err != nil {
+			return err
+		}
+		for j := 0; j < consumed; j++ {
+			headerOffset += len(lines[i+j]) + 1
+		}
+		i += consumed
+	}
+	return nil
+}
+
+func withHeaderLineContext(err error, state *parseState, headerOffset int, line string) error {
+	lineOffset := headerOffset + leadingWhitespaceOffset(line)
+	return attachLineContext(err, state.fullRaw, lineOffset, line)
+}
+
 func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLoader) (map[string]interface{}, string, error) {
 	context := make(map[string]interface{})
 	outputMimeType := "application/json"
@@ -472,9 +537,6 @@ func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLo
 	if !hasHeader {
 		return context, outputMimeType, nil
 	}
-
-	// Normalize single-line headers to multi-line format
-	header = normalizeHeader(header)
 
 	state := &parseState{
 		context:        context,
@@ -484,72 +546,9 @@ func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLo
 		loader:         loader,
 	}
 
-	lines := strings.Split(header, "\n")
-	headerOffset := 0
-
-	for i := 0; i < len(lines); {
-		line := lines[i]
-		trimmedLine := strings.TrimSpace(line)
-		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "//") {
-			headerOffset += len(line) + 1
-			i++
-			continue
-		}
-
-		if strings.HasPrefix(trimmedLine, "fun ") {
-			state.headerOffset = headerOffset
-			fn, fnName, consumed, err := parseFunDeclFromLines(lines, i, state.context)
-			if err != nil {
-				lineOffset := headerOffset + leadingWhitespaceOffset(line)
-				return nil, "", attachLineContext(err, fullRaw, lineOffset, line)
-			}
-			if fnName != "" {
-				state.context[fnName] = fn
-			}
-			for j := 0; j < consumed; j++ {
-				headerOffset += len(lines[i+j]) + 1
-			}
-			i += consumed
-			continue
-		}
-
-		if strings.HasPrefix(trimmedLine, "var ") {
-			state.headerOffset = headerOffset
-			val, varName, consumed, err := parseVarDeclFromLines(lines, i, state.headerOffset, state.context, state.fullRaw)
-			if err != nil {
-				lineOffset := headerOffset + leadingWhitespaceOffset(line)
-				return nil, "", attachLineContext(err, fullRaw, lineOffset, line)
-			}
-			if varName != "" {
-				state.context[varName] = val
-			}
-			for j := 0; j < consumed; j++ {
-				headerOffset += len(lines[i+j]) + 1
-			}
-			i += consumed
-			continue
-		}
-
-		// Try each handler to see if it can handle this line
-		parsed := false
-		for _, h := range directiveHandlers {
-			if strings.HasPrefix(trimmedLine, h.prefix) {
-				state.headerOffset = headerOffset
-				if err := h.handler(line, trimmedLine, state); err != nil {
-					lineOffset := headerOffset + leadingWhitespaceOffset(line)
-					return nil, "", attachLineContext(err, fullRaw, lineOffset, line)
-				}
-				parsed = true
-				break
-			}
-		}
-		if !parsed {
-			lineOffset := headerOffset + leadingWhitespaceOffset(line)
-			return nil, "", attachLineContext(unifiederrors.ParseErrorf("unrecognized header directive: %s", trimmedLine), fullRaw, lineOffset, line)
-		}
-
-		headerOffset += len(line) + 1
-		i++
+	lines := normalizeHeaderLines(header)
+	if err := parseHeaderLines(lines, state); err != nil {
+		return nil, "", err
 	}
 
 	// Store namespaces in context if any were declared
