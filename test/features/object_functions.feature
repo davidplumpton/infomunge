@@ -393,6 +393,18 @@ Feature: Object Functions
     Then the output should contain "\"x_val\":105"
     And the output should contain "\"y_val\":110"
 
+  Scenario: mapObject with arbitrary parameter names uses DataWeave order
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      mapObject({"a": 1, "b": 2}, (first, second) -> [second ++ "_dw", first + 1])
+      """
+    When I run the application with this content
+    Then the output should contain "\"a_dw\":2"
+    And the output should contain "\"b_dw\":3"
+
   Scenario: mapObject returns object entries from conditional object literal
     Given the following JSON input:
       """
@@ -539,6 +551,19 @@ Feature: Object Functions
     Then the output should contain "\"active\":true"
     And the output should contain "\"admin\":true"
     And the output should not contain "\"archived\""
+
+  Scenario: filterObject with arbitrary parameter names uses DataWeave order
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      filterObject({"a": 1, "b": 2, "c": 3}, (left, right) -> left > 1)
+      """
+    When I run the application with this content
+    Then the output should contain "\"b\":2"
+    And the output should contain "\"c\":3"
+    And the output should not contain "\"a\":1"
 
   Scenario: filterObject with no matches
     Given the following input content:

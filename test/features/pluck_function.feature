@@ -45,6 +45,20 @@ Feature: Pluck Function
       [11,12]
       """
 
+  Scenario: pluck on object with arbitrary parameter names uses DataWeave order
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {"a": 1, "b": 2} pluck (first, second) -> second ++ ":" ++ (first as String)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["a:1","b:2"]
+      """
+
   Scenario: pluck on array with string selector (existing field extraction)
     Given the following input content:
       """

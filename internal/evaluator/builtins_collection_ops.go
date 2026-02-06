@@ -411,14 +411,9 @@ func callBuiltinFilterObject(e *ast.CallExpr, context map[string]interface{}, de
 	result := make(map[string]interface{})
 	index := 0
 
-	// Detect parameter order (DataWeave style: value, key)
-	isDataWeaveOrder := false
-	if lambda.ParamCount() >= 2 {
-		p0, p1 := lambda.ParamName(0), lambda.ParamName(1)
-		if (p0 == "value" && p1 == "key") || (p0 == "v" && p1 == "k") {
-			isDataWeaveOrder = true
-		}
-	}
+	// Default to DataWeave order (value, key) unless lambda explicitly uses
+	// legacy names (key, value) or (k, v).
+	isDataWeaveOrder := !shouldUseLegacyObjectLambdaOrder(lambda)
 
 	// Create a deterministic order by sorting keys
 	keys := make([]string, 0, len(obj))
@@ -568,15 +563,9 @@ func callBuiltinPluck(e *ast.CallExpr, context map[string]interface{}, depth int
 }
 
 func pluckObject(obj map[string]interface{}, lambda *Lambda, context map[string]interface{}, depth int, e *ast.CallExpr) (interface{}, error) {
-	// Detect parameter order
-	isDataWeaveOrder := false
-	if lambda.ParamCount() >= 2 {
-		param0 := lambda.ParamName(0)
-		param1 := lambda.ParamName(1)
-		if (param0 == "value" && param1 == "key") || (param0 == "v" && param1 == "k") {
-			isDataWeaveOrder = true
-		}
-	}
+	// Default to DataWeave order (value, key) unless lambda explicitly uses
+	// legacy names (key, value) or (k, v).
+	isDataWeaveOrder := !shouldUseLegacyObjectLambdaOrder(lambda)
 
 	keys := make([]string, 0, len(obj))
 	for k := range obj {

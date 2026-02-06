@@ -32,16 +32,6 @@ func extractMapObjectResult(mapResult interface{}, pos token.Pos) (map[string]in
 	}
 }
 
-// isDataWeaveParamOrder returns true if the lambda parameters indicate DataWeave order (value, key).
-func isDataWeaveParamOrder(lambda *Lambda) bool {
-	if lambda.ParamCount() != 2 {
-		return false
-	}
-	param0 := lambda.ParamName(0)
-	param1 := lambda.ParamName(1)
-	return (param0 == "value" && param1 == "key") || (param0 == "v" && param1 == "k")
-}
-
 func evalMapObjectInputs(e *ast.CallExpr, context map[string]interface{}, depth int) (map[string]interface{}, *Lambda, error) {
 	if len(e.Args) != 2 {
 		return nil, nil, newPosError("mapObject requires exactly 2 arguments: object, lambda", e.Pos())
@@ -83,7 +73,7 @@ func mapObjectLambdaContext(context map[string]interface{}, param0, param1 strin
 
 func applyMapObject(obj map[string]interface{}, lambda *Lambda, context map[string]interface{}, depth int, pos token.Pos) (map[string]interface{}, error) {
 	param0, param1 := lambda.ParamName(0), lambda.ParamName(1)
-	dwOrder := isDataWeaveParamOrder(lambda)
+	dwOrder := !shouldUseLegacyObjectLambdaOrder(lambda)
 	keys := sortedKeys(obj)
 	result := make(map[string]interface{})
 
@@ -145,8 +135,8 @@ func applyAndMerge(value interface{}, key string, result map[string]interface{},
 //   - lambda: A function with exactly 2 parameters
 //
 // Lambda parameter order detection:
-//   - DataWeave style (value, key): If params are named "value"/"key" or "v"/"k"
-//   - Traditional style (key, value): For all other parameter names
+//   - Legacy InfoMunge style (key, value): only for params named "key"/"value" or "k"/"v"
+//   - DataWeave style (value, key): all other parameter names
 //
 // Lambda return value:
 //   - Should return an object with a single key-value pair: {"newKey": newValue}
