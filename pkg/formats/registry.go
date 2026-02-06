@@ -30,7 +30,11 @@ var (
 	objectReaders = make(map[string]ObjectReader)
 	arrayReaders  = make(map[string]ArrayReader)
 	extensions    = make(map[string]string)
-	registryMu    sync.RWMutex
+	// Registration normally happens during init() in format-specific files.
+	// We keep RWMutex protection to support tests and optional runtime extension
+	// safely; callers that need deterministic behavior should finish registration
+	// before serving concurrent read traffic.
+	registryMu sync.RWMutex
 )
 
 // RegisterReader registers a reader for a specific MIME type.
