@@ -4,17 +4,17 @@
 build:
 	go build -o infomunge ./cmd/infomunge
 
-# Run all tests (quiet on success, shows failures)
+# Run all tests (failed steps + periodic pass counts)
 test:
-	go test ./test -timeout 10m
+	GODOG_FORMAT=failures go test -v ./test -timeout 10m
 
-# Run tests with each test name printed (use to find hanging/timeout tests)
+# Run tests with full progress output (use to find hanging/timeout tests)
 test-verbose:
-	go test -v ./test -timeout 10m
+	GODOG_FORMAT=progress go test -v ./test -timeout 10m
 
 # Run tests with minimal output (failed steps + periodic pass counts)
 test-failures:
-	GODOG_FORMAT=failures go test ./test -timeout 10m
+	GODOG_FORMAT=failures go test -v ./test -timeout 10m
 
 # Run a specific feature file (usage: make test-feature FEATURE=simple_types)
 test-feature:

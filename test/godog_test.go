@@ -39,7 +39,7 @@ func TestFeatures(t *testing.T) {
 	// Support filtering via environment variables:
 	//   GODOG_PATHS - comma-separated feature file paths (default: "features")
 	//   GODOG_TAGS  - tag expression to filter scenarios (e.g., "@fast", "@slow and not @wip")
-	//   GODOG_FORMAT - output format (default: "progress", options: "pretty", "cucumber", "junit")
+	//   GODOG_FORMAT - output format (default: "failures", options: any registered Godog formatter)
 	//
 	// Examples:
 	//   GODOG_PATHS=features/date_time_functions.feature go test -v
@@ -54,16 +54,10 @@ func TestFeatures(t *testing.T) {
 		}
 	}
 
-	format := "progress"
-	if envFormat := os.Getenv("GODOG_FORMAT"); envFormat != "" {
-		format = envFormat
-	}
-
 	opts := &godog.Options{
-		Format:   format,
-		Paths:    paths,
-		Output:   os.Stdout, // Direct output to stdout for immediate feedback
-		TestingT: t,         // Integrate with go test for real-time progress output
+		Format: resolveGodogFormat(),
+		Paths:  paths,
+		Output: os.Stdout, // Direct output to stdout for immediate feedback
 	}
 
 	if tags := os.Getenv("GODOG_TAGS"); tags != "" {
@@ -78,6 +72,14 @@ func TestFeatures(t *testing.T) {
 	if suite.Run() != 0 {
 		t.Fatal("non-zero status returned, failed to run feature tests")
 	}
+}
+
+func resolveGodogFormat() string {
+	if envFormat := os.Getenv("GODOG_FORMAT"); envFormat != "" {
+		return envFormat
+	}
+	// failures formatter suppresses per-step names while still printing periodic pass counts.
+	return failuresFormatName
 }
 
 func InitializeScenario(ctx *godog.ScenarioContext) {
