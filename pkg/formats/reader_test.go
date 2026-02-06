@@ -1,6 +1,7 @@
 package formats
 
 import (
+	"encoding/xml"
 	"fmt"
 	"reflect"
 	"testing"
@@ -525,6 +526,45 @@ func TestSimplifyXML(t *testing.T) {
 				t.Errorf("got %v, want %v", got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestNamespaceDeclsNormalization(t *testing.T) {
+	decls := namespaceDeclsFromNodeObject(Object{
+		"#default": "http://example.com/default",
+		"ns":       "http://example.com/ns",
+	})
+
+	if decls[""] != "http://example.com/default" {
+		t.Fatalf("expected default namespace to normalize to empty prefix, got %q", decls[""])
+	}
+	if decls["ns"] != "http://example.com/ns" {
+		t.Fatalf("expected ns prefix to be preserved, got %q", decls["ns"])
+	}
+
+	node := decls.toNodeObject()
+	if node["#default"] != "http://example.com/default" {
+		t.Fatalf("expected default namespace to round-trip as #default, got %v", node["#default"])
+	}
+	if node["ns"] != "http://example.com/ns" {
+		t.Fatalf("expected ns prefix to round-trip, got %v", node["ns"])
+	}
+}
+
+func TestXMLNamespaceContextShadowing(t *testing.T) {
+	var ctx xmlNamespaceContext
+	ctx.Push(xmlNamespaceDecls{"ns": "http://example.com/one"})
+	ctx.Push(xmlNamespaceDecls{"ns": "http://example.com/two"})
+
+	name := ctx.ResolveElementName(xml.Name{Space: "http://example.com/two", Local: "item"})
+	if name != "ns:item" {
+		t.Fatalf("expected child namespace prefix resolution, got %q", name)
+	}
+
+	ctx.Pop()
+	name = ctx.ResolveElementName(xml.Name{Space: "http://example.com/one", Local: "item"})
+	if name != "ns:item" {
+		t.Fatalf("expected parent namespace prefix resolution after pop, got %q", name)
 	}
 }
 

@@ -31,7 +31,7 @@ func readXML(content string) (interface{}, error) {
 	decoder := xml.NewDecoder(strings.NewReader(content))
 	var stack []Object
 	var result Object
-	var nsStack []map[string]string // namespace prefix -> URI mappings at each level
+	var nsCtx xmlNamespaceContext
 
 	for {
 		token, err := decoder.Token()
@@ -49,8 +49,7 @@ func readXML(content string) (interface{}, error) {
 				return nil, unifiederrors.ValidationErrorf("XML element nesting depth exceeded (max %d levels)", MaxXMLDepth)
 			}
 
-			newNode, elemName, newNsStack := handleXMLStartElement(t, nsStack)
-			nsStack = newNsStack
+			newNode, elemName := handleXMLStartElement(t, &nsCtx)
 
 			if len(stack) > 0 {
 				addChildToParent(stack[len(stack)-1], elemName, newNode)
@@ -63,9 +62,7 @@ func readXML(content string) (interface{}, error) {
 			if len(stack) > 0 {
 				stack = stack[:len(stack)-1]
 			}
-			if len(nsStack) > 0 {
-				nsStack = nsStack[:len(nsStack)-1]
-			}
+			nsCtx.Pop()
 
 		case xml.CharData:
 			if str := strings.TrimSpace(string(t)); str != "" && len(stack) > 0 {
@@ -109,45 +106,43 @@ func formatXMLWithOptions(result interface{}, opts XMLOutputOptions) (string, er
 // flow and easier maintenance compared to the nested conditional approach.
 
 // handleXMLStartElement processes a start element, extracting namespaces and attributes.
-func handleXMLStartElement(elem xml.StartElement, nsStack []map[string]string) (Object, string, []map[string]string) {
+func handleXMLStartElement(elem xml.StartElement, nsCtx *xmlNamespaceContext) (Object, string) {
 	newNode := make(Object)
 
 	// Collect namespace declarations from attributes
-	nsDecls := collectNamespaceDecls(elem.Attr)
+	nsDecls := namespaceDeclsFromAttrs(elem.Attr)
 
 	// Push namespace context (inherit from parent + new declarations)
-	nsStack = pushNamespaceContext(nsStack, nsDecls)
+	nsCtx.Push(nsDecls)
 
 	// Build element name with prefix if namespace is present
-	elemName := buildElementName(elem.Name, nsStack)
+	elemName := nsCtx.ResolveElementName(elem.Name)
 
 	// Store namespace declarations in the node
 	if len(nsDecls) > 0 {
-		xmlnsMap := make(Object)
-		for prefix, uri := range nsDecls {
-			if prefix == "" {
-				xmlnsMap["#default"] = uri
-			} else {
-				xmlnsMap[prefix] = uri
-			}
-		}
-		newNode[XMLNamespaceKey] = xmlnsMap
+		newNode[XMLNamespaceKey] = nsDecls.toNodeObject()
 	}
 
 	// Store non-namespace attributes
 	for _, attr := range elem.Attr {
 		if attr.Name.Space != "xmlns" && !(attr.Name.Local == "xmlns" && attr.Name.Space == "") {
-			attrName := XMLAttrPrefix + buildElementName(attr.Name, nsStack)
+			attrName := XMLAttrPrefix + nsCtx.ResolveElementName(attr.Name)
 			newNode[attrName] = attr.Value
 		}
 	}
 
-	return newNode, elemName, nsStack
+	return newNode, elemName
 }
 
-// collectNamespaceDecls extracts namespace declarations from XML attributes.
-func collectNamespaceDecls(attrs []xml.Attr) map[string]string {
-	nsDecls := make(map[string]string)
+type xmlNamespaceDecls map[string]string
+
+func newXMLNamespaceDecls() xmlNamespaceDecls {
+	return make(xmlNamespaceDecls)
+}
+
+// namespaceDeclsFromAttrs extracts namespace declarations from XML attributes.
+func namespaceDeclsFromAttrs(attrs []xml.Attr) xmlNamespaceDecls {
+	nsDecls := newXMLNamespaceDecls()
 	for _, attr := range attrs {
 		if attr.Name.Space == "xmlns" {
 			nsDecls[attr.Name.Local] = attr.Value // xmlns:prefix="uri"
@@ -158,19 +153,87 @@ func collectNamespaceDecls(attrs []xml.Attr) map[string]string {
 	return nsDecls
 }
 
-// pushNamespaceContext creates a new namespace context inheriting from parent.
-func pushNamespaceContext(nsStack []map[string]string, nsDecls map[string]string) []map[string]string {
-	if len(nsStack) > 0 {
-		inherited := make(map[string]string)
-		for k, v := range nsStack[len(nsStack)-1] {
-			inherited[k] = v
+func namespaceDeclsFromNodeObject(nsMap Object) xmlNamespaceDecls {
+	nsDecls := newXMLNamespaceDecls()
+	for prefix, uri := range nsMap {
+		p := prefix
+		if p == "#default" {
+			p = ""
 		}
-		for k, v := range nsDecls {
-			inherited[k] = v
-		}
-		return append(nsStack, inherited)
+		nsDecls[p] = fmt.Sprintf("%v", uri)
 	}
-	return append(nsStack, nsDecls)
+	return nsDecls
+}
+
+func namespaceDeclsFromStringMap(nsMap map[string]string) xmlNamespaceDecls {
+	nsDecls := newXMLNamespaceDecls()
+	for prefix, uri := range nsMap {
+		nsDecls[prefix] = uri
+	}
+	return nsDecls
+}
+
+func (nsDecls xmlNamespaceDecls) toNodeObject() Object {
+	node := make(Object)
+	for prefix, uri := range nsDecls {
+		if prefix == "" {
+			node["#default"] = uri
+			continue
+		}
+		node[prefix] = uri
+	}
+	return node
+}
+
+func (nsDecls xmlNamespaceDecls) mergeInto(dst map[string]string) {
+	for prefix, uri := range nsDecls {
+		dst[prefix] = uri
+	}
+}
+
+func (nsDecls xmlNamespaceDecls) declarationStrings() []string {
+	decls := make([]string, 0, len(nsDecls))
+	for prefix, uri := range nsDecls {
+		if prefix == "" {
+			decls = append(decls, fmt.Sprintf(`xmlns="%v"`, uri))
+			continue
+		}
+		decls = append(decls, fmt.Sprintf(`xmlns:%s="%v"`, prefix, uri))
+	}
+	return decls
+}
+
+type xmlNamespaceContext struct {
+	stack []map[string]string
+}
+
+func (ctx *xmlNamespaceContext) Push(nsDecls xmlNamespaceDecls) {
+	merged := make(map[string]string)
+	if current := ctx.current(); current != nil {
+		for prefix, uri := range current {
+			merged[prefix] = uri
+		}
+	}
+	nsDecls.mergeInto(merged)
+	ctx.stack = append(ctx.stack, merged)
+}
+
+func (ctx *xmlNamespaceContext) Pop() {
+	if len(ctx.stack) == 0 {
+		return
+	}
+	ctx.stack = ctx.stack[:len(ctx.stack)-1]
+}
+
+func (ctx *xmlNamespaceContext) current() map[string]string {
+	if len(ctx.stack) == 0 {
+		return nil
+	}
+	return ctx.stack[len(ctx.stack)-1]
+}
+
+func (ctx *xmlNamespaceContext) ResolveElementName(name xml.Name) string {
+	return buildElementName(name, ctx.current())
 }
 
 // addChildToParent adds a child node to a parent, handling repeated elements as arrays.
@@ -210,14 +273,13 @@ func appendTextContent(node Object, text string) {
 }
 
 // buildElementName creates an element name, using prefix if a namespace is present
-func buildElementName(name xml.Name, nsStack []map[string]string) string {
+func buildElementName(name xml.Name, current map[string]string) string {
 	if name.Space == "" {
 		return name.Local
 	}
 
 	// Look up prefix for this namespace URI
-	if len(nsStack) > 0 {
-		current := nsStack[len(nsStack)-1]
+	if current != nil {
 		for prefix, uri := range current {
 			if uri == name.Space && prefix != "" {
 				return prefix + ":" + name.Local
@@ -245,8 +307,7 @@ func shouldSimplifyNode(node Object) bool {
 	return false
 }
 
-// simplifyXMLMap recursively simplifies a map, converting single text nodes to their string values.
-func simplifyXMLMap(node Object) interface{} {
+func simplifyXMLObject(node Object) interface{} {
 	if shouldSimplifyNode(node) {
 		return node[XMLTextKey]
 	}
@@ -256,30 +317,22 @@ func simplifyXMLMap(node Object) interface{} {
 	return node
 }
 
-// simplifyXMLArray recursively simplifies array elements.
-func simplifyXMLArray(arr Array) Array {
-	for i, val := range arr {
-		arr[i] = simplifyXML(val)
+func simplifyXMLSlice(length int, get func(int) interface{}, set func(int, interface{})) {
+	for i := 0; i < length; i++ {
+		set(i, simplifyXML(get(i)))
 	}
-	return arr
-}
-
-// simplifyXMLMultiValue recursively simplifies XMLMultiValue elements.
-func simplifyXMLMultiValue(arr XMLMultiValue) XMLMultiValue {
-	for i, val := range arr {
-		arr[i] = simplifyXML(val)
-	}
-	return arr
 }
 
 func simplifyXML(input interface{}) interface{} {
 	switch v := input.(type) {
 	case Object:
-		return simplifyXMLMap(v)
+		return simplifyXMLObject(v)
 	case XMLMultiValue:
-		return simplifyXMLMultiValue(v)
+		simplifyXMLSlice(len(v), func(i int) interface{} { return v[i] }, func(i int, value interface{}) { v[i] = value })
+		return v
 	case Array:
-		return simplifyXMLArray(v)
+		simplifyXMLSlice(len(v), func(i int) interface{} { return v[i] }, func(i int, value interface{}) { v[i] = value })
+		return v
 	default:
 		return v
 	}
@@ -364,7 +417,7 @@ func buildXMLAttributes(val Object) ([]string, []string) {
 // buildXMLAttributesWithOptions builds XML namespace declarations and attribute strings.
 func buildXMLAttributesWithOptions(val Object, elementName string, opts xmlRenderOptions, isChild bool, elementIsNil bool) ([]string, []string, string) {
 	var attrs []string
-	xmlnsMap := make(map[string]string)
+	xmlnsMap := newXMLNamespaceDecls()
 
 	resolvedElement, elementPrefix, elementURI, elementHasPrefix := resolveName(elementName, opts.namespaceVars)
 
@@ -375,13 +428,7 @@ func buildXMLAttributesWithOptions(val Object, elementName string, opts xmlRende
 	for _, k := range keys {
 		if k == XMLNamespaceKey {
 			if nsMap, ok := val[k].(Object); ok {
-				for prefix, uri := range nsMap {
-					p := prefix
-					if p == "#default" {
-						p = ""
-					}
-					xmlnsMap[p] = fmt.Sprintf("%v", uri)
-				}
+				namespaceDeclsFromNodeObject(nsMap).mergeInto(xmlnsMap)
 			}
 		} else if strings.HasPrefix(k, XMLAttrPrefix) {
 			if opts.skipNullOnAttributes && val[k] == nil {
@@ -403,7 +450,7 @@ func buildXMLAttributesWithOptions(val Object, elementName string, opts xmlRende
 
 	// Root declared namespaces based on writeDeclaredNamespaces
 	if !isChild {
-		for prefix, uri := range opts.rootDeclaredNames {
+		for prefix, uri := range namespaceDeclsFromStringMap(opts.rootDeclaredNames) {
 			ensureNamespace(xmlnsMap, prefix, uri)
 		}
 	}
@@ -424,7 +471,7 @@ func buildXMLAttributesWithOptions(val Object, elementName string, opts xmlRende
 		ensureNamespace(xmlnsMap, "xsi", XMLSchemaInstanceURI)
 	}
 
-	xmlnsDecls := buildNamespaceDeclsFromStringMap(xmlnsMap)
+	xmlnsDecls := xmlnsMap.declarationStrings()
 	sort.Strings(xmlnsDecls)
 	sort.Strings(attrs)
 
@@ -441,31 +488,6 @@ func extractAndSortAttributeKeys(val Object) []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-// buildNamespaceDecls is a generic function that builds namespace declaration strings
-// from a map. It handles both interface{} maps (where default key is "#default")
-// and string maps (where default key is "").
-func buildNamespaceDecls[V any](nsMap map[string]V, defaultKeyValue string) []string {
-	var decls []string
-	for prefix, uri := range nsMap {
-		if prefix == defaultKeyValue {
-			decls = append(decls, fmt.Sprintf(`xmlns="%v"`, uri))
-		} else {
-			decls = append(decls, fmt.Sprintf(`xmlns:%s="%v"`, prefix, uri))
-		}
-	}
-	return decls
-}
-
-// buildNamespaceDeclsFromMap builds namespace declaration strings from a map (parsed from @xmlns).
-func buildNamespaceDeclsFromMap(nsMap Object) []string {
-	return buildNamespaceDecls(nsMap, "#default")
-}
-
-// buildNamespaceDeclsFromStringMap builds namespace declaration strings from a string map (from ns keyword).
-func buildNamespaceDeclsFromStringMap(nsMap map[string]string) []string {
-	return buildNamespaceDecls(nsMap, "")
 }
 
 // buildXMLChildren builds child element strings from a map.
