@@ -2,6 +2,7 @@
 # The binary name from your go build command
 /infomunge
 /test/infomunge
+/test/input.txt
 *.exe
 *.exe~
 *.dll
