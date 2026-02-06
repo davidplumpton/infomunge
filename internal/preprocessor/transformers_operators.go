@@ -9,47 +9,134 @@ import (
 	"infomunge/internal/stringutils"
 )
 
-// replaceDefaultOperator converts "expr default value" to "__default(expr, value)"
-func replaceDefaultOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
+const (
+	binaryOpDefault     = "default"
+	binaryOpOnNull      = "onNull"
+	binaryOpThen        = "then"
+	binaryOpUpdate      = "update"
+	binaryOpFind        = "find"
+	binaryOpConcatenate = "concatenate"
+	binaryOpRemove      = "remove"
+	binaryOpSplitBy     = "splitBy"
+	binaryOpJoinBy      = "joinBy"
+	binaryOpTo          = "to"
+	binaryOpMatch       = "match"
+	binaryOpContains    = "contains"
+	binaryOpMatches     = "matches"
+	binaryOpRepeat      = "repeat"
+	binaryOpMod         = "mod"
+)
+
+var binaryOperatorConfigs = map[string]stringutils.BinaryOperatorConfig{
+	binaryOpDefault: {
 		Operator:     " default ",
 		FuncName:     "__default",
 		RightStopOps: []string{" and "},
-	})
-}
-
-// replaceOnNullOperator converts "expr onNull value" to "onNull(expr, value)"
-func replaceOnNullOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
+	},
+	binaryOpOnNull: {
 		Operator: " onNull ",
 		FuncName: "onNull",
-	})
-}
-
-// replaceThenOperator converts "expr then value" to "then(expr, value)"
-func replaceThenOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
+	},
+	binaryOpThen: {
 		Operator: " then ",
 		FuncName: "then",
-	})
-}
-
-// replaceUpdateOperator converts "obj ~ {field: value}" to "__update(obj, {field: value})"
-func replaceUpdateOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
+	},
+	binaryOpUpdate: {
 		Operator:     " ~ ",
 		FuncName:     "__update",
 		ExtraStops:   []rune{'~'},
 		RightStopOps: []string{" ~ "},
-	})
+	},
+	binaryOpFind: {
+		Operator: " find ",
+		FuncName: "find",
+	},
+	binaryOpConcatenate: {
+		Operator:     " ++ ",
+		FuncName:     "__concat",
+		ExtraStops:   []rune{'+'},
+		RightStopOps: []string{" ++ "},
+	},
+	binaryOpRemove: {
+		Operator:     " -- ",
+		FuncName:     "__remove",
+		ExtraStops:   []rune{'-'},
+		RightStopOps: []string{" -- "},
+	},
+	binaryOpSplitBy: {
+		Operator:     " splitBy ",
+		FuncName:     "splitBy",
+		RightStopOps: []string{" splitBy "},
+	},
+	binaryOpJoinBy: {
+		Operator:     " joinBy ",
+		FuncName:     "joinBy",
+		RightStopOps: []string{" joinBy "},
+	},
+	binaryOpTo: {
+		Operator:        " to ",
+		FuncName:        "to",
+		RightStopOps:    []string{" to "},
+		UseMinimalStops: true, // Allow negative numbers like -2 to 5
+	},
+	binaryOpMatch: {
+		Operator:     " match ",
+		FuncName:     "match",
+		RightStopOps: []string{" match "},
+	},
+	binaryOpContains: {
+		Operator:     " contains ",
+		FuncName:     "contains",
+		RightStopOps: []string{" && ", " || ", " and ", " or ", " contains "},
+	},
+	binaryOpMatches: {
+		Operator:     " matches ",
+		FuncName:     "matches",
+		RightStopOps: []string{" matches "},
+	},
+	binaryOpRepeat: {
+		Operator:     " repeat ",
+		FuncName:     "repeat",
+		RightStopOps: []string{" repeat "},
+	},
+	binaryOpMod: {
+		Operator:     " mod ",
+		FuncName:     "mod",
+		RightStopOps: []string{"==", "!=", "<", ">", "<=", ">=", " matches "},
+	},
+}
+
+func replaceConfiguredBinaryOperator(s string, key string) string {
+	config, ok := binaryOperatorConfigs[key]
+	if !ok {
+		panic("missing binary operator config: " + key)
+	}
+	return stringutils.ReplaceBinaryOperator(s, config)
+}
+
+// replaceDefaultOperator converts "expr default value" to "__default(expr, value)"
+func replaceDefaultOperator(s string) string {
+	return replaceConfiguredBinaryOperator(s, binaryOpDefault)
+}
+
+// replaceOnNullOperator converts "expr onNull value" to "onNull(expr, value)"
+func replaceOnNullOperator(s string) string {
+	return replaceConfiguredBinaryOperator(s, binaryOpOnNull)
+}
+
+// replaceThenOperator converts "expr then value" to "then(expr, value)"
+func replaceThenOperator(s string) string {
+	return replaceConfiguredBinaryOperator(s, binaryOpThen)
+}
+
+// replaceUpdateOperator converts "obj ~ {field: value}" to "__update(obj, {field: value})"
+func replaceUpdateOperator(s string) string {
+	return replaceConfiguredBinaryOperator(s, binaryOpUpdate)
 }
 
 // replaceFindOperator converts "source find value" to "find(source, value)"
 func replaceFindOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
-		Operator: " find ",
-		FuncName: "find",
-	})
+	return replaceConfiguredBinaryOperator(s, binaryOpFind)
 }
 
 // replaceAsOperator converts "value as TypeExpr" to "__coerce(value, \"TypeExpr\")"
@@ -210,22 +297,12 @@ func replaceIsOperator(s string) string {
 
 // replaceConcatenateOperator converts "++" to "__concat".
 func replaceConcatenateOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
-		Operator:     " ++ ",
-		FuncName:     "__concat",
-		ExtraStops:   []rune{'+'},
-		RightStopOps: []string{" ++ "},
-	})
+	return replaceConfiguredBinaryOperator(s, binaryOpConcatenate)
 }
 
 // replaceRemoveOperator converts "--" to "__remove".
 func replaceRemoveOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
-		Operator:     " -- ",
-		FuncName:     "__remove",
-		ExtraStops:   []rune{'-'},
-		RightStopOps: []string{" -- "},
-	})
+	return replaceConfiguredBinaryOperator(s, binaryOpRemove)
 }
 
 // replaceExponentOperator converts "**" to "pow".
@@ -342,30 +419,17 @@ func shouldStopExponentAtOperator(s string, pos int, start int) bool {
 
 // replaceSplitByOperator converts "splitBy".
 func replaceSplitByOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
-		Operator:     " splitBy ",
-		FuncName:     "splitBy",
-		RightStopOps: []string{" splitBy "},
-	})
+	return replaceConfiguredBinaryOperator(s, binaryOpSplitBy)
 }
 
 // replaceJoinByOperator converts "joinBy".
 func replaceJoinByOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
-		Operator:     " joinBy ",
-		FuncName:     "joinBy",
-		RightStopOps: []string{" joinBy "},
-	})
+	return replaceConfiguredBinaryOperator(s, binaryOpJoinBy)
 }
 
 // replaceToOperator converts "start to end" to "to(start, end)" for range expressions.
 func replaceToOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
-		Operator:        " to ",
-		FuncName:        "to",
-		RightStopOps:    []string{" to "},
-		UseMinimalStops: true, // Allow negative numbers like -2 to 5
-	})
+	return replaceConfiguredBinaryOperator(s, binaryOpTo)
 }
 
 // replacePipeToFunctionOperator converts "expr | funcName" to "funcName(expr)"
@@ -506,48 +570,28 @@ func findLeftOperandForAs(result []rune) int {
 // This transforms the infix match operator into a function call.
 // Note: In DataWeave, `match` returns capture groups, while `matches` returns a boolean.
 func replaceMatchOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
-		Operator:     " match ",
-		FuncName:     "match",
-		RightStopOps: []string{" match "},
-	})
+	return replaceConfiguredBinaryOperator(s, binaryOpMatch)
 }
 
 // replaceContainsOperator converts "arr contains value" to "contains(arr, value)"
 func replaceContainsOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
-		Operator:     " contains ",
-		FuncName:     "contains",
-		RightStopOps: []string{" && ", " || ", " and ", " or ", " contains "},
-	})
+	return replaceConfiguredBinaryOperator(s, binaryOpContains)
 }
 
 // replaceMatchesOperator converts "str matches pattern" to "matches(str, pattern)"
 // This transforms the infix matches operator into a function call.
 func replaceMatchesOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
-		Operator:     " matches ",
-		FuncName:     "matches",
-		RightStopOps: []string{" matches "},
-	})
+	return replaceConfiguredBinaryOperator(s, binaryOpMatches)
 }
 
 // replaceRepeatOperator converts "str repeat n" to "repeat(str, n)"
 func replaceRepeatOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
-		Operator:     " repeat ",
-		FuncName:     "repeat",
-		RightStopOps: []string{" repeat "},
-	})
+	return replaceConfiguredBinaryOperator(s, binaryOpRepeat)
 }
 
 // replaceModOperator converts "a mod b" to "mod(a, b)"
 func replaceModOperator(s string) string {
-	return stringutils.ReplaceBinaryOperator(s, stringutils.BinaryOperatorConfig{
-		Operator:     " mod ",
-		FuncName:     "mod",
-		RightStopOps: []string{"==", "!=", "<", ">", "<=", ">=", " matches "},
-	})
+	return replaceConfiguredBinaryOperator(s, binaryOpMod)
 }
 
 // replaceMethodCallOperator is a generic transformer for "left operator(args)" → "operator(left, args)".

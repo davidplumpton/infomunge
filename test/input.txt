@@ -1,4 +1,0 @@
-%im 0.1
-output application/json
----
-takeWhile([1, 2, 3], (x) -> x > 10)
