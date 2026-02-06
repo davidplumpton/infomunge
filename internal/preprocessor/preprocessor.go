@@ -9,7 +9,13 @@ import (
 const MaxRecursionDepth = 100
 
 const (
-	MaxRewriteIterations   = 10000
+	// MaxRewriteIterations is intentionally much higher than MaxTransformIterations:
+	// the core rewriter is a single byte-walking pass over raw input and can recurse
+	// into rewritten branch bodies, so large inputs legitimately require thousands of
+	// iterations before we should suspect non-progress.
+	MaxRewriteIterations = 10000
+	// MaxTransformIterations bounds fixpoint loops in stage transforms where each
+	// pass should converge quickly (typically in a small number of iterations).
 	MaxTransformIterations = 100
 )
 
@@ -116,6 +122,9 @@ func (r *rewriter) RewriteWithDepth(depth int) (string, []int, error) {
 
 	iterCount := 0
 	maxIterations := MaxRewriteIterations
+	// Scale by input length so large but valid inputs do not trip the static cap.
+	// The x4 factor provides slack for rewrites that emit additional tokens while
+	// still detecting pathological non-progress quickly.
 	if scaled := len(r.input) * 4; scaled > maxIterations {
 		maxIterations = scaled
 	}

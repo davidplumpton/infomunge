@@ -15,6 +15,9 @@ const (
 )
 
 var regexPrefixKeywords = map[string]struct{}{
+	// These keywords syntactically behave like operators in DW-like expressions.
+	// If a slash follows one of them, we treat it like an expression start, so
+	// `/.../` should be parsed as a regex literal (not division).
 	"and":      {},
 	"case":     {},
 	"contains": {},
@@ -51,6 +54,11 @@ func replaceRegexLiterals(s string) string {
 	inSingleQuoteString := false
 	lastKind := regexTokenNone
 
+	// Single-pass lexer-style rewrite:
+	// 1) Track string contexts so we never rewrite slashes inside string literals.
+	// 2) Maintain lastKind (value/operator/none) to decide whether '/' can start regex.
+	// 3) When context allows, parse `/pattern/flags` and rewrite to regex("pattern", "flags").
+	// 4) Otherwise keep '/' as-is so downstream stages can interpret division/comments.
 	for i < len(s) {
 		ch := s[i]
 
@@ -141,17 +149,17 @@ func replaceRegexLiterals(s string) string {
 					result.WriteString("regex(\"")
 					result.WriteString(escaped)
 					result.WriteString("\"")
-					
+
 					// Add flags argument if present
 					if flags != "" {
 						result.WriteString(", \"")
 						result.WriteString(flags)
 						result.WriteString("\"")
 					}
-					
+
 					result.WriteByte(')')
 					lastKind = regexTokenValue
-					
+
 					i = regexEnd
 					continue
 				}
@@ -290,6 +298,12 @@ func isRegexPrefixKeyword(word string) bool {
 
 func isRegexOperatorChar(ch byte) bool {
 	switch ch {
+	// Grouped categories:
+	// - Delimiters: ',', ';', ':'
+	// - Assignment/comparison: '=', '<', '>', '!'
+	// - Boolean/bitwise: '&', '|', '^', '~'
+	// - Arithmetic/prefix/suffix: '+', '-', '*', '%', '?'
+	// - Brackets are included for compatibility with historical context checks.
 	case '(', '[', '{', ',', ';', ':', '=', '<', '>', '!', '&', '|', '+', '-', '*', '%', '^', '~', '?':
 		return true
 	default:
@@ -301,6 +315,11 @@ func canStartRegexAfter(kind regexTokenKind) bool {
 	return kind == regexTokenNone || kind == regexTokenOperator
 }
 
+// scanRegexPrefixKind classifies the token kind immediately before position end.
+// This mirrors replaceRegexLiterals context tracking but only for the prefix.
+// It intentionally re-parses nested/quoted constructs so comment stripping and
+// other slash-aware passes can answer "would '/' start a regex here?" without
+// running the full rewrite pipeline.
 func scanRegexPrefixKind(s string, end int) regexTokenKind {
 	if end > len(s) {
 		end = len(s)
@@ -340,6 +359,8 @@ func scanRegexPrefixKind(s string, end int) regexTokenKind {
 			continue
 		}
 		if ch == '/' {
+			// Reuse full literal parsing here so escaped slashes and flags are
+			// interpreted exactly the same as the main regex rewrite pass.
 			if canStartRegexAfter(lastKind) {
 				regexEnd, _, _ := parseRegexLiteral(s, i)
 				if regexEnd > i && regexEnd <= end {

@@ -175,6 +175,11 @@ func matchesAt(runes []rune, i int, pattern string) bool {
 func scanLambdaBody(runes []rune, start int) (end int, hasArrow bool) {
 	depth, inStr := 0, false
 	wasInGroup := false
+	// This scanner decides where an implicit lambda body stops.
+	// It tracks nesting and strings so commas/operators only terminate at depth 0.
+	// Special case: after closing a top-level group, we look ahead for either
+	// `->` (explicit lambda, so caller should not rewrite) or another collection
+	// operator that starts the next pipeline segment.
 	for i := start; i < len(runes); i++ {
 		ch := runes[i]
 		if ch == '"' && (i == 0 || runes[i-1] != '\\') {
