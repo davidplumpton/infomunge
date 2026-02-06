@@ -9,6 +9,8 @@ Feature: Playground webapp
     And the output should contain "result-panel"
     And the output should contain "Add input"
     And the output should contain "Run Script"
+    And the output should contain "pretty-print"
+    And the output should contain "Pretty print"
 
   Scenario: Playground page supports standalone runner hook
     Given the server is running

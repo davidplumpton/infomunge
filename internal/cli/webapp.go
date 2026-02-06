@@ -176,6 +176,10 @@ const playgroundHTML = `<!DOCTYPE html>
             <option value="text/plain">text</option>
           </select>
         </label>
+        <label>
+          <input id="pretty-print" type="checkbox" checked />
+          Pretty print
+        </label>
       </div>
       <main class="layout">
         <section class="panel" id="inputs-panel">
@@ -205,6 +209,7 @@ payload</textarea>
       const result = document.getElementById("result");
       const examplePicker = document.getElementById("example-picker");
       const outputFormat = document.getElementById("output-format");
+      const prettyPrint = document.getElementById("pretty-print");
       const scriptArea = document.getElementById("script");
 
       const examples = [
@@ -404,6 +409,63 @@ payload</textarea>
         applyExample(selected);
       }
 
+      function normalizeMimeType(format, fallbackMimeType) {
+        if (format) {
+          if (format.indexOf("/") >= 0) {
+            return format;
+          }
+          const shortToMime = {
+            json: "application/json",
+            xml: "application/xml",
+            csv: "application/csv",
+            yaml: "application/yaml",
+            text: "text/plain",
+          };
+          return shortToMime[format] || format;
+        }
+        if (!fallbackMimeType) {
+          return "";
+        }
+        return fallbackMimeType.split(";")[0].trim();
+      }
+
+      function prettyPrintXML(xml) {
+        const normalized = xml.trim().replace(/>\s*</g, "><");
+        const lines = normalized.replace(/(>)(<)(\/*)/g, "$1\n$2$3").split("\n");
+        let indent = 0;
+        const formatted = [];
+        lines.forEach((line) => {
+          if (!line) {
+            return;
+          }
+          if (line.match(/^<\/.+>/)) {
+            indent = Math.max(indent - 1, 0);
+          }
+          formatted.push("  ".repeat(indent) + line);
+          if (line.match(/^<[^!?/][^>]*[^/]>/)) {
+            indent++;
+          }
+        });
+        return formatted.join("\n");
+      }
+
+      function formatResultOutput(raw, mimeType) {
+        if (!prettyPrint.checked) {
+          return raw;
+        }
+        if (mimeType === "application/json") {
+          try {
+            return JSON.stringify(JSON.parse(raw), null, 2);
+          } catch (_) {
+            return raw;
+          }
+        }
+        if (mimeType === "application/xml" || mimeType === "text/xml") {
+          return prettyPrintXML(raw);
+        }
+        return raw;
+      }
+
       async function runScript() {
         const script = scriptArea.value;
         const output = outputFormat.value;
@@ -417,7 +479,10 @@ payload</textarea>
         try {
           if (window.infomungeRun) {
             const response = window.infomungeRun(JSON.stringify(payload));
-            result.value = response && response.result ? response.result : "";
+            const responseText = response && response.result ? response.result : "";
+            const responseMimeType = response && response.mimeType ? response.mimeType : "";
+            const mimeType = normalizeMimeType(output, responseMimeType);
+            result.value = formatResultOutput(responseText, mimeType);
             if (response && response.ok) {
               status.textContent = "Success";
             } else {
@@ -433,7 +498,8 @@ payload</textarea>
             body: JSON.stringify(payload),
           });
           const text = await response.text();
-          result.value = text;
+          const mimeType = normalizeMimeType(output, response.headers.get("Content-Type") || "");
+          result.value = formatResultOutput(text, mimeType);
           status.textContent = response.ok ? "Success" : "Error";
           if (!response.ok) {
             status.textContent += " " + response.status;
