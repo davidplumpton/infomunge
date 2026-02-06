@@ -409,6 +409,24 @@ func TestPrepareForParsing_IfElseStatements(t *testing.T) {
 	}
 }
 
+func TestPrepareForParsing_ConditionalObjectLiteralEntries(t *testing.T) {
+	input := `{(a: value) if (flag), (b: value + 1)}`
+	result, _, err := PrepareForParsing(input, Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, "merge(") {
+		t.Fatalf("expected merged object rewrite, got %q", result)
+	}
+	if !strings.Contains(result, "__ifelse(") {
+		t.Fatalf("expected conditional entry rewrite, got %q", result)
+	}
+	if !strings.Contains(result, `map[string]interface{}{"b": value + 1,}`) {
+		t.Fatalf("expected non-conditional entry to be preserved, got %q", result)
+	}
+}
+
 func TestPrepareForParsing_IfElseMultiline(t *testing.T) {
 	input := "if (x > 0)\n  \"positive\"\nelse\n  \"non-positive\""
 	result, _, err := PrepareForParsing(input, Options{AllowMultilineIfElse: true})

@@ -851,47 +851,16 @@ func (r *rewriter) tryRewriteConditionalObjectLiteral() (string, int, bool) {
 		return "", 0, false
 	}
 
-	type entryParts struct {
-		expr          string
-		cond          string
-		isConditional bool
-	}
-	parsed := make([]entryParts, 0, len(entries))
-	conditionalFound := false
-	for _, entry := range entries {
-		trimmed := strings.TrimSpace(entry)
-		if trimmed == "" {
-			continue
-		}
-		expr, cond, isConditional := splitConditionalEntry(trimmed)
-		if !isConditional {
-			expr = trimmed
-		}
-		parsed = append(parsed, entryParts{expr: expr, cond: cond, isConditional: isConditional})
-		if isConditional {
-			conditionalFound = true
-		}
-	}
-
+	parsed, conditionalFound := parseConditionalObjectEntries(entries)
 	if !conditionalFound {
 		return "", 0, false
 	}
 
 	rewrittenEntries := make([]string, 0, len(parsed))
 	for _, entry := range parsed {
-		expr := stripOuterParens(entry.expr)
-		entryLiteral := "{" + expr + "}"
-		rewrittenEntry, ok := r.rewriteBranch(entryLiteral)
+		rewrittenEntry, ok := r.rewriteConditionalObjectEntry(entry)
 		if !ok {
 			return "", 0, true
-		}
-		if entry.isConditional {
-			condRewritten, ok := r.rewriteBranch(entry.cond)
-			if !ok {
-				return "", 0, true
-			}
-			rewrittenEntries = append(rewrittenEntries, "__ifelse("+condRewritten+", "+rewrittenEntry+", map[string]interface{}{})")
-			continue
 		}
 		rewrittenEntries = append(rewrittenEntries, rewrittenEntry)
 	}
@@ -901,6 +870,59 @@ func (r *rewriter) tryRewriteConditionalObjectLiteral() (string, int, bool) {
 	}
 
 	return "merge(" + strings.Join(rewrittenEntries, ", ") + ")", braceEnd, true
+}
+
+type conditionalObjectEntry struct {
+	expr          string
+	cond          string
+	isConditional bool
+}
+
+func parseConditionalObjectEntries(entries []string) ([]conditionalObjectEntry, bool) {
+	parsed := make([]conditionalObjectEntry, 0, len(entries))
+	conditionalFound := false
+
+	for _, entry := range entries {
+		trimmed := strings.TrimSpace(entry)
+		if trimmed == "" {
+			continue
+		}
+
+		expr, cond, isConditional := splitConditionalEntry(trimmed)
+		if !isConditional {
+			expr = trimmed
+		}
+
+		parsed = append(parsed, conditionalObjectEntry{
+			expr:          expr,
+			cond:          cond,
+			isConditional: isConditional,
+		})
+		if isConditional {
+			conditionalFound = true
+		}
+	}
+
+	return parsed, conditionalFound
+}
+
+func (r *rewriter) rewriteConditionalObjectEntry(entry conditionalObjectEntry) (string, bool) {
+	expr := stripOuterParens(entry.expr)
+	entryLiteral := "{" + expr + "}"
+	rewrittenEntry, ok := r.rewriteBranch(entryLiteral)
+	if !ok {
+		return "", false
+	}
+
+	if !entry.isConditional {
+		return rewrittenEntry, true
+	}
+
+	condRewritten, ok := r.rewriteBranch(entry.cond)
+	if !ok {
+		return "", false
+	}
+	return "__ifelse(" + condRewritten + ", " + rewrittenEntry + ", map[string]interface{}{})", true
 }
 
 func splitObjectEntries(input string) []string {
