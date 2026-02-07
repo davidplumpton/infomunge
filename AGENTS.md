@@ -43,6 +43,8 @@ Important: use jj for version control. Never use git commands. Always commit wit
 - Use golang only
 - Always verify new features or changes by adding a cucumber test
 - Stay within the infomunge directory, put temp files in tmp
+- Track agent mistakes in `MIND_MAP.md` as they are discovered (what happened, why, and how to avoid repeating it)
+- Track user preferences in `MIND_MAP.md` as they become clear (for example workflow/style likes and dislikes)
 
 ## Repo Tour
 

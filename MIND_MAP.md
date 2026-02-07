@@ -43,3 +43,13 @@
 [20] **Multiple Inputs** - CLI supports multiple named inputs; server `/run` accepts `inputs` array with `name`, `content`, and optional `format` [4][5][10].
 
 [21] **Standalone Playground (JS)** - Build with gopherjs: `gopherjs build ./cmd/infomunge-js -o docs/playground/infomunge.js`, then open `docs/playground/index.html` for a local JS runner (no server) [4][5][2].
+
+[22] **Agent Memory Policy** - Keep a small running log in this file for (a) agent mistakes and prevention steps and (b) user preferences. Update it when new evidence appears.
+
+[23] **Agent Mistakes Log** - No concrete mistakes recorded yet in this session. First actionable rule: when task instructions imply "update instructions + update memory", verify both files are edited before handoff [22].
+
+[24] **User Preferences Log** - Confirmed preference: keep persistent memory in `MIND_MAP.md` for both agent mistakes and things the user likes [22].
+
+[25] **User Likes (Known So Far)** - Likes explicit operating instructions in `AGENTS.md`; likes using `MIND_MAP.md` as a durable coordination artifact; likes capturing process-level improvements, not just code changes [24].
+
+[26] **Ideas Backlog (Current)** - Add dated mini-entries for each future mistake/preference; add a short "Do/Don't" list for fast agent onboarding; keep this section concise to avoid noise while preserving learning value [22][23][24].
