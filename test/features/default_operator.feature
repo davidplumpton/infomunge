@@ -122,3 +122,17 @@ Feature: Default Operator
       """
       "final"
       """
+
+  Scenario: Default inside object literal field
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {value: nil default "fallback"}
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"value":"fallback"}
+      """

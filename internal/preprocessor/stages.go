@@ -80,12 +80,12 @@ func CreateOperatorProcessingStage() PipelineStage {
 			// Apply looping operators first
 			transforms := []struct {
 				name string
-				fn   transformHandler
+				fn   errorAwareHandler
 			}{
-				{"replaceDefaultOperator", replaceDefaultOperator},
-				{"replaceOnNullOperator", replaceOnNullOperator},
-				{"replaceThenOperator", replaceThenOperator},
-				{"replaceToOperator", replaceToOperator},
+				{"replaceDefaultOperator", replaceDefaultOperatorErr},
+				{"replaceOnNullOperator", replaceOnNullOperatorErr},
+				{"replaceThenOperator", replaceThenOperatorErr},
+				{"replaceToOperator", replaceToOperatorErr},
 			}
 			result := s
 			for _, t := range transforms {
@@ -96,7 +96,11 @@ func CreateOperatorProcessingStage() PipelineStage {
 						return result, unifiederrors.ParseErrorf("infinite loop detected in %s", t.name)
 					}
 					prevResult = result
-					result = t.fn(result)
+					nextResult, err := t.fn(result)
+					if err != nil {
+						return result, err
+					}
+					result = nextResult
 					iterCount++
 				}
 			}
@@ -110,52 +114,58 @@ func CreateFunctionalProcessingStage() PipelineStage {
 	return &errorAwareStage{
 		name: "Functional Processing",
 		handler: func(s string) (string, error) {
+			wrap := func(fn transformHandler) errorAwareHandler {
+				return func(input string) (string, error) {
+					return fn(input), nil
+				}
+			}
+
 			// Apply looping functional transformations
 			transforms := []struct {
 				name string
-				fn   transformHandler
+				fn   errorAwareHandler
 			}{
-				{"replaceImplicitLambdas", replaceImplicitLambdas},
-				{"replaceModuleCall", replaceModuleCall},
-				{"replaceCaseStatements", replaceCaseStatements},
-				{"replaceArrowFunctions", replaceArrowFunctions},
-				{"replaceFilterOperator", replaceFilterOperator},
-				{"replaceMapOperator", replaceMapOperator},
-				{"replaceReduceOperator", replaceReduceOperator},
-				{"replaceGroupByOperator", replaceGroupByOperator},
-				{"replacePluckOperator", replacePluckOperator},
-				{"replaceFlatMapOperator", replaceFlatMapOperator},
-				{"replaceMaxByOperator", replaceMaxByOperator},
-				{"replaceMinByOperator", replaceMinByOperator},
-				{"replaceOrderByOperator", replaceOrderByOperator},
-				{"replaceSortOperator", replaceSortOperator},
-				{"replaceDistinctByOperator", replaceDistinctByOperator},
-				{"replaceFilterObjectOperator", replaceFilterObjectOperator},
-				{"replaceMapObjectOperator", replaceMapObjectOperator},
-				{"replaceUpdateOperator", replaceUpdateOperator},
-				{"replaceAsOperator", replaceAsOperator},
-				{"replaceIsOperator", replaceIsOperator},
-				{"replaceFindOperator", replaceFindOperator},
-				{"replaceContainsOperator", replaceContainsOperator},
-				{"replaceSplitByOperator", replaceSplitByOperator},
-				{"replaceJoinByOperator", replaceJoinByOperator},
-				{"replaceConcatenateOperator", replaceConcatenateOperator},
-				{"replaceRemoveOperator", replaceRemoveOperator},
-				{"replaceExponentOperator", replaceExponentOperator},
-				{"replaceMatchOperator", replaceMatchOperator},
-				{"replaceMatchesOperator", replaceMatchesOperator},
-				{"replaceModOperator", replaceModOperator},
-				{"replaceRepeatOperator", replaceRepeatOperator},
-				{"replaceSubstringOperator", replaceSubstringOperator},
-				{"replaceContainsMethodCall", replaceContainsMethodCall},
-				{"replaceFindMethodCall", replaceFindMethodCall},
-				{"replaceMatchMethodCall", replaceMatchMethodCall},
-				{"replaceMatchesMethodCall", replaceMatchesMethodCall},
-				{"replaceScanMethodCall", replaceScanMethodCall},
-				{"replaceSplitByMethodCall", replaceSplitByMethodCall},
-				{"replacePipeToFunctionOperator", replacePipeToFunctionOperator},
-				{"replaceReplaceOperator", replaceReplaceOperator},
-				{"replaceAssignmentExpressions", replaceAssignmentExpressions},
+				{"replaceImplicitLambdas", wrap(replaceImplicitLambdas)},
+				{"replaceModuleCall", wrap(replaceModuleCall)},
+				{"replaceCaseStatements", wrap(replaceCaseStatements)},
+				{"replaceArrowFunctions", wrap(replaceArrowFunctions)},
+				{"replaceFilterOperator", wrap(replaceFilterOperator)},
+				{"replaceMapOperator", wrap(replaceMapOperator)},
+				{"replaceReduceOperator", wrap(replaceReduceOperator)},
+				{"replaceGroupByOperator", wrap(replaceGroupByOperator)},
+				{"replacePluckOperator", wrap(replacePluckOperator)},
+				{"replaceFlatMapOperator", wrap(replaceFlatMapOperator)},
+				{"replaceMaxByOperator", wrap(replaceMaxByOperator)},
+				{"replaceMinByOperator", wrap(replaceMinByOperator)},
+				{"replaceOrderByOperator", wrap(replaceOrderByOperator)},
+				{"replaceSortOperator", wrap(replaceSortOperator)},
+				{"replaceDistinctByOperator", wrap(replaceDistinctByOperator)},
+				{"replaceFilterObjectOperator", wrap(replaceFilterObjectOperator)},
+				{"replaceMapObjectOperator", wrap(replaceMapObjectOperator)},
+				{"replaceUpdateOperator", replaceUpdateOperatorErr},
+				{"replaceAsOperator", wrap(replaceAsOperator)},
+				{"replaceIsOperator", wrap(replaceIsOperator)},
+				{"replaceFindOperator", replaceFindOperatorErr},
+				{"replaceContainsOperator", replaceContainsOperatorErr},
+				{"replaceSplitByOperator", replaceSplitByOperatorErr},
+				{"replaceJoinByOperator", replaceJoinByOperatorErr},
+				{"replaceConcatenateOperator", replaceConcatenateOperatorErr},
+				{"replaceRemoveOperator", replaceRemoveOperatorErr},
+				{"replaceExponentOperator", wrap(replaceExponentOperator)},
+				{"replaceMatchOperator", replaceMatchOperatorErr},
+				{"replaceMatchesOperator", replaceMatchesOperatorErr},
+				{"replaceModOperator", replaceModOperatorErr},
+				{"replaceRepeatOperator", replaceRepeatOperatorErr},
+				{"replaceSubstringOperator", wrap(replaceSubstringOperator)},
+				{"replaceContainsMethodCall", wrap(replaceContainsMethodCall)},
+				{"replaceFindMethodCall", wrap(replaceFindMethodCall)},
+				{"replaceMatchMethodCall", wrap(replaceMatchMethodCall)},
+				{"replaceMatchesMethodCall", wrap(replaceMatchesMethodCall)},
+				{"replaceScanMethodCall", wrap(replaceScanMethodCall)},
+				{"replaceSplitByMethodCall", wrap(replaceSplitByMethodCall)},
+				{"replacePipeToFunctionOperator", wrap(replacePipeToFunctionOperator)},
+				{"replaceReplaceOperator", wrap(replaceReplaceOperator)},
+				{"replaceAssignmentExpressions", wrap(replaceAssignmentExpressions)},
 			}
 			result := s
 			for _, t := range transforms {
@@ -166,7 +176,11 @@ func CreateFunctionalProcessingStage() PipelineStage {
 						return result, unifiederrors.ParseErrorf("infinite loop detected in %s", t.name)
 					}
 					prevResult = result
-					result = t.fn(result)
+					nextResult, err := t.fn(result)
+					if err != nil {
+						return result, err
+					}
+					result = nextResult
 					iterCount++
 				}
 			}

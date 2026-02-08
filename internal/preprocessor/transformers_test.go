@@ -624,3 +624,14 @@ func TestReplaceContainsOperator(t *testing.T) {
 		})
 	}
 }
+
+func TestReplaceConfiguredBinaryOperator_MissingConfigReturnsError(t *testing.T) {
+	input := "x default 0"
+	result, err := replaceConfiguredBinaryOperator(input, "missing-config-key")
+	if err == nil {
+		t.Fatal("expected missing binary operator config error, got nil")
+	}
+	if result != input {
+		t.Fatalf("expected original input %q on error, got %q", input, result)
+	}
+}

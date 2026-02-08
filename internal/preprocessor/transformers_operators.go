@@ -1,6 +1,7 @@
 package preprocessor
 
 import (
+	unifiederrors "infomunge/internal/errors"
 	"strconv"
 	"strings"
 	"unicode"
@@ -106,36 +107,61 @@ var binaryOperatorConfigs = map[string]stringutils.BinaryOperatorConfig{
 	},
 }
 
-func replaceConfiguredBinaryOperator(s string, key string) string {
+func replaceConfiguredBinaryOperator(s string, key string) (string, error) {
 	config, ok := binaryOperatorConfigs[key]
 	if !ok {
-		panic("missing binary operator config: " + key)
+		return s, unifiederrors.ParseErrorf("missing binary operator config: %s", key)
 	}
-	return stringutils.ReplaceBinaryOperator(s, config)
+	return stringutils.ReplaceBinaryOperator(s, config), nil
 }
 
 // replaceDefaultOperator converts "expr default value" to "__default(expr, value)"
 func replaceDefaultOperator(s string) string {
+	result, _ := replaceDefaultOperatorErr(s)
+	return result
+}
+
+func replaceDefaultOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpDefault)
 }
 
 // replaceOnNullOperator converts "expr onNull value" to "onNull(expr, value)"
 func replaceOnNullOperator(s string) string {
+	result, _ := replaceOnNullOperatorErr(s)
+	return result
+}
+
+func replaceOnNullOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpOnNull)
 }
 
 // replaceThenOperator converts "expr then value" to "then(expr, value)"
 func replaceThenOperator(s string) string {
+	result, _ := replaceThenOperatorErr(s)
+	return result
+}
+
+func replaceThenOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpThen)
 }
 
 // replaceUpdateOperator converts "obj ~ {field: value}" to "__update(obj, {field: value})"
 func replaceUpdateOperator(s string) string {
+	result, _ := replaceUpdateOperatorErr(s)
+	return result
+}
+
+func replaceUpdateOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpUpdate)
 }
 
 // replaceFindOperator converts "source find value" to "find(source, value)"
 func replaceFindOperator(s string) string {
+	result, _ := replaceFindOperatorErr(s)
+	return result
+}
+
+func replaceFindOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpFind)
 }
 
@@ -297,11 +323,21 @@ func replaceIsOperator(s string) string {
 
 // replaceConcatenateOperator converts "++" to "__concat".
 func replaceConcatenateOperator(s string) string {
+	result, _ := replaceConcatenateOperatorErr(s)
+	return result
+}
+
+func replaceConcatenateOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpConcatenate)
 }
 
 // replaceRemoveOperator converts "--" to "__remove".
 func replaceRemoveOperator(s string) string {
+	result, _ := replaceRemoveOperatorErr(s)
+	return result
+}
+
+func replaceRemoveOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpRemove)
 }
 
@@ -419,16 +455,31 @@ func shouldStopExponentAtOperator(s string, pos int, start int) bool {
 
 // replaceSplitByOperator converts "splitBy".
 func replaceSplitByOperator(s string) string {
+	result, _ := replaceSplitByOperatorErr(s)
+	return result
+}
+
+func replaceSplitByOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpSplitBy)
 }
 
 // replaceJoinByOperator converts "joinBy".
 func replaceJoinByOperator(s string) string {
+	result, _ := replaceJoinByOperatorErr(s)
+	return result
+}
+
+func replaceJoinByOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpJoinBy)
 }
 
 // replaceToOperator converts "start to end" to "to(start, end)" for range expressions.
 func replaceToOperator(s string) string {
+	result, _ := replaceToOperatorErr(s)
+	return result
+}
+
+func replaceToOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpTo)
 }
 
@@ -570,27 +621,52 @@ func findLeftOperandForAs(result []rune) int {
 // This transforms the infix match operator into a function call.
 // Note: In DataWeave, `match` returns capture groups, while `matches` returns a boolean.
 func replaceMatchOperator(s string) string {
+	result, _ := replaceMatchOperatorErr(s)
+	return result
+}
+
+func replaceMatchOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpMatch)
 }
 
 // replaceContainsOperator converts "arr contains value" to "contains(arr, value)"
 func replaceContainsOperator(s string) string {
+	result, _ := replaceContainsOperatorErr(s)
+	return result
+}
+
+func replaceContainsOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpContains)
 }
 
 // replaceMatchesOperator converts "str matches pattern" to "matches(str, pattern)"
 // This transforms the infix matches operator into a function call.
 func replaceMatchesOperator(s string) string {
+	result, _ := replaceMatchesOperatorErr(s)
+	return result
+}
+
+func replaceMatchesOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpMatches)
 }
 
 // replaceRepeatOperator converts "str repeat n" to "repeat(str, n)"
 func replaceRepeatOperator(s string) string {
+	result, _ := replaceRepeatOperatorErr(s)
+	return result
+}
+
+func replaceRepeatOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpRepeat)
 }
 
 // replaceModOperator converts "a mod b" to "mod(a, b)"
 func replaceModOperator(s string) string {
+	result, _ := replaceModOperatorErr(s)
+	return result
+}
+
+func replaceModOperatorErr(s string) (string, error) {
 	return replaceConfiguredBinaryOperator(s, binaryOpMod)
 }
 
