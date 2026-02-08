@@ -394,7 +394,7 @@ func buildElementContent(name string, value interface{}, opts xmlRenderOptions, 
 	}
 	elementIsNil := value == nil
 
-	xmlnsDecls, attrs, _ := buildXMLAttributesWithOptions(valObj, name, opts, isChild, elementIsNil)
+	xmlnsDecls, attrs := buildXMLAttributesWithOptions(valObj, name, opts, isChild, elementIsNil)
 	openingTag := buildXMLOpeningTag(xmlnsDecls, attrs)
 
 	if elementIsNil {
@@ -410,16 +410,16 @@ func buildElementContent(name string, value interface{}, opts xmlRenderOptions, 
 
 // buildXMLAttributes builds XML namespace declarations and attribute strings.
 func buildXMLAttributes(val Object) ([]string, []string) {
-	xmlnsDecls, attrs, _ := buildXMLAttributesWithOptions(val, "", xmlRenderOptions{}, false, false)
+	xmlnsDecls, attrs := buildXMLAttributesWithOptions(val, "", xmlRenderOptions{}, false, false)
 	return xmlnsDecls, attrs
 }
 
 // buildXMLAttributesWithOptions builds XML namespace declarations and attribute strings.
-func buildXMLAttributesWithOptions(val Object, elementName string, opts xmlRenderOptions, isChild bool, elementIsNil bool) ([]string, []string, string) {
+func buildXMLAttributesWithOptions(val Object, elementName string, opts xmlRenderOptions, isChild bool, elementIsNil bool) ([]string, []string) {
 	var attrs []string
 	xmlnsMap := newXMLNamespaceDecls()
 
-	resolvedElement, elementPrefix, elementURI, elementHasPrefix := resolveName(elementName, opts.namespaceVars)
+	_, elementPrefix, elementURI, elementHasPrefix := resolveName(elementName, opts.namespaceVars)
 
 	// Extract and sort attribute-related keys
 	keys := extractAndSortAttributeKeys(val)
@@ -475,7 +475,7 @@ func buildXMLAttributesWithOptions(val Object, elementName string, opts xmlRende
 	sort.Strings(xmlnsDecls)
 	sort.Strings(attrs)
 
-	return xmlnsDecls, attrs, resolvedElement
+	return xmlnsDecls, attrs
 }
 
 // extractAndSortAttributeKeys extracts keys that represent XML attributes and namespaces.

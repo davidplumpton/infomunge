@@ -181,8 +181,22 @@ func callBuiltinSort(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 	if allNumbers {
 		sort.Slice(result, func(i, j int) bool {
-			af, _ := toFloat64(result[i])
-			bf, _ := toFloat64(result[j])
+			var af float64
+			switch v := result[i].(type) {
+			case int:
+				af = float64(v)
+			case float64:
+				af = v
+			}
+
+			var bf float64
+			switch v := result[j].(type) {
+			case int:
+				bf = float64(v)
+			case float64:
+				bf = v
+			}
+
 			return af < bf
 		})
 	} else if allStrings {
@@ -197,19 +211,6 @@ func callBuiltinSort(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	}
 
 	return result, nil
-}
-
-
-// toFloat64 converts a value to float64
-func toFloat64(v interface{}) (float64, bool) {
-	switch val := v.(type) {
-	case int:
-		return float64(val), true
-	case float64:
-		return val, true
-	default:
-		return 0, false
-	}
 }
 
 // callBuiltinJoin implements the join(array, separator) function.
@@ -553,11 +554,21 @@ func callBuiltinMultival(args []interface{}, e *ast.CallExpr) (interface{}, erro
 			return []interface{}{val}, nil
 		}
 		return []interface{}{}, nil
-	case []interface{}, XMLMultiValue:
+	case []interface{}:
 		// For an array, extract field from each object
-		arr, _ := AsArray(v)
-		result := make([]interface{}, 0, len(arr))
-		for _, item := range arr {
+		result := make([]interface{}, 0, len(v))
+		for _, item := range v {
+			if itemMap, ok := item.(map[string]interface{}); ok {
+				if val, exists := itemMap[field]; exists {
+					result = append(result, val)
+				}
+			}
+		}
+		return result, nil
+	case XMLMultiValue:
+		// For an array, extract field from each object
+		result := make([]interface{}, 0, len(v))
+		for _, item := range v {
 			if itemMap, ok := item.(map[string]interface{}); ok {
 				if val, exists := itemMap[field]; exists {
 					result = append(result, val)
@@ -986,22 +997,23 @@ func callBuiltinConcat(args []interface{}, e *ast.CallExpr) (interface{}, error)
 
 	// Check if we're concatenating arrays
 	allArrays := true
+	arrays := make([]Array, 0, len(args))
 	for _, arg := range args {
-		if _, ok := AsArray(arg); !ok {
+		arr, ok := AsArray(arg)
+		if !ok {
 			allArrays = false
 			break
 		}
+		arrays = append(arrays, arr)
 	}
 
 	if allArrays {
 		var totalLen int
-		for _, arg := range args {
-			arr, _ := AsArray(arg)
+		for _, arr := range arrays {
 			totalLen += len(arr)
 		}
 		result := make([]interface{}, 0, totalLen)
-		for _, arg := range args {
-			arr, _ := AsArray(arg)
+		for _, arr := range arrays {
 			result = append(result, arr...)
 		}
 		return result, nil

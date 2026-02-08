@@ -85,3 +85,17 @@ Feature: Error Reporting
       """
     When I run the application and it fails
     Then the error should contain "6:10:"
+
+  Scenario: Malformed key attributes report syntax error location
+    Given the following input content:
+      """
+      %im 0.1
+      ---
+      {
+        root: {
+          item @(lang: ): "x"
+        }
+      }
+      """
+    When I run the application and it fails
+    Then the error should contain "7:1:"

@@ -727,9 +727,13 @@ func replaceKeyAttributes(s string) string {
 							result = append(result, []rune(val)...)
 							result = append(result, []rune(", ")...)
 
-							// Rewrite attributes using the rewriter to handle unquoted keys and braces
+							// Rewrite attributes using the rewriter to handle unquoted keys and braces.
+							// If rewriting fails, keep original attributes so downstream parsing reports the actual error.
 							attrRewriter := newRewriter("{"+attrs+"}", Options{})
-							rewrittenAttrs, _, _ := attrRewriter.Rewrite()
+							rewrittenAttrs, _, rewriteErr := attrRewriter.Rewrite()
+							if rewriteErr != nil {
+								rewrittenAttrs = "{" + attrs + "}"
+							}
 							result = append(result, []rune(rewrittenAttrs)...)
 
 							result = append(result, ')')
