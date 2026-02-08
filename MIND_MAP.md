@@ -55,3 +55,5 @@
 [26] **Ideas Backlog (Current)** - Add dated mini-entries for each future mistake/preference; add a short "Do/Don't" list for fast agent onboarding; keep this section concise to avoid noise while preserving learning value [22][23][24].
 
 [27] **Agent Mistakes Log** - 2026-02-08: Attempted file edits by invoking `apply_patch` through `exec_command` instead of using the dedicated `apply_patch` tool. Why: tool-routing oversight while parallelizing edits. Prevention: run patches only via the `apply_patch` tool and reserve `exec_command` for shell commands [22].
+
+[28] **Agent Mistakes Log** - 2026-02-08: Ran targeted cucumber test with `GODOG_PATHS=test/features/...` from repo root, but the test runner resolves paths relative to `./test` so it failed with "feature path ... is not available". Why: forgot path base in `test/godog_test.go` workflow. Prevention: use `GODOG_PATHS=features/...` when invoking `go test -run TestFeatures ./test` [22].

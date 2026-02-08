@@ -668,93 +668,134 @@ func replaceKeyAttributes(s string) string {
 
 	for sc.Pos() < len(s) {
 		if !sc.IsInString() && sc.Peek() == '@' && sc.Pos()+1 < len(s) && s[sc.Pos()+1] == '(' {
-			// Found @(
-			// Try to find the key to the left. A key can be an identifier or a string.
-			start := stringutils.FindLeftOperandStart(result, nil)
-			if start < len(result) {
-				keyStr := strings.TrimSpace(string(result[start:]))
-				// Verify it's a potential key: identifier or string
-				if isPotentialKey(keyStr) {
-					sc.Advance(1) // Skip @
-					attrEnd := sc.FindMatchingCloseBracket(sc.Pos())
-					if attrEnd != -1 {
-						attrs := strings.TrimSpace(s[sc.Pos()+1 : attrEnd])
-						// Look for : after attrEnd
-						pos := attrEnd + 1
-						for pos < len(s) && (s[pos] == ' ' || s[pos] == '\t' || s[pos] == '\n' || s[pos] == '\r') {
-							pos++
-						}
-						if pos < len(s) && s[pos] == ':' {
-							// Found it! Transform to Key: __with_attrs(Value, Attrs)
-							result = result[:start]
-							// Ensure Key is quoted if it was an unquoted identifier
-							if !strings.HasPrefix(keyStr, "\"") && !strings.HasPrefix(keyStr, "'") && !strings.HasPrefix(keyStr, "(") {
-								keyStr = "\"" + keyStr + "\""
-							}
-							result = append(result, []rune(keyStr)...)
-							result = append(result, ':')
-							result = append(result, []rune(" __with_attrs(")...)
-
-							// Skip the : and whitespace
-							sc.SetPos(pos + 1)
-							sc.SkipWhitespace()
-
-							// Now we need to find the end of the Value.
-							// Value ends at the next comma or closing brace at the same depth.
-							valStart := sc.Pos()
-							depth := 0
-							inStr := false
-							for sc.Pos() < len(s) {
-								ch := s[sc.Pos()]
-								if ch == '"' && (sc.Pos() == 0 || s[sc.Pos()-1] != '\\') {
-									inStr = !inStr
-								}
-								if !inStr {
-									if ch == '(' || ch == '[' || ch == '{' {
-										depth++
-									} else if ch == ')' || ch == ']' || ch == '}' {
-										if depth == 0 {
-											break
-										}
-										depth--
-									} else if ch == ',' && depth == 0 {
-										break
-									}
-								}
-								sc.Advance(1)
-							}
-							val := strings.TrimSpace(s[valStart:sc.Pos()])
-							result = append(result, []rune(val)...)
-							result = append(result, []rune(", ")...)
-
-							// Rewrite attributes using the rewriter to handle unquoted keys and braces.
-							// If rewriting fails, keep original attributes so downstream parsing reports the actual error.
-							attrRewriter := newRewriter("{"+attrs+"}", Options{})
-							rewrittenAttrs, _, rewriteErr := attrRewriter.Rewrite()
-							if rewriteErr != nil {
-								rewrittenAttrs = "{" + attrs + "}"
-							}
-							result = append(result, []rune(rewrittenAttrs)...)
-
-							result = append(result, ')')
-							// sc.Pos() is at the delimiter (comma or closing brace)
-							continue
-						} else {
-							// Not followed by :, reset scanner to AFTER the @( block
-							sc.SetPos(attrEnd + 1)
-							result = append(result, '@')
-							result = append(result, '(')
-							result = append(result, []rune(attrs)...)
-							result = append(result, ')')
-							continue
-						}
-					}
+			if info, ok := parseKeyAttributeInfo(s, sc, result); ok {
+				if !info.hasColon {
+					sc.SetPos(info.attrEnd + 1)
+					result = appendKeyAttributesLiteral(result, info.attrs)
+					continue
 				}
+				result = rewriteKeyAttributesExpression(s, sc, result, info)
+				continue
 			}
 		}
 		result = append(result, sc.NextRune())
 	}
 	return string(result)
+}
+
+type keyAttributeInfo struct {
+	keyStart int
+	key      string
+	attrs    string
+	attrEnd  int
+	colonPos int
+	hasColon bool
+}
+
+func parseKeyAttributeInfo(s string, sc *stringutils.ExpressionScanner, result []rune) (keyAttributeInfo, bool) {
+	start := stringutils.FindLeftOperandStart(result, nil)
+	if start >= len(result) {
+		return keyAttributeInfo{}, false
+	}
+
+	keyStr := strings.TrimSpace(string(result[start:]))
+	if !isPotentialKey(keyStr) {
+		return keyAttributeInfo{}, false
+	}
+
+	openParen := sc.Pos() + 1
+	attrEnd := sc.FindMatchingCloseBracket(openParen)
+	if attrEnd == -1 {
+		return keyAttributeInfo{}, false
+	}
+
+	attrs := strings.TrimSpace(s[openParen+1 : attrEnd])
+	colonPos, hasColon := findKeyAttributeColon(s, attrEnd+1)
+	return keyAttributeInfo{
+		keyStart: start,
+		key:      keyStr,
+		attrs:    attrs,
+		attrEnd:  attrEnd,
+		colonPos: colonPos,
+		hasColon: hasColon,
+	}, true
+}
+
+func findKeyAttributeColon(s string, pos int) (int, bool) {
+	for pos < len(s) && (s[pos] == ' ' || s[pos] == '\t' || s[pos] == '\n' || s[pos] == '\r') {
+		pos++
+	}
+	if pos < len(s) && s[pos] == ':' {
+		return pos, true
+	}
+	return -1, false
+}
+
+func appendKeyAttributesLiteral(result []rune, attrs string) []rune {
+	result = append(result, '@')
+	result = append(result, '(')
+	result = append(result, []rune(attrs)...)
+	result = append(result, ')')
+	return result
+}
+
+func rewriteKeyAttributesExpression(s string, sc *stringutils.ExpressionScanner, result []rune, info keyAttributeInfo) []rune {
+	result = result[:info.keyStart]
+	result = append(result, []rune(quoteKeyAttributeKey(info.key))...)
+	result = append(result, ':')
+	result = append(result, []rune(" __with_attrs(")...)
+
+	sc.SetPos(info.colonPos + 1)
+	sc.SkipWhitespace()
+
+	val := readKeyAttributeValue(s, sc)
+	result = append(result, []rune(val)...)
+	result = append(result, []rune(", ")...)
+	result = append(result, []rune(rewriteKeyAttributesObject(info.attrs))...)
+	result = append(result, ')')
+	return result
+}
+
+func quoteKeyAttributeKey(key string) string {
+	if strings.HasPrefix(key, "\"") || strings.HasPrefix(key, "'") || strings.HasPrefix(key, "(") {
+		return key
+	}
+	return "\"" + key + "\""
+}
+
+func readKeyAttributeValue(s string, sc *stringutils.ExpressionScanner) string {
+	valStart := sc.Pos()
+	depth := 0
+	inStr := false
+	for sc.Pos() < len(s) {
+		ch := s[sc.Pos()]
+		if ch == '"' && (sc.Pos() == 0 || s[sc.Pos()-1] != '\\') {
+			inStr = !inStr
+		}
+		if !inStr {
+			if ch == '(' || ch == '[' || ch == '{' {
+				depth++
+			} else if ch == ')' || ch == ']' || ch == '}' {
+				if depth == 0 {
+					break
+				}
+				depth--
+			} else if ch == ',' && depth == 0 {
+				break
+			}
+		}
+		sc.Advance(1)
+	}
+	return strings.TrimSpace(s[valStart:sc.Pos()])
+}
+
+func rewriteKeyAttributesObject(attrs string) string {
+	attrRewriter := newRewriter("{"+attrs+"}", Options{})
+	rewrittenAttrs, _, rewriteErr := attrRewriter.Rewrite()
+	if rewriteErr != nil {
+		return "{" + attrs + "}"
+	}
+	return rewrittenAttrs
 }
 
 func isPotentialKey(s string) bool {

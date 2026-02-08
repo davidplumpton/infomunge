@@ -69,3 +69,27 @@ Feature: XML Insert Attribute Cookbook
       """
       <author loc="US">Per Bothner</author>
       """
+
+  Scenario: Attribute insertion keeps full object value before next key
+    Given the following script:
+      """
+      %im 0.1
+      output application/xml
+      ---
+      root: {
+        child @(lang: "en", year: (1 + 1)): {
+          first: "A",
+          second: "B"
+        },
+        tail: "done"
+      }
+      """
+    When I run the script
+    Then the output should contain:
+      """
+      <child lang="en" year="2"><first>A</first><second>B</second></child>
+      """
+    And the output should contain:
+      """
+      <tail>done</tail>
+      """
