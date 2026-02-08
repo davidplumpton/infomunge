@@ -344,18 +344,11 @@ func replaceRemoveOperatorErr(s string) (string, error) {
 // replaceExponentOperator converts "**" to "pow".
 func replaceExponentOperator(s string) string {
 	var result []rune
-	inString := false
+	var topState ScanState
 	i := 0
 
 	for i < len(s) {
-		if s[i] == '"' && (i == 0 || s[i-1] != '\\') {
-			inString = !inString
-			result = append(result, '"')
-			i++
-			continue
-		}
-
-		if !inString && i+2 <= len(s) && s[i:i+2] == "**" {
+		if !topState.InString() && i+2 <= len(s) && s[i:i+2] == "**" {
 			leftStart := stringutils.FindLeftOperandStart(result, nil)
 			if leftStart >= len(result) {
 				result = append(result, []rune("**")...)
@@ -376,34 +369,24 @@ func replaceExponentOperator(s string) string {
 			}
 
 			rightEnd := rightStart
-			depth := 0
-			inStringLocal := false
+			var rightState ScanState
 
 			for rightEnd < len(s) {
 				ch := s[rightEnd]
-				if ch == '"' && (rightEnd == 0 || s[rightEnd-1] != '\\') {
-					inStringLocal = !inStringLocal
-				}
-
-				if !inStringLocal {
+				if !rightState.InString() {
 					if ch == '(' || ch == '[' || ch == '{' {
-						depth++
+						rightState.Advance(ch)
 						rightEnd++
 						continue
 					}
-					if ch == ')' || ch == ']' || ch == '}' {
-						if depth == 0 {
-							break
-						}
-						depth--
-						rightEnd++
-						continue
+					if (ch == ')' || ch == ']' || ch == '}') && rightState.Depth() == 0 {
+						break
 					}
-					if depth == 0 && (ch == ',' || shouldStopExponentAtOperator(s, rightEnd, rightStart)) {
+					if rightState.Depth() == 0 && (ch == ',' || shouldStopExponentAtOperator(s, rightEnd, rightStart)) {
 						break
 					}
 				}
-
+				rightState.Advance(ch)
 				rightEnd++
 			}
 
@@ -426,6 +409,7 @@ func replaceExponentOperator(s string) string {
 
 		r, size := utf8.DecodeRuneInString(s[i:])
 		result = append(result, r)
+		topState.Advance(s[i])
 		i += size
 	}
 
@@ -677,19 +661,12 @@ func replaceMethodCallOperator(s string, operatorName string) string {
 	tokenLen := len(token)
 
 	var result []rune
-	inString := false
+	var topState ScanState
 	i := 0
 
 	for i < len(s) {
-		if s[i] == '"' && (i == 0 || s[i-1] != '\\') {
-			inString = !inString
-			result = append(result, '"')
-			i++
-			continue
-		}
-
 		// Look for " operator(" pattern
-		if !inString && i+tokenLen <= len(s) && s[i:i+tokenLen] == token {
+		if !topState.InString() && i+tokenLen <= len(s) && s[i:i+tokenLen] == token {
 			// Find the left operand
 			leftStart := stringutils.FindLeftOperandStart(result, nil)
 
@@ -710,20 +687,10 @@ func replaceMethodCallOperator(s string, operatorName string) string {
 			i += tokenLen // skip " operator("
 
 			// Copy the rest of the arguments until we find the closing paren
-			depth := 1
-			inStringLocal := false
-			for i < len(s) && depth > 0 {
+			argState := ScanState{DepthParen: 1}
+			for i < len(s) && argState.DepthParen > 0 {
 				ch := s[i]
-				if ch == '"' && (i == 0 || s[i-1] != '\\') {
-					inStringLocal = !inStringLocal
-				}
-				if !inStringLocal {
-					if ch == '(' {
-						depth++
-					} else if ch == ')' {
-						depth--
-					}
-				}
+				argState.Advance(ch)
 				result = append(result, rune(ch))
 				i++
 			}
@@ -732,6 +699,7 @@ func replaceMethodCallOperator(s string, operatorName string) string {
 
 		r, size := utf8.DecodeRuneInString(s[i:])
 		result = append(result, r)
+		topState.Advance(s[i])
 		i += size
 	}
 

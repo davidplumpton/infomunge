@@ -1,5 +1,7 @@
 package preprocessor
 
+import "unicode/utf8"
+
 // Go type literal prefixes used as rewrite targets in the preprocessor.
 const (
 	GoObjectPrefix      = "map[string]interface{}{"
@@ -86,6 +88,14 @@ func (s *ScanState) Advance(ch byte) {
 		if s.DepthBrace > 0 {
 			s.DepthBrace--
 		}
+	}
+}
+
+// AdvanceRune updates state for a rune-oriented scanner.
+// Non-ASCII runes do not affect delimiter/depth tracking.
+func (s *ScanState) AdvanceRune(ch rune) {
+	if ch >= 0 && ch < utf8.RuneSelf {
+		s.Advance(byte(ch))
 	}
 }
 

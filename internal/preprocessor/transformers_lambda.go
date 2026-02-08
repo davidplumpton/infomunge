@@ -174,7 +174,7 @@ func matchesAt(runes []rune, i int, pattern string) bool {
 }
 
 func scanLambdaBody(runes []rune, start int) (end int, hasArrow bool) {
-	depth, inStr := 0, false
+	var state ScanState
 	wasInGroup := false
 	// This scanner decides where an implicit lambda body stops.
 	// It tracks nesting and strings so commas/operators only terminate at depth 0.
@@ -183,23 +183,21 @@ func scanLambdaBody(runes []rune, start int) (end int, hasArrow bool) {
 	// operator that starts the next pipeline segment.
 	for i := start; i < len(runes); i++ {
 		ch := runes[i]
-		if ch == '"' && (i == 0 || runes[i-1] != '\\') {
-			inStr = !inStr
-		}
-		if inStr {
+		if state.InString() {
+			state.AdvanceRune(ch)
 			continue
 		}
 		switch ch {
 		case '(', '[', '{':
-			depth++
+			state.AdvanceRune(ch)
 			wasInGroup = true
 		case ')', ']', '}':
-			if depth == 0 {
+			if state.Depth() == 0 {
 				return i, false
 			}
-			depth--
+			state.AdvanceRune(ch)
 			// If we just exited a group back to depth 0, check what follows
-			if depth == 0 && wasInGroup {
+			if state.Depth() == 0 && wasInGroup {
 				// Look ahead for "->" or collection operators after optional whitespace
 				j := i + 1
 				for j < len(runes) && (runes[j] == ' ' || runes[j] == '\t') {
@@ -221,12 +219,12 @@ func scanLambdaBody(runes []rune, start int) (end int, hasArrow bool) {
 				// No arrow or collection operator, continue scanning
 			}
 		case ',':
-			if depth == 0 {
+			if state.Depth() == 0 {
 				return i, false
 			}
 		case ' ':
 			// Check for collection operators at depth 0
-			if depth == 0 {
+			if state.Depth() == 0 {
 				rest := string(runes[i+1:])
 				for _, op := range CollectionOperators {
 					opWithSpace := op + " "
@@ -236,6 +234,8 @@ func scanLambdaBody(runes []rune, start int) (end int, hasArrow bool) {
 					}
 				}
 			}
+		default:
+			state.AdvanceRune(ch)
 		}
 		if matchesAt(runes, i, "->") {
 			return i, true
@@ -311,24 +311,17 @@ func replaceArrowFunctions(s string) string {
 					}
 					bodyStart := pos
 					// Track depth fresh from the body start position
-					bodyDepth := 0
-					bodyInString := false
+					var bodyState ScanState
 					for pos < len(s) {
 						ch := s[pos]
-						if ch == '"' && (pos == 0 || s[pos-1] != '\\') {
-							bodyInString = !bodyInString
-						}
-						if !bodyInString {
-							if ch == '(' || ch == '[' || ch == '{' {
-								bodyDepth++
-							} else if ch == ')' || ch == ']' || ch == '}' {
-								if bodyDepth == 0 {
-									break
-								}
-								bodyDepth--
-							} else if bodyDepth == 0 && ch == ',' {
+						if !bodyState.InString() {
+							if (ch == ')' || ch == ']' || ch == '}') && bodyState.Depth() == 0 {
 								break
-							} else if bodyDepth == 0 && ch == ' ' {
+							}
+							if bodyState.Depth() == 0 && ch == ',' {
+								break
+							}
+							if bodyState.Depth() == 0 && ch == ' ' {
 								// Check for operators that end the body
 								if pos+4 <= len(s) && s[pos:pos+4] == " or " {
 									break
@@ -347,6 +340,7 @@ func replaceArrowFunctions(s string) string {
 								}
 							}
 						}
+						bodyState.Advance(ch)
 						pos++
 					}
 

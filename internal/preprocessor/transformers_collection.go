@@ -100,25 +100,21 @@ func replaceCollectionOperator(s string, opKey string, funcName string) string {
 				}
 				lambdaStart := pos
 				// Track depth fresh from the lambda start position
-				depth := 0
-				inString := false
+				var state ScanState
 				wasInGroup := false
 				for pos < len(s) {
 					ch := s[pos]
-					if ch == '"' && (pos == 0 || s[pos-1] != '\\') {
-						inString = !inString
-					}
-					if !inString {
+					if !state.InString() {
 						if ch == '(' || ch == '[' || ch == '{' {
-							depth++
+							state.Advance(ch)
 							wasInGroup = true
 						} else if ch == ')' || ch == ']' || ch == '}' {
-							if depth == 0 {
+							if state.Depth() == 0 {
 								break
 							}
-							depth--
+							state.Advance(ch)
 							// If we just exited a group back to depth 0, check for collection operators
-							if depth == 0 && wasInGroup {
+							if state.Depth() == 0 && wasInGroup {
 								// Look ahead for collection operators that would start a new expression
 								j := pos + 1
 								for j < len(s) && (s[j] == ' ' || s[j] == '\t') {
@@ -138,9 +134,11 @@ func replaceCollectionOperator(s string, opKey string, funcName string) string {
 									break
 								}
 							}
-						} else if depth == 0 && (ch == ',' || (ch == ' ' && pos+opLen <= len(s) && s[pos:pos+opLen] == opKey)) {
+						} else if state.Depth() == 0 && (ch == ',' || (ch == ' ' && pos+opLen <= len(s) && s[pos:pos+opLen] == opKey)) {
 							break
 						}
+					} else {
+						state.Advance(ch)
 					}
 					pos++
 				}

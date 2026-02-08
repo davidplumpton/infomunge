@@ -389,16 +389,13 @@ func scanRegexPrefixKind(s string, end int) regexTokenKind {
 }
 
 func scanStringLiteral(s string, start int, quote byte) int {
-	i := start + 1
-	for i < len(s) {
-		if s[i] == '\\' {
-			i += 2
-			continue
-		}
-		if s[i] == quote {
+	var state ScanState
+	state.Advance(quote)
+	for i := start + 1; i < len(s); i++ {
+		state.Advance(s[i])
+		if !state.InString() {
 			return i + 1
 		}
-		i++
 	}
 	return len(s)
 }

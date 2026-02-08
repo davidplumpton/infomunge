@@ -46,7 +46,7 @@
 
 [22] **Agent Memory Policy** - Keep a small running log in this file for (a) agent mistakes and prevention steps and (b) user preferences. Update it when new evidence appears.
 
-[23] **Agent Mistakes Log** - No concrete mistakes recorded yet in this session. First actionable rule: when task instructions imply "update instructions + update memory", verify both files are edited before handoff [22].
+[23] **Agent Mistakes Log** - 2026-02-08: During ScanState refactor, exponent rewrite briefly regressed for grouped operands (`(1 + 1) ** (2 + 1)` stayed untransformed). Why: stop-condition check ran before handling opening brackets. Prevention: in right-operand scanners, process open/close bracket transitions before operator-stop checks and verify grouped-operand cucumber scenarios before handoff [22].
 
 [24] **User Preferences Log** - Confirmed preference: keep persistent memory in `MIND_MAP.md` for both agent mistakes and things the user likes [22].
 
