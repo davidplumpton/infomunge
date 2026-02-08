@@ -18,6 +18,13 @@ Feature: Playground webapp
     Then the response status should be 200
     And the output should contain "infomungeRun"
 
+  Scenario: Playground input cards avoid HTML interpolation of input names
+    Given the server is running
+    When I request the playground page
+    Then the response status should be 200
+    And the output should contain "nameInput.value = defaultName"
+    And the output should not contain "value=\"' + defaultName + '\""
+
   Scenario: Playground page lists examples
     Given the server is running
     When I request the playground page
