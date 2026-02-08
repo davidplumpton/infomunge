@@ -159,11 +159,6 @@ func isIdentRune(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '#'
 }
 
-// isIdentChar returns true if ch can be part of an identifier.
-func isIdentChar(ch byte) bool {
-	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '#'
-}
-
 // isComparisonOperatorEq checks if a '=' is part of a comparison operator.
 func isComparisonOperatorEq(prevChar, nextChar byte) bool {
 	return nextChar == '=' || prevChar == '=' || prevChar == '!' || prevChar == '<' || prevChar == '>'

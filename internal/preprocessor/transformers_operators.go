@@ -509,7 +509,7 @@ func replacePipeToFunctionOperator(s string) string {
 
 			// Scan the identifier
 			identStart := i
-			for i < len(s) && isIdentChar(s[i]) {
+			for i < len(s) && isIdentRune(rune(s[i])) {
 				i++
 			}
 			funcName := s[identStart:i]
