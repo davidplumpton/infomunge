@@ -125,7 +125,7 @@ func (sc *ExpressionScanner) Depth() int {
 // updateState updates the inString and depth trackers based on a character.
 func (sc *ExpressionScanner) updateState(ch byte) {
 	// Handle string state
-	if ch == '"' && (sc.pos == 0 || sc.s[sc.pos-1] != '\\') {
+	if ch == '"' && !IsEscapedAt(sc.s, sc.pos) {
 		sc.inString = !sc.inString
 		return
 	}
@@ -175,7 +175,7 @@ func (sc *ExpressionScanner) FindMatchingCloseBracket(startPos int) int {
 	for i < len(sc.s) {
 		c := sc.s[i]
 
-		if c == '"' && (i == 0 || sc.s[i-1] != '\\') {
+		if c == '"' && !IsEscapedAt(sc.s, i) {
 			inStr = !inStr
 		}
 
@@ -206,7 +206,7 @@ func (sc *ExpressionScanner) SubstringUntilDepth(targetDepth int) string {
 	for i < len(sc.s) {
 		ch := sc.s[i]
 
-		if ch == '"' && (i == 0 || sc.s[i-1] != '\\') {
+		if ch == '"' && !IsEscapedAt(sc.s, i) {
 			inStr = !inStr
 		}
 

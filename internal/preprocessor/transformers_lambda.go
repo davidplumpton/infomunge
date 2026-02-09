@@ -161,7 +161,7 @@ func copyStringLiteral(runes []rune, i int, result []rune) (int, []rune) {
 	i++
 	for i < len(runes) {
 		result = append(result, runes[i])
-		if runes[i] == '"' && runes[i-1] != '\\' {
+		if runes[i] == '"' && !stringutils.IsEscapedRuneAt(runes, i) {
 			break
 		}
 		i++

@@ -20,7 +20,7 @@ func ReplaceOperatorsOutsideStrings(s string, replacements []OperatorReplacement
 	i := 0
 
 	for i < len(s) {
-		if s[i] == '"' && (i == 0 || s[i-1] != '\\') {
+		if s[i] == '"' && !IsEscapedAt(s, i) {
 			inString = !inString
 			result = append(result, '"')
 			i++
@@ -66,7 +66,7 @@ func ReplaceBinaryOperator(s string, cfg BinaryOperatorConfig) string {
 	opLen := len(cfg.Operator)
 
 	for i < len(s) {
-		if s[i] == '"' && (i == 0 || s[i-1] != '\\') {
+		if s[i] == '"' && !IsEscapedAt(s, i) {
 			inString = !inString
 			result = append(result, '"')
 			i++
@@ -101,7 +101,7 @@ func ReplaceBinaryOperator(s string, cfg BinaryOperatorConfig) string {
 
 			for rightEnd < len(s) {
 				ch := s[rightEnd]
-				if ch == '"' && (rightEnd == 0 || s[rightEnd-1] != '\\') {
+				if ch == '"' && !IsEscapedAt(s, rightEnd) {
 					inStringLocal = !inStringLocal
 				}
 

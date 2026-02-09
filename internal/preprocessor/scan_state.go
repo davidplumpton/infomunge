@@ -1,6 +1,9 @@
 package preprocessor
 
-import "unicode/utf8"
+import (
+	"infomunge/internal/stringutils"
+	"unicode/utf8"
+)
 
 // Go type literal prefixes used as rewrite targets in the preprocessor.
 const (
@@ -15,11 +18,7 @@ const (
 // Example: "hello\"" -> quote at end is escaped (1 backslash)
 // Example: "hello\\"  -> quote at end is NOT escaped (2 backslashes = escaped backslash)
 func isEscapedAt(s string, i int) bool {
-	backslashCount := 0
-	for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
-		backslashCount++
-	}
-	return backslashCount%2 == 1
+	return stringutils.IsEscapedAt(s, i)
 }
 
 // stringState tracks whether we are inside a string literal, handling

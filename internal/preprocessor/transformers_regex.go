@@ -1,6 +1,7 @@
 package preprocessor
 
 import (
+	"infomunge/internal/stringutils"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -63,7 +64,7 @@ func replaceRegexLiterals(s string) string {
 		ch := s[i]
 
 		// Track string state
-		if ch == '"' && !inSingleQuoteString && (i == 0 || s[i-1] != '\\') {
+		if ch == '"' && !inSingleQuoteString && !stringutils.IsEscapedAt(s, i) {
 			inString = !inString
 			result.WriteByte(ch)
 			if !inString {
@@ -73,7 +74,7 @@ func replaceRegexLiterals(s string) string {
 			continue
 		}
 
-		if ch == '\'' && !inString && (i == 0 || s[i-1] != '\\') {
+		if ch == '\'' && !inString && !stringutils.IsEscapedAt(s, i) {
 			inSingleQuoteString = !inSingleQuoteString
 			result.WriteByte(ch)
 			if !inSingleQuoteString {
@@ -411,7 +412,7 @@ func replaceReplaceOperator(s string) string {
 	i := 0
 
 	for i < len(s) {
-		if s[i] == '"' && (i == 0 || s[i-1] != '\\') {
+		if s[i] == '"' && !stringutils.IsEscapedAt(s, i) {
 			inString = !inString
 			result = append(result, '"')
 			i++
@@ -561,7 +562,7 @@ func findWithKeyword(s string, start int) int {
 	depth := 0
 
 	for i := start; i+len(withKeyword) <= len(s); i++ {
-		if s[i] == '"' && (i == 0 || s[i-1] != '\\') {
+		if s[i] == '"' && !stringutils.IsEscapedAt(s, i) {
 			inString = !inString
 			continue
 		}
@@ -603,7 +604,7 @@ func findReplaceRightOperand(s string, start int) (string, int) {
 	for i < len(s) {
 		ch := s[i]
 
-		if ch == '"' && (i == 0 || s[i-1] != '\\') {
+		if ch == '"' && !stringutils.IsEscapedAt(s, i) {
 			inString = !inString
 			i++
 			continue

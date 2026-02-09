@@ -168,9 +168,7 @@ func TestScannerBracketStateTracking(t *testing.T) {
 }
 
 func TestScannerStringStateTracking(t *testing.T) {
-	// Note: checkPos is the number of Next() calls, so we process chars 0 through checkPos-1
-	// The scanner uses a simple backslash check (prev char == '\\') not full escape counting.
-	// For proper double-backslash handling, use isEscapedAt() or the full rewriter.
+	// Note: checkPos is the number of Next() calls, so we process chars 0 through checkPos-1.
 	tests := []struct {
 		name        string
 		input       string
@@ -182,9 +180,7 @@ func TestScannerStringStateTracking(t *testing.T) {
 		{"inside double quote", `"abc"`, 2, true, "inside string"},
 		{"after string closes", `"a"b`, 4, false, "after closing quote at pos 2"},
 		{"escaped quote stays in string", `"a\"b"`, 4, true, "escaped quote not closing"},
-		// Note: Scanner's simple check considers \\" as escaped quote, staying in string.
-		// This is a known limitation - use isEscapedAt for precise escape detection.
-		{"double backslash simple check", `"a\\"`, 5, true, "scanner sees backslash before quote"},
+		{"double backslash closes string", `"a\\"`, 5, false, "even backslashes should not escape quote"},
 	}
 
 	for _, tt := range tests {
@@ -269,6 +265,7 @@ func TestCopyStringLiteral(t *testing.T) {
 		{"simple string", `"hello"`, 0, 6, `"hello"`},
 		{"with escaped quote", `"he\"llo"`, 0, 8, `"he\"llo"`},
 		{"with escaped backslash", `"path\\file"`, 0, 11, `"path\\file"`},
+		{"double backslash before quote closes", `"a\\"b"`, 0, 4, `"a\\"`},
 		{"empty string", `""`, 0, 1, `""`},
 	}
 

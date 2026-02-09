@@ -185,6 +185,20 @@ Feature: Regex Literals
       "fooNUMbar"
       """
 
+  Scenario: Infix matches after string ending in escaped backslashes
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "a\\\\" matches /^a\\\\$/
+      """
+    When I run the script
+    Then the output should be:
+      """
+      true
+      """
+
   Scenario: Type of regex literal
     Given the following script:
       """
