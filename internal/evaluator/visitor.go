@@ -37,26 +37,15 @@ type ASTVisitor interface {
 // DefaultVisitor provides a concrete implementation of ASTVisitor.
 // It uses recursion depth tracking to prevent stack overflow attacks.
 type DefaultVisitor struct {
-	context      Context
-	depth        int
-	ErrorContext Context
+	context Context
+	depth   int
 }
 
 // NewDefaultVisitor creates a new DefaultVisitor with the given context and depth.
 func NewDefaultVisitor(context Context, depth int) *DefaultVisitor {
 	return &DefaultVisitor{
-		context:      context,
-		depth:        depth,
-		ErrorContext: context,
-	}
-}
-
-// NewDefaultVisitorWithErrorContext creates a new DefaultVisitor with the given context, depth, and error context.
-func NewDefaultVisitorWithErrorContext(context Context, depth int, errorContext Context) *DefaultVisitor {
-	return &DefaultVisitor{
-		context:      context,
-		depth:        depth,
-		ErrorContext: errorContext,
+		context: context,
+		depth:   depth,
 	}
 }
 
@@ -101,7 +90,7 @@ func (v *DefaultVisitor) VisitIdent(expr *ast.Ident) (Value, error) {
 // VisitBinaryExpr evaluates a binary expression by evaluating both operands
 // and applying the operator.
 func (v *DefaultVisitor) VisitBinaryExpr(expr *ast.BinaryExpr) (Value, error) {
-	childVisitor := NewDefaultVisitorWithErrorContext(v.context, v.depth+1, v.ErrorContext)
+	childVisitor := NewDefaultVisitor(v.context, v.depth+1)
 
 	left, err := childVisitor.Visit(expr.X)
 	if err != nil {
