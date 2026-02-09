@@ -6,13 +6,6 @@ import (
 	"unicode"
 )
 
-// CollectionOperators is the canonical list of collection operators used for body boundary detection.
-// These operators signal the end of a lambda body when chaining expressions.
-var CollectionOperators = []string{
-	"map", "filter", "reduce", "flatMap", "groupBy", "pluck",
-	"sort", "orderBy", "maxBy", "minBy", "distinctBy", "filterObject", "mapObject",
-}
-
 // replaceImplicitLambdas converts implicit lambda syntax using $ and $$ to explicit arrow functions.
 func replaceImplicitLambdas(s string) string {
 	for _, op := range []string{" map ", " filter ", " reduce ", " groupBy ", " sort ",
@@ -207,14 +200,9 @@ func scanLambdaBody(runes []rune, start int) (end int, hasArrow bool) {
 					// There's an arrow, continue scanning to find it
 					continue
 				}
-				// Check for collection operators that would end the body
-				rest := string(runes[j:])
-				for _, op := range CollectionOperators {
-					opWithSpace := op + " "
-					if len(rest) >= len(opWithSpace) && rest[:len(opWithSpace)] == opWithSpace {
-						// Collection operator found, body ends here
-						return i + 1, false
-					}
+				// Check for collection operators that would end the body.
+				if isCollectionOperatorAtRunes(runes, j) {
+					return i + 1, false
 				}
 				// No arrow or collection operator, continue scanning
 			}
@@ -225,13 +213,8 @@ func scanLambdaBody(runes []rune, start int) (end int, hasArrow bool) {
 		case ' ':
 			// Check for collection operators at depth 0
 			if state.Depth() == 0 {
-				rest := string(runes[i+1:])
-				for _, op := range CollectionOperators {
-					opWithSpace := op + " "
-					if len(rest) >= len(opWithSpace) && rest[:len(opWithSpace)] == opWithSpace {
-						// Collection operator found, body ends here
-						return i, false
-					}
+				if isCollectionOperatorAtRunes(runes, i+1) {
+					return i, false
 				}
 			}
 		default:
@@ -326,16 +309,7 @@ func replaceArrowFunctions(s string) string {
 								if pos+4 <= len(s) && s[pos:pos+4] == " or " {
 									break
 								}
-								// Check for collection operators
-								shouldBreak := false
-								for _, op := range CollectionOperators {
-									opWithSpaces := " " + op + " "
-									if pos+len(opWithSpaces) <= len(s) && s[pos:pos+len(opWithSpaces)] == opWithSpaces {
-										shouldBreak = true
-										break
-									}
-								}
-								if shouldBreak {
+								if isCollectionOperatorWithSpacesAt(s, pos) {
 									break
 								}
 							}

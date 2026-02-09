@@ -120,16 +120,7 @@ func replaceCollectionOperator(s string, opKey string, funcName string) string {
 								for j < len(s) && (s[j] == ' ' || s[j] == '\t') {
 									j++
 								}
-								// Check for collection operators
-								shouldBreak := false
-								for _, op := range CollectionOperators {
-									opWithSpace := op + " "
-									if j+len(opWithSpace) <= len(s) && s[j:j+len(opWithSpace)] == opWithSpace {
-										shouldBreak = true
-										break
-									}
-								}
-								if shouldBreak {
+								if isCollectionOperatorAt(s, j) {
 									pos++ // include the closing bracket
 									break
 								}

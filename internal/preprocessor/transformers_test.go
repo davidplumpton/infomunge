@@ -337,6 +337,24 @@ func TestReplaceCollectionOperator(t *testing.T) {
 	}
 }
 
+func TestIsCollectionOperatorHelpers(t *testing.T) {
+	input := " map value filter rest"
+	runes := []rune(input)
+
+	if !isCollectionOperatorAt(input, 1) {
+		t.Fatalf("expected collection operator at byte pos 1")
+	}
+	if !isCollectionOperatorAtRunes(runes, 1) {
+		t.Fatalf("expected collection operator at rune pos 1")
+	}
+	if !isCollectionOperatorWithSpacesAt(input, 0) {
+		t.Fatalf("expected space-delimited collection operator at byte pos 0")
+	}
+	if isCollectionOperatorAt(input, 0) {
+		t.Fatalf("did not expect collection operator at leading space")
+	}
+}
+
 // Tests for case statement parsing
 
 func TestParseCaseItems(t *testing.T) {
