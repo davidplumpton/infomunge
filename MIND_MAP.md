@@ -28,7 +28,7 @@
 
 [13] **Version Control** - Use `jj` only; never use git commands. Commit with `jj commit -m <description>` and do not use `jj new` with a message [19].
 
-[14] **Beads Workflow** - Issue tracking via `bd` (beads): `bd ready`, `bd show <id>`, `bd update <id> --status in_progress`, `bd close <id>`, `bd sync` [19].
+[14] **Beads Workflow** - Issue tracking via `bd` (beads): `bv --robot-triage` to find prioritized work, `bd show <id>`, `bd update <id> --status in_progress`, `bd close <id>`, `bd sync` [19].
 
 [15] **Agent Constraints** - Use Go only; do not install new software; put temp files in `tmp`; run cucumber tests with a 5 minute timeout [12][14][19].
 

@@ -7,7 +7,7 @@ This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get sta
 ## Quick Reference
 
 ```bash
-bd ready              # Find available work
+bv --robot-triage     # Find available work
 bd show <id>          # View issue details
 bd update <id> --status in_progress  # Claim work
 bd close <id>         # Complete work
@@ -31,7 +31,7 @@ Important: use jj for version control. Never use git commands. Always commit wit
 
 ### Best Practices
 
-- Check `bd ready` at session start to find available work
+- Check `bv --robot-triage` at session start to find available work
 - Update status as you work (in_progress → closed)
 - Create new issues with `bd create` when you discover tasks
 - Use descriptive titles and set appropriate priority/type, and dependencies between related items
