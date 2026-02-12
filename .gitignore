@@ -77,3 +77,4 @@ Formula/bd.rb
 *.coverprofile
 
 tmp/
+tmp/intensive-testing/failures/
