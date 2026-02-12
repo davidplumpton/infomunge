@@ -252,7 +252,7 @@ func drawAnyLiteral(t *rapid.T, label string) string {
 	case 1:
 		return drawSmallFloatLiteral(t, label+"_float")
 	case 2:
-		return exprgen.StringLiteral().Draw(t, label+"_string")
+		return safeStringLiteral(t, label+"_string")
 	case 3:
 		return exprgen.BoolLiteral().Draw(t, label+"_bool")
 	default:
