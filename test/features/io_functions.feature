@@ -342,6 +342,46 @@ Feature: I/O Functions
       """
     Then running the script should fail with error containing "expects mimeType to be a string"
 
+  Scenario: readUrl blocks private IP addresses
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      readUrl("http://127.0.0.1/secret", "application/json")
+      """
+    Then running the script should fail with error containing "private/internal address"
+
+  Scenario: readUrl blocks link-local metadata addresses
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      readUrl("http://169.254.169.254/latest/meta-data/", "text/plain")
+      """
+    Then running the script should fail with error containing "private/internal address"
+
+  Scenario: readUrl blocks non-HTTP schemes
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      readUrl("file:///etc/passwd", "text/plain")
+      """
+    Then running the script should fail with error containing "unsupported scheme"
+
+  Scenario: readUrl blocks ftp scheme
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      readUrl("ftp://example.com/file", "text/plain")
+      """
+    Then running the script should fail with error containing "unsupported scheme"
+
   # Complex scenarios combining read and write
   Scenario: transform CSV to JSON
     Given the following script:
