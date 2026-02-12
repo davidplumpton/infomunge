@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -635,8 +636,19 @@ func tryParseNumber(v Value) (float64, bool) {
 	return 0, false
 }
 
-// numericEquals compares two values for equality, treating int and float64 as comparable
+// numericEquals compares two values for equality, treating int and float64 as comparable.
+// Handles uncomparable types (slices, maps) via reflect.DeepEqual.
 func numericEquals(left, right Value) bool {
+	// Handle uncomparable types (slices, maps) that would panic with ==.
+	switch left.(type) {
+	case []interface{}, map[string]interface{}:
+		return reflect.DeepEqual(left, right)
+	}
+	switch right.(type) {
+	case []interface{}, map[string]interface{}:
+		return reflect.DeepEqual(left, right)
+	}
+
 	if left == right {
 		return true
 	}
