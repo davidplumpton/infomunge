@@ -335,3 +335,22 @@ Feature: Basic Operators
       """
       [true,true]
       """
+
+  Scenario: Algebraic identity smoke checks
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [
+        (7 + 0) == 7,
+        (7 * 1) == 7,
+        ("x" default "x") == "x",
+        ([] ++ [1, 2]) == [1, 2]
+      ]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [true,true,true,true]
+      """
