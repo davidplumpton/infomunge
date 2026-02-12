@@ -1,6 +1,7 @@
 package exprgen_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -9,6 +10,8 @@ import (
 
 	"pgregory.net/rapid"
 )
+
+var objectFieldPattern = regexp.MustCompile(`"[A-Za-z_][A-Za-z0-9_]*"\s*:`)
 
 // --- Bounded depth: generated expressions are reasonable size ---
 
@@ -81,7 +84,7 @@ func TestExpression_ComparisonOnly(t *testing.T) {
 }
 
 func TestExpression_NoArraysWithoutFeature(t *testing.T) {
-	features := exprgen.FeatureArithmetic | exprgen.FeatureComparison | exprgen.FeatureLogical | exprgen.FeatureUnary | exprgen.FeatureParens
+	features := exprgen.FeatureArithmetic | exprgen.FeatureComparison | exprgen.FeatureLogical | exprgen.FeatureObjects | exprgen.FeatureUnary | exprgen.FeatureParens
 	rapid.Check(t, func(t *rapid.T) {
 		expr := exprgen.Expression(3, features).Draw(t, "expr")
 		if containsArrayLiteral(expr) {
@@ -146,6 +149,86 @@ func TestExpression_ArraysProducesBrackets(t *testing.T) {
 	}
 	if !sawArray {
 		t.Error("500 draws with FeatureArrays never produced an array literal")
+	}
+}
+
+func TestExpression_ObjectsProduceBraces(t *testing.T) {
+	sawObject := false
+	for i := 0; i < 500; i++ {
+		var expr string
+		rapid.Check(t, func(t *rapid.T) {
+			expr = exprgen.Expression(3, exprgen.FeatureObjects).Draw(t, "expr")
+		})
+		if strings.HasPrefix(strings.TrimSpace(expr), "{") {
+			if strings.TrimSpace(expr) != "{}" && !objectFieldPattern.MatchString(expr) {
+				t.Fatalf("object literal fields must be valid identifier-like keys, got %q", expr)
+			}
+			sawObject = true
+			break
+		}
+	}
+	if !sawObject {
+		t.Error("500 draws with FeatureObjects never produced an object literal")
+	}
+}
+
+func TestExpression_DotAccessProducesFieldSelectors(t *testing.T) {
+	sawDot := false
+	for i := 0; i < 500; i++ {
+		var expr string
+		rapid.Check(t, func(t *rapid.T) {
+			expr = exprgen.Expression(3, exprgen.FeatureDotAccess).Draw(t, "expr")
+		})
+		if !exprgen.IsValid(expr) {
+			t.Fatalf("FeatureDotAccess produced syntactically invalid expression: %q", expr)
+		}
+		if strings.Contains(expr, "payload.") {
+			sawDot = true
+			break
+		}
+	}
+	if !sawDot {
+		t.Fatal("500 draws with FeatureDotAccess never produced payload field access")
+	}
+}
+
+func TestExpression_IndexAccessSyntacticallyValid(t *testing.T) {
+	sawIndex := false
+	for i := 0; i < 500; i++ {
+		var expr string
+		rapid.Check(t, func(t *rapid.T) {
+			expr = exprgen.Expression(3, exprgen.FeatureIndexAccess).Draw(t, "expr")
+		})
+		if !exprgen.IsValid(expr) {
+			t.Fatalf("FeatureIndexAccess produced syntactically invalid expression: %q", expr)
+		}
+		if strings.Contains(expr, "[") && strings.Contains(expr, "]") {
+			sawIndex = true
+			break
+		}
+	}
+	if !sawIndex {
+		t.Fatal("500 draws with FeatureIndexAccess never produced index brackets")
+	}
+}
+
+func TestExpression_RangeIndexSyntacticallyValid(t *testing.T) {
+	sawRange := false
+	for i := 0; i < 500; i++ {
+		var expr string
+		rapid.Check(t, func(t *rapid.T) {
+			expr = exprgen.Expression(3, exprgen.FeatureRangeIndex).Draw(t, "expr")
+		})
+		if !exprgen.IsValid(expr) {
+			t.Fatalf("FeatureRangeIndex produced syntactically invalid expression: %q", expr)
+		}
+		if strings.Contains(expr, " to ") {
+			sawRange = true
+			break
+		}
+	}
+	if !sawRange {
+		t.Fatal("500 draws with FeatureRangeIndex never produced a range index")
 	}
 }
 

@@ -2,6 +2,7 @@ package exprgen
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"infomunge/internal/preprocessor"
@@ -17,9 +18,13 @@ const (
 	FeatureComparison                      // ==, !=, <, >
 	FeatureLogical                         // &&, ||
 	FeatureArrays                          // array literals
+	FeatureObjects                         // object literals
+	FeatureDotAccess                       // expr.field
+	FeatureIndexAccess                     // expr[index]
+	FeatureRangeIndex                      // expr[start to end]
 	FeatureUnary                           // !, - (prefix)
 	FeatureParens                          // parenthesized expressions
-	FeatureAll         Feature = FeatureArithmetic | FeatureComparison | FeatureLogical | FeatureArrays | FeatureUnary | FeatureParens
+	FeatureAll         Feature = FeatureArithmetic | FeatureComparison | FeatureLogical | FeatureArrays | FeatureObjects | FeatureDotAccess | FeatureIndexAccess | FeatureRangeIndex | FeatureUnary | FeatureParens
 )
 
 // opsByFeature maps feature flags to the binary operators they enable.
@@ -57,6 +62,10 @@ func expressionAtDepth(depth int, features Feature) *rapid.Generator[string] {
 	hasUnary := features&FeatureUnary != 0
 	hasParens := features&FeatureParens != 0
 	hasArrays := features&FeatureArrays != 0
+	hasObjects := features&FeatureObjects != 0
+	hasDotAccess := features&FeatureDotAccess != 0
+	hasIndexAccess := features&FeatureIndexAccess != 0
+	hasRangeIndex := features&FeatureRangeIndex != 0
 
 	// Build a list of enabled form generators with weights.
 	type form struct {
@@ -84,6 +93,26 @@ func expressionAtDepth(depth int, features Feature) *rapid.Generator[string] {
 	if hasArrays {
 		forms = append(forms, form{weight: 2, name: "array", gen: func(d int) *rapid.Generator[string] {
 			return filteredArrayExpr(d, features)
+		}})
+	}
+	if hasObjects {
+		forms = append(forms, form{weight: 2, name: "object", gen: func(d int) *rapid.Generator[string] {
+			return filteredObjectExpr(d, features)
+		}})
+	}
+	if hasDotAccess {
+		forms = append(forms, form{weight: 2, name: "dot", gen: func(d int) *rapid.Generator[string] {
+			return filteredDotAccessExpr(d, features)
+		}})
+	}
+	if hasIndexAccess {
+		forms = append(forms, form{weight: 2, name: "index", gen: func(d int) *rapid.Generator[string] {
+			return filteredIndexAccessExpr(d, features)
+		}})
+	}
+	if hasRangeIndex {
+		forms = append(forms, form{weight: 1, name: "rangeIndex", gen: func(d int) *rapid.Generator[string] {
+			return filteredRangeIndexExpr(d, features)
 		}})
 	}
 
@@ -142,6 +171,88 @@ func filteredArrayExpr(depth int, features Feature) *rapid.Generator[string] {
 		}
 		return "[" + strings.Join(elems, ", ") + "]"
 	})
+}
+
+func filteredObjectExpr(depth int, features Feature) *rapid.Generator[string] {
+	return rapid.Custom(func(t *rapid.T) string {
+		n := rapid.IntRange(0, 5).Draw(t, "len")
+		if n == 0 {
+			return "{}"
+		}
+		fields := make([]string, n)
+		used := map[string]struct{}{}
+		for i := range fields {
+			key := generateIdentifierKey(t, used, i)
+			value := expressionAtDepth(depth-1, features).Draw(t, fmt.Sprintf("value%d", i))
+			fields[i] = fmt.Sprintf("%s: %s", strconv.Quote(key), value)
+		}
+		return "{" + strings.Join(fields, ", ") + "}"
+	})
+}
+
+func filteredDotAccessExpr(depth int, features Feature) *rapid.Generator[string] {
+	return rapid.Custom(func(t *rapid.T) string {
+		base := payloadBaseExpr(t)
+		field := rapid.SampledFrom(ContextShapeFields()).Draw(t, "field")
+		return fmt.Sprintf("%s.%s", base, field)
+	})
+}
+
+func filteredIndexAccessExpr(depth int, features Feature) *rapid.Generator[string] {
+	return rapid.Custom(func(t *rapid.T) string {
+		base := payloadBaseExpr(t)
+		index := rapid.OneOf(
+			rapid.Custom(func(t *rapid.T) string {
+				return strconv.Itoa(rapid.IntRange(0, 5).Draw(t, "idxInt"))
+			}),
+			rapid.Custom(func(t *rapid.T) string {
+				field := rapid.SampledFrom(ContextShapeFields()).Draw(t, "idxField")
+				return strconv.Quote(field)
+			}),
+		).Draw(t, "index")
+		return fmt.Sprintf("%s[%s]", base, index)
+	})
+}
+
+func filteredRangeIndexExpr(depth int, features Feature) *rapid.Generator[string] {
+	return rapid.Custom(func(t *rapid.T) string {
+		base := payloadBaseExpr(t)
+		start := rapid.IntRange(0, 3).Draw(t, "start")
+		end := rapid.IntRange(start, start+3).Draw(t, "end")
+		return fmt.Sprintf("%s[%d to %d]", base, start, end)
+	})
+}
+
+func payloadBaseExpr(t *rapid.T) string {
+	if rapid.Bool().Draw(t, "usePayloadField") {
+		field := rapid.SampledFrom(ContextShapeFields()).Draw(t, "baseField")
+		return "payload." + field
+	}
+	return "payload"
+}
+
+func generateIdentifierKey(t *rapid.T, used map[string]struct{}, fallbackIdx int) string {
+	for attempt := 0; attempt < 5; attempt++ {
+		key := rapid.StringMatching(`[A-Za-z_][A-Za-z0-9_]{0,11}`).Draw(t, fmt.Sprintf("key%d", attempt))
+		if _, exists := used[key]; exists {
+			continue
+		}
+		used[key] = struct{}{}
+		return key
+	}
+	fallback := fmt.Sprintf("field%d", fallbackIdx)
+	if _, exists := used[fallback]; !exists {
+		used[fallback] = struct{}{}
+		return fallback
+	}
+	for i := 0; ; i++ {
+		candidate := fmt.Sprintf("field%d_%d", fallbackIdx, i)
+		if _, exists := used[candidate]; exists {
+			continue
+		}
+		used[candidate] = struct{}{}
+		return candidate
+	}
 }
 
 // WrapScript wraps an expression in a valid infomunge script with header.

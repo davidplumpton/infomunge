@@ -7,6 +7,11 @@ import (
 	"pgregory.net/rapid"
 )
 
+var defaultContextFieldNames = []string{
+	"name", "age", "active", "score", "tags",
+	"address", "items", "count", "value", "label",
+}
+
 // TestContext holds a generated test context with both the Go value
 // (for passing to the runner) and the JSON string (for CLI input).
 type TestContext struct {
@@ -59,11 +64,18 @@ func samplePayload(t *rapid.T) interface{} {
 
 // fieldName returns a deterministic field name for a given index.
 func fieldName(i int) string {
-	names := []string{"name", "age", "active", "score", "tags", "address", "items", "count", "value", "label"}
-	if i < len(names) {
-		return names[i]
+	if i < len(defaultContextFieldNames) {
+		return defaultContextFieldNames[i]
 	}
 	return fmt.Sprintf("field%d", i)
+}
+
+// ContextShapeFields returns a copy of the top-level field names used by
+// SampleContext payload generation.
+func ContextShapeFields() []string {
+	fields := make([]string, len(defaultContextFieldNames))
+	copy(fields, defaultContextFieldNames)
+	return fields
 }
 
 // sampleValue generates a random JSON-compatible value with depth control.

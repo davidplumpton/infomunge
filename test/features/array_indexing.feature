@@ -116,3 +116,17 @@ Feature: Array Indexing
       """
       {"descent":["A","B"],"dot":["A","B"]}
       """
+
+  Scenario: Slice array with range index
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [10, 20, 30, 40, 50][1 to 3]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [20,30,40]
+      """
