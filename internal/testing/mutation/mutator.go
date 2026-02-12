@@ -477,19 +477,31 @@ func SubtreeSwapWithin(expr string, rng *rand.Rand) string {
 	if len(spans) < 2 {
 		return expr
 	}
-	i := rng.Intn(len(spans))
-	j := rng.Intn(len(spans))
-	for j == i {
-		j = rng.Intn(len(spans))
+
+	type pair struct {
+		a span
+		b span
 	}
-	a, b := spans[i], spans[j]
-	if a.start > b.start {
-		a, b = b, a
+	var pairs []pair
+	for i := 0; i < len(spans); i++ {
+		for j := i + 1; j < len(spans); j++ {
+			left, right := spans[i], spans[j]
+			if left.start > right.start {
+				left, right = right, left
+			}
+			if left.end <= right.start {
+				pairs = append(pairs, pair{a: left, b: right})
+			}
+		}
+	}
+	if len(pairs) == 0 {
+		return expr
 	}
 
-	left := expr[a.start:a.end]
-	right := expr[b.start:b.end]
-	return expr[:a.start] + right + expr[a.end:b.start] + left + expr[b.end:]
+	chosen := pairs[rng.Intn(len(pairs))]
+	left := expr[chosen.a.start:chosen.a.end]
+	right := expr[chosen.b.start:chosen.b.end]
+	return expr[:chosen.a.start] + right + expr[chosen.a.end:chosen.b.start] + left + expr[chosen.b.end:]
 }
 
 // DebugDescribeMutation is useful for tests and diagnostics.
