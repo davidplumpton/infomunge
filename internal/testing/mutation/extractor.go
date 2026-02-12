@@ -185,7 +185,7 @@ func extractScenarioEntry(featureFile, scenarioName string, steps []*messages.St
 		}
 
 		if phase == "then" {
-			if docString != "" {
+			if docString != "" && isExactExpectedDocstringStep(textLower) {
 				entry.ExpectedOutput = docString
 			} else if value, ok := parseExpectedValue(text); ok {
 				entry.ExpectedOutput = value
@@ -235,19 +235,39 @@ func parseInlineInputValue(stepText string) (string, bool) {
 }
 
 func parseExpectedValue(stepText string) (string, bool) {
-	if matches := quotedValueRegex.FindStringSubmatch(stepText); len(matches) == 2 {
-		return matches[1], true
+	trimmed := strings.TrimSpace(stepText)
+	lower := strings.ToLower(trimmed)
+
+	const outputPrefix = "the output should be "
+	const resultPrefix = "the result should be "
+
+	var value string
+	switch {
+	case strings.HasPrefix(lower, outputPrefix):
+		value = strings.TrimSpace(trimmed[len(outputPrefix):])
+	case strings.HasPrefix(lower, resultPrefix):
+		value = strings.TrimSpace(trimmed[len(resultPrefix):])
+	default:
+		return "", false
 	}
 
-	lower := strings.ToLower(stepText)
-	const marker = "should be "
-	idx := strings.Index(lower, marker)
-	if idx >= 0 {
-		value := strings.TrimSpace(stepText[idx+len(marker):])
-		if value != "" {
-			return value, true
-		}
+	if value == "" {
+		return "", false
 	}
 
-	return "", false
+	// Exclude matcher/meta assertions that are not exact output equality checks.
+	if strings.HasPrefix(strings.ToLower(value), "valid json") {
+		return "", false
+	}
+
+	return value, true
+}
+
+func isExactExpectedDocstringStep(stepTextLower string) bool {
+	switch strings.TrimSpace(stepTextLower) {
+	case "the output should be:", "the result should be:":
+		return true
+	default:
+		return false
+	}
 }

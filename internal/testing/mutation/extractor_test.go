@@ -87,3 +87,75 @@ func TestExtractCorpusRealFeaturesSanity(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractCorpusIgnoresNonEqualityThenAssertions(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	featurePath := filepath.Join(dir, "assertions.feature")
+	content := `Feature: Then assertion handling
+
+  Scenario: Exact output assertion is included
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    Then the output should be:
+      """
+      {"ok":true}
+      """
+
+  Scenario: Contains assertion is excluded
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    Then the output should contain "ok"
+
+  Scenario: Error contains assertion is excluded
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload.missing.required.field
+      """
+    Then the error should contain "missing"
+
+  Scenario: Matcher docstring assertion is excluded
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    Then the output should contain:
+      """
+      {"ok":true}
+      """
+`
+	if err := os.WriteFile(featurePath, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	entries, err := ExtractCorpus(dir)
+	if err != nil {
+		t.Fatalf("ExtractCorpus() error = %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("len(entries) = %d, want 1", len(entries))
+	}
+	if entries[0].ScenarioName != "Exact output assertion is included" {
+		t.Fatalf("ScenarioName = %q, want exact-output scenario", entries[0].ScenarioName)
+	}
+	if strings.TrimSpace(entries[0].ExpectedOutput) != `{"ok":true}` {
+		t.Fatalf("ExpectedOutput = %q", entries[0].ExpectedOutput)
+	}
+}
