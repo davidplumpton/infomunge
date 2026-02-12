@@ -2,6 +2,7 @@ package exprgen_test
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -230,6 +231,162 @@ func TestExpression_RangeIndexSyntacticallyValid(t *testing.T) {
 	if !sawRange {
 		t.Fatal("500 draws with FeatureRangeIndex never produced a range index")
 	}
+}
+
+func TestExpression_ConditionalsProduceIfElse(t *testing.T) {
+	sawConditional := false
+	for i := 0; i < 500; i++ {
+		var expr string
+		rapid.Check(t, func(t *rapid.T) {
+			expr = exprgen.Expression(3, exprgen.FeatureConditionals).Draw(t, "expr")
+		})
+		if !exprgen.IsValid(expr) {
+			t.Fatalf("FeatureConditionals produced syntactically invalid expression: %q", expr)
+		}
+		if strings.Contains(expr, "if (") && strings.Contains(expr, " else ") {
+			sawConditional = true
+			break
+		}
+	}
+	if !sawConditional {
+		t.Fatal("500 draws with FeatureConditionals never produced an if/else expression")
+	}
+}
+
+func TestExpression_DefaultProducesOperator(t *testing.T) {
+	sawDefault := false
+	for i := 0; i < 500; i++ {
+		var expr string
+		rapid.Check(t, func(t *rapid.T) {
+			expr = exprgen.Expression(3, exprgen.FeatureDefault).Draw(t, "expr")
+		})
+		if !exprgen.IsValid(expr) {
+			t.Fatalf("FeatureDefault produced syntactically invalid expression: %q", expr)
+		}
+		if strings.Contains(expr, " default ") {
+			sawDefault = true
+			break
+		}
+	}
+	if !sawDefault {
+		t.Fatal("500 draws with FeatureDefault never produced a default expression")
+	}
+}
+
+func TestExpression_StringInterpolationProducesInterpolation(t *testing.T) {
+	sawInterpolation := false
+	for i := 0; i < 500; i++ {
+		var expr string
+		rapid.Check(t, func(t *rapid.T) {
+			expr = exprgen.Expression(3, exprgen.FeatureStringInterpolation).Draw(t, "expr")
+		})
+		if !exprgen.IsValid(expr) {
+			t.Fatalf("FeatureStringInterpolation produced syntactically invalid expression: %q", expr)
+		}
+		unquoted, err := strconv.Unquote(expr)
+		if err != nil {
+			continue
+		}
+		if strings.Contains(unquoted, "$(") && strings.Contains(unquoted, ")") {
+			sawInterpolation = true
+			break
+		}
+	}
+	if !sawInterpolation {
+		t.Fatal("500 draws with FeatureStringInterpolation never produced interpolation syntax")
+	}
+}
+
+func TestExpression_BuiltinCallsRespectArity(t *testing.T) {
+	oneArgBuiltins := []string{
+		"sizeOf(", "typeOf(", "upper(", "lower(", "flatten(", "keys(", "values(", "trim(", "isEmpty(",
+	}
+	twoArgBuiltins := []string{"contains(", "startsWith(", "endsWith("}
+
+	sawBuiltin := false
+	for i := 0; i < 500; i++ {
+		var expr string
+		rapid.Check(t, func(t *rapid.T) {
+			expr = exprgen.Expression(3, exprgen.FeatureBuiltinCalls).Draw(t, "expr")
+		})
+		if !exprgen.IsValid(expr) {
+			t.Fatalf("FeatureBuiltinCalls produced syntactically invalid expression: %q", expr)
+		}
+
+		matched := false
+		for _, fn := range oneArgBuiltins {
+			if !strings.Contains(expr, fn) {
+				continue
+			}
+			if !hasBuiltinArity(expr, fn, 1) {
+				t.Fatalf("builtin %s expected 1 arg in expression %q", strings.TrimSuffix(fn, "("), expr)
+			}
+			matched = true
+		}
+		for _, fn := range twoArgBuiltins {
+			if !strings.Contains(expr, fn) {
+				continue
+			}
+			if !hasBuiltinArity(expr, fn, 2) {
+				t.Fatalf("builtin %s expected 2 args in expression %q", strings.TrimSuffix(fn, "("), expr)
+			}
+			matched = true
+		}
+		if matched {
+			sawBuiltin = true
+			break
+		}
+	}
+	if !sawBuiltin {
+		t.Fatal("500 draws with FeatureBuiltinCalls never produced builtin calls")
+	}
+}
+
+func hasBuiltinArity(expr, fnToken string, want int) bool {
+	fnIdx := strings.Index(expr, fnToken)
+	if fnIdx < 0 {
+		return false
+	}
+	start := fnIdx + len(fnToken)
+	depth := 1
+	commaCount := 0
+	inString := false
+	escaped := false
+	for i := start; i < len(expr); i++ {
+		ch := expr[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if inString && ch == '\\' {
+			escaped = true
+			continue
+		}
+		if ch == '"' {
+			inString = !inString
+			continue
+		}
+		if inString {
+			continue
+		}
+		switch ch {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				if i == start {
+					return want == 0
+				}
+				return commaCount+1 == want
+			}
+		case ',':
+			if depth == 1 {
+				commaCount++
+			}
+		}
+	}
+	return false
 }
 
 // containsArrayLiteral checks if the expression contains [ or ] outside of strings.

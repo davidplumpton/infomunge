@@ -14,21 +14,45 @@ import (
 type Feature uint
 
 const (
-	FeatureArithmetic     Feature = 1 << iota // +, -, *, /
-	FeatureComparison                         // ==, !=, <, >
-	FeatureLogical                            // &&, ||
-	FeatureArrays                             // array literals
-	FeatureObjects                            // object literals
-	FeatureDotAccess                          // expr.field
-	FeatureIndexAccess                        // expr[index]
-	FeatureRangeIndex                         // expr[start to end]
-	FeatureUnary                              // !, - (prefix)
-	FeatureParens                             // parenthesized expressions
-	FeatureLambdas                            // (x) -> expr
-	FeatureCollections                        // arr map/filter/reduce/flatMap ...
-	FeatureImplicitLambda                     // $ and $$ in collection bodies
-	FeatureAll            Feature = FeatureArithmetic | FeatureComparison | FeatureLogical | FeatureArrays | FeatureObjects | FeatureDotAccess | FeatureIndexAccess | FeatureRangeIndex | FeatureUnary | FeatureParens | FeatureLambdas | FeatureCollections | FeatureImplicitLambda
+	FeatureArithmetic          Feature = 1 << iota // +, -, *, /
+	FeatureComparison                              // ==, !=, <, >
+	FeatureLogical                                 // &&, ||
+	FeatureArrays                                  // array literals
+	FeatureObjects                                 // object literals
+	FeatureDotAccess                               // expr.field
+	FeatureIndexAccess                             // expr[index]
+	FeatureRangeIndex                              // expr[start to end]
+	FeatureUnary                                   // !, - (prefix)
+	FeatureParens                                  // parenthesized expressions
+	FeatureLambdas                                 // (x) -> expr
+	FeatureCollections                             // arr map/filter/reduce/flatMap ...
+	FeatureImplicitLambda                          // $ and $$ in collection bodies
+	FeatureConditionals                            // if (cond) expr else expr
+	FeatureDefault                                 // expr default expr
+	FeatureStringInterpolation                     // "text $(expr) text"
+	FeatureBuiltinCalls                            // sizeOf(...), contains(...), ...
+	FeatureAll                 Feature = FeatureArithmetic | FeatureComparison | FeatureLogical | FeatureArrays | FeatureObjects | FeatureDotAccess | FeatureIndexAccess | FeatureRangeIndex | FeatureUnary | FeatureParens | FeatureLambdas | FeatureCollections | FeatureImplicitLambda | FeatureConditionals | FeatureDefault | FeatureStringInterpolation | FeatureBuiltinCalls
 )
+
+type builtinSpec struct {
+	name  string
+	arity int
+}
+
+var builtinSpecs = []builtinSpec{
+	{name: "sizeOf", arity: 1},
+	{name: "typeOf", arity: 1},
+	{name: "upper", arity: 1},
+	{name: "lower", arity: 1},
+	{name: "flatten", arity: 1},
+	{name: "keys", arity: 1},
+	{name: "values", arity: 1},
+	{name: "trim", arity: 1},
+	{name: "isEmpty", arity: 1},
+	{name: "contains", arity: 2},
+	{name: "startsWith", arity: 2},
+	{name: "endsWith", arity: 2},
+}
 
 // opsByFeature maps feature flags to the binary operators they enable.
 var opsByFeature = map[Feature][]string{
@@ -81,6 +105,10 @@ func expressionAtDepthWithScope(depth int, features Feature, scope lambdaScope) 
 	hasRangeIndex := features&FeatureRangeIndex != 0
 	hasLambdas := features&FeatureLambdas != 0
 	hasCollections := features&FeatureCollections != 0
+	hasConditionals := features&FeatureConditionals != 0
+	hasDefault := features&FeatureDefault != 0
+	hasStringInterpolation := features&FeatureStringInterpolation != 0
+	hasBuiltinCalls := features&FeatureBuiltinCalls != 0
 
 	// Build a list of enabled form generators with weights.
 	type form struct {
@@ -145,6 +173,26 @@ func expressionAtDepthWithScope(depth int, features Feature, scope lambdaScope) 
 			return collectionOpGenWithScope(d, features, scope)
 		}})
 	}
+	if hasConditionals {
+		forms = append(forms, form{weight: 1, name: "conditional", gen: func(d int) *rapid.Generator[string] {
+			return filteredConditionalExpr(d, features, scope)
+		}})
+	}
+	if hasDefault {
+		forms = append(forms, form{weight: 1, name: "defaultOp", gen: func(d int) *rapid.Generator[string] {
+			return filteredDefaultExpr(d, features, scope)
+		}})
+	}
+	if hasStringInterpolation {
+		forms = append(forms, form{weight: 1, name: "stringInterpolation", gen: func(d int) *rapid.Generator[string] {
+			return filteredStringInterpolationExpr(d, features, scope)
+		}})
+	}
+	if hasBuiltinCalls {
+		forms = append(forms, form{weight: 2, name: "builtinCall", gen: func(d int) *rapid.Generator[string] {
+			return filteredBuiltinCallExpr(d, features, scope)
+		}})
+	}
 
 	totalWeight := 0
 	for _, f := range forms {
@@ -166,30 +214,34 @@ func expressionAtDepthWithScope(depth int, features Feature, scope lambdaScope) 
 }
 
 func filteredBinaryExpr(depth int, features Feature, ops []string, scope lambdaScope) *rapid.Generator[string] {
+	nestedFeatures := expressionNestedFeatures(features)
 	return rapid.Custom(func(t *rapid.T) string {
-		left := expressionAtDepthWithScope(depth-1, features, scope).Draw(t, "left")
+		left := expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, "left")
 		op := rapid.SampledFrom(ops).Draw(t, "op")
-		right := expressionAtDepthWithScope(depth-1, features, scope).Draw(t, "right")
+		right := expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, "right")
 		return fmt.Sprintf("%s %s %s", left, op, right)
 	})
 }
 
 func filteredUnaryExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
+	nestedFeatures := expressionNestedFeatures(features)
 	return rapid.Custom(func(t *rapid.T) string {
 		op := UnaryOp().Draw(t, "op")
-		operand := expressionAtDepthWithScope(depth-1, features, scope).Draw(t, "operand")
+		operand := expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, "operand")
 		return fmt.Sprintf("%s(%s)", op, operand)
 	})
 }
 
 func filteredParenExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
+	nestedFeatures := expressionNestedFeatures(features)
 	return rapid.Custom(func(t *rapid.T) string {
-		inner := expressionAtDepthWithScope(depth-1, features, scope).Draw(t, "inner")
+		inner := expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, "inner")
 		return fmt.Sprintf("(%s)", inner)
 	})
 }
 
 func filteredArrayExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
+	nestedFeatures := expressionNestedFeatures(features)
 	return rapid.Custom(func(t *rapid.T) string {
 		n := rapid.IntRange(0, 5).Draw(t, "len")
 		if n == 0 {
@@ -197,13 +249,14 @@ func filteredArrayExpr(depth int, features Feature, scope lambdaScope) *rapid.Ge
 		}
 		elems := make([]string, n)
 		for i := range elems {
-			elems[i] = expressionAtDepthWithScope(depth-1, features, scope).Draw(t, fmt.Sprintf("elem%d", i))
+			elems[i] = expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, fmt.Sprintf("elem%d", i))
 		}
 		return "[" + strings.Join(elems, ", ") + "]"
 	})
 }
 
 func filteredObjectExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
+	nestedFeatures := expressionNestedFeatures(features)
 	return rapid.Custom(func(t *rapid.T) string {
 		n := rapid.IntRange(0, 5).Draw(t, "len")
 		if n == 0 {
@@ -213,7 +266,7 @@ func filteredObjectExpr(depth int, features Feature, scope lambdaScope) *rapid.G
 		used := map[string]struct{}{}
 		for i := range fields {
 			key := generateIdentifierKey(t, used, i)
-			value := expressionAtDepthWithScope(depth-1, features, scope).Draw(t, fmt.Sprintf("value%d", i))
+			value := expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, fmt.Sprintf("value%d", i))
 			fields[i] = fmt.Sprintf("%s: %s", strconv.Quote(key), value)
 		}
 		return "{" + strings.Join(fields, ", ") + "}"
@@ -251,6 +304,57 @@ func filteredRangeIndexExpr(depth int, features Feature, scope lambdaScope) *rap
 		end := rapid.IntRange(start, start+3).Draw(t, "end")
 		return fmt.Sprintf("%s[%d to %d]", base, start, end)
 	})
+}
+
+func filteredConditionalExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
+	nestedFeatures := expressionNestedFeatures(features)
+	return rapid.Custom(func(t *rapid.T) string {
+		cond := expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, "cond")
+		thenExpr := expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, "then")
+		elseExpr := expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, "else")
+		return fmt.Sprintf("if (%s) %s else %s", cond, thenExpr, elseExpr)
+	})
+}
+
+func filteredDefaultExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
+	nestedFeatures := expressionNestedFeatures(features)
+	return rapid.Custom(func(t *rapid.T) string {
+		left := expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, "left")
+		right := expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, "right")
+		return fmt.Sprintf("%s default %s", left, right)
+	})
+}
+
+func filteredStringInterpolationExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
+	nestedFeatures := expressionNestedFeatures(features)
+	return rapid.Custom(func(t *rapid.T) string {
+		prefix := interpolationTextPiece(t, "prefix")
+		mid := interpolationTextPiece(t, "mid")
+		suffix := interpolationTextPiece(t, "suffix")
+		expr := expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, "interpolatedExpr")
+		return strconv.Quote(prefix + "$(" + expr + ")" + mid + "$(" + Literal().Draw(t, "secondInterpolatedExpr") + ")" + suffix)
+	})
+}
+
+func filteredBuiltinCallExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
+	nestedFeatures := expressionNestedFeatures(features)
+	return rapid.Custom(func(t *rapid.T) string {
+		spec := rapid.SampledFrom(builtinSpecs).Draw(t, "builtin")
+		args := make([]string, spec.arity)
+		for i := range args {
+			args[i] = expressionAtDepthWithScope(depth-1, nestedFeatures, scope).Draw(t, fmt.Sprintf("arg%d", i))
+		}
+		return fmt.Sprintf("%s(%s)", spec.name, strings.Join(args, ", "))
+	})
+}
+
+func interpolationTextPiece(t *rapid.T, label string) string {
+	piece := rapid.StringMatching(`[A-Za-z0-9 ]{0,6}`).Draw(t, label)
+	return strings.ReplaceAll(piece, `"`, "")
+}
+
+func expressionNestedFeatures(features Feature) Feature {
+	return features &^ FeatureConditionals
 }
 
 func payloadOrScopeBaseExpr(t *rapid.T, scope lambdaScope) string {
