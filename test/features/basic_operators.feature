@@ -307,3 +307,31 @@ Feature: Basic Operators
       """
       {"b":2}
       """
+
+  Scenario: Comparison operators include <= and >=
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [3 <= 3, 3 >= 4]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [true,false]
+      """
+
+  Scenario: Coercion equality operator with ~=
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ["42" ~= 42, "3.14" ~= 3.14]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [true,true]
+      """

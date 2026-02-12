@@ -14,8 +14,8 @@ import (
 type Feature uint
 
 const (
-	FeatureArithmetic          Feature = 1 << iota // +, -, *, /
-	FeatureComparison                              // ==, !=, <, >
+	FeatureArithmetic          Feature = 1 << iota // +, -, *, /, **, %, ++
+	FeatureComparison                              // ==, !=, <, >, <=, >=, ~=
 	FeatureLogical                                 // &&, ||
 	FeatureArrays                                  // array literals
 	FeatureObjects                                 // object literals
@@ -54,20 +54,76 @@ var builtinSpecs = []builtinSpec{
 	{name: "endsWith", arity: 2},
 }
 
-// opsByFeature maps feature flags to the binary operators they enable.
-var opsByFeature = map[Feature][]string{
-	FeatureArithmetic: {"+", "-", "*", "/"},
-	FeatureComparison: {"==", "!=", "<", ">"},
-	FeatureLogical:    {"&&", "||"},
+type weightedOperator struct {
+	op     string
+	weight int
 }
 
-// filteredOps returns the binary operators enabled by the given feature set.
+var operatorFeatureOrder = []Feature{
+	FeatureArithmetic,
+	FeatureComparison,
+	FeatureLogical,
+}
+
+// weightedOpsByFeature maps feature flags to weighted binary operators.
+// Common operators get larger weights so they appear more often.
+var weightedOpsByFeature = map[Feature][]weightedOperator{
+	FeatureArithmetic: {
+		{op: "+", weight: 8},
+		{op: "-", weight: 7},
+		{op: "*", weight: 6},
+		{op: "/", weight: 5},
+		{op: "%", weight: 3},
+		{op: "++", weight: 3},
+		{op: "**", weight: 1},
+	},
+	FeatureComparison: {
+		{op: "==", weight: 6},
+		{op: "!=", weight: 5},
+		{op: "<", weight: 4},
+		{op: ">", weight: 4},
+		{op: "<=", weight: 4},
+		{op: ">=", weight: 4},
+		{op: "~=", weight: 1},
+	},
+	FeatureLogical: {
+		{op: "&&", weight: 5},
+		{op: "||", weight: 5},
+	},
+}
+
+func expandWeightedOperators(weightedOps []weightedOperator) []string {
+	total := 0
+	for _, op := range weightedOps {
+		if op.weight > 0 {
+			total += op.weight
+		}
+	}
+	expanded := make([]string, 0, total)
+	for _, op := range weightedOps {
+		for i := 0; i < op.weight; i++ {
+			expanded = append(expanded, op.op)
+		}
+	}
+	return expanded
+}
+
+func allWeightedBinaryOps() []string {
+	var all []string
+	for _, feature := range operatorFeatureOrder {
+		all = append(all, expandWeightedOperators(weightedOpsByFeature[feature])...)
+	}
+	return all
+}
+
+// filteredOps returns weighted binary operators enabled by the given feature set.
 func filteredOps(features Feature) []string {
 	var ops []string
-	for feat, featureOps := range opsByFeature {
-		if features&feat != 0 {
-			ops = append(ops, featureOps...)
+	for _, feature := range operatorFeatureOrder {
+		if features&feature == 0 {
+			continue
 		}
+		ops = append(ops, expandWeightedOperators(weightedOpsByFeature[feature])...)
 	}
 	return ops
 }

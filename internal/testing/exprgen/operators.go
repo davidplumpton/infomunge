@@ -7,8 +7,8 @@ import (
 	"pgregory.net/rapid"
 )
 
-// binaryOps is the minimal set of binary operators for phase-1 generation.
-var binaryOps = []string{"+", "-", "*", "/", "==", "!=", "<", ">", "&&", "||"}
+// binaryOps is the weighted binary-operator set for generator sampling.
+var binaryOps = allWeightedBinaryOps()
 
 // BinaryOp returns a generator that picks a random binary operator.
 func BinaryOp() *rapid.Generator[string] {
@@ -55,9 +55,9 @@ func exprAtDepth(depth int) *rapid.Generator[string] {
 // binaryExpr generates "left op right" with children at depth-1.
 func binaryExpr(depth int) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
-		left := exprAtDepth(depth - 1).Draw(t, "left")
+		left := exprAtDepth(depth-1).Draw(t, "left")
 		op := BinaryOp().Draw(t, "op")
-		right := exprAtDepth(depth - 1).Draw(t, "right")
+		right := exprAtDepth(depth-1).Draw(t, "right")
 		return fmt.Sprintf("%s %s %s", left, op, right)
 	})
 }
@@ -67,7 +67,7 @@ func binaryExpr(depth int) *rapid.Generator[string] {
 func unaryExpr(depth int) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
 		op := UnaryOp().Draw(t, "op")
-		operand := exprAtDepth(depth - 1).Draw(t, "operand")
+		operand := exprAtDepth(depth-1).Draw(t, "operand")
 		return fmt.Sprintf("%s(%s)", op, operand)
 	})
 }
@@ -75,7 +75,7 @@ func unaryExpr(depth int) *rapid.Generator[string] {
 // parenExpr wraps a sub-expression in parentheses.
 func parenExpr(depth int) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
-		inner := exprAtDepth(depth - 1).Draw(t, "inner")
+		inner := exprAtDepth(depth-1).Draw(t, "inner")
 		return fmt.Sprintf("(%s)", inner)
 	})
 }
@@ -89,7 +89,7 @@ func arrayExpr(depth int) *rapid.Generator[string] {
 		}
 		elems := make([]string, n)
 		for i := range elems {
-			elems[i] = exprAtDepth(depth - 1).Draw(t, fmt.Sprintf("elem%d", i))
+			elems[i] = exprAtDepth(depth-1).Draw(t, fmt.Sprintf("elem%d", i))
 		}
 		return "[" + strings.Join(elems, ", ") + "]"
 	})

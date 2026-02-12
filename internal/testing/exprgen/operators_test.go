@@ -1,6 +1,7 @@
 package exprgen_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -28,11 +29,31 @@ func TestBinaryOp_ValidOps(t *testing.T) {
 		op := exprgen.BinaryOp().Draw(t, "op")
 		valid := map[string]bool{
 			"+": true, "-": true, "*": true, "/": true,
-			"==": true, "!=": true, "<": true, ">": true,
+			"%": true, "++": true, "**": true,
+			"==": true, "!=": true, "<": true, ">": true, "<=": true, ">=": true, "~=": true,
 			"&&": true, "||": true,
 		}
 		if !valid[op] {
 			t.Fatalf("BinaryOp produced unexpected operator: %q", op)
+		}
+	})
+}
+
+func TestBinaryOp_WeightedDistribution(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		counts := map[string]int{}
+		for i := 0; i < 4000; i++ {
+			op := exprgen.BinaryOp().Draw(t, fmt.Sprintf("op%d", i))
+			counts[op]++
+		}
+		if counts["+"] <= counts["**"] {
+			t.Fatalf("expected + to appear more often than **, got +=%d **=%d", counts["+"], counts["**"])
+		}
+		if counts["=="] <= counts["~="] {
+			t.Fatalf("expected == to appear more often than ~=, got ==%d ~=%d", counts["=="], counts["~="])
+		}
+		if counts["&&"] <= counts["~="] {
+			t.Fatalf("expected && to appear more often than ~=, got &&=%d ~=%d", counts["&&"], counts["~="])
 		}
 	})
 }
@@ -148,7 +169,7 @@ func TestExpr_ProducesVariety(t *testing.T) {
 		rapid.Check(t, func(t *rapid.T) {
 			expr = exprgen.Expr(3).Draw(t, "expr")
 		})
-		for _, op := range []string{" + ", " - ", " * ", " / ", " == ", " != ", " < ", " > ", " && ", " || "} {
+		for _, op := range []string{" + ", " - ", " * ", " / ", " % ", " ++ ", " ** ", " == ", " != ", " < ", " > ", " <= ", " >= ", " ~= ", " && ", " || "} {
 			if strings.Contains(expr, op) {
 				sawBinaryOp = true
 				break

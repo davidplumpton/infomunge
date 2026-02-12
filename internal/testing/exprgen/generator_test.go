@@ -54,7 +54,7 @@ func TestExpression_ArithmeticOnly(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		expr := exprgen.Expression(3, exprgen.FeatureArithmetic).Draw(t, "expr")
 		// Should not contain comparison or logical operators.
-		for _, op := range []string{" == ", " != ", " && ", " || "} {
+		for _, op := range []string{" == ", " != ", " < ", " > ", " <= ", " >= ", " ~= ", " && ", " || "} {
 			if strings.Contains(expr, op) {
 				t.Fatalf("FeatureArithmetic expression %q contains forbidden operator %q", expr, op)
 			}
@@ -70,7 +70,7 @@ func TestExpression_ComparisonOnly(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		expr := exprgen.Expression(3, exprgen.FeatureComparison).Draw(t, "expr")
 		// Should not contain arithmetic ops (except - which is also unary in literals).
-		for _, op := range []string{" + ", " * ", " / "} {
+		for _, op := range []string{" + ", " * ", " / ", " % ", " ++ ", " ** "} {
 			if strings.Contains(expr, op) {
 				t.Fatalf("FeatureComparison expression %q contains forbidden operator %q", expr, op)
 			}
@@ -121,7 +121,7 @@ func TestExpression_ArithmeticProducesOps(t *testing.T) {
 		rapid.Check(t, func(t *rapid.T) {
 			expr = exprgen.Expression(3, exprgen.FeatureArithmetic).Draw(t, "expr")
 		})
-		for _, op := range []string{" + ", " - ", " * ", " / "} {
+		for _, op := range []string{" + ", " - ", " * ", " / ", " % ", " ++ ", " ** "} {
 			if strings.Contains(expr, op) {
 				sawOp = true
 				break
