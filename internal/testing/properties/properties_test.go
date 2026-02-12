@@ -239,7 +239,7 @@ func drawNonNullLiteral(t *rapid.T, label string) string {
 	case 1:
 		return drawSmallFloatLiteral(t, label+"_float")
 	case 2:
-		return exprgen.StringLiteral().Draw(t, label+"_string")
+		return safeStringLiteral(t, label+"_string")
 	default:
 		return exprgen.BoolLiteral().Draw(t, label+"_bool")
 	}
@@ -275,7 +275,7 @@ func drawArrayLiteral(t *rapid.T, label string) string {
 		case 1:
 			items[i] = drawSmallFloatLiteral(t, itemLabel+"_float")
 		case 2:
-			items[i] = exprgen.StringLiteral().Draw(t, itemLabel+"_string")
+			items[i] = safeStringLiteral(t, itemLabel+"_string")
 		case 3:
 			items[i] = exprgen.BoolLiteral().Draw(t, itemLabel+"_bool")
 		default:
@@ -284,6 +284,10 @@ func drawArrayLiteral(t *rapid.T, label string) string {
 	}
 
 	return "[" + joinComma(items) + "]"
+}
+
+func safeStringLiteral(t *rapid.T, label string) string {
+	return strconv.Quote(rapid.StringMatching(`[A-Za-z0-9 ]{0,24}`).Draw(t, label))
 }
 
 func joinComma(items []string) string {

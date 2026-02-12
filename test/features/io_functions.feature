@@ -420,3 +420,17 @@ Feature: I/O Functions
       """
       "{\"a\":{\"b\":1}}"
       """
+
+  Scenario: JSON read/write round trip preserves structure
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read(write({"name": "Alice", "scores": [1, 2, 3], "active": true}, "application/json"), "application/json")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"active":true,"name":"Alice","scores":[1,2,3]}
+      """
