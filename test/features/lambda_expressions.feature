@@ -335,3 +335,17 @@ Feature: Lambda Expression Support
       """
       [{"greeting":"hello alice"},{"greeting":"hello bob"}]
       """
+
+  Scenario: Nested lambdas keep inner and outer parameters distinct
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] map (x, i) -> ([x, i] map (y, j) -> y + j + x)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [[2,2],[4,4]]
+      """

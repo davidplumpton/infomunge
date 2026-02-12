@@ -14,17 +14,20 @@ import (
 type Feature uint
 
 const (
-	FeatureArithmetic  Feature = 1 << iota // +, -, *, /
-	FeatureComparison                      // ==, !=, <, >
-	FeatureLogical                         // &&, ||
-	FeatureArrays                          // array literals
-	FeatureObjects                         // object literals
-	FeatureDotAccess                       // expr.field
-	FeatureIndexAccess                     // expr[index]
-	FeatureRangeIndex                      // expr[start to end]
-	FeatureUnary                           // !, - (prefix)
-	FeatureParens                          // parenthesized expressions
-	FeatureAll         Feature = FeatureArithmetic | FeatureComparison | FeatureLogical | FeatureArrays | FeatureObjects | FeatureDotAccess | FeatureIndexAccess | FeatureRangeIndex | FeatureUnary | FeatureParens
+	FeatureArithmetic     Feature = 1 << iota // +, -, *, /
+	FeatureComparison                         // ==, !=, <, >
+	FeatureLogical                            // &&, ||
+	FeatureArrays                             // array literals
+	FeatureObjects                            // object literals
+	FeatureDotAccess                          // expr.field
+	FeatureIndexAccess                        // expr[index]
+	FeatureRangeIndex                         // expr[start to end]
+	FeatureUnary                              // !, - (prefix)
+	FeatureParens                             // parenthesized expressions
+	FeatureLambdas                            // (x) -> expr
+	FeatureCollections                        // arr map/filter/reduce/flatMap ...
+	FeatureImplicitLambda                     // $ and $$ in collection bodies
+	FeatureAll            Feature = FeatureArithmetic | FeatureComparison | FeatureLogical | FeatureArrays | FeatureObjects | FeatureDotAccess | FeatureIndexAccess | FeatureRangeIndex | FeatureUnary | FeatureParens | FeatureLambdas | FeatureCollections | FeatureImplicitLambda
 )
 
 // opsByFeature maps feature flags to the binary operators they enable.
@@ -50,11 +53,21 @@ func filteredOps(features Feature) []string {
 // which expression forms are enabled; start with FeatureAll or a subset like
 // FeatureArithmetic|FeatureComparison|FeatureArrays.
 func Expression(maxDepth int, features Feature) *rapid.Generator[string] {
-	return expressionAtDepth(maxDepth, features)
+	return expressionAtDepthWithScope(maxDepth, features, lambdaScope{})
 }
 
 func expressionAtDepth(depth int, features Feature) *rapid.Generator[string] {
+	return expressionAtDepthWithScope(depth, features, lambdaScope{})
+}
+
+func expressionAtDepthWithScope(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
 	if depth <= 0 {
+		if scope.hasReferences() {
+			return rapid.OneOf(
+				Literal(),
+				scopeReferenceExpr(scope),
+			)
+		}
 		return Literal()
 	}
 	ops := filteredOps(features)
@@ -66,6 +79,8 @@ func expressionAtDepth(depth int, features Feature) *rapid.Generator[string] {
 	hasDotAccess := features&FeatureDotAccess != 0
 	hasIndexAccess := features&FeatureIndexAccess != 0
 	hasRangeIndex := features&FeatureRangeIndex != 0
+	hasLambdas := features&FeatureLambdas != 0
+	hasCollections := features&FeatureCollections != 0
 
 	// Build a list of enabled form generators with weights.
 	type form struct {
@@ -74,45 +89,60 @@ func expressionAtDepth(depth int, features Feature) *rapid.Generator[string] {
 		gen    func(depth int) *rapid.Generator[string]
 	}
 	forms := []form{{weight: 4, name: "lit", gen: func(_ int) *rapid.Generator[string] { return Literal() }}}
+	if scope.hasReferences() {
+		forms = append(forms, form{weight: 2, name: "scopeRef", gen: func(_ int) *rapid.Generator[string] {
+			return scopeReferenceExpr(scope)
+		}})
+	}
 	if hasBinary {
 		captured := ops // capture for closure
 		forms = append(forms, form{weight: 2, name: "binary", gen: func(d int) *rapid.Generator[string] {
-			return filteredBinaryExpr(d, features, captured)
+			return filteredBinaryExpr(d, features, captured, scope)
 		}})
 	}
 	if hasUnary {
 		forms = append(forms, form{weight: 1, name: "unary", gen: func(d int) *rapid.Generator[string] {
-			return filteredUnaryExpr(d, features)
+			return filteredUnaryExpr(d, features, scope)
 		}})
 	}
 	if hasParens {
 		forms = append(forms, form{weight: 1, name: "paren", gen: func(d int) *rapid.Generator[string] {
-			return filteredParenExpr(d, features)
+			return filteredParenExpr(d, features, scope)
 		}})
 	}
 	if hasArrays {
 		forms = append(forms, form{weight: 2, name: "array", gen: func(d int) *rapid.Generator[string] {
-			return filteredArrayExpr(d, features)
+			return filteredArrayExpr(d, features, scope)
 		}})
 	}
 	if hasObjects {
 		forms = append(forms, form{weight: 2, name: "object", gen: func(d int) *rapid.Generator[string] {
-			return filteredObjectExpr(d, features)
+			return filteredObjectExpr(d, features, scope)
 		}})
 	}
 	if hasDotAccess {
 		forms = append(forms, form{weight: 2, name: "dot", gen: func(d int) *rapid.Generator[string] {
-			return filteredDotAccessExpr(d, features)
+			return filteredDotAccessExpr(d, features, scope)
 		}})
 	}
 	if hasIndexAccess {
 		forms = append(forms, form{weight: 2, name: "index", gen: func(d int) *rapid.Generator[string] {
-			return filteredIndexAccessExpr(d, features)
+			return filteredIndexAccessExpr(d, features, scope)
 		}})
 	}
 	if hasRangeIndex {
 		forms = append(forms, form{weight: 1, name: "rangeIndex", gen: func(d int) *rapid.Generator[string] {
-			return filteredRangeIndexExpr(d, features)
+			return filteredRangeIndexExpr(d, features, scope)
+		}})
+	}
+	if hasLambdas {
+		forms = append(forms, form{weight: 1, name: "lambda", gen: func(d int) *rapid.Generator[string] {
+			return lambdaGenWithScope(d, features, scope)
+		}})
+	}
+	if hasCollections {
+		forms = append(forms, form{weight: 2, name: "collection", gen: func(d int) *rapid.Generator[string] {
+			return collectionOpGenWithScope(d, features, scope)
 		}})
 	}
 
@@ -135,31 +165,31 @@ func expressionAtDepth(depth int, features Feature) *rapid.Generator[string] {
 	})
 }
 
-func filteredBinaryExpr(depth int, features Feature, ops []string) *rapid.Generator[string] {
+func filteredBinaryExpr(depth int, features Feature, ops []string, scope lambdaScope) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
-		left := expressionAtDepth(depth-1, features).Draw(t, "left")
+		left := expressionAtDepthWithScope(depth-1, features, scope).Draw(t, "left")
 		op := rapid.SampledFrom(ops).Draw(t, "op")
-		right := expressionAtDepth(depth-1, features).Draw(t, "right")
+		right := expressionAtDepthWithScope(depth-1, features, scope).Draw(t, "right")
 		return fmt.Sprintf("%s %s %s", left, op, right)
 	})
 }
 
-func filteredUnaryExpr(depth int, features Feature) *rapid.Generator[string] {
+func filteredUnaryExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
 		op := UnaryOp().Draw(t, "op")
-		operand := expressionAtDepth(depth-1, features).Draw(t, "operand")
+		operand := expressionAtDepthWithScope(depth-1, features, scope).Draw(t, "operand")
 		return fmt.Sprintf("%s(%s)", op, operand)
 	})
 }
 
-func filteredParenExpr(depth int, features Feature) *rapid.Generator[string] {
+func filteredParenExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
-		inner := expressionAtDepth(depth-1, features).Draw(t, "inner")
+		inner := expressionAtDepthWithScope(depth-1, features, scope).Draw(t, "inner")
 		return fmt.Sprintf("(%s)", inner)
 	})
 }
 
-func filteredArrayExpr(depth int, features Feature) *rapid.Generator[string] {
+func filteredArrayExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
 		n := rapid.IntRange(0, 5).Draw(t, "len")
 		if n == 0 {
@@ -167,13 +197,13 @@ func filteredArrayExpr(depth int, features Feature) *rapid.Generator[string] {
 		}
 		elems := make([]string, n)
 		for i := range elems {
-			elems[i] = expressionAtDepth(depth-1, features).Draw(t, fmt.Sprintf("elem%d", i))
+			elems[i] = expressionAtDepthWithScope(depth-1, features, scope).Draw(t, fmt.Sprintf("elem%d", i))
 		}
 		return "[" + strings.Join(elems, ", ") + "]"
 	})
 }
 
-func filteredObjectExpr(depth int, features Feature) *rapid.Generator[string] {
+func filteredObjectExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
 		n := rapid.IntRange(0, 5).Draw(t, "len")
 		if n == 0 {
@@ -183,24 +213,24 @@ func filteredObjectExpr(depth int, features Feature) *rapid.Generator[string] {
 		used := map[string]struct{}{}
 		for i := range fields {
 			key := generateIdentifierKey(t, used, i)
-			value := expressionAtDepth(depth-1, features).Draw(t, fmt.Sprintf("value%d", i))
+			value := expressionAtDepthWithScope(depth-1, features, scope).Draw(t, fmt.Sprintf("value%d", i))
 			fields[i] = fmt.Sprintf("%s: %s", strconv.Quote(key), value)
 		}
 		return "{" + strings.Join(fields, ", ") + "}"
 	})
 }
 
-func filteredDotAccessExpr(depth int, features Feature) *rapid.Generator[string] {
+func filteredDotAccessExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
-		base := payloadBaseExpr(t)
+		base := payloadOrScopeBaseExpr(t, scope)
 		field := rapid.SampledFrom(ContextShapeFields()).Draw(t, "field")
 		return fmt.Sprintf("%s.%s", base, field)
 	})
 }
 
-func filteredIndexAccessExpr(depth int, features Feature) *rapid.Generator[string] {
+func filteredIndexAccessExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
-		base := payloadBaseExpr(t)
+		base := payloadOrScopeBaseExpr(t, scope)
 		index := rapid.OneOf(
 			rapid.Custom(func(t *rapid.T) string {
 				return strconv.Itoa(rapid.IntRange(0, 5).Draw(t, "idxInt"))
@@ -214,13 +244,20 @@ func filteredIndexAccessExpr(depth int, features Feature) *rapid.Generator[strin
 	})
 }
 
-func filteredRangeIndexExpr(depth int, features Feature) *rapid.Generator[string] {
+func filteredRangeIndexExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
-		base := payloadBaseExpr(t)
+		base := payloadOrScopeBaseExpr(t, scope)
 		start := rapid.IntRange(0, 3).Draw(t, "start")
 		end := rapid.IntRange(start, start+3).Draw(t, "end")
 		return fmt.Sprintf("%s[%d to %d]", base, start, end)
 	})
+}
+
+func payloadOrScopeBaseExpr(t *rapid.T, scope lambdaScope) string {
+	if scope.hasNamed() && rapid.Bool().Draw(t, "useScopeBase") {
+		return rapid.SampledFrom(scope.named).Draw(t, "scopeBase")
+	}
+	return payloadBaseExpr(t)
 }
 
 func payloadBaseExpr(t *rapid.T) string {
