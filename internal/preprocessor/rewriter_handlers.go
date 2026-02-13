@@ -329,22 +329,13 @@ func (r *rewriter) handleUsing() bool {
 		return false
 	}
 
-	parenDepth := 1
 	parenEnd := parenStart + 1
-	state := stringState{}
-	for parenEnd < len(r.input) && parenDepth > 0 {
-		ch := r.input[parenEnd]
-		state.Advance(ch)
-		if !state.inString {
-			if ch == '(' {
-				parenDepth++
-			} else if ch == ')' {
-				parenDepth--
-			}
-		}
+	state := ScanState{DepthParen: 1}
+	for parenEnd < len(r.input) && state.DepthParen > 0 {
+		state.Advance(r.input[parenEnd])
 		parenEnd++
 	}
-	if parenDepth != 0 {
+	if state.DepthParen != 0 {
 		return false
 	}
 
@@ -374,45 +365,31 @@ func (r *rewriter) handleUsing() bool {
 }
 
 func findUsingExpressionEnd(input string, start int) int {
-	depthParen := 0
-	depthBracket := 0
-	depthBrace := 0
-	state := stringState{}
+	state := ScanState{}
 
 	for i := start; i < len(input); i++ {
 		ch := input[i]
+		if !state.InString() {
+			switch ch {
+			case ')':
+				if state.DepthParen == 0 {
+					return i
+				}
+			case ']':
+				if state.DepthBrack == 0 {
+					return i
+				}
+			case '}':
+				if state.DepthBrace == 0 {
+					return i
+				}
+			case ',', '\n', '\r':
+				if state.AtTopLevel() {
+					return i
+				}
+			}
+		}
 		state.Advance(ch)
-		if state.inString {
-			continue
-		}
-
-		switch ch {
-		case '(':
-			depthParen++
-		case ')':
-			if depthParen == 0 {
-				return i
-			}
-			depthParen--
-		case '[':
-			depthBracket++
-		case ']':
-			if depthBracket == 0 {
-				return i
-			}
-			depthBracket--
-		case '{':
-			depthBrace++
-		case '}':
-			if depthBrace == 0 {
-				return i
-			}
-			depthBrace--
-		case ',', '\n', '\r':
-			if depthParen == 0 && depthBracket == 0 && depthBrace == 0 {
-				return i
-			}
-		}
 	}
 
 	return len(input)
@@ -438,42 +415,16 @@ func buildUsingDeclarations(assignments string) string {
 func splitTopLevelArgs(input string) []string {
 	var parts []string
 	start := 0
-	depthParen := 0
-	depthBracket := 0
-	depthBrace := 0
-	state := stringState{}
+	state := ScanState{}
 
 	for i := 0; i < len(input); i++ {
 		ch := input[i]
-		state.Advance(ch)
-		if state.inString {
+		if ch == ',' && state.AtTopLevel() {
+			parts = append(parts, input[start:i])
+			start = i + 1
 			continue
 		}
-		switch ch {
-		case '(':
-			depthParen++
-		case ')':
-			if depthParen > 0 {
-				depthParen--
-			}
-		case '[':
-			depthBracket++
-		case ']':
-			if depthBracket > 0 {
-				depthBracket--
-			}
-		case '{':
-			depthBrace++
-		case '}':
-			if depthBrace > 0 {
-				depthBrace--
-			}
-		case ',':
-			if depthParen == 0 && depthBracket == 0 && depthBrace == 0 {
-				parts = append(parts, input[start:i])
-				start = i + 1
-			}
-		}
+		state.Advance(ch)
 	}
 
 	parts = append(parts, input[start:])
@@ -635,6 +586,19 @@ func skipSpace(input string, pos int, includeNewlines bool) int {
 	return pos
 }
 
+func delimiterDepth(state ScanState, opener byte) int {
+	switch opener {
+	case '(':
+		return state.DepthParen
+	case '[':
+		return state.DepthBrack
+	case '{':
+		return state.DepthBrace
+	default:
+		return 0
+	}
+}
+
 // findMatchingDelimited locates a delimited block starting at start, handling nesting.
 //
 // Returns the opener and closer positions (inclusive) or ok=false when the opener
@@ -653,21 +617,22 @@ func findMatchingDelimited(input string, start int, opener byte, closer byte, al
 
 	startPos := pos
 	pos++
-	depth := 1
-	state := stringState{}
-	for pos < len(input) && depth > 0 {
-		ch := input[pos]
-		state.Advance(ch)
-		if !state.inString {
-			if ch == opener {
-				depth++
-			} else if ch == closer {
-				depth--
-			}
-		}
+	state := ScanState{}
+	switch opener {
+	case '(':
+		state.DepthParen = 1
+	case '[':
+		state.DepthBrack = 1
+	case '{':
+		state.DepthBrace = 1
+	default:
+		return 0, 0, false
+	}
+	for pos < len(input) && delimiterDepth(state, opener) > 0 {
+		state.Advance(input[pos])
 		pos++
 	}
-	if depth != 0 {
+	if delimiterDepth(state, opener) != 0 {
 		return 0, 0, false
 	}
 
@@ -682,27 +647,20 @@ func findMatchingDelimited(input string, start int, opener byte, closer byte, al
 // an unmatched closer if the scan fails.
 func scanBranchEnd(input string, start int, allowMultiline bool) BranchScanResult {
 	pos := start
-	depth := 0
-	state := stringState{}
+	state := ScanState{}
 	for pos < len(input) {
 		ch := input[pos]
-		state.Advance(ch)
-		if !state.inString {
-			if isBranchOpener(ch) {
-				depth++
-			} else if isBranchCloser(ch) {
-				depth--
-				if depth < 0 {
-					return BranchScanResult{ErrPos: pos}
-				}
-			} else if depth == 0 && isElseKeywordAt(input, pos) {
+		if !state.InString() {
+			if isBranchCloser(ch) && state.Depth() == 0 {
+				return BranchScanResult{ErrPos: pos}
+			} else if state.Depth() == 0 && isElseKeywordAt(input, pos) {
 				// branchEnd should be before any whitespace leading to else
 				branchEnd := pos
 				for branchEnd > start && isWhitespace(input[branchEnd-1]) {
 					branchEnd--
 				}
 				return BranchScanResult{BranchEnd: branchEnd, ElsePos: pos, ErrPos: -1, OK: true}
-			} else if allowMultiline && depth == 0 && (ch == '\n' || ch == '\r') {
+			} else if allowMultiline && state.Depth() == 0 && (ch == '\n' || ch == '\r') {
 				next := pos + 1
 				for next < len(input) && isWhitespace(input[next]) {
 					next++
@@ -713,13 +671,14 @@ func scanBranchEnd(input string, start int, allowMultiline bool) BranchScanResul
 					return BranchScanResult{BranchEnd: pos, ElsePos: -1, ErrPos: -1, OK: true}
 				}
 			}
-			if !allowMultiline && depth == 0 && (ch == '\n' || pos == len(input)-1) {
+			if !allowMultiline && state.Depth() == 0 && (ch == '\n' || pos == len(input)-1) {
 				if ch != '\n' {
 					pos++
 				}
 				return BranchScanResult{BranchEnd: pos, ElsePos: -1, ErrPos: -1, OK: true}
 			}
 		}
+		state.Advance(ch)
 		pos++
 	}
 
@@ -741,49 +700,35 @@ func isElseKeywordAt(input string, pos int) bool {
 }
 
 func findExpressionEnd(input string, start int, allowNewlines bool) int {
-	depthParen := 0
-	depthBracket := 0
-	depthBrace := 0
-	state := stringState{}
+	state := ScanState{}
 
 	for i := start; i < len(input); i++ {
 		ch := input[i]
+		if !state.InString() {
+			switch ch {
+			case ')':
+				if state.DepthParen == 0 {
+					return i
+				}
+			case ']':
+				if state.DepthBrack == 0 {
+					return i
+				}
+			case '}':
+				if state.DepthBrace == 0 {
+					return i
+				}
+			case ',':
+				if state.AtTopLevel() {
+					return i
+				}
+			case '\n', '\r':
+				if !allowNewlines && state.AtTopLevel() {
+					return i
+				}
+			}
+		}
 		state.Advance(ch)
-		if state.inString {
-			continue
-		}
-
-		switch ch {
-		case '(':
-			depthParen++
-		case ')':
-			if depthParen == 0 {
-				return i
-			}
-			depthParen--
-		case '[':
-			depthBracket++
-		case ']':
-			if depthBracket == 0 {
-				return i
-			}
-			depthBracket--
-		case '{':
-			depthBrace++
-		case '}':
-			if depthBrace == 0 {
-				return i
-			}
-			depthBrace--
-		case ',':
-			if depthParen == 0 && depthBracket == 0 && depthBrace == 0 {
-				return i
-			}
-		case '\n', '\r':
-			if !allowNewlines && depthParen == 0 && depthBracket == 0 && depthBrace == 0 {
-				return i
-			}
-		}
 	}
 
 	return len(input)
@@ -927,24 +872,16 @@ func (r *rewriter) rewriteConditionalObjectEntry(entry conditionalObjectEntry) (
 
 func splitObjectEntries(input string) []string {
 	entries := make([]string, 0, 4)
-	state := stringState{}
-	depth := 0
+	state := ScanState{}
 	start := 0
 	for i := 0; i < len(input); i++ {
 		ch := input[i]
-		state.Advance(ch)
-		if !state.inString {
-			if ch == '(' || ch == '{' || ch == '[' {
-				depth++
-			} else if ch == ')' || ch == '}' || ch == ']' {
-				if depth > 0 {
-					depth--
-				}
-			} else if ch == ',' && depth == 0 {
-				entries = append(entries, input[start:i])
-				start = i + 1
-			}
+		if ch == ',' && state.AtTopLevel() {
+			entries = append(entries, input[start:i])
+			start = i + 1
+			continue
 		}
+		state.Advance(ch)
 	}
 
 	if start <= len(input) {
@@ -954,34 +891,23 @@ func splitObjectEntries(input string) []string {
 }
 
 func splitConditionalEntry(entry string) (string, string, bool) {
-	state := stringState{}
-	depth := 0
+	state := ScanState{}
 	for i := 0; i < len(entry); i++ {
 		ch := entry[i]
-		state.Advance(ch)
-		if !state.inString {
-			if ch == '(' || ch == '{' || ch == '[' {
-				depth++
-			} else if ch == ')' || ch == '}' || ch == ']' {
-				if depth > 0 {
-					depth--
-				}
-			}
-
-			if depth == 0 && entry[i] == ' ' && strings.HasPrefix(entry[i:], " if") {
-				afterIf := i + 3
-				afterIf = skipSpace(entry, afterIf, false)
-				if afterIf < len(entry) && entry[afterIf] == '(' {
-					condStart := afterIf
-					_, condEnd, ok := findMatchingDelimited(entry, condStart, '(', ')', false)
-					if ok && strings.TrimSpace(entry[condEnd+1:]) == "" {
-						expr := strings.TrimSpace(entry[:i])
-						cond := strings.TrimSpace(entry[condStart+1 : condEnd])
-						return expr, cond, true
-					}
+		if state.AtTopLevel() && ch == ' ' && strings.HasPrefix(entry[i:], " if") {
+			afterIf := i + 3
+			afterIf = skipSpace(entry, afterIf, false)
+			if afterIf < len(entry) && entry[afterIf] == '(' {
+				condStart := afterIf
+				_, condEnd, ok := findMatchingDelimited(entry, condStart, '(', ')', false)
+				if ok && strings.TrimSpace(entry[condEnd+1:]) == "" {
+					expr := strings.TrimSpace(entry[:i])
+					cond := strings.TrimSpace(entry[condStart+1 : condEnd])
+					return expr, cond, true
 				}
 			}
 		}
+		state.Advance(ch)
 	}
 
 	return "", "", false
