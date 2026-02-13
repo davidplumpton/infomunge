@@ -200,3 +200,15 @@ Feature: Import Directive
       """
       {"joined":"x:y","keys":["a","b"]}
       """
+
+  Scenario: Reject module import path traversal
+    Given the following input content:
+      """
+      %im 0.1
+      import ..::..::tmp::evil
+      output application/json
+      ---
+      1
+      """
+    When I run the application and it fails
+    Then the error should contain "invalid module spec"

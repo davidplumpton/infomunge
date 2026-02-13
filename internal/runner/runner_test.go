@@ -451,6 +451,28 @@ fun double(x) = x * 2
 		}
 	})
 
+	t.Run("Resolve rejects traversal", func(t *testing.T) {
+		escapeDir := filepath.Join(filepath.Dir(tmpDir), "escape_mods")
+		if err := os.MkdirAll(escapeDir, 0755); err != nil {
+			t.Fatalf("Failed to create escape dir: %v", err)
+		}
+		t.Cleanup(func() { _ = os.RemoveAll(escapeDir) })
+
+		escapePath := filepath.Join(escapeDir, "Evil.im")
+		if err := os.WriteFile(escapePath, []byte("%im 0.1\nvar x = 42\n"), 0644); err != nil {
+			t.Fatalf("Failed to write escape module file: %v", err)
+		}
+
+		loader := NewModuleLoader(tmpDir)
+		_, _, err := loader.Resolve("..::escape_mods::Evil")
+		if err == nil {
+			t.Fatalf("Resolve() expected error for traversal module spec")
+		}
+		if !containsString(err.Error(), "invalid module spec") {
+			t.Fatalf("Resolve() error = %q, expected invalid module spec error", err.Error())
+		}
+	})
+
 	t.Run("Load", func(t *testing.T) {
 		loader := NewModuleLoader(tmpDir)
 		m, err := loader.Load("MyModule")

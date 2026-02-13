@@ -38,12 +38,18 @@ func NewModuleLoader(baseDir string) *ModuleLoader {
 // Resolve converts a module spec (e.g., "modules::MyModule") into a module name and file path.
 func (l *ModuleLoader) Resolve(moduleSpec string) (moduleName string, path string, err error) {
 	parts := strings.Split(moduleSpec, "::")
+	if err := validateModuleSpec(parts); err != nil {
+		return "", "", err
+	}
 	moduleName = parts[len(parts)-1]
 
 	relPath := filepath.Join(parts...) + ".im"
 
 	for _, searchPath := range l.SearchPaths {
 		candidate := filepath.Join(searchPath, relPath)
+		if !isSubpath(searchPath, candidate) {
+			continue
+		}
 		if _, err := os.Stat(candidate); err == nil {
 			return moduleName, candidate, nil
 		}
@@ -86,4 +92,35 @@ func (l *ModuleLoader) Load(moduleSpec string) (*Module, error) {
 	l.cache[path] = m
 
 	return m, nil
+}
+
+func validateModuleSpec(parts []string) error {
+	if len(parts) == 0 {
+		return unifiederrors.ParseError("invalid module spec")
+	}
+	for _, part := range parts {
+		if part == "" || part == "." || part == ".." {
+			return unifiederrors.ParseErrorf("invalid module spec segment %q", part)
+		}
+		if strings.ContainsAny(part, `/\`) {
+			return unifiederrors.ParseErrorf("invalid module spec segment %q", part)
+		}
+	}
+	return nil
+}
+
+func isSubpath(root, candidate string) bool {
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return false
+	}
+	candidateAbs, err := filepath.Abs(candidate)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(rootAbs, candidateAbs)
+	if err != nil {
+		return false
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
