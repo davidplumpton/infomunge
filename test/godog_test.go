@@ -140,6 +140,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the following CSV input:$`, tc.theFollowingCSVInput)
 	ctx.Step(`^the following YAML input:$`, tc.theFollowingYAMLInput)
 	ctx.Step(`^the following properties input:$`, tc.theFollowingPropertiesInput)
+	ctx.Step(`^the following NDJSON input:$`, tc.theFollowingNDJSONInput)
 	ctx.Step(`^the following script:$`, tc.theFollowingScript)
 	ctx.Step(`^I run the script$`, tc.iRunTheScript)
 	ctx.Step(`^I run the script with a canceled evaluation context$`, tc.iRunTheScriptWithCanceledEvaluationContext)
@@ -373,6 +374,12 @@ func (tc *testContext) theFollowingYAMLInput(content *godog.DocString) error {
 func (tc *testContext) theFollowingPropertiesInput(content *godog.DocString) error {
 	tc.payloadContent = content.Content
 	tc.payloadMime = "text/x-java-properties"
+	return nil
+}
+
+func (tc *testContext) theFollowingNDJSONInput(content *godog.DocString) error {
+	tc.payloadContent = content.Content
+	tc.payloadMime = "application/x-ndjson"
 	return nil
 }
 
