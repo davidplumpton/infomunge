@@ -213,3 +213,15 @@ func TestProtobufFormatLookup(t *testing.T) {
 		t.Fatalf("expected application/protobuf for .pbf extension, got %q", got)
 	}
 }
+
+func TestExcelFormatLookup(t *testing.T) {
+	if got := MimeTypeForFormat("xlsx"); got != "application/xlsx" {
+		t.Fatalf("expected application/xlsx for format 'xlsx', got %q", got)
+	}
+	if got := MimeTypeForFormat("excel"); got != "application/xlsx" {
+		t.Fatalf("expected application/xlsx for format 'excel', got %q", got)
+	}
+	if got := DetectMimeType("payload.xlsx"); got != "application/xlsx" {
+		t.Fatalf("expected application/xlsx for .xlsx extension, got %q", got)
+	}
+}

@@ -152,6 +152,34 @@ Feature: I/O Functions
       "x-protobuf-bytes"
       """
 
+  Scenario: read xlsx content
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("xlsx-bytes", "application/xlsx")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "xlsx-bytes"
+      """
+
+  Scenario: read xlsx standard mime alias content
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("xlsx-alias-bytes", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "xlsx-alias-bytes"
+      """
+
   Scenario: read with invalid JSON fails
     Given the following script:
       """
@@ -401,6 +429,34 @@ Feature: I/O Functions
     Then the output should be:
       """
       "x-protobuf-bytes"
+      """
+
+  Scenario: write string to xlsx
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write("xlsx-bytes", "application/xlsx")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "xlsx-bytes"
+      """
+
+  Scenario: write string to xlsx standard mime alias
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write("xlsx-alias-bytes", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "xlsx-alias-bytes"
       """
 
   Scenario: write requires exactly two arguments

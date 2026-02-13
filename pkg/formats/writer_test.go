@@ -344,6 +344,48 @@ func TestFormat_Protobuf(t *testing.T) {
 	}
 }
 
+func TestFormat_Excel(t *testing.T) {
+	tests := []struct {
+		name     string
+		mimeType string
+	}{
+		{name: "application/xlsx", mimeType: "application/xlsx"},
+		{name: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+"/string input", func(t *testing.T) {
+			result, err := Format("PK\x03\x04xlsx-content", tt.mimeType)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != "PK\x03\x04xlsx-content" {
+				t.Fatalf("expected passthrough excel string, got %q", result)
+			}
+		})
+
+		t.Run(tt.name+"/byte slice input", func(t *testing.T) {
+			result, err := Format([]byte("PK\x03\x04sheet1.xml"), tt.mimeType)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != "PK\x03\x04sheet1.xml" {
+				t.Fatalf("unexpected formatted excel output: %q", result)
+			}
+		})
+
+		t.Run(tt.name+"/unsupported type", func(t *testing.T) {
+			_, err := Format(Object{"a": 1}, tt.mimeType)
+			if err == nil {
+				t.Fatal("expected error for non-excel input")
+			}
+			if !strings.Contains(err.Error(), "binary output expects string or []byte") {
+				t.Fatalf("unexpected error message: %v", err)
+			}
+		})
+	}
+}
+
 func TestFormat_UnknownMimeType(t *testing.T) {
 	// Unknown mime types should return an error rather than silently falling back
 	_, err := Format(42, "application/unknown")

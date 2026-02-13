@@ -239,6 +239,30 @@ func TestRead_Protobuf(t *testing.T) {
 	}
 }
 
+func TestRead_Excel(t *testing.T) {
+	content := "PK\x03\x04xlsx-content"
+
+	tests := []struct {
+		name     string
+		mimeType string
+	}{
+		{name: "application/xlsx", mimeType: "application/xlsx"},
+		{name: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Read(content, tt.mimeType)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got, ok := result.(string); !ok || got != content {
+				t.Fatalf("expected excel reader to return original content, got %#v (%T)", result, result)
+			}
+		})
+	}
+}
+
 func TestRead_XML(t *testing.T) {
 	tests := []struct {
 		name     string
