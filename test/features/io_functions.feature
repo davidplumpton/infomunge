@@ -312,6 +312,17 @@ Feature: I/O Functions
       """
     Then running the script should fail with error containing "readUrl"
 
+  Scenario: readUrl respects canceled evaluation context
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      readUrl("http://1.1.1.1", "application/json")
+      """
+    When I run the script with a canceled evaluation context
+    Then the output should contain "context canceled"
+
   Scenario: readUrl requires two arguments
     Given the following script:
       """

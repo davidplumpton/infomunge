@@ -101,7 +101,19 @@ func callBuiltinRead(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinReadUrl implements the readUrl(url, mimeType) function.
-func callBuiltinReadUrl(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinReadUrl(e *ast.CallExpr, evalCtx map[string]interface{}, depth int) (interface{}, error) {
+	args := make([]interface{}, 0, len(e.Args))
+	for _, argExpr := range e.Args {
+		arg, err := evalASTWithDepth(argExpr, evalCtx, depth+1)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, arg)
+	}
+	return callBuiltinReadUrlWithArgs(args, e, evalCtx)
+}
+
+func callBuiltinReadUrlWithArgs(args []interface{}, e *ast.CallExpr, evalCtx map[string]interface{}) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, newPosError("readUrl requires exactly 2 arguments: url and mimeType", e.Pos())
 	}
@@ -125,8 +137,14 @@ func callBuiltinReadUrl(args []interface{}, e *ast.CallExpr) (interface{}, error
 		return nil, newPosError(err.Error(), e.Pos())
 	}
 
+	goCtx := GetGoContext(evalCtx)
+	req, err := http.NewRequestWithContext(goCtx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, newPosError(fmt.Sprintf("readUrl: failed to create request: %v", err), e.Pos())
+	}
+
 	// Fetch the URL with timeout-aware client
-	resp, err := readUrlClient.Get(rawURL)
+	resp, err := readUrlClient.Do(req)
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("readUrl: failed to fetch URL: %v", err), e.Pos())
 	}

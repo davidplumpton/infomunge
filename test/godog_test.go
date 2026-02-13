@@ -19,6 +19,7 @@ import (
 
 	"github.com/cucumber/godog"
 	"infomunge/internal/cli"
+	"infomunge/internal/evaluator"
 	"infomunge/internal/runner"
 	"infomunge/pkg/formats"
 )
@@ -119,6 +120,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the following properties input:$`, tc.theFollowingPropertiesInput)
 	ctx.Step(`^the following script:$`, tc.theFollowingScript)
 	ctx.Step(`^I run the script$`, tc.iRunTheScript)
+	ctx.Step(`^I run the script with a canceled evaluation context$`, tc.iRunTheScriptWithCanceledEvaluationContext)
 	ctx.Step(`^running the script should fail with error containing "([^"]*)"$`, tc.runningTheScriptShouldFailWithErrorContaining)
 
 	// Additional step for JSON input with script from input content
@@ -349,6 +351,30 @@ func (tc *testContext) iRunTheScript() error {
 
 	// Run the script with timeout protection
 	return tc.runScriptWithTimeout(tc.scriptContent, ctx)
+}
+
+func (tc *testContext) iRunTheScriptWithCanceledEvaluationContext() error {
+	ctx := make(map[string]interface{})
+
+	if tc.payloadMime != "" {
+		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
+		if err != nil {
+			return fmt.Errorf("failed to parse payload: %v", err)
+		}
+		ctx["payload"] = payload
+	}
+
+	goCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	ctx[evaluator.GoContextKey] = goCtx
+
+	err := tc.runScriptWithTimeout(tc.scriptContent, ctx)
+	if err == nil {
+		return fmt.Errorf("expected script to fail, but it succeeded")
+	}
+
+	tc.lastOutput = err.Error()
+	return nil
 }
 
 func (tc *testContext) runningTheScriptShouldFailWithErrorContaining(expected string) error {

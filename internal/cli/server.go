@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"infomunge/internal/evaluator"
 	"io"
 	"log"
 	"net/http"
@@ -124,6 +125,7 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		context[evaluator.GoContextKey] = r.Context()
 		if deadline, ok := r.Context().Deadline(); ok {
 			context["__deadline"] = deadline
 		}

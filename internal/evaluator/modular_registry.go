@@ -65,6 +65,7 @@ func init() {
 		"try":               callBuiltinTry,
 		"orElse":            callBuiltinOrElse,
 		"orElseTry":         callBuiltinOrElseTry,
+		"readUrl":           callBuiltinReadUrl,
 		"eachItem":          callEachItemMatcher,
 		"haveItem":          callHaveItemMatcher,
 		"anyOf":             callAnyOfMatcher,
@@ -73,7 +74,6 @@ func init() {
 
 	builtinFunctionRegistry = map[string]RegularBuiltinFunc{
 		"read":                      callBuiltinRead,
-		"readUrl":                   callBuiltinReadUrl,
 		"write":                     callBuiltinWrite,
 		"__concat":                  callBuiltinConcat,
 		"__remove":                  callBuiltinRemove,
