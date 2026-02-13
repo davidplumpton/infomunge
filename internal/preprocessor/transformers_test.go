@@ -511,6 +511,7 @@ func TestReplaceArrayRangeIndexing(t *testing.T) {
 		{"range with variable end", "arr[0 to end]", "arr[0 to end]"},
 		// Range inside function call arguments (bug q022)
 		{"range inside function call", `typeOf(payload["name"][0 to 0])`, `typeOf(slice(payload["name"], 0, 1))`},
+		{"range inside function call with dot notation", `typeOf(payload.name[0 to 0])`, `typeOf(slice(payload.name, 0, 1))`},
 		{"range inside nested brackets", `foo(bar["x"][1 to 3])`, `foo(slice(bar["x"], 1, 4))`},
 	}
 
