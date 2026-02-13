@@ -13,8 +13,10 @@ Feature: I/O Functions
       read("{\"name\": \"Alice\", \"age\": 30}", "application/json")
       """
     When I run the script
-    Then the output should contain "Alice"
-    And the output should contain "30"
+    Then the output should be:
+      """
+      {"age":30,"name":"Alice"}
+      """
 
   Scenario: read CSV content
     Given the following script:
@@ -25,8 +27,10 @@ Feature: I/O Functions
       read("name,age\nAlice,30\nBob,25", "application/csv")
       """
     When I run the script
-    Then the output should contain "Alice"
-    And the output should contain "30"
+    Then the output should be:
+      """
+      [{"age":"30","name":"Alice"},{"age":"25","name":"Bob"}]
+      """
 
   Scenario: read YAML content
     Given the following script:
@@ -37,8 +41,10 @@ Feature: I/O Functions
       read("name: Alice\nage: 30", "application/yaml")
       """
     When I run the script
-    Then the output should contain "Alice"
-    And the output should contain "30"
+    Then the output should be:
+      """
+      {"age":30,"name":"Alice"}
+      """
 
   Scenario: read XML content
     Given the following script:

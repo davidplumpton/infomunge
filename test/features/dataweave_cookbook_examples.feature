@@ -52,9 +52,10 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
         "nationality": "USA"
       }
       """
-    Then the output should contain "\"name\":\"Michael\""
-    And the output should contain "\"address1\":\"Koala Boulevard 314\""
-    And the output should contain "\"country\":\"USA\""
+    Then the output should be:
+      """
+      {"address1":"Koala Boulevard 314","city":"San Diego","country":"USA","email":"mike@hotmail.com","name":"Michael","postalCode":"1345","stateOrProvince":"CA"}
+      """
 
   # Example 3: Map Array Items
   Scenario: Map array to transform each item
@@ -87,10 +88,10 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
         ]
       }
       """
-    Then the output should contain "\"title\":\"Everyday Italian\""
-    And the output should contain "\"author\":\"J K. Rowling\""
-    And the output should contain "\"id\":0"
-    And the output should contain "\"id\":1"
+    Then the output should be:
+      """
+      [{"author":"Giada De Laurentiis","id":0,"title":"Everyday Italian"},{"author":"J K. Rowling","id":1,"title":"Harry Potter"}]
+      """
 
   # Example 4: FlatMap (Map and Flatten)
   Scenario: FlatMap to flatten nested arrays
@@ -136,8 +137,10 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
         }
       ]
       """
-    Then the output should contain "\"price\":30"
-    And the output should contain "\"year\":2005"
+    Then the output should be:
+      """
+      [{"price":30,"title":"Book One","year":2005},{"price":29.99,"title":"Book Two","year":2006}]
+      """
 
   # Example 6: Filter Array
   Scenario: Filter array with condition
@@ -176,8 +179,10 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
         {"name": "Charlie", "status": "active"}
       ]
       """
-    Then the output should contain "\"active\":"
-    And the output should contain "\"inactive\":"
+    Then the output should be:
+      """
+      {"active":[{"name":"Alice","status":"active"},{"name":"Charlie","status":"active"}],"inactive":[{"name":"Bob","status":"inactive"}]}
+      """
 
   # Example 8: Pluck (Extract Field)
   Scenario: Pluck extracts single field from array of objects
@@ -241,9 +246,10 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
         "email": "alice@example.com"
       }
       """
-    Then the output should contain "\"NAME\":\"Alice\""
-    And the output should contain "\"AGE\":30"
-    And the output should contain "\"EMAIL\":\"alice@example.com\""
+    Then the output should be:
+      """
+      {"AGE":30,"EMAIL":"alice@example.com","NAME":"Alice"}
+      """
 
   # Example 11: FilterObject
   Scenario: FilterObject filters out entries not matching predicate
@@ -259,10 +265,10 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
       """
       {"a": 1, "b": 2, "c": 3, "d": 4}
       """
-    Then the output should contain "\"c\":3"
-    And the output should contain "\"d\":4"
-    And the output should not contain "\"a\":"
-    And the output should not contain "\"b\":"
+    Then the output should be:
+      """
+      {"c":3,"d":4}
+      """
 
   # Example 12: KeysOf
   Scenario: KeysOf extracts all keys from object
@@ -366,8 +372,10 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
         }
       }
       """
-    Then the output should contain "\"name\":\"Alice\""
-    And the output should contain "\"city\":\"New York\""
+    Then the output should be:
+      """
+      {"city":"New York","name":"Alice"}
+      """
 
   # Example 17: String Concatenation
   Scenario: Concatenate strings with ++ operator
@@ -434,8 +442,10 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
         {"id": 2, "name": "Bob", "age": 25}
       ]
       """
-    Then the output should contain "\"label\":\"Alice (30)\""
-    And the output should contain "\"label\":\"Bob (25)\""
+    Then the output should be:
+      """
+      [{"id":1,"label":"Alice (30)"},{"id":2,"label":"Bob (25)"}]
+      """
 
   # Example 20: FlatMap with filtering
   Scenario: FlatMap with conditional logic
