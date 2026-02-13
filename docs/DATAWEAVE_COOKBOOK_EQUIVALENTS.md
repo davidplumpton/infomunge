@@ -880,6 +880,7 @@ output application/json
 | **String Concat in Objects** | `{key: val1 ++ val2}` | Must use `{key: (val1 ++ val2)}` (requires parens) |
 | **Complex Expressions in Objects** | Can use operators directly | Require parentheses: `{key: (expr1 op expr2)}` |
 | **Multiple Inputs** | `input <name> <format>` | `input <name> <format>` |
+| **Null Literal** | `null` | `null` (preferred), `nil` alias also accepted |
 | **Type System** | Complex type definitions | Basic types with `as` coercion |
 | **Supported Formats** | JSON, XML, CSV, YAML, Properties | JSON, XML, CSV, YAML, Properties |
 

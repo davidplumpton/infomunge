@@ -32,6 +32,7 @@ go build -o infomunge ./cmd/infomunge
 Notes:
 - CSV output expects an array of objects; non-array results or non-object rows return a validation error.
 - Date formatting uses a documented subset of Java SimpleDateFormat tokens; see `docs/DATE_FORMATS.md`.
+- For null literals, use `null` for DataWeave compatibility. InfoMunge also accepts `nil` as an alias.
 
 ### Comparison to Datawave
 
