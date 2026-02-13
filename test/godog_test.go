@@ -11,9 +11,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,8 +35,15 @@ type testContext struct {
 	serverClose    func()
 	serverAPIKey   string
 	lastHTTPStatus int
+	workDir        string
 	timeout        time.Duration // Timeout for script execution to prevent infinite loops
 }
+
+var (
+	godogBuildOnce sync.Once
+	godogBinary    string
+	godogBuildErr  error
+)
 
 func TestFeatures(t *testing.T) {
 	// Support filtering via environment variables:
@@ -56,9 +65,10 @@ func TestFeatures(t *testing.T) {
 	}
 
 	opts := &godog.Options{
-		Format: resolveGodogFormat(),
-		Paths:  paths,
-		Output: os.Stdout, // Direct output to stdout for immediate feedback
+		Format:      resolveGodogFormat(),
+		Paths:       paths,
+		Output:      os.Stdout, // Direct output to stdout for immediate feedback
+		Concurrency: resolveGodogConcurrency(),
 	}
 
 	if tags := os.Getenv("GODOG_TAGS"); tags != "" {
@@ -83,17 +93,29 @@ func resolveGodogFormat() string {
 	return failuresFormatName
 }
 
+func resolveGodogConcurrency() int {
+	if envConcurrency := os.Getenv("GODOG_CONCURRENCY"); envConcurrency != "" {
+		if parsed, err := strconv.Atoi(envConcurrency); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	return 4
+}
+
 func InitializeScenario(ctx *godog.ScenarioContext) {
 	tc := &testContext{
 		timeout: 5 * time.Second, // Default 5-second timeout for all script executions
 	}
 
 	ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
-		os.Remove("input.txt")
 		if tc.serverClose != nil {
 			tc.serverClose()
 			tc.serverClose = nil
 			tc.serverURL = ""
+		}
+		if tc.workDir != "" {
+			_ = os.RemoveAll(tc.workDir)
+			tc.workDir = ""
 		}
 		return ctx, nil
 	})
@@ -178,17 +200,26 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 
 // Existing steps
 func (tc *testContext) aFileNamedWithContent(fileName, content string) error {
-	return os.WriteFile(fileName, []byte(content), 0644)
+	if err := tc.ensureWorkspace(); err != nil {
+		return err
+	}
+	filePath := filepath.Join(tc.workDir, fileName)
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(filePath, []byte(content), 0644)
 }
 
 func (tc *testContext) iRunTheApplicationWith(arg string) error {
-	// Build the application
-	buildCmd := exec.Command("go", "build", "-o", "infomunge", "../cmd/infomunge/main.go")
-	if err := buildCmd.Run(); err != nil {
-		return fmt.Errorf("failed to build app: %v", err)
+	if err := tc.ensureWorkspace(); err != nil {
+		return err
 	}
-
-	cmd := exec.Command("./infomunge", "-f", arg)
+	binPath, err := ensureGodogBinary()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(binPath, "-f", arg)
+	cmd.Dir = tc.workDir
 	output, err := cmd.CombinedOutput()
 	tc.lastOutput = string(output)
 	if err != nil {
@@ -234,40 +265,47 @@ func (tc *testContext) aScriptWithRepeatedLines(count int) error {
 }
 
 func (tc *testContext) iRunTheApplicationWithThisContent() error {
+	if err := tc.ensureWorkspace(); err != nil {
+		return err
+	}
 	// Write inputContent to a temp file
-	if err := os.WriteFile("input.txt", []byte(tc.inputContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
 		return err
 	}
 	return tc.iRunTheApplicationWith("input.txt")
 }
 
 func (tc *testContext) iRunTheApplicationAndItFails() error {
-	if err := os.WriteFile("input.txt", []byte(tc.inputContent), 0644); err != nil {
+	if err := tc.ensureWorkspace(); err != nil {
 		return err
 	}
-	// Build the application
-	buildCmd := exec.Command("go", "build", "-o", "infomunge", "../cmd/infomunge/main.go")
-	if err := buildCmd.Run(); err != nil {
-		return fmt.Errorf("failed to build app: %v", err)
+	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
+		return err
 	}
-
-	cmd := exec.Command("./infomunge", "-f", "input.txt")
+	binPath, err := ensureGodogBinary()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(binPath, "-f", "input.txt")
+	cmd.Dir = tc.workDir
 	output, _ := cmd.CombinedOutput()
 	tc.lastOutput = string(output)
 	return nil
 }
 
 func (tc *testContext) iRunTheApplicationWithRunSubcommand() error {
-	if err := os.WriteFile("input.txt", []byte(tc.inputContent), 0644); err != nil {
+	if err := tc.ensureWorkspace(); err != nil {
 		return err
 	}
-	// Build the application
-	buildCmd := exec.Command("go", "build", "-o", "infomunge", "../cmd/infomunge/main.go")
-	if err := buildCmd.Run(); err != nil {
-		return fmt.Errorf("failed to build app: %v", err)
+	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
+		return err
 	}
-
-	cmd := exec.Command("./infomunge", "run", "-f", "input.txt")
+	binPath, err := ensureGodogBinary()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(binPath, "run", "-f", "input.txt")
+	cmd.Dir = tc.workDir
 	output, err := cmd.CombinedOutput()
 	tc.lastOutput = string(output)
 	if err != nil {
@@ -284,15 +322,18 @@ func (tc *testContext) theOutputShouldBe(expected *godog.DocString) error {
 }
 
 func (tc *testContext) theApplicationShouldFailWithErrorContaining(expected string) error {
-	if err := os.WriteFile("input.txt", []byte(tc.inputContent), 0644); err != nil {
+	if err := tc.ensureWorkspace(); err != nil {
 		return err
 	}
-	buildCmd := exec.Command("go", "build", "-o", "infomunge", "../cmd/infomunge/main.go")
-	if err := buildCmd.Run(); err != nil {
-		return fmt.Errorf("failed to build app: %v", err)
+	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
+		return err
 	}
-
-	cmd := exec.Command("./infomunge", "-f", "input.txt")
+	binPath, err := ensureGodogBinary()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(binPath, "-f", "input.txt")
+	cmd.Dir = tc.workDir
 	output, err := cmd.CombinedOutput()
 	tc.lastOutput = string(output)
 	if err == nil {
@@ -1004,4 +1045,41 @@ func (tc *testContext) theResponseStatusShouldBe(statusCode string) error {
 		return fmt.Errorf("expected status %d, got %d", expected, tc.lastHTTPStatus)
 	}
 	return nil
+}
+
+func (tc *testContext) ensureWorkspace() error {
+	if tc.workDir != "" {
+		return nil
+	}
+	if err := os.MkdirAll("../tmp", 0755); err != nil {
+		return fmt.Errorf("failed to create tmp directory: %v", err)
+	}
+	workDir, err := os.MkdirTemp("../tmp", "godog-scenario-")
+	if err != nil {
+		return fmt.Errorf("failed to create scenario workspace: %v", err)
+	}
+	tc.workDir = workDir
+	return nil
+}
+
+func ensureGodogBinary() (string, error) {
+	godogBuildOnce.Do(func() {
+		if err := os.MkdirAll("../tmp", 0755); err != nil {
+			godogBuildErr = fmt.Errorf("failed to create tmp directory: %v", err)
+			return
+		}
+		binaryPath := filepath.Join("..", "tmp", fmt.Sprintf("infomunge-godog-%d", os.Getpid()))
+		absBinaryPath, err := filepath.Abs(binaryPath)
+		if err != nil {
+			godogBuildErr = fmt.Errorf("failed to resolve absolute binary path: %v", err)
+			return
+		}
+		godogBinary = absBinaryPath
+		buildCmd := exec.Command("go", "build", "-o", godogBinary, "../cmd/infomunge/main.go")
+		output, err := buildCmd.CombinedOutput()
+		if err != nil {
+			godogBuildErr = fmt.Errorf("failed to build app: %v, output: %s", err, strings.TrimSpace(string(output)))
+		}
+	})
+	return godogBinary, godogBuildErr
 }
