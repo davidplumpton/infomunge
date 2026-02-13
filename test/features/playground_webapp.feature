@@ -71,7 +71,7 @@ Feature: Playground webapp
       """
     When I run the server script with a canceled request context
     Then the response status should be 408
-    And the output should contain "request canceled"
+    And the output should contain "Request timeout"
 
   Scenario: Run endpoint rejects oversized request bodies
     Given the server is running

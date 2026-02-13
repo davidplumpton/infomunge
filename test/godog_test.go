@@ -205,6 +205,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I run the server script without specifying output$`, tc.iRunTheServerScriptWithoutOutput)
 	ctx.Step(`^I run the server script with output "([^"]*)"$`, tc.iRunTheServerScriptWithOutput)
 	ctx.Step(`^the server run inputs are:$`, tc.theServerRunInputsAre)
+	ctx.Step(`^I configure (\d+) server JSON inputs$`, tc.iConfigureServerJSONInputs)
 	ctx.Step(`^I run the server script with configured inputs$`, tc.iRunTheServerScriptWithConfiguredInputs)
 	ctx.Step(`^I run the server script without an API key$`, tc.iRunTheServerScriptWithoutAPIKey)
 	ctx.Step(`^I run the server script with API key "([^"]*)"$`, tc.iRunTheServerScriptWithAPIKey)
@@ -1196,6 +1197,27 @@ func (tc *testContext) theServerRunInputsAre(content *godog.DocString) error {
 	var inputs []map[string]string
 	if err := json.Unmarshal([]byte(content.Content), &inputs); err != nil {
 		return fmt.Errorf("invalid server run inputs JSON: %v", err)
+	}
+	tc.serverRunInputs = inputs
+	return nil
+}
+
+func (tc *testContext) iConfigureServerJSONInputs(countStr string) error {
+	count, err := strconv.Atoi(countStr)
+	if err != nil {
+		return fmt.Errorf("invalid input count %q: %v", countStr, err)
+	}
+	if count < 0 {
+		return fmt.Errorf("input count must be non-negative")
+	}
+
+	inputs := make([]map[string]string, 0, count)
+	for i := 0; i < count; i++ {
+		inputs = append(inputs, map[string]string{
+			"name":    fmt.Sprintf("input%d", i),
+			"format":  "json",
+			"content": fmt.Sprintf("%d", i),
+		})
 	}
 	tc.serverRunInputs = inputs
 	return nil

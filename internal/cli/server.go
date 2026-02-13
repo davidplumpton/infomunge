@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os/signal"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -25,6 +26,8 @@ const (
 	serverShutdownTimeout   = 5 * time.Second
 	runRequestBodyMaxBytes  = 1 * 1024 * 1024
 )
+
+var absolutePathPattern = regexp.MustCompile(`(?:[A-Za-z]:\\|/)[^\s:"]+`)
 
 func (app *App) serve(config *Config) error {
 	addr := config.Listen
@@ -109,7 +112,7 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 			return
 		}
 		if err := r.Context().Err(); err != nil {
-			http.Error(w, fmt.Sprintf("request canceled: %v", err), http.StatusRequestTimeout)
+			writeRequestTimeout(w)
 			return
 		}
 
@@ -121,17 +124,17 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 				http.Error(w, fmt.Sprintf("request body exceeds %d bytes", runRequestBodyMaxBytes), http.StatusRequestEntityTooLarge)
 				return
 			}
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			writeSanitizedBadRequest(w, err)
 			return
 		}
 
 		evalContext, err := handlers.BuildRunContext(payload.Inputs)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			writeSanitizedBadRequest(w, err)
 			return
 		}
 		if err := r.Context().Err(); err != nil {
-			http.Error(w, fmt.Sprintf("request canceled: %v", err), http.StatusRequestTimeout)
+			writeRequestTimeout(w)
 			return
 		}
 
@@ -140,23 +143,28 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 		}
 		result, _, headerOutputMimeType, evalCtx, err := runner.RunStringWithGoContextAndOptionsWithOutput(r.Context(), payload.Script, evalContext, opts)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				writeRequestTimeout(w)
+				return
+			}
+			writeSanitizedBadRequest(w, err)
 			return
 		}
 
 		outputMimeType, err := handlers.ResolveOutputMimeType(payload.Output, headerOutputMimeType)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			writeSanitizedBadRequest(w, err)
 			return
 		}
 
 		formatted, err := handlers.FormatRunResult(result, outputMimeType, evalCtx)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("run endpoint format error: %v", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
 		if err := r.Context().Err(); err != nil {
-			http.Error(w, fmt.Sprintf("request canceled: %v", err), http.StatusRequestTimeout)
+			writeRequestTimeout(w)
 			return
 		}
 
@@ -165,6 +173,31 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 			log.Printf("server write error: %v", err)
 		}
 	}
+}
+
+func writeRequestTimeout(w http.ResponseWriter) {
+	http.Error(w, "Request timeout", http.StatusRequestTimeout)
+}
+
+func writeSanitizedBadRequest(w http.ResponseWriter, err error) {
+	http.Error(w, sanitizeClientErrorMessage(err), http.StatusBadRequest)
+}
+
+func sanitizeClientErrorMessage(err error) string {
+	if err == nil {
+		return "bad request"
+	}
+	message := strings.TrimSpace(err.Error())
+	if message == "" {
+		return "bad request"
+	}
+
+	message = strings.ReplaceAll(message, "\r", " ")
+	message = strings.ReplaceAll(message, "\n", " ")
+	message = strings.Join(strings.Fields(message), " ")
+	message = absolutePathPattern.ReplaceAllString(message, "<path>")
+
+	return strings.TrimSpace(message)
 }
 
 func authorizedRunRequest(r *http.Request, expectedAPIKey string) bool {

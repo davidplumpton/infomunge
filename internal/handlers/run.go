@@ -12,6 +12,8 @@ import (
 	"infomunge/pkg/formats"
 )
 
+const maxRunInputs = 100
+
 // RunInput represents a single named input with optional format.
 type RunInput struct {
 	Name    string `json:"name"`
@@ -83,6 +85,10 @@ func NormalizeMimeType(format string, label string) (string, error) {
 
 // BuildRunContext parses named inputs into an evaluation context map.
 func BuildRunContext(inputs []RunInput) (map[string]interface{}, error) {
+	if len(inputs) > maxRunInputs {
+		return nil, unifiederrors.ValidationErrorf("too many inputs: maximum %d", maxRunInputs)
+	}
+
 	context := make(map[string]interface{})
 	for _, input := range inputs {
 		name, err := inputio.NormalizeAndValidateInputName(input.Name)

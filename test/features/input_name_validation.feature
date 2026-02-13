@@ -137,3 +137,16 @@ Feature: Input name validation
     When I run the server script with configured inputs
     Then the response status should be 400
     And the output should contain "invalid input name \"payload-name\""
+
+  Scenario: Run endpoint rejects too many inputs
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    And I configure 101 server JSON inputs
+    When I run the server script with configured inputs
+    Then the response status should be 400
+    And the output should contain "too many inputs: maximum 100"
