@@ -83,3 +83,7 @@
 [40] **Agent Mistakes Log** - 2026-02-14: Ran `go test ./...` without excluding `tmp`, causing expected build collisions from multiple helper `main` files in `tmp/`. Why: used blanket quality gate in a repo that intentionally keeps multiple executable scratch files in `tmp`. Prevention: run targeted package/feature tests for changed areas (or exclude `tmp`) instead of full-recursive `./...` when scratch binaries are present [22].
 
 [41] **User Preferences Log** - 2026-02-14: User explicitly asked to create additional beads tickets whenever meaningful follow-up work is discovered during implementation, instead of leaving implicit TODOs.
+
+[42] **Agent Mistakes Log** - 2026-02-14: Invoked `apply_patch` through `exec_command` while editing `pkg/formats/reader.go`; tool warning confirmed the routing error. Why: slipped back into shell-based patch habit under time pressure. Prevention: invoke the dedicated `apply_patch` tool directly for every patch and reserve `exec_command` for non-edit shell operations [22].
+
+[43] **Agent Mistakes Log** - 2026-02-14: Added a cucumber script using multiline function arguments with commas again, and parser failed (`expected operand, found ','`). Why: ignored existing parser formatting constraint while drafting a new scenario. Prevention: keep feature-script function calls on one expression line unless there is proven multiline parser coverage for that pattern [22][39].

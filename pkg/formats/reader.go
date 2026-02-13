@@ -24,6 +24,8 @@ func ReadWithOptions(content, mimeType string, options Object) (interface{}, err
 			return readFlatfileWithOptions(content, options)
 		case "application/java":
 			return readJavaWithOptions(content, options)
+		case "application/xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+			return readXLSXWithOptions(content, options)
 		case "application/protobuf", "application/x-protobuf":
 			return readProtobufWithOptions(content, options)
 		default:

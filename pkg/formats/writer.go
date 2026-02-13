@@ -25,6 +25,8 @@ func FormatWithOptions(result interface{}, mimeType string, options Object) (str
 			return formatFlatfileWithOptions(result, options)
 		case "application/java":
 			return formatJavaWithOptions(result, options)
+		case "application/xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+			return formatXLSXWithOptions(result, options)
 		case "application/protobuf", "application/x-protobuf":
 			return formatProtobufWithOptions(result, options)
 		default:

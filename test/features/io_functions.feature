@@ -270,6 +270,20 @@ Feature: I/O Functions
       "xlsx-alias-bytes"
       """
 
+  Scenario: read and write structured xlsx workbook
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read(write({Employees: [{name: "Alice", age: 30, active: true}, {name: "Bob", age: 41, active: false}], Sales: [{region: "west", amount: 12.5}]}, "application/xlsx", {structured: true}), "application/xlsx", {structured: true})
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"Employees":[{"active":true,"age":30,"name":"Alice"},{"active":false,"age":41,"name":"Bob"}],"Sales":[{"amount":12.5,"region":"west"}]}
+      """
+
   Scenario: read with invalid JSON fails
     Given the following script:
       """
