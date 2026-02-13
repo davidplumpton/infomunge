@@ -263,6 +263,59 @@ func TestRead_Excel(t *testing.T) {
 	}
 }
 
+func TestRead_Multipart(t *testing.T) {
+	content := strings.Join([]string{
+		"--boundary123",
+		`Content-Disposition: form-data; name="name"`,
+		"",
+		"Alice",
+		"--boundary123",
+		`Content-Disposition: form-data; name="tags"`,
+		"",
+		"alpha",
+		"--boundary123",
+		`Content-Disposition: form-data; name="tags"`,
+		"",
+		"beta",
+		"--boundary123",
+		`Content-Disposition: form-data; name="upload"; filename="hello.txt"`,
+		"Content-Type: text/plain",
+		"",
+		"Hello file",
+		"--boundary123--",
+		"",
+	}, "\r\n")
+
+	result, err := Read(content, "multipart/form-data")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := Object{
+		"name": "Alice",
+		"tags": Array{"alpha", "beta"},
+		"upload": Object{
+			"content":     "Hello file",
+			"contentType": "text/plain",
+			"filename":    "hello.txt",
+		},
+	}
+
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("expected %+v, got %+v", expected, result)
+	}
+}
+
+func TestRead_Multipart_Invalid(t *testing.T) {
+	_, err := Read("name=Alice", "multipart/form-data")
+	if err == nil {
+		t.Fatal("expected error for invalid multipart payload")
+	}
+	if !strings.Contains(err.Error(), "boundary") {
+		t.Fatalf("expected boundary-related error, got: %v", err)
+	}
+}
+
 func TestRead_XML(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -386,6 +386,56 @@ func TestFormat_Excel(t *testing.T) {
 	}
 }
 
+func TestFormat_Multipart(t *testing.T) {
+	input := Object{
+		"name": "Alice",
+		"tags": Array{"alpha", "beta"},
+		"upload": Object{
+			"filename":    "hello.txt",
+			"contentType": "text/plain",
+			"content":     "Hello file",
+		},
+	}
+
+	formatted, err := Format(input, "multipart/form-data")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(formatted, "--infomunge-boundary") {
+		t.Fatalf("expected deterministic boundary, got: %s", formatted)
+	}
+	if !strings.Contains(formatted, `name="upload"; filename="hello.txt"`) {
+		t.Fatalf("expected file part headers, got: %s", formatted)
+	}
+
+	parsed, err := Read(formatted, "multipart/form-data")
+	if err != nil {
+		t.Fatalf("expected formatted multipart to be readable, got error: %v", err)
+	}
+
+	if parsedObj, ok := parsed.(Object); !ok {
+		t.Fatalf("expected parsed object, got %T", parsed)
+	} else {
+		if parsedObj["name"] != "Alice" {
+			t.Fatalf("expected name field to round-trip, got %#v", parsedObj["name"])
+		}
+		if !strings.Contains(marshalToJSON(parsedObj["tags"]), `["alpha","beta"]`) {
+			t.Fatalf("expected repeated field round-trip, got %#v", parsedObj["tags"])
+		}
+	}
+}
+
+func TestFormat_Multipart_NonObject(t *testing.T) {
+	_, err := Format(Array{1, 2, 3}, "multipart/form-data")
+	if err == nil {
+		t.Fatal("expected error for non-object multipart output")
+	}
+	if !strings.Contains(err.Error(), "multipart output expects an object") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
 func TestFormat_UnknownMimeType(t *testing.T) {
 	// Unknown mime types should return an error rather than silently falling back
 	_, err := Format(42, "application/unknown")

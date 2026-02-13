@@ -142,6 +142,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the following properties input:$`, tc.theFollowingPropertiesInput)
 	ctx.Step(`^the following NDJSON input:$`, tc.theFollowingNDJSONInput)
 	ctx.Step(`^the following URL-encoded input:$`, tc.theFollowingURLEncodedInput)
+	ctx.Step(`^the following multipart input:$`, tc.theFollowingMultipartInput)
 	ctx.Step(`^the following script:$`, tc.theFollowingScript)
 	ctx.Step(`^I run the script$`, tc.iRunTheScript)
 	ctx.Step(`^I run the script with a canceled evaluation context$`, tc.iRunTheScriptWithCanceledEvaluationContext)
@@ -387,6 +388,12 @@ func (tc *testContext) theFollowingNDJSONInput(content *godog.DocString) error {
 func (tc *testContext) theFollowingURLEncodedInput(content *godog.DocString) error {
 	tc.payloadContent = content.Content
 	tc.payloadMime = "application/x-www-form-urlencoded"
+	return nil
+}
+
+func (tc *testContext) theFollowingMultipartInput(content *godog.DocString) error {
+	tc.payloadContent = content.Content
+	tc.payloadMime = "multipart/form-data"
 	return nil
 }
 
@@ -1108,9 +1115,9 @@ func setupWorkspaceModules(workDir string) error {
 
 	// Write test-only module files used by import_directive.feature
 	testModules := map[string]string{
-		"MathUtils.im": "%im 0.1\nvar offset = 5\nvar scale = 10\nvar settings = {\n  scale: 10,\n  offset: 5\n}\nfun double(x) = x * 2\nfun triple(x) = x * 3\nfun addOffset(x) = x + offset\nfun scaleAndAdd(x) = x * scale + offset\nfun scaleAndAddSettings(x) = x * settings.scale + settings.offset\n",
+		"MathUtils.im":   "%im 0.1\nvar offset = 5\nvar scale = 10\nvar settings = {\n  scale: 10,\n  offset: 5\n}\nfun double(x) = x * 2\nfun triple(x) = x * 3\nfun addOffset(x) = x + offset\nfun scaleAndAdd(x) = x * scale + offset\nfun scaleAndAddSettings(x) = x * settings.scale + settings.offset\n",
 		"StringUtils.im": "%im 0.1\nfun greet(name) = \"Hello, \" ++ name\nfun shout(s) = upper(s)\n",
-		"DoBlock.im": "%im 0.1\nfun addOne(x) = do {\n  var result = x + 1\n  ---\n  result\n}\n",
+		"DoBlock.im":     "%im 0.1\nfun addOne(x) = do {\n  var result = x + 1\n  ---\n  result\n}\n",
 	}
 	for name, content := range testModules {
 		if err := os.WriteFile(filepath.Join(modulesDir, name), []byte(content), 0644); err != nil {

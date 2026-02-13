@@ -225,3 +225,18 @@ func TestExcelFormatLookup(t *testing.T) {
 		t.Fatalf("expected application/xlsx for .xlsx extension, got %q", got)
 	}
 }
+
+func TestMultipartFormatLookup(t *testing.T) {
+	if got := MimeTypeForFormat("multipart"); got != "multipart/form-data" {
+		t.Fatalf("expected multipart/form-data for format 'multipart', got %q", got)
+	}
+	if got := MimeTypeForFormat("formdata"); got != "multipart/form-data" {
+		t.Fatalf("expected multipart/form-data for format 'formdata', got %q", got)
+	}
+	if got := DetectMimeType("payload.multipart"); got != "multipart/form-data" {
+		t.Fatalf("expected multipart/form-data for .multipart extension, got %q", got)
+	}
+	if got := DetectMimeType("payload.formdata"); got != "multipart/form-data" {
+		t.Fatalf("expected multipart/form-data for .formdata extension, got %q", got)
+	}
+}
