@@ -578,6 +578,54 @@ func TestFormatWithOptions_ProtobufStructuredTypeMismatch(t *testing.T) {
 	}
 }
 
+func TestFormatWithOptions_ProtobufStructuredDescriptorSet(t *testing.T) {
+	options := Object{
+		"structured": true,
+		"descriptor": Object{
+			"set":     testPersonDescriptorSetBytes(t),
+			"message": "test.Person",
+		},
+	}
+
+	input := Object{
+		"name":          "Bob",
+		"lucky_numbers": Array{1.0, 150.0},
+	}
+
+	result, err := FormatWithOptions(input, "application/protobuf", options)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "\x0a\x03Bob\x12\x03\x01\x96\x01" {
+		t.Fatalf("unexpected protobuf output: %q", result)
+	}
+}
+
+func TestFormatWithOptions_ProtobufStructuredPackedRepeated(t *testing.T) {
+	options := Object{
+		"structured": true,
+		"schema": Object{
+			"fields": Array{
+				Object{"number": 1, "name": "ids", "type": "int32", "repeated": true, "packed": true},
+			},
+		},
+	}
+
+	input := Object{
+		"ids": Array{1.0, 2.0, 300.0},
+	}
+
+	result, err := FormatWithOptions(input, "application/protobuf", options)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "\x0a\x04\x01\x02\xac\x02" {
+		t.Fatalf("unexpected protobuf output: %q", result)
+	}
+}
+
 func TestFormat_Excel(t *testing.T) {
 	tests := []struct {
 		name     string

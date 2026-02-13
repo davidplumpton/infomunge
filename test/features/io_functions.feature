@@ -214,6 +214,34 @@ Feature: I/O Functions
       """
     Then running the script should fail with error containing "unknown field number"
 
+  Scenario: read structured protobuf payload with descriptor set
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read(write({name: "Bob", lucky_numbers: [1, 150]}, "application/protobuf", {structured: true, descriptor: {set: "\u000a]\u000a\fperson.proto\u0012\u0004test\"?\u000a\u0006Person\u0012\f\u000a\u0004name\u0018\u0001 \u0001(\t\u0012'\u000a\rlucky_numbers\u0018\u0002 \u0003(\u0005B\u0002\u0010\u0001R\fluckyNumbersb\u0006proto3", message: "test.Person"}}), "application/protobuf", {structured: true, descriptor: {set: "\u000a]\u000a\fperson.proto\u0012\u0004test\"?\u000a\u0006Person\u0012\f\u000a\u0004name\u0018\u0001 \u0001(\t\u0012'\u000a\rlucky_numbers\u0018\u0002 \u0003(\u0005B\u0002\u0010\u0001R\fluckyNumbersb\u0006proto3", message: "test.Person"}})
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"lucky_numbers":[1,150],"name":"Bob"}
+      """
+
+  Scenario: read packed protobuf payload without packed schema hint
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read(write({ids: [1, 2, 300]}, "application/protobuf", {structured: true, schema: {fields: [{number: 1, name: "ids", type: "int32", repeated: true, packed: true}]}}), "application/protobuf", {structured: true, schema: {fields: [{number: 1, name: "ids", type: "int32", repeated: true}]}})
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"ids":[1,2,300]}
+      """
+
   Scenario: read xlsx content
     Given the following script:
       """

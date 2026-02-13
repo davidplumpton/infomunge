@@ -7,6 +7,12 @@ import (
 	"math"
 	"slices"
 	"strings"
+
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 type protobufFormatOptions struct {
@@ -27,6 +33,7 @@ type protobufField struct {
 	name     string
 	kind     string
 	repeated bool
+	packed   bool
 	schema   *protobufSchema
 }
 
@@ -76,6 +83,9 @@ func parseProtobufOptions(options Object, allowWriteOnly bool) (protobufFormatOp
 	}
 
 	var rawSchema interface{}
+	var rawDescriptor interface{}
+	var rawDescriptorSet interface{}
+	var rawMessage interface{}
 	for key, raw := range options {
 		switch key {
 		case "structured":
@@ -92,6 +102,12 @@ func parseProtobufOptions(options Object, allowWriteOnly bool) (protobufFormatOp
 			parsed.strict = v
 		case "schema":
 			rawSchema = raw
+		case "descriptor":
+			rawDescriptor = raw
+		case "descriptorSet":
+			rawDescriptorSet = raw
+		case "message":
+			rawMessage = raw
 		default:
 			if !allowWriteOnly || key != "preserveUnknown" {
 				return protobufFormatOptions{}, unifiederrors.ValidationErrorf("unsupported protobuf option: %s", key)
@@ -99,22 +115,273 @@ func parseProtobufOptions(options Object, allowWriteOnly bool) (protobufFormatOp
 		}
 	}
 
+	if rawDescriptor != nil {
+		if rawDescriptorSet != nil {
+			return protobufFormatOptions{}, unifiederrors.ValidationError("protobuf options descriptor and descriptorSet are mutually exclusive")
+		}
+		if descriptorObj, ok := rawDescriptor.(map[string]interface{}); ok {
+			rawSet, hasSet := descriptorObj["set"]
+			if !hasSet {
+				rawSet, hasSet = descriptorObj["descriptorSet"]
+			}
+			if !hasSet {
+				return protobufFormatOptions{}, unifiederrors.ValidationError("protobuf option descriptor must include set")
+			}
+			rawDescriptorSet = rawSet
+			if rawDescriptorMessage, hasMessage := descriptorObj["message"]; hasMessage {
+				if rawMessage != nil {
+					return protobufFormatOptions{}, unifiederrors.ValidationError("protobuf message cannot be set in both descriptor and top-level message option")
+				}
+				rawMessage = rawDescriptorMessage
+			}
+		} else {
+			rawDescriptorSet = rawDescriptor
+		}
+	}
+
 	if parsed.structured {
-		if rawSchema == nil {
-			return protobufFormatOptions{}, unifiederrors.ValidationError("protobuf structured mode requires schema")
+		if rawSchema != nil && (rawDescriptorSet != nil || rawMessage != nil) {
+			return protobufFormatOptions{}, unifiederrors.ValidationError("protobuf structured mode options schema and descriptor are mutually exclusive")
 		}
-		schema, err := parseProtobufSchema(rawSchema, "schema")
-		if err != nil {
-			return protobufFormatOptions{}, err
+		if rawSchema != nil {
+			schema, err := parseProtobufSchema(rawSchema, "schema")
+			if err != nil {
+				return protobufFormatOptions{}, err
+			}
+			parsed.schema = schema
+		} else if rawDescriptorSet != nil || rawMessage != nil {
+			schema, err := parseProtobufSchemaFromDescriptor(rawDescriptorSet, rawMessage)
+			if err != nil {
+				return protobufFormatOptions{}, err
+			}
+			parsed.schema = schema
+		} else {
+			return protobufFormatOptions{}, unifiederrors.ValidationError("protobuf structured mode requires schema or descriptor")
 		}
-		parsed.schema = schema
 	}
 
 	if !parsed.structured && rawSchema != nil {
 		return protobufFormatOptions{}, unifiederrors.ValidationError("protobuf option schema requires structured=true")
 	}
+	if !parsed.structured && rawDescriptor != nil {
+		return protobufFormatOptions{}, unifiederrors.ValidationError("protobuf option descriptor requires structured=true")
+	}
+	if !parsed.structured && rawDescriptorSet != nil {
+		return protobufFormatOptions{}, unifiederrors.ValidationError("protobuf option descriptorSet requires structured=true")
+	}
+	if !parsed.structured && rawMessage != nil {
+		return protobufFormatOptions{}, unifiederrors.ValidationError("protobuf option message requires structured=true")
+	}
 
 	return parsed, nil
+}
+
+func parseProtobufSchemaFromDescriptor(rawDescriptorSet interface{}, rawMessage interface{}) (protobufSchema, error) {
+	if rawDescriptorSet == nil {
+		return protobufSchema{}, unifiederrors.ValidationError("protobuf descriptor options require descriptor set bytes")
+	}
+	messageName, err := parseProtobufMessageName(rawMessage)
+	if err != nil {
+		return protobufSchema{}, err
+	}
+	if messageName == "" {
+		return protobufSchema{}, unifiederrors.ValidationError("protobuf descriptor options require message")
+	}
+
+	descriptorSetBytes, err := parseProtobufDescriptorSetBytes(rawDescriptorSet)
+	if err != nil {
+		return protobufSchema{}, err
+	}
+
+	var descriptorSet descriptorpb.FileDescriptorSet
+	if err := proto.Unmarshal(descriptorSetBytes, &descriptorSet); err != nil {
+		return protobufSchema{}, unifiederrors.ValidationErrorf("invalid protobuf descriptor set: %v", err)
+	}
+
+	files, err := protodesc.NewFiles(&descriptorSet)
+	if err != nil {
+		return protobufSchema{}, unifiederrors.ValidationErrorf("invalid protobuf descriptor set: %v", err)
+	}
+
+	messageDesc, err := findProtobufMessageDescriptor(files, messageName)
+	if err != nil {
+		return protobufSchema{}, err
+	}
+
+	return protobufSchemaFromMessageDescriptor(messageDesc)
+}
+
+func parseProtobufMessageName(raw interface{}) (string, error) {
+	if raw == nil {
+		return "", nil
+	}
+	name, ok := raw.(string)
+	if !ok {
+		return "", unifiederrors.ValidationErrorf("protobuf message must be a non-empty string, got %T", raw)
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", unifiederrors.ValidationError("protobuf message must be a non-empty string")
+	}
+	return name, nil
+}
+
+func parseProtobufDescriptorSetBytes(raw interface{}) ([]byte, error) {
+	switch v := raw.(type) {
+	case string:
+		if v == "" {
+			return nil, unifiederrors.ValidationError("protobuf descriptor set must not be empty")
+		}
+		return []byte(v), nil
+	case []byte:
+		if len(v) == 0 {
+			return nil, unifiederrors.ValidationError("protobuf descriptor set must not be empty")
+		}
+		return v, nil
+	default:
+		return nil, unifiederrors.ValidationErrorf("protobuf descriptor set must be string or []byte, got %T", raw)
+	}
+}
+
+func findProtobufMessageDescriptor(files *protoregistry.Files, messageName string) (protoreflect.MessageDescriptor, error) {
+	fullName := protoreflect.FullName(messageName)
+	desc, err := files.FindDescriptorByName(fullName)
+	if err == nil {
+		msg, ok := desc.(protoreflect.MessageDescriptor)
+		if !ok {
+			return nil, unifiederrors.ValidationErrorf("protobuf descriptor %q is not a message", messageName)
+		}
+		return msg, nil
+	}
+
+	var messages []protoreflect.MessageDescriptor
+	files.RangeFiles(func(file protoreflect.FileDescriptor) bool {
+		collectProtobufMessageDescriptors(file.Messages(), &messages)
+		return true
+	})
+	var matches []protoreflect.MessageDescriptor
+	for _, candidate := range messages {
+		candidateName := string(candidate.FullName())
+		if candidateName == messageName || strings.HasSuffix(candidateName, "."+messageName) {
+			matches = append(matches, candidate)
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0], nil
+	}
+	if len(matches) > 1 {
+		return nil, unifiederrors.ValidationErrorf("protobuf message %q is ambiguous; use fully-qualified name", messageName)
+	}
+	return nil, unifiederrors.ValidationErrorf("protobuf message %q was not found in descriptor set", messageName)
+}
+
+func collectProtobufMessageDescriptors(messages protoreflect.MessageDescriptors, out *[]protoreflect.MessageDescriptor) {
+	for i := 0; i < messages.Len(); i++ {
+		message := messages.Get(i)
+		*out = append(*out, message)
+		collectProtobufMessageDescriptors(message.Messages(), out)
+	}
+}
+
+func protobufSchemaFromMessageDescriptor(message protoreflect.MessageDescriptor) (protobufSchema, error) {
+	fields := message.Fields()
+	schema := protobufSchema{
+		messageName: string(message.FullName()),
+		fields:      make([]protobufField, 0, fields.Len()),
+		byNumber:    make(map[int]protobufField, fields.Len()),
+		byName:      make(map[string]protobufField, fields.Len()),
+	}
+
+	for i := 0; i < fields.Len(); i++ {
+		descriptorField := fields.Get(i)
+		if descriptorField.IsMap() {
+			return protobufSchema{}, unifiederrors.ValidationErrorf("protobuf descriptor field %q map type is not supported", descriptorField.FullName())
+		}
+
+		kind, ok := protobufKindFromDescriptorKind(descriptorField.Kind())
+		if !ok {
+			return protobufSchema{}, unifiederrors.ValidationErrorf(
+				"protobuf descriptor field %q has unsupported kind %q",
+				descriptorField.FullName(),
+				descriptorField.Kind().String(),
+			)
+		}
+
+		field := protobufField{
+			number:   int(descriptorField.Number()),
+			name:     string(descriptorField.Name()),
+			kind:     kind,
+			repeated: descriptorField.Cardinality() == protoreflect.Repeated,
+			packed:   descriptorField.IsPacked(),
+		}
+		if kind == "message" {
+			nested, err := protobufSchemaFromMessageDescriptor(descriptorField.Message())
+			if err != nil {
+				return protobufSchema{}, err
+			}
+			field.schema = &nested
+		}
+		if field.packed && (!field.repeated || !isProtobufPackableField(field.kind)) {
+			return protobufSchema{}, unifiederrors.ValidationErrorf("protobuf descriptor field %q cannot be packed", descriptorField.FullName())
+		}
+
+		schema.fields = append(schema.fields, field)
+		schema.byNumber[field.number] = field
+		schema.byName[field.name] = field
+	}
+
+	slices.SortFunc(schema.fields, func(a, b protobufField) int {
+		if a.number < b.number {
+			return -1
+		}
+		if a.number > b.number {
+			return 1
+		}
+		return 0
+	})
+
+	return schema, nil
+}
+
+func protobufKindFromDescriptorKind(kind protoreflect.Kind) (string, bool) {
+	switch kind {
+	case protoreflect.BoolKind:
+		return "bool", true
+	case protoreflect.EnumKind:
+		return "enum", true
+	case protoreflect.Int32Kind:
+		return "int32", true
+	case protoreflect.Sint32Kind:
+		return "sint32", true
+	case protoreflect.Sfixed32Kind:
+		return "sfixed32", true
+	case protoreflect.Int64Kind:
+		return "int64", true
+	case protoreflect.Sint64Kind:
+		return "sint64", true
+	case protoreflect.Sfixed64Kind:
+		return "sfixed64", true
+	case protoreflect.Uint32Kind:
+		return "uint32", true
+	case protoreflect.Fixed32Kind:
+		return "fixed32", true
+	case protoreflect.Uint64Kind:
+		return "uint64", true
+	case protoreflect.Fixed64Kind:
+		return "fixed64", true
+	case protoreflect.FloatKind:
+		return "float", true
+	case protoreflect.DoubleKind:
+		return "double", true
+	case protoreflect.StringKind:
+		return "string", true
+	case protoreflect.BytesKind:
+		return "bytes", true
+	case protoreflect.MessageKind:
+		return "message", true
+	default:
+		return "", false
+	}
 }
 
 func parseProtobufSchema(raw interface{}, path string) (protobufSchema, error) {
@@ -173,11 +440,16 @@ func parseProtobufSchema(raw interface{}, path string) (protobufSchema, error) {
 		}
 
 		repeated := protobufBool(fieldObj["repeated"], false)
+		packed := protobufBool(fieldObj["packed"], false)
 		field := protobufField{
 			number:   number,
 			name:     name,
 			kind:     kind,
 			repeated: repeated,
+			packed:   packed,
+		}
+		if packed && (!repeated || !isProtobufPackableField(kind)) {
+			return protobufSchema{}, unifiederrors.ValidationErrorf("protobuf %s field %q cannot be packed", path, name)
 		}
 
 		if kind == "message" {
@@ -256,7 +528,11 @@ func decodeProtobufMessage(content []byte, schema protobufSchema, strict bool) (
 
 		if field.repeated {
 			existing, _ := out[field.name].([]interface{})
-			out[field.name] = append(existing, value)
+			if packedValues, ok := value.([]interface{}); ok {
+				out[field.name] = append(existing, packedValues...)
+			} else {
+				out[field.name] = append(existing, value)
+			}
 			continue
 		}
 
@@ -274,6 +550,13 @@ func decodeProtobufField(content []byte, offset int, field protobufField, wireTy
 	expectedWireType, ok := protobufWireTypeForField(field.kind)
 	if !ok {
 		return nil, offset, unifiederrors.ValidationErrorf("protobuf field %q has unsupported type %q", field.name, field.kind)
+	}
+	if field.repeated && isProtobufPackableField(field.kind) && wireType == 2 {
+		values, next, err := decodePackedProtobufField(content, offset, field)
+		if err != nil {
+			return nil, offset, err
+		}
+		return values, next, nil
 	}
 	if wireType != expectedWireType {
 		return nil, offset, unifiederrors.ValidationErrorf(
@@ -444,6 +727,14 @@ func encodeProtobufMessage(value interface{}, schema protobufSchema, strict bool
 			if !ok {
 				return nil, unifiederrors.ValidationErrorf("protobuf field %q is repeated and expects an array, got %T", field.name, rawValue)
 			}
+			if field.packed && isProtobufPackableField(field.kind) {
+				encoded, err := encodePackedProtobufField(field, values, strict)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, encoded...)
+				continue
+			}
 			for _, item := range values {
 				encoded, err := encodeProtobufField(field, item, strict)
 				if err != nil {
@@ -461,6 +752,27 @@ func encodeProtobufMessage(value interface{}, schema protobufSchema, strict bool
 		out = append(out, encoded...)
 	}
 
+	return out, nil
+}
+
+func encodePackedProtobufField(field protobufField, values []interface{}, strict bool) ([]byte, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+
+	payload := make([]byte, 0, len(values)*4)
+	for _, value := range values {
+		encodedValue, err := encodeProtobufFieldValue(field, value, strict)
+		if err != nil {
+			return nil, err
+		}
+		payload = append(payload, encodedValue...)
+	}
+
+	tag := uint64(field.number<<3 | 2)
+	out := appendVarint(nil, tag)
+	out = appendVarint(out, uint64(len(payload)))
+	out = append(out, payload...)
 	return out, nil
 }
 
@@ -690,6 +1002,77 @@ func protobufWireTypeForField(kind string) (int, bool) {
 func isSupportedProtobufFieldType(kind string) bool {
 	_, ok := protobufWireTypeForField(kind)
 	return ok
+}
+
+func isProtobufPackableField(kind string) bool {
+	switch kind {
+	case "int32", "int64", "uint32", "uint64", "sint32", "sint64", "bool", "enum", "fixed64", "sfixed64", "double", "fixed32", "sfixed32", "float":
+		return true
+	default:
+		return false
+	}
+}
+
+func decodePackedProtobufField(content []byte, offset int, field protobufField) ([]interface{}, int, error) {
+	length, n := binary.Uvarint(content[offset:])
+	if n <= 0 {
+		return nil, offset, unifiederrors.ValidationErrorf("invalid protobuf packed length for field %q", field.name)
+	}
+	offset += n
+	if int(length) < 0 || offset+int(length) > len(content) {
+		return nil, offset, unifiederrors.ValidationErrorf("invalid protobuf packed value for field %q: truncated payload", field.name)
+	}
+	packed := content[offset : offset+int(length)]
+	offset += int(length)
+
+	values := make([]interface{}, 0, 4)
+	packedOffset := 0
+	for packedOffset < len(packed) {
+		value, next, err := decodePackedProtobufElement(packed, packedOffset, field)
+		if err != nil {
+			return nil, offset, err
+		}
+		packedOffset = next
+		values = append(values, value)
+	}
+
+	return values, offset, nil
+}
+
+func decodePackedProtobufElement(content []byte, offset int, field protobufField) (interface{}, int, error) {
+	wireType, _ := protobufWireTypeForField(field.kind)
+	switch wireType {
+	case 0:
+		raw, n := binary.Uvarint(content[offset:])
+		if n <= 0 {
+			return nil, offset, unifiederrors.ValidationErrorf("invalid protobuf packed varint for field %q", field.name)
+		}
+		value, err := decodeProtobufVarint(field.kind, raw)
+		if err != nil {
+			return nil, offset, err
+		}
+		return value, offset + n, nil
+	case 1:
+		if offset+8 > len(content) {
+			return nil, offset, unifiederrors.ValidationErrorf("invalid protobuf packed fixed64 for field %q: truncated payload", field.name)
+		}
+		value, err := decodeProtobufFixed64(field.kind, content[offset:offset+8])
+		if err != nil {
+			return nil, offset, err
+		}
+		return value, offset + 8, nil
+	case 5:
+		if offset+4 > len(content) {
+			return nil, offset, unifiederrors.ValidationErrorf("invalid protobuf packed fixed32 for field %q: truncated payload", field.name)
+		}
+		value, err := decodeProtobufFixed32(field.kind, content[offset:offset+4])
+		if err != nil {
+			return nil, offset, err
+		}
+		return value, offset + 4, nil
+	default:
+		return nil, offset, unifiederrors.ValidationErrorf("protobuf field %q type %q cannot be packed", field.name, field.kind)
+	}
 }
 
 func appendVarint(out []byte, value uint64) []byte {

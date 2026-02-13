@@ -407,6 +407,69 @@ func TestReadWithOptions_ProtobufStructuredUnknownFieldNonStrict(t *testing.T) {
 	}
 }
 
+func TestReadWithOptions_ProtobufStructuredDescriptorSet(t *testing.T) {
+	content := "\x0a\x03Bob\x12\x03\x01\x96\x01"
+	options := Object{
+		"structured": true,
+		"descriptor": Object{
+			"set":     testPersonDescriptorSetBytes(t),
+			"message": "test.Person",
+		},
+	}
+
+	result, err := ReadWithOptions(content, "application/protobuf", options)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := Object{
+		"name":          "Bob",
+		"lucky_numbers": Array{1.0, 150.0},
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("expected %#v, got %#v", expected, result)
+	}
+}
+
+func TestReadWithOptions_ProtobufStructuredPackedInteroperability(t *testing.T) {
+	packedContent := "\x0a\x04\x01\x02\xac\x02"
+	unpackedContent := "\x08\x01\x08\x02\x08\xac\x02"
+
+	withoutPackedOption := Object{
+		"structured": true,
+		"schema": Object{
+			"fields": Array{
+				Object{"number": 1, "name": "ids", "type": "int32", "repeated": true},
+			},
+		},
+	}
+	withPackedOption := Object{
+		"structured": true,
+		"schema": Object{
+			"fields": Array{
+				Object{"number": 1, "name": "ids", "type": "int32", "repeated": true, "packed": true},
+			},
+		},
+	}
+
+	packedResult, err := ReadWithOptions(packedContent, "application/protobuf", withoutPackedOption)
+	if err != nil {
+		t.Fatalf("unexpected error decoding packed payload: %v", err)
+	}
+	unpackedResult, err := ReadWithOptions(unpackedContent, "application/protobuf", withPackedOption)
+	if err != nil {
+		t.Fatalf("unexpected error decoding unpacked payload: %v", err)
+	}
+
+	expected := Object{"ids": Array{1.0, 2.0, 300.0}}
+	if !reflect.DeepEqual(packedResult, expected) {
+		t.Fatalf("expected %#v from packed payload, got %#v", expected, packedResult)
+	}
+	if !reflect.DeepEqual(unpackedResult, expected) {
+		t.Fatalf("expected %#v from unpacked payload, got %#v", expected, unpackedResult)
+	}
+}
+
 func TestRead_Excel(t *testing.T) {
 	content := "PK\x03\x04xlsx-content"
 
