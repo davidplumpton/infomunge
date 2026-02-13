@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -27,6 +28,8 @@ import (
 
 type testContext struct {
 	lastOutput     string
+	lastStdout     string
+	lastStderr     string
 	inputContent   string
 	payloadContent string
 	payloadMime    string
@@ -171,6 +174,8 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the output should be false$`, tc.theOutputShouldBeFalse)
 	ctx.Step(`^the output should be null$`, tc.theOutputShouldBeNull)
 	ctx.Step(`^the output should be "([^"]*)"$`, tc.theOutputShouldBeString)
+	ctx.Step(`^the stdout should be valid JSON equal to:$`, tc.theStdoutShouldBeValidJSONEqualTo)
+	ctx.Step(`^the stderr should contain "((?:[^"\\]|\\.)*)"$`, tc.theStderrShouldContain)
 
 	// Steps for namespace support
 	ctx.Step(`^the output should contain:$`, tc.theOutputShouldContainDocstring)
@@ -218,14 +223,7 @@ func (tc *testContext) iRunTheApplicationWith(arg string) error {
 	if err := tc.ensureWorkspace(); err != nil {
 		return err
 	}
-	binPath, err := ensureGodogBinary()
-	if err != nil {
-		return err
-	}
-	cmd := exec.Command(binPath, "-f", arg)
-	cmd.Dir = tc.workDir
-	output, err := cmd.CombinedOutput()
-	tc.lastOutput = string(output)
+	err := tc.runCLI("-f", arg)
 	if err != nil {
 		return fmt.Errorf("app failed: %v, output: %s", err, tc.lastOutput)
 	}
@@ -286,14 +284,7 @@ func (tc *testContext) iRunTheApplicationAndItFails() error {
 	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
 		return err
 	}
-	binPath, err := ensureGodogBinary()
-	if err != nil {
-		return err
-	}
-	cmd := exec.Command(binPath, "-f", "input.txt")
-	cmd.Dir = tc.workDir
-	output, _ := cmd.CombinedOutput()
-	tc.lastOutput = string(output)
+	_ = tc.runCLI("-f", "input.txt")
 	return nil
 }
 
@@ -304,14 +295,7 @@ func (tc *testContext) iRunTheApplicationWithRunSubcommand() error {
 	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
 		return err
 	}
-	binPath, err := ensureGodogBinary()
-	if err != nil {
-		return err
-	}
-	cmd := exec.Command(binPath, "run", "-f", "input.txt")
-	cmd.Dir = tc.workDir
-	output, err := cmd.CombinedOutput()
-	tc.lastOutput = string(output)
+	err := tc.runCLI("run", "-f", "input.txt")
 	if err != nil {
 		return fmt.Errorf("app failed: %v, output: %s", err, tc.lastOutput)
 	}
@@ -332,14 +316,7 @@ func (tc *testContext) theApplicationShouldFailWithErrorContaining(expected stri
 	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
 		return err
 	}
-	binPath, err := ensureGodogBinary()
-	if err != nil {
-		return err
-	}
-	cmd := exec.Command(binPath, "-f", "input.txt")
-	cmd.Dir = tc.workDir
-	output, err := cmd.CombinedOutput()
-	tc.lastOutput = string(output)
+	err := tc.runCLI("-f", "input.txt")
 	if err == nil {
 		return fmt.Errorf("expected application to fail, but it succeeded with output: %s", tc.lastOutput)
 	}
@@ -347,6 +324,27 @@ func (tc *testContext) theApplicationShouldFailWithErrorContaining(expected stri
 		return fmt.Errorf("expected error to contain %q, but got: %s", expected, tc.lastOutput)
 	}
 	return nil
+}
+
+func (tc *testContext) runCLI(args ...string) error {
+	binPath, err := ensureGodogBinary()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command(binPath, args...)
+	cmd.Dir = tc.workDir
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err = cmd.Run()
+	tc.lastStdout = stdout.String()
+	tc.lastStderr = stderr.String()
+	tc.lastOutput = tc.lastStdout + tc.lastStderr
+	return err
 }
 
 // Typed input step definitions for xr3 refactoring
@@ -838,6 +836,37 @@ func (tc *testContext) theOutputShouldBeString(expected string) error {
 		return nil
 	}
 	return fmt.Errorf("expected output to be %q, but got '%s'", expected, trimmed)
+}
+
+func (tc *testContext) theStdoutShouldBeValidJSONEqualTo(expected *godog.DocString) error {
+	var got interface{}
+	if err := json.Unmarshal([]byte(tc.lastStdout), &got); err != nil {
+		return fmt.Errorf("expected stdout to be valid JSON, but got invalid JSON: %v, stdout: %s, stderr: %s", err, tc.lastStdout, tc.lastStderr)
+	}
+
+	var want interface{}
+	if err := json.Unmarshal([]byte(expected.Content), &want); err != nil {
+		return fmt.Errorf("expected JSON literal in step is invalid: %v, content: %s", err, expected.Content)
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		return fmt.Errorf("expected stdout JSON %v, but got %v (stdout: %s, stderr: %s)", want, got, tc.lastStdout, tc.lastStderr)
+	}
+	return nil
+}
+
+func (tc *testContext) theStderrShouldContain(expected string) error {
+	if strings.Contains(expected, `\"`) {
+		unquoted, err := strconv.Unquote(`"` + expected + `"`)
+		if err == nil {
+			expected = unquoted
+		}
+	}
+
+	if !strings.Contains(tc.lastStderr, expected) {
+		return fmt.Errorf("expected stderr to contain %q, but got %q", expected, tc.lastStderr)
+	}
+	return nil
 }
 
 func (tc *testContext) theInputString(input string) error {

@@ -13,7 +13,11 @@ Feature: Logging Functions
       log(42)
       """
     When I run the application with this content
-    Then the output should contain "42"
+    Then the stdout should be valid JSON equal to:
+      """
+      42
+      """
+    And the stderr should contain "42"
 
   Scenario: log with string value
     Given the following input content:
@@ -24,7 +28,10 @@ Feature: Logging Functions
       log("hello")
       """
     When I run the application with this content
-    Then the output should contain "hello"
+    Then the stdout should be valid JSON equal to:
+      """
+      "hello"
+      """
 
   Scenario: log with array value
     Given the following input content:
@@ -35,7 +42,10 @@ Feature: Logging Functions
       log([1, 2, 3])
       """
     When I run the application with this content
-    Then the output should contain "[1,2,3]"
+    Then the stdout should be valid JSON equal to:
+      """
+      [1,2,3]
+      """
 
   Scenario: log with null value
     Given the following input content:
@@ -46,7 +56,10 @@ Feature: Logging Functions
       log(null)
       """
     When I run the application with this content
-    Then the output should contain "null"
+    Then the stdout should be valid JSON equal to:
+      """
+      null
+      """
 
   Scenario: log with boolean value
     Given the following input content:
@@ -57,7 +70,10 @@ Feature: Logging Functions
       log(true)
       """
     When I run the application with this content
-    Then the output should contain "true"
+    Then the stdout should be valid JSON equal to:
+      """
+      true
+      """
 
   # logDebug function
   Scenario: logDebug returns the input value and logs with DEBUG prefix
@@ -69,8 +85,11 @@ Feature: Logging Functions
       logDebug(100)
       """
     When I run the application with this content
-    Then the output should contain "[DEBUG]"
-    And the output should contain "100"
+    Then the stdout should be valid JSON equal to:
+      """
+      100
+      """
+    And the stderr should contain "[DEBUG]"
 
   Scenario: logDebug with string value
     Given the following input content:
@@ -81,8 +100,10 @@ Feature: Logging Functions
       logDebug("debug message")
       """
     When I run the application with this content
-    Then the output should contain "[DEBUG]"
-    And the output should contain "debug message"
+    Then the stdout should be valid JSON equal to:
+      """
+      "debug message"
+      """
 
   # logInfo function
   Scenario: logInfo returns the input value and logs with INFO prefix
@@ -94,8 +115,11 @@ Feature: Logging Functions
       logInfo(200)
       """
     When I run the application with this content
-    Then the output should contain "[INFO]"
-    And the output should contain "200"
+    Then the stdout should be valid JSON equal to:
+      """
+      200
+      """
+    And the stderr should contain "[INFO]"
 
   Scenario: logInfo with string value
     Given the following input content:
@@ -106,8 +130,10 @@ Feature: Logging Functions
       logInfo("info message")
       """
     When I run the application with this content
-    Then the output should contain "[INFO]"
-    And the output should contain "info message"
+    Then the stdout should be valid JSON equal to:
+      """
+      "info message"
+      """
 
   # logWarn function
   Scenario: logWarn returns the input value and logs with WARN prefix
@@ -119,8 +145,11 @@ Feature: Logging Functions
       logWarn(300)
       """
     When I run the application with this content
-    Then the output should contain "[WARN]"
-    And the output should contain "300"
+    Then the stdout should be valid JSON equal to:
+      """
+      300
+      """
+    And the stderr should contain "[WARN]"
 
   Scenario: logWarn with string value
     Given the following input content:
@@ -131,8 +160,10 @@ Feature: Logging Functions
       logWarn("warning message")
       """
     When I run the application with this content
-    Then the output should contain "[WARN]"
-    And the output should contain "warning message"
+    Then the stdout should be valid JSON equal to:
+      """
+      "warning message"
+      """
 
   # logError function
   Scenario: logError returns the input value and logs with ERROR prefix
@@ -144,8 +175,11 @@ Feature: Logging Functions
       logError(400)
       """
     When I run the application with this content
-    Then the output should contain "[ERROR]"
-    And the output should contain "400"
+    Then the stdout should be valid JSON equal to:
+      """
+      400
+      """
+    And the stderr should contain "[ERROR]"
 
   Scenario: logError with string value
     Given the following input content:
@@ -156,8 +190,10 @@ Feature: Logging Functions
       logError("error message")
       """
     When I run the application with this content
-    Then the output should contain "[ERROR]"
-    And the output should contain "error message"
+    Then the stdout should be valid JSON equal to:
+      """
+      "error message"
+      """
 
   # logWith function - custom prefix
   Scenario: logWith returns the input value and logs with custom prefix
@@ -169,8 +205,11 @@ Feature: Logging Functions
       logWith(500, "CUSTOM")
       """
     When I run the application with this content
-    Then the output should contain "[CUSTOM]"
-    And the output should contain "500"
+    Then the stdout should be valid JSON equal to:
+      """
+      500
+      """
+    And the stderr should contain "[CUSTOM]"
 
   Scenario: logWith with string value and custom prefix
     Given the following input content:
@@ -181,8 +220,10 @@ Feature: Logging Functions
       logWith("custom message", "MY_TAG")
       """
     When I run the application with this content
-    Then the output should contain "[MY_TAG]"
-    And the output should contain "custom message"
+    Then the stdout should be valid JSON equal to:
+      """
+      "custom message"
+      """
 
   # Error handling
   Scenario: log requires exactly one argument
@@ -239,7 +280,10 @@ Feature: Logging Functions
       log(5) + log(3)
       """
     When I run the application with this content
-    Then the output should contain "8"
+    Then the stdout should be valid JSON equal to:
+      """
+      8
+      """
 
   Scenario: log with computed expression
     Given the following input content:
@@ -250,7 +294,10 @@ Feature: Logging Functions
       log(10 * 5)
       """
     When I run the application with this content
-    Then the output should contain "50"
+    Then the stdout should be valid JSON equal to:
+      """
+      50
+      """
 
   # Different log levels work correctly
   Scenario: All log levels output with correct prefix
@@ -267,7 +314,11 @@ Feature: Logging Functions
       }
       """
     When I run the application with this content
-    Then the output should contain "[DEBUG]"
-    And the output should contain "[INFO]"
-    And the output should contain "[WARN]"
-    And the output should contain "[ERROR]"
+    Then the stdout should be valid JSON equal to:
+      """
+      {"debug":"d","info":"i","warn":"w","error":"e"}
+      """
+    And the stderr should contain "[DEBUG]"
+    And the stderr should contain "[INFO]"
+    And the stderr should contain "[WARN]"
+    And the stderr should contain "[ERROR]"
