@@ -3,18 +3,8 @@ Feature: Lambda Expression Support
   As a developer
   I want to define and use lambda (anonymous) functions
 
-  Scenario: Simple single-parameter lambda
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (x) -> x + 1
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda output includes representation
+  # Representation-only checks are intentionally minimal.
+  Scenario: Lambda representation includes expected markers
     Given the following input content:
       """
       %im 0.1
@@ -26,205 +16,7 @@ Feature: Lambda Expression Support
     Then the output should contain "lambda:"
     And the output should contain "x + 1"
 
-  Scenario: Lambda with two parameters
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (a, b) -> a + b
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with string concatenation
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (name) -> "Hello " + name
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with comparison expression
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (x) -> x > 10
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with if/else expression
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (x) -> if (x > 0) "positive" else "non-positive"
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with array access
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (arr) -> arr[0]
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with multiplication
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (x) -> x * 2
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with division
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (x) -> x / 2
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with nested arithmetic
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (x) -> (x + 1) * 2
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with logical AND
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (x, y) -> x > 0 and y > 0
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with equality check
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (x) -> x == 42
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with less-than comparison
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (age) -> age < 18
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with less-than-or-equal comparison
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (score) -> score <= 100
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with greater-than-or-equal comparison
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (value) -> value >= 0
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with field access using dot notation
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (obj) -> obj.name
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with nested field access
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (obj) -> obj.person.name
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with sizeOf function call
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (arr) -> sizeOf(arr)
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with complex expression using sizeOf
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (arr) -> sizeOf(arr) > 0
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Lambda with default operator
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      (x) -> x default 0
-      """
-    When I run the application with this content
-    Then the output should contain a lambda function
-
-  Scenario: Three-parameter lambda
+  Scenario: Three-parameter lambda representation
     Given the following input content:
       """
       %im 0.1
@@ -235,16 +27,285 @@ Feature: Lambda Expression Support
     When I run the application with this content
     Then the output should contain a lambda function
 
+  Scenario: Simple single-parameter lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2, 3] map (x) -> x + 1
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [2,3,4]
+      """
+
+  Scenario: Lambda with two parameters
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [10, 20] map (a, b) -> a + b
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [10,21]
+      """
+
+  Scenario: Lambda with string concatenation
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ["Alice", "Bob"] map (name) -> "Hello " + name
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["Hello Alice","Hello Bob"]
+      """
+
+  Scenario: Lambda with comparison expression
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [5, 11] map (x) -> x > 10
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [false,true]
+      """
+
+  Scenario: Lambda with if/else expression
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [-1, 2] map (x) -> if (x > 0) "positive" else "non-positive"
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["non-positive","positive"]
+      """
+
+  Scenario: Lambda with array access
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [[1, 2], [3, 4]] map (arr) -> arr[0]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,3]
+      """
+
+  Scenario: Lambda with multiplication
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [2, 3] map (x) -> x * 2
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [4,6]
+      """
+
+  Scenario: Lambda with division
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [4, 10] map (x) -> x / 2
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [2,5]
+      """
+
+  Scenario: Lambda with nested arithmetic
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 3] map (x) -> (x + 1) * 2
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [4,8]
+      """
+
+  Scenario: Lambda with logical AND
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] map (x, y) -> x > 0 and y > 0
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [false,true]
+      """
+
+  Scenario: Lambda with equality check
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [41, 42] map (x) -> x == 42
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [false,true]
+      """
+
+  Scenario: Lambda with less-than comparison
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [17, 18] map (age) -> age < 18
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [true,false]
+      """
+
+  Scenario: Lambda with less-than-or-equal comparison
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [100, 101] map (score) -> score <= 100
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [true,false]
+      """
+
+  Scenario: Lambda with greater-than-or-equal comparison
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [-1, 0] map (value) -> value >= 0
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [false,true]
+      """
+
+  Scenario: Lambda with field access using dot notation
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{name: "alice"}, {name: "bob"}] map (obj) -> obj.name
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["alice","bob"]
+      """
+
+  Scenario: Lambda with nested field access
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{person: {name: "alice"}}, {person: {name: "bob"}}] map (obj) -> obj.person.name
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["alice","bob"]
+      """
+
+  Scenario: Lambda with sizeOf function call
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [[1], [1, 2, 3]] map (arr) -> sizeOf(arr)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,3]
+      """
+
+  Scenario: Lambda with complex expression using sizeOf
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [[], [1]] map (arr) -> sizeOf(arr) > 0
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [false,true]
+      """
+
+  Scenario: Lambda with default operator
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [null, 5] map (x) -> x default 0
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [0,5]
+      """
+
   Scenario: Lambda body with parenthesized subexpression
     Given the following input content:
       """
       %im 0.1
       output application/json
       ---
-      (x) -> (x + 5) * (x - 2)
+      [3, 5] map (x) -> (x + 5) * (x - 2)
       """
     When I run the application with this content
-    Then the output should contain a lambda function
+    Then the output should be:
+      """
+      [8,30]
+      """
 
   Scenario: Lambda with nested if/else
     Given the following input content:
@@ -252,10 +313,13 @@ Feature: Lambda Expression Support
       %im 0.1
       output application/json
       ---
-      (x) -> if (x > 10) "high" else if (x > 0) "low" else "zero"
+      [-1, 5, 11] map (x) -> if (x > 10) "high" else if (x > 0) "low" else "zero"
       """
     When I run the application with this content
-    Then the output should contain a lambda function
+    Then the output should be:
+      """
+      ["zero","low","high"]
+      """
 
   Scenario: Lambda with object literal
     Given the following input content:
@@ -263,10 +327,13 @@ Feature: Lambda Expression Support
       %im 0.1
       output application/json
       ---
-      (name, age) -> {name: name, age: age}
+      ["alice", "bob"] map (name, age) -> {name: name, age: age}
       """
     When I run the application with this content
-    Then the output should contain a lambda function
+    Then the output should be:
+      """
+      [{"age":0,"name":"alice"},{"age":1,"name":"bob"}]
+      """
 
   Scenario: Lambda with array literal
     Given the following input content:
@@ -274,10 +341,13 @@ Feature: Lambda Expression Support
       %im 0.1
       output application/json
       ---
-      (a, b) -> [a, b]
+      ["a", "b"] map (a, b) -> [a, b]
       """
     When I run the application with this content
-    Then the output should contain a lambda function
+    Then the output should be:
+      """
+      [["a",0],["b",1]]
+      """
 
   Scenario: Lambda with underscore in parameter name
     Given the following input content:
@@ -285,10 +355,13 @@ Feature: Lambda Expression Support
       %im 0.1
       output application/json
       ---
-      (item_value) -> item_value + 1
+      [1, 2] map (item_value) -> item_value + 1
       """
     When I run the application with this content
-    Then the output should contain a lambda function
+    Then the output should be:
+      """
+      [2,3]
+      """
 
   Scenario: Lambda body accessing variable from context
     Given the following input content:
@@ -297,10 +370,13 @@ Feature: Lambda Expression Support
       var multiplier = 3
       output application/json
       ---
-      (x) -> x * multiplier
+      [2, 4] map (x) -> x * multiplier
       """
     When I run the application with this content
-    Then the output should contain a lambda function
+    Then the output should be:
+      """
+      [6,12]
+      """
 
   Scenario: Multiline map body with brace on separate line
     Given the following input content:
