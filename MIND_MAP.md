@@ -91,3 +91,5 @@
 [44] **Agent Mistakes Log** - 2026-02-13: Applied an oversized patch hunk to `internal/preprocessor/rewriter_handlers.go` that briefly corrupted the `handleCloseBrace` function body. Why: attempted a very broad single-shot patch edit instead of smaller targeted hunks. Prevention: split large refactors into scoped patches and immediately validate edited regions with focused `sed` checks before running tests [22].
 
 [45] **Agent Mistakes Log** - 2026-02-14: Ran `rg` with a search pattern beginning with `-` without using `--`, causing option parsing errors and a noisy search loop. Why: rushed CLI composition for ripgrep flags/pattern ordering. Prevention: when a pattern may begin with `-`, use `rg ... -- \"<pattern>\" <path>` and place `-g` options before `--` [22].
+
+[46] **Agent Mistakes Log** - 2026-02-14: Batched `bd update` and `bd show` in parallel again, producing contradictory status reads (`in_progress` and stale `open`) for the same ticket in one run. Why: reused parallel wrapper around a state mutation plus immediate read. Prevention: run beads mutations and status verification strictly sequentially (`bd update` first, then `bd show`) [22][37][38].
