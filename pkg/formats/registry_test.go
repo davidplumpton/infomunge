@@ -153,3 +153,12 @@ func TestBinaryFormatLookup(t *testing.T) {
 		t.Fatalf("expected application/octet-stream for .bin extension, got %q", got)
 	}
 }
+
+func TestAvroFormatLookup(t *testing.T) {
+	if got := MimeTypeForFormat("avro"); got != "application/avro" {
+		t.Fatalf("expected application/avro for format 'avro', got %q", got)
+	}
+	if got := DetectMimeType("payload.avro"); got != "application/avro" {
+		t.Fatalf("expected application/avro for .avro extension, got %q", got)
+	}
+}

@@ -171,6 +171,17 @@ func TestRead_Binary(t *testing.T) {
 	}
 }
 
+func TestRead_Avro(t *testing.T) {
+	content := "\x00Obj\x01avro\xff"
+	result, err := Read(content, "application/avro")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, ok := result.(string); !ok || got != content {
+		t.Fatalf("expected avro reader to return original content, got %#v (%T)", result, result)
+	}
+}
+
 func TestRead_XML(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -68,6 +68,20 @@ Feature: I/O Functions
       "hello-binary"
       """
 
+  Scenario: read avro content
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("hello-avro", "application/avro")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "hello-avro"
+      """
+
   Scenario: read with invalid JSON fails
     Given the following script:
       """
@@ -233,6 +247,20 @@ Feature: I/O Functions
     Then the output should be:
       """
       "abc-xyz"
+      """
+
+  Scenario: write string to avro
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write("avro-xyz", "application/avro")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "avro-xyz"
       """
 
   Scenario: write requires exactly two arguments
