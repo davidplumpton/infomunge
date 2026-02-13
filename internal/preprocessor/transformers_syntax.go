@@ -100,31 +100,78 @@ func interpolateString(content string) string {
 func replaceArrayRangeIndexing(s string) string {
 	// Find patterns like expr[ start to end ]
 	// Replace with slice(expr, start, end+1)
+	// We scan right-to-left for ']' then find its matching '[', respecting nesting and strings.
 
-	i := strings.LastIndex(s, "[")
+	// Find the last ']' outside strings
+	j := -1
+	inString := false
+	for k := len(s) - 1; k >= 0; k-- {
+		if s[k] == '"' && !stringutils.IsEscapedAt(s, k) {
+			inString = !inString
+		}
+		if !inString && s[k] == ']' {
+			j = k
+			break
+		}
+	}
+	if j == -1 {
+		return s
+	}
+
+	// Find the matching '[' by walking backwards from j, respecting nesting
+	depth := 0
+	i := -1
+	inString = false
+	for k := j; k >= 0; k-- {
+		if s[k] == '"' && !stringutils.IsEscapedAt(s, k) {
+			inString = !inString
+		}
+		if inString {
+			continue
+		}
+		if s[k] == ']' {
+			depth++
+		} else if s[k] == '[' {
+			depth--
+			if depth == 0 {
+				i = k
+				break
+			}
+		}
+	}
 	if i == -1 {
 		return s
 	}
-	if i+1 >= len(s) || !unicode.IsDigit(rune(s[i+1])) && !unicode.IsLetter(rune(s[i+1])) && s[i+1] != '(' {
+
+	if i+1 >= j {
 		return s
 	}
-	j := strings.LastIndex(s, "]")
-	if j <= i {
+	ch := s[i+1]
+	if !unicode.IsDigit(rune(ch)) && !unicode.IsLetter(rune(ch)) && ch != '(' {
 		return s
 	}
+
 	bracketContent := s[i+1 : j]
 	if strings.Contains(bracketContent, " to ") {
 		parts := strings.Split(bracketContent, " to ")
 		if len(parts) == 2 {
 			start := strings.TrimSpace(parts[0])
 			endStr := strings.TrimSpace(parts[1])
-			arrayExpr := s[:i]
 			endInt, err := strconv.Atoi(endStr)
 			if err != nil {
 				return s
 			}
 			endPlusOne := endInt + 1
-			return fmt.Sprintf("slice(%s, %s, %d)", arrayExpr, start, endPlusOne)
+
+			// Find the start of the expression being indexed by walking backwards
+			// from the '[' position. We need just the indexed expression, not any
+			// enclosing function call or other context.
+			prefix := []rune(s[:i])
+			exprStart := stringutils.FindLeftOperandStart(prefix, nil)
+			arrayExpr := strings.TrimSpace(string(prefix[exprStart:]))
+			beforeExpr := string(prefix[:exprStart])
+			suffix := s[j+1:]
+			return fmt.Sprintf("%sslice(%s, %s, %d)%s", beforeExpr, arrayExpr, start, endPlusOne, suffix)
 		}
 	}
 	return s

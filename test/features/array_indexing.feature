@@ -130,3 +130,21 @@ Feature: Array Indexing
       """
       [20,30,40]
       """
+
+  Scenario: Range index inside function call arguments
+    Given the following input payload "payload" with format "json":
+      """
+      {"name": "hello"}
+      """
+    And the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      typeOf(payload.name[0 to 0])
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      "String"
+      """
