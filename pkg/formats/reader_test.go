@@ -204,6 +204,17 @@ func TestRead_Flatfile(t *testing.T) {
 	}
 }
 
+func TestRead_Java(t *testing.T) {
+	content := "\xac\xed\x00\x05sr\x00\x10java.lang.String"
+	result, err := Read(content, "application/java")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, ok := result.(string); !ok || got != content {
+		t.Fatalf("expected java reader to return original content, got %#v (%T)", result, result)
+	}
+}
+
 func TestRead_XML(t *testing.T) {
 	tests := []struct {
 		name     string

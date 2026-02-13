@@ -270,6 +270,38 @@ func TestFormat_Flatfile(t *testing.T) {
 	})
 }
 
+func TestFormat_Java(t *testing.T) {
+	t.Run("string input", func(t *testing.T) {
+		result, err := Format("\xac\xed\x00\x05java-object", "application/java")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != "\xac\xed\x00\x05java-object" {
+			t.Fatalf("expected passthrough java string, got %q", result)
+		}
+	})
+
+	t.Run("byte slice input", func(t *testing.T) {
+		result, err := Format([]byte{0xac, 0xed, 0x00, 0x05, 0x01, 0x02}, "application/java")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != "\xac\xed\x00\x05\x01\x02" {
+			t.Fatalf("unexpected formatted java output: %q", result)
+		}
+	})
+
+	t.Run("unsupported type", func(t *testing.T) {
+		_, err := Format(Object{"a": 1}, "application/java")
+		if err == nil {
+			t.Fatal("expected error for non-java input")
+		}
+		if !strings.Contains(err.Error(), "binary output expects string or []byte") {
+			t.Fatalf("unexpected error message: %v", err)
+		}
+	})
+}
+
 func TestFormat_UnknownMimeType(t *testing.T) {
 	// Unknown mime types should return an error rather than silently falling back
 	_, err := Format(42, "application/unknown")

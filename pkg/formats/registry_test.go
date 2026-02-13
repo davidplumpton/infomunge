@@ -186,3 +186,15 @@ func TestFlatfileFormatLookup(t *testing.T) {
 		t.Fatalf("expected application/flatfile for .ffd extension, got %q", got)
 	}
 }
+
+func TestJavaFormatLookup(t *testing.T) {
+	if got := MimeTypeForFormat("java"); got != "application/java" {
+		t.Fatalf("expected application/java for format 'java', got %q", got)
+	}
+	if got := DetectMimeType("payload.java"); got != "application/java" {
+		t.Fatalf("expected application/java for .java extension, got %q", got)
+	}
+	if got := DetectMimeType("payload.ser"); got != "application/java" {
+		t.Fatalf("expected application/java for .ser extension, got %q", got)
+	}
+}

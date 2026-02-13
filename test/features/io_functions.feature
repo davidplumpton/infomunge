@@ -110,6 +110,20 @@ Feature: I/O Functions
       "HDR0001ALICE   000030NY\nDTL0002BOB     000025CA"
       """
 
+  Scenario: read java content
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("serialized-java-object", "application/java")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "serialized-java-object"
+      """
+
   Scenario: read with invalid JSON fails
     Given the following script:
       """
@@ -317,6 +331,20 @@ Feature: I/O Functions
     Then the output should be:
       """
       "HDR0001ALICE   000030NY\nDTL0002BOB     000025CA"
+      """
+
+  Scenario: write string to java
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write("serialized-java-object", "application/java")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "serialized-java-object"
       """
 
   Scenario: write requires exactly two arguments
