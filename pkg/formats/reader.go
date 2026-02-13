@@ -22,6 +22,8 @@ func ReadWithOptions(content, mimeType string, options Object) (interface{}, err
 		switch mimeType {
 		case "application/flatfile":
 			return readFlatfileWithOptions(content, options)
+		case "application/java":
+			return readJavaWithOptions(content, options)
 		default:
 			if len(options) > 0 {
 				return nil, unifiederrors.ValidationErrorf("read options are not supported for mimeType: %s", mimeType)

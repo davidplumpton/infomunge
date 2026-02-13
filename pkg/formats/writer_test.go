@@ -1,6 +1,7 @@
 package formats
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -349,6 +350,91 @@ func TestFormat_Java(t *testing.T) {
 			t.Fatalf("unexpected error message: %v", err)
 		}
 	})
+}
+
+func TestFormatWithOptions_JavaStructured(t *testing.T) {
+	result, err := FormatWithOptions(
+		Object{"name": "Alice", "age": 30},
+		"application/java",
+		Object{"structured": true},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	parsed, err := Read(result, "application/json")
+	if err != nil {
+		t.Fatalf("expected structured java output to be valid json: %v", err)
+	}
+
+	expected := Object{
+		"@class": "java.util.LinkedHashMap",
+		"value":  Object{"name": "Alice", "age": 30.0},
+	}
+	if parsedObj, ok := parsed.(Object); !ok || !reflect.DeepEqual(parsedObj, expected) {
+		t.Fatalf("expected %#v, got %#v", expected, parsed)
+	}
+}
+
+func TestFormatWithOptions_JavaStructuredWithClassOverride(t *testing.T) {
+	result, err := FormatWithOptions(
+		Array{"a", "b"},
+		"application/java",
+		Object{
+			"structured": true,
+			"class":      "java.util.LinkedList",
+		},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	parsed, err := Read(result, "application/json")
+	if err != nil {
+		t.Fatalf("expected structured java output to be valid json: %v", err)
+	}
+
+	expected := Object{
+		"@class": "java.util.LinkedList",
+		"value":  Array{"a", "b"},
+	}
+	if parsedObj, ok := parsed.(Object); !ok || !reflect.DeepEqual(parsedObj, expected) {
+		t.Fatalf("expected %#v, got %#v", expected, parsed)
+	}
+}
+
+func TestFormatWithOptions_JavaStructuredClassMismatch(t *testing.T) {
+	_, err := FormatWithOptions(
+		Object{"name": "Alice"},
+		"application/java",
+		Object{
+			"structured": true,
+			"class":      "java.util.List",
+		},
+	)
+	if err == nil {
+		t.Fatal("expected validation error for class/value mismatch")
+	}
+	if !strings.Contains(err.Error(), "is incompatible with value type") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestFormatWithOptions_JavaStructuredUnknownClass(t *testing.T) {
+	_, err := FormatWithOptions(
+		Object{"name": "Alice"},
+		"application/java",
+		Object{
+			"structured": true,
+			"class":      "com.example.CustomType",
+		},
+	)
+	if err == nil {
+		t.Fatal("expected validation error for unknown class")
+	}
+	if !strings.Contains(err.Error(), "unsupported java class") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestFormat_Protobuf(t *testing.T) {

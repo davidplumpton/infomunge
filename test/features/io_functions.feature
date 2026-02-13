@@ -138,6 +138,30 @@ Feature: I/O Functions
       "serialized-java-object"
       """
 
+  Scenario: read structured java envelope
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("{\"@class\":\"java.util.LinkedHashMap\",\"value\":{\"name\":\"Alice\",\"age\":30}}", "application/java", {structured: true})
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"age":30,"name":"Alice"}
+      """
+
+  Scenario: read structured java envelope with unsupported class fails
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("{\"@class\":\"com.example.CustomType\",\"value\":{\"name\":\"Alice\"}}", "application/java", {structured: true})
+      """
+    Then running the script should fail with error containing "unsupported java class"
+
   Scenario: read protobuf content
     Given the following script:
       """
@@ -440,6 +464,30 @@ Feature: I/O Functions
       """
       "serialized-java-object"
       """
+
+  Scenario: write structured java envelope
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write({name: "Alice", age: 30}, "application/java", {structured: true})
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "{\"@class\":\"java.util.LinkedHashMap\",\"value\":{\"age\":30,\"name\":\"Alice\"}}"
+      """
+
+  Scenario: write structured java envelope class mismatch fails
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write({name: "Alice"}, "application/java", {structured: true, class: "java.util.List"})
+      """
+    Then running the script should fail with error containing "is incompatible with value type"
 
   Scenario: write string to protobuf
     Given the following script:

@@ -264,6 +264,51 @@ func TestRead_Java(t *testing.T) {
 	}
 }
 
+func TestReadWithOptions_JavaStructured(t *testing.T) {
+	content := `{"@class":"java.util.LinkedHashMap","value":{"name":"Alice","age":30}}`
+	result, err := ReadWithOptions(content, "application/java", Object{"structured": true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := Object{"name": "Alice", "age": 30.0}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("expected %#v, got %#v", expected, result)
+	}
+}
+
+func TestReadWithOptions_JavaStructuredClassMismatch(t *testing.T) {
+	content := `{"@class":"java.util.List","value":{"name":"Alice"}}`
+	_, err := ReadWithOptions(content, "application/java", Object{"structured": true})
+	if err == nil {
+		t.Fatal("expected validation error for class/value mismatch")
+	}
+	if !strings.Contains(err.Error(), "is incompatible with value type") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReadWithOptions_JavaStructuredUnknownClass(t *testing.T) {
+	content := `{"@class":"com.example.CustomType","value":{"name":"Alice"}}`
+	_, err := ReadWithOptions(content, "application/java", Object{"structured": true})
+	if err == nil {
+		t.Fatal("expected validation error for unknown class")
+	}
+	if !strings.Contains(err.Error(), "unsupported java class") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReadWithOptions_JavaUnsupportedOption(t *testing.T) {
+	_, err := ReadWithOptions(`{"a":1}`, "application/java", Object{"mode": "structured"})
+	if err == nil {
+		t.Fatal("expected error for unsupported java option")
+	}
+	if !strings.Contains(err.Error(), "unsupported java option") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestRead_Protobuf(t *testing.T) {
 	content := "\x0a\x05Alice\x10\x1e"
 
