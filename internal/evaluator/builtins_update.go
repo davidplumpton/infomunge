@@ -253,6 +253,9 @@ func setValueAtPath(value interface{}, path []selectorSegment, newValue interfac
 		if isTerminal {
 			return updateArrayElement(arr, seg.index, newValue)
 		}
+		if seg.index < 0 || seg.index >= len(arr) {
+			return nil, unifiederrors.EvalErrorf("index out of bounds: %d", seg.index)
+		}
 		childValue, err := setValueAtPath(arr[seg.index], path[1:], newValue, depth+1)
 		if err != nil {
 			return nil, err

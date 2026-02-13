@@ -150,6 +150,22 @@ Feature: Update Expression
     Then the output should contain "10"
     And the output should contain "20"
 
+  Scenario: Update with out-of-bounds selector is a no-op
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {a: [[1]]} update {
+        case x at .a[5][0] -> 99
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"a":[[1]]}
+      """
+
   Scenario: Update expression used in concatenation
     Given the following input content:
       """
