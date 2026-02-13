@@ -81,3 +81,5 @@
 [39] **Agent Mistakes Log** - 2026-02-14: Added new cucumber script expressions using multi-line function argument formatting with commas; parser rejected them (`expected operand, found ','`). Why: assumed multi-line argument layout behaves like Go/JSON formatting. Prevention: keep complex function calls in feature scripts on a single expression line unless existing parser coverage confirms multiline argument separators [22].
 
 [40] **Agent Mistakes Log** - 2026-02-14: Ran `go test ./...` without excluding `tmp`, causing expected build collisions from multiple helper `main` files in `tmp/`. Why: used blanket quality gate in a repo that intentionally keeps multiple executable scratch files in `tmp`. Prevention: run targeted package/feature tests for changed areas (or exclude `tmp`) instead of full-recursive `./...` when scratch binaries are present [22].
+
+[41] **User Preferences Log** - 2026-02-14: User explicitly asked to create additional beads tickets whenever meaningful follow-up work is discovered during implementation, instead of leaving implicit TODOs.

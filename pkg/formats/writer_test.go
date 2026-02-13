@@ -479,6 +479,105 @@ func TestFormat_Protobuf(t *testing.T) {
 	}
 }
 
+func TestFormatWithOptions_ProtobufStructured(t *testing.T) {
+	options := Object{
+		"structured": true,
+		"schema": Object{
+			"message": "Person",
+			"fields": Array{
+				Object{"number": 1, "name": "name", "type": "string"},
+				Object{"number": 2, "name": "age", "type": "int32"},
+				Object{"number": 3, "name": "active", "type": "bool"},
+			},
+		},
+	}
+
+	input := Object{
+		"name":   "Alice",
+		"age":    30.0,
+		"active": true,
+	}
+
+	result, err := FormatWithOptions(input, "application/protobuf", options)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "\x0a\x05Alice\x10\x1e\x18\x01" {
+		t.Fatalf("unexpected protobuf output: %q", result)
+	}
+}
+
+func TestFormatWithOptions_ProtobufStructuredRepeated(t *testing.T) {
+	options := Object{
+		"structured": true,
+		"schema": Object{
+			"fields": Array{
+				Object{"number": 1, "name": "tags", "type": "string", "repeated": true},
+			},
+		},
+	}
+
+	input := Object{
+		"tags": Array{"a", "bb"},
+	}
+
+	result, err := FormatWithOptions(input, "application/x-protobuf", options)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "\x0a\x01a\x0a\x02bb" {
+		t.Fatalf("unexpected protobuf output: %q", result)
+	}
+}
+
+func TestFormatWithOptions_ProtobufStructuredUnknownField(t *testing.T) {
+	options := Object{
+		"structured": true,
+		"schema": Object{
+			"fields": Array{
+				Object{"number": 1, "name": "name", "type": "string"},
+			},
+		},
+	}
+
+	_, err := FormatWithOptions(
+		Object{"name": "Alice", "extra": "ignored"},
+		"application/protobuf",
+		options,
+	)
+	if err == nil {
+		t.Fatal("expected error for unknown protobuf field")
+	}
+	if !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestFormatWithOptions_ProtobufStructuredTypeMismatch(t *testing.T) {
+	options := Object{
+		"structured": true,
+		"schema": Object{
+			"fields": Array{
+				Object{"number": 1, "name": "active", "type": "bool"},
+			},
+		},
+	}
+
+	_, err := FormatWithOptions(
+		Object{"active": "yes"},
+		"application/protobuf",
+		options,
+	)
+	if err == nil {
+		t.Fatal("expected error for protobuf bool type mismatch")
+	}
+	if !strings.Contains(err.Error(), "expects bool") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestFormat_Excel(t *testing.T) {
 	tests := []struct {
 		name     string

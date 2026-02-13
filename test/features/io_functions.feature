@@ -190,6 +190,30 @@ Feature: I/O Functions
       "x-protobuf-bytes"
       """
 
+  Scenario: read structured protobuf payload with schema
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read(write({name: "Alice", age: 30, active: true}, "application/protobuf", {structured: true, schema: {fields: [{number: 1, name: "name", type: "string"}, {number: 2, name: "age", type: "int32"}, {number: 3, name: "active", type: "bool"}]}}), "application/protobuf", {structured: true, schema: {fields: [{number: 1, name: "name", type: "string"}, {number: 2, name: "age", type: "int32"}, {number: 3, name: "active", type: "bool"}]}})
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"active":true,"age":30,"name":"Alice"}
+      """
+
+  Scenario: read structured protobuf payload with unknown field fails
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read(write({name: "Alice", age: 30}, "application/protobuf", {structured: true, schema: {fields: [{number: 1, name: "name", type: "string"}, {number: 2, name: "age", type: "int32"}]}}) ++ write({extra: 1}, "application/protobuf", {structured: true, schema: {fields: [{number: 9, name: "extra", type: "int32"}]}}), "application/protobuf", {structured: true, schema: {fields: [{number: 1, name: "name", type: "string"}, {number: 2, name: "age", type: "int32"}]}})
+      """
+    Then running the script should fail with error containing "unknown field number"
+
   Scenario: read xlsx content
     Given the following script:
       """
@@ -516,6 +540,30 @@ Feature: I/O Functions
       """
       "x-protobuf-bytes"
       """
+
+  Scenario: write structured protobuf with schema and round-trip decode
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read(write({tags: ["a", "bb"]}, "application/x-protobuf", {structured: true, schema: {fields: [{number: 1, name: "tags", type: "string", repeated: true}]}}), "application/x-protobuf", {structured: true, schema: {fields: [{number: 1, name: "tags", type: "string", repeated: true}]}})
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"tags":["a","bb"]}
+      """
+
+  Scenario: write structured protobuf with unknown field fails
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write({name: "Alice", extra: "x"}, "application/protobuf", {structured: true, schema: {fields: [{number: 1, name: "name", type: "string"}]}})
+      """
+    Then running the script should fail with error containing "unknown field"
 
   Scenario: write string to xlsx
     Given the following script:

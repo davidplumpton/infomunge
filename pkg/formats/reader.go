@@ -24,6 +24,8 @@ func ReadWithOptions(content, mimeType string, options Object) (interface{}, err
 			return readFlatfileWithOptions(content, options)
 		case "application/java":
 			return readJavaWithOptions(content, options)
+		case "application/protobuf", "application/x-protobuf":
+			return readProtobufWithOptions(content, options)
 		default:
 			if len(options) > 0 {
 				return nil, unifiederrors.ValidationErrorf("read options are not supported for mimeType: %s", mimeType)

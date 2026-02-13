@@ -333,6 +333,80 @@ func TestRead_Protobuf(t *testing.T) {
 	}
 }
 
+func TestReadWithOptions_ProtobufStructured(t *testing.T) {
+	content := "\x0a\x05Alice\x10\x1e\x18\x01"
+	options := Object{
+		"structured": true,
+		"schema": Object{
+			"message": "Person",
+			"fields": Array{
+				Object{"number": 1, "name": "name", "type": "string"},
+				Object{"number": 2, "name": "age", "type": "int32"},
+				Object{"number": 3, "name": "active", "type": "bool"},
+			},
+		},
+	}
+
+	result, err := ReadWithOptions(content, "application/protobuf", options)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := Object{
+		"name":   "Alice",
+		"age":    30.0,
+		"active": true,
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("expected %#v, got %#v", expected, result)
+	}
+}
+
+func TestReadWithOptions_ProtobufStructuredUnknownFieldStrict(t *testing.T) {
+	content := "\x0a\x05Alice\x48\x01"
+	options := Object{
+		"structured": true,
+		"schema": Object{
+			"fields": Array{
+				Object{"number": 1, "name": "name", "type": "string"},
+			},
+		},
+	}
+
+	_, err := ReadWithOptions(content, "application/protobuf", options)
+	if err == nil {
+		t.Fatal("expected error for unknown protobuf field")
+	}
+	if !strings.Contains(err.Error(), "unknown field number") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReadWithOptions_ProtobufStructuredUnknownFieldNonStrict(t *testing.T) {
+	content := "\x0a\x05Alice\x48\x01"
+	options := Object{
+		"structured": true,
+		"strict":     false,
+		"schema": Object{
+			"fields": Array{
+				Object{"number": 1, "name": "name", "type": "string"},
+			},
+		},
+	}
+
+	result, err := ReadWithOptions(content, "application/x-protobuf", options)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := Object{
+		"name": "Alice",
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("expected %#v, got %#v", expected, result)
+	}
+}
+
 func TestRead_Excel(t *testing.T) {
 	content := "PK\x03\x04xlsx-content"
 
