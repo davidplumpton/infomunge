@@ -159,6 +159,17 @@ func TestRead_CSV_Empty(t *testing.T) {
 	}
 }
 
+func TestRead_Binary(t *testing.T) {
+	content := "\x00\x01hello\xff"
+	result, err := Read(content, "application/octet-stream")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, ok := result.(string); !ok || got != content {
+		t.Fatalf("expected binary reader to return original content, got %#v (%T)", result, result)
+	}
+}
+
 func TestRead_XML(t *testing.T) {
 	tests := []struct {
 		name     string

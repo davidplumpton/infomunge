@@ -142,6 +142,38 @@ func TestFormat_CSV_MissingKeys(t *testing.T) {
 	}
 }
 
+func TestFormat_Binary(t *testing.T) {
+	t.Run("string input", func(t *testing.T) {
+		result, err := Format("hello\x00world", "application/octet-stream")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != "hello\x00world" {
+			t.Fatalf("expected passthrough binary string, got %q", result)
+		}
+	})
+
+	t.Run("byte slice input", func(t *testing.T) {
+		result, err := Format([]byte{0x41, 0x42, 0x00, 0x43}, "application/octet-stream")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != "AB\x00C" {
+			t.Fatalf("unexpected formatted binary output: %q", result)
+		}
+	})
+
+	t.Run("unsupported type", func(t *testing.T) {
+		_, err := Format(Object{"a": 1}, "application/octet-stream")
+		if err == nil {
+			t.Fatal("expected error for non-binary input")
+		}
+		if !strings.Contains(err.Error(), "binary output expects string or []byte") {
+			t.Fatalf("unexpected error message: %v", err)
+		}
+	})
+}
+
 func TestFormat_UnknownMimeType(t *testing.T) {
 	// Unknown mime types should return an error rather than silently falling back
 	_, err := Format(42, "application/unknown")

@@ -141,3 +141,15 @@ func TestRegistryConcurrentRegisterAndLookup(t *testing.T) {
 		t.Fatalf("expected extension lookup after concurrent registration, got %q", got)
 	}
 }
+
+func TestBinaryFormatLookup(t *testing.T) {
+	if got := MimeTypeForFormat("binary"); got != "application/octet-stream" {
+		t.Fatalf("expected application/octet-stream for format 'binary', got %q", got)
+	}
+	if got := MimeTypeForFormat("bin"); got != "application/octet-stream" {
+		t.Fatalf("expected application/octet-stream for format 'bin', got %q", got)
+	}
+	if got := DetectMimeType("payload.bin"); got != "application/octet-stream" {
+		t.Fatalf("expected application/octet-stream for .bin extension, got %q", got)
+	}
+}

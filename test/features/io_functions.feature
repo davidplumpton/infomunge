@@ -54,6 +54,20 @@ Feature: I/O Functions
       {"root":{"age":"30","name":"Alice"}}
       """
 
+  Scenario: read binary octet-stream content
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("hello-binary", "application/octet-stream")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "hello-binary"
+      """
+
   Scenario: read with invalid JSON fails
     Given the following script:
       """
@@ -206,6 +220,20 @@ Feature: I/O Functions
       """
     When I run the script
     Then the output should contain "Alice"
+
+  Scenario: write string to binary octet-stream
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write("abc-xyz", "application/octet-stream")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "abc-xyz"
+      """
 
   Scenario: write requires exactly two arguments
     Given the following script:
