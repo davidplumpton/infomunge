@@ -179,3 +179,17 @@ Feature: Update Expression
     When I run the application with this content
     Then the output should contain "\"a\":2"
     And the output should contain "\"b\":2"
+
+  Scenario: Update block without trailing whitespace before closing brace
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {a: 1} update {case x at .a -> x + 1}
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"a":2}
+      """

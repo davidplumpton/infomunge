@@ -220,6 +220,21 @@ Feature: Function Definitions
       3
       """
 
+  Scenario: Function with compact do block keeps last expression character
+    Given the following input content:
+      """
+      %im 0.1
+      fun addOne(x) = do {var y = x + 1---y + 1}
+      output application/json
+      ---
+      addOne(2)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      4
+      """
+
   Scenario: Multiline function with return type annotation
     Given the following input content:
       """

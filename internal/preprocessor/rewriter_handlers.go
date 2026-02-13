@@ -490,7 +490,7 @@ func (r *rewriter) handleDoBlock() bool {
 		return false
 	}
 
-	content := r.input[braceStart+1 : braceEnd-1]
+	content := r.input[braceStart+1 : braceEnd]
 	separatorIdx := strings.Index(content, "---")
 	if separatorIdx == -1 {
 		return false
@@ -521,7 +521,7 @@ func (r *rewriter) handleUpdateExprBlock() bool {
 		return false
 	}
 
-	casesContent := strings.TrimSpace(r.input[braceStart+1 : braceEnd-1])
+	casesContent := strings.TrimSpace(r.input[braceStart+1 : braceEnd])
 	leftStart := findLeftOperandStartBytes(r.result)
 	if leftStart >= len(r.result) {
 		return false
