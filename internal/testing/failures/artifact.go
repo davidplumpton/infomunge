@@ -19,6 +19,8 @@ const defaultFailuresDir = "tmp/intensive-testing/failures"
 type Artifact struct {
 	ID                  int         `json:"id"`
 	Timestamp           string      `json:"timestamp"`
+	DetectedAt          string      `json:"detected_at,omitempty"`
+	MinimizedAt         string      `json:"minimized_at,omitempty"`
 	Property            string      `json:"property"`
 	MinimizedExpression string      `json:"minimized_expression"`
 	OriginalExpression  string      `json:"original_expression"`
@@ -59,6 +61,12 @@ func SaveArtifactToDir(dir string, a Artifact) (string, bool, error) {
 
 	a.ID = nextID
 	a.Timestamp = now.Format(time.RFC3339)
+	if strings.TrimSpace(a.DetectedAt) == "" {
+		a.DetectedAt = a.Timestamp
+	}
+	if strings.TrimSpace(a.MinimizedAt) == "" {
+		a.MinimizedAt = a.Timestamp
+	}
 	a.Fingerprint = fingerprint
 
 	fileName := fmt.Sprintf(

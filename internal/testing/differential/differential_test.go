@@ -3,12 +3,15 @@ package differential
 import (
 	"flag"
 	"fmt"
+	"os"
 	"runtime/debug"
+	"strings"
 	"testing"
 
 	"infomunge/internal/runner"
 	"infomunge/internal/testing/exprgen"
 	"infomunge/internal/testing/failures"
+	"infomunge/internal/testing/metrics"
 	"infomunge/internal/testing/testbudget"
 
 	"pgregory.net/rapid"
@@ -33,6 +36,9 @@ func TestDifferential_InfomungeVsDataWeave(t *testing.T) {
 		// Evaluate in infomunge.
 		imResult, imErr := safeEvalInfomunge(script, tc.Value)
 		if imErr != nil {
+			if strings.Contains(strings.ToLower(imErr.Error()), "panic:") {
+				metrics.RecordPanic()
+			}
 			// Expression errors (type errors, div-by-zero, etc.) are not
 			// differential mismatches — skip.
 			return
@@ -91,4 +97,10 @@ func setRapidChecks(t *testing.T, checks int) {
 	t.Cleanup(func() {
 		_ = f.Value.Set(previous)
 	})
+}
+
+func TestMain(m *testing.M) {
+	code := m.Run()
+	metrics.ReportAndPersist("differential", metrics.Options{EnableCoverage: false})
+	os.Exit(code)
 }

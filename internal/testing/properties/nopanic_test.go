@@ -10,6 +10,7 @@ import (
 	"infomunge/internal/evaluator"
 	"infomunge/internal/preprocessor"
 	"infomunge/internal/testing/exprgen"
+	"infomunge/internal/testing/metrics"
 	"infomunge/internal/testing/testbudget"
 
 	"pgregory.net/rapid"
@@ -37,11 +38,13 @@ func TestEvaluate_NoPanics_Deterministic_AndTypeConsistent(t *testing.T) {
 
 		firstResult, firstErr, panicValue, panicStack := safeEval(expr, tc.Value)
 		if panicValue != nil {
+			metrics.RecordPanic()
 			t.Fatalf("panic while evaluating expression\nexpr: %q\nctx: %#v\npanic: %v\nstack:\n%s", expr, tc.Value, panicValue, panicStack)
 		}
 
 		secondResult, secondErr, panicValue, panicStack := safeEval(expr, tc.Value)
 		if panicValue != nil {
+			metrics.RecordPanic()
 			t.Fatalf("panic while re-evaluating expression\nexpr: %q\nctx: %#v\npanic: %v\nstack:\n%s", expr, tc.Value, panicValue, panicStack)
 		}
 
@@ -63,6 +66,7 @@ func TestEvaluate_NoPanics_Deterministic_AndTypeConsistent(t *testing.T) {
 		typeExpr := fmt.Sprintf("typeOf(%s)", expr)
 		typeResult, typeErr, panicValue, panicStack := safeEval(typeExpr, tc.Value)
 		if panicValue != nil {
+			metrics.RecordPanic()
 			t.Fatalf("panic while evaluating typeOf\nexpr: %q\nctx: %#v\npanic: %v\nstack:\n%s", typeExpr, tc.Value, panicValue, panicStack)
 		}
 		if typeErr != nil {

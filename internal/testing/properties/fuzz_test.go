@@ -7,6 +7,7 @@ import (
 
 	"infomunge/internal/preprocessor"
 	"infomunge/internal/testing/exprgen"
+	"infomunge/internal/testing/metrics"
 
 	"pgregory.net/rapid"
 )
@@ -20,6 +21,7 @@ func FuzzExprEval(f *testing.F) {
 
 		result, err, panicValue, panicStack := safeEval(expr, tc.Value)
 		if panicValue != nil {
+			metrics.RecordPanic()
 			t.Fatalf("panic in FuzzExprEval expr=%q ctx=%#v panic=%v\n%s", expr, tc.Value, panicValue, panicStack)
 		}
 		if err != nil {
@@ -33,6 +35,7 @@ func FuzzExprEval(f *testing.F) {
 		typeExpr := fmt.Sprintf("typeOf(%s)", expr)
 		typeResult, typeErr, panicValue, panicStack := safeEval(typeExpr, tc.Value)
 		if panicValue != nil {
+			metrics.RecordPanic()
 			t.Fatalf("panic in typeOf expr=%q ctx=%#v panic=%v\n%s", typeExpr, tc.Value, panicValue, panicStack)
 		}
 		if typeErr != nil {
@@ -65,6 +68,7 @@ func FuzzExprDeep(f *testing.F) {
 
 		result, err, panicValue, panicStack := safeEval(expr, tc.Value)
 		if panicValue != nil {
+			metrics.RecordPanic()
 			t.Fatalf("panic in FuzzExprDeep expr=%q ctx=%#v panic=%v\n%s", expr, tc.Value, panicValue, panicStack)
 		}
 		if err != nil {

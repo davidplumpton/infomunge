@@ -57,6 +57,12 @@ func TestSaveAndLoadArtifactsRoundTrip(t *testing.T) {
 	if got.Fingerprint != Fingerprint(input.MinimizedExpression, input.Property) {
 		t.Fatalf("fingerprint mismatch: got %q", got.Fingerprint)
 	}
+	if got.DetectedAt == "" {
+		t.Fatalf("detected_at is empty, want timestamp")
+	}
+	if got.MinimizedAt == "" {
+		t.Fatalf("minimized_at is empty, want timestamp")
+	}
 	if got.Property != input.Property {
 		t.Fatalf("property = %q, want %q", got.Property, input.Property)
 	}

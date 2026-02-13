@@ -5,15 +5,18 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime/debug"
 	"strings"
 	"testing"
+	"time"
 
 	"infomunge/internal/preprocessor"
 	"infomunge/internal/runner"
 	"infomunge/internal/testing/failures"
+	"infomunge/internal/testing/metrics"
 	"infomunge/internal/testing/testbudget"
 
 	"pgregory.net/rapid"
@@ -39,11 +42,14 @@ func TestMutatedCorpusExpressions_NoPanics_AndDeterministic(t *testing.T) {
 		rng := rand.New(rand.NewSource(seed)) //nolint:gosec
 		mutatedExpr := MutateN(baseExpr, mutationCount, rng)
 		script := buildScript(header, mutatedExpr)
+		baseScript := buildScript(header, baseExpr)
 		ctx := buildInputContext(entry.Inputs)
+		detectedAt := time.Now().UTC()
 
 		firstRes, firstErr, panicVal, panicStack := safeRun(script, ctx)
 		if panicVal != nil {
-			recordMutationFailure("mutation_no_panic", baseExpr, mutatedExpr, seed, ctx, panicStack)
+			metrics.RecordPanic()
+			recordMutationFailure("mutation_no_panic", baseExpr, mutatedExpr, seed, ctx, panicStack, detectedAt)
 			t.Fatalf("panic while evaluating mutation (seed=%d): %v\nexpr=%q\nmutated=%q", seed, panicVal, baseExpr, mutatedExpr)
 		}
 		if isKnownNondeterministic(mutatedExpr) {
@@ -52,26 +58,38 @@ func TestMutatedCorpusExpressions_NoPanics_AndDeterministic(t *testing.T) {
 
 		secondRes, secondErr, panicVal, panicStack := safeRun(script, ctx)
 		if panicVal != nil {
-			recordMutationFailure("mutation_no_panic", baseExpr, mutatedExpr, seed, ctx, panicStack)
+			metrics.RecordPanic()
+			recordMutationFailure("mutation_no_panic", baseExpr, mutatedExpr, seed, ctx, panicStack, detectedAt)
 			t.Fatalf("panic while re-evaluating mutation (seed=%d): %v\nexpr=%q\nmutated=%q", seed, panicVal, baseExpr, mutatedExpr)
 		}
 
 		if (firstErr == nil) != (secondErr == nil) {
-			recordMutationFailure("mutation_determinism", baseExpr, mutatedExpr, seed, ctx, "")
+			recordMutationFailure("mutation_determinism", baseExpr, mutatedExpr, seed, ctx, "", detectedAt)
 			t.Fatalf("nondeterministic success/error for mutation seed=%d mutated=%q firstErr=%v secondErr=%v", seed, mutatedExpr, firstErr, secondErr)
 		}
 
 		if firstErr != nil {
 			if firstErr.Error() != secondErr.Error() {
-				recordMutationFailure("mutation_determinism", baseExpr, mutatedExpr, seed, ctx, "")
+				recordMutationFailure("mutation_determinism", baseExpr, mutatedExpr, seed, ctx, "", detectedAt)
 				t.Fatalf("nondeterministic error text for mutation seed=%d mutated=%q firstErr=%v secondErr=%v", seed, mutatedExpr, firstErr, secondErr)
 			}
 			return
 		}
 
 		if !deterministicallyEqual(firstRes, secondRes) {
-			recordMutationFailure("mutation_determinism", baseExpr, mutatedExpr, seed, ctx, "")
+			recordMutationFailure("mutation_determinism", baseExpr, mutatedExpr, seed, ctx, "", detectedAt)
 			t.Fatalf("nondeterministic result for mutation seed=%d mutated=%q first=%#v second=%#v", seed, mutatedExpr, firstRes, secondRes)
+		}
+
+		baseRes, baseErr, basePanic, baseStack := safeRun(baseScript, ctx)
+		if basePanic != nil {
+			metrics.RecordPanic()
+			recordMutationFailure("mutation_no_panic", baseExpr, baseExpr, seed, ctx, baseStack, detectedAt)
+			t.Fatalf("panic while evaluating base expression (seed=%d): %v\nexpr=%q", seed, basePanic, baseExpr)
+		}
+		if strings.TrimSpace(mutatedExpr) != strings.TrimSpace(baseExpr) && !isKnownNondeterministic(baseExpr) {
+			killed := mutationChangesBehavior(baseRes, baseErr, firstRes, firstErr)
+			metrics.RecordMutationOutcome(killed)
 		}
 	})
 }
@@ -190,7 +208,8 @@ func deterministicallyEqual(a, b interface{}) bool {
 	return string(aj) == string(bj)
 }
 
-func recordMutationFailure(property, originalExpr, mutatedExpr string, seed int64, ctx map[string]interface{}, panicStack string) {
+func recordMutationFailure(property, originalExpr, mutatedExpr string, seed int64, ctx map[string]interface{}, panicStack string, detectedAt time.Time) {
+	minimizedAt := time.Now().UTC()
 	artifact := failures.Artifact{
 		Property:            property,
 		MinimizedExpression: mutatedExpr,
@@ -198,11 +217,29 @@ func recordMutationFailure(property, originalExpr, mutatedExpr string, seed int6
 		InputPayload:        ctx,
 		Seed:                seed,
 		PanicStack:          panicStack,
+		DetectedAt:          detectedAt.Format(time.RFC3339),
+		MinimizedAt:         minimizedAt.Format(time.RFC3339),
 	}
 	if _, _, err := failures.SaveArtifact(artifact); err != nil {
 		return
 	}
 	_, _, _ = failures.WriteCandidateScenario(artifact)
+}
+
+func mutationChangesBehavior(baseRes interface{}, baseErr error, mutatedRes interface{}, mutatedErr error) bool {
+	if (baseErr == nil) != (mutatedErr == nil) {
+		return true
+	}
+	if baseErr != nil && mutatedErr != nil {
+		return baseErr.Error() != mutatedErr.Error()
+	}
+	return !deterministicallyEqual(baseRes, mutatedRes)
+}
+
+func TestMain(m *testing.M) {
+	code := m.Run()
+	metrics.ReportAndPersist("mutation", metrics.Options{EnableCoverage: true})
+	os.Exit(code)
 }
 
 func isKnownNondeterministic(expr string) bool {
