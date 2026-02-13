@@ -141,6 +141,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the following YAML input:$`, tc.theFollowingYAMLInput)
 	ctx.Step(`^the following properties input:$`, tc.theFollowingPropertiesInput)
 	ctx.Step(`^the following NDJSON input:$`, tc.theFollowingNDJSONInput)
+	ctx.Step(`^the following URL-encoded input:$`, tc.theFollowingURLEncodedInput)
 	ctx.Step(`^the following script:$`, tc.theFollowingScript)
 	ctx.Step(`^I run the script$`, tc.iRunTheScript)
 	ctx.Step(`^I run the script with a canceled evaluation context$`, tc.iRunTheScriptWithCanceledEvaluationContext)
@@ -380,6 +381,12 @@ func (tc *testContext) theFollowingPropertiesInput(content *godog.DocString) err
 func (tc *testContext) theFollowingNDJSONInput(content *godog.DocString) error {
 	tc.payloadContent = content.Content
 	tc.payloadMime = "application/x-ndjson"
+	return nil
+}
+
+func (tc *testContext) theFollowingURLEncodedInput(content *godog.DocString) error {
+	tc.payloadContent = content.Content
+	tc.payloadMime = "application/x-www-form-urlencoded"
 	return nil
 }
 
