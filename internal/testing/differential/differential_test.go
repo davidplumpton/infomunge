@@ -9,11 +9,10 @@ import (
 	"infomunge/internal/runner"
 	"infomunge/internal/testing/exprgen"
 	"infomunge/internal/testing/failures"
+	"infomunge/internal/testing/testbudget"
 
 	"pgregory.net/rapid"
 )
-
-const diffChecks = 1000
 
 // TestDifferential_InfomungeVsDataWeave generates DW-compatible expressions,
 // evaluates them in both infomunge and the DataWeave CLI, and compares results
@@ -23,7 +22,7 @@ func TestDifferential_InfomungeVsDataWeave(t *testing.T) {
 		t.Skip("dw CLI not available on PATH")
 	}
 
-	setRapidChecks(t, diffChecks)
+	setRapidChecks(t, testbudget.DiffChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		tc := exprgen.SampleContext().Draw(t, "ctx")

@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
-	"os"
 	"path/filepath"
 	"reflect"
 	"runtime/debug"
@@ -15,13 +14,9 @@ import (
 	"infomunge/internal/preprocessor"
 	"infomunge/internal/runner"
 	"infomunge/internal/testing/failures"
+	"infomunge/internal/testing/testbudget"
 
 	"pgregory.net/rapid"
-)
-
-const (
-	defaultMutationSampleSize = 100
-	defaultMutationChecks     = 300
 )
 
 func TestMutatedCorpusExpressions_NoPanics_AndDeterministic(t *testing.T) {
@@ -30,14 +25,8 @@ func TestMutatedCorpusExpressions_NoPanics_AndDeterministic(t *testing.T) {
 		t.Fatal("no corpus entries available for mutation testing")
 	}
 
-	maxMutations := 3
-	checks := defaultMutationChecks
-	if soakModeEnabled() {
-		maxMutations = 10
-		checks = 1000
-	}
-
-	setRapidChecks(t, checks)
+	maxMutations := testbudget.MutationMaxMutations()
+	setRapidChecks(t, testbudget.MutationChecks())
 	rapid.Check(t, func(t *rapid.T) {
 		entry := entries[rapid.IntRange(0, len(entries)-1).Draw(t, "entry_idx")]
 		header, baseExpr := extractHeaderAndExpr(entry.Script)
@@ -94,8 +83,9 @@ func TestMutationEngineProducesNonTrivialMutations(t *testing.T) {
 	}
 
 	sample := entries
-	if len(sample) > 50 && !soakModeEnabled() {
-		sample = sample[:50]
+	sampleSize := testbudget.MutationSampleSize()
+	if sampleSize > 0 && len(sample) > sampleSize {
+		sample = sample[:sampleSize]
 	}
 
 	changed := 0
@@ -128,22 +118,18 @@ func loadMutationCorpus(t *testing.T) []CorpusEntry {
 	if err != nil {
 		t.Fatalf("ExtractCorpus failed: %v", err)
 	}
-	if soakModeEnabled() || len(entries) <= defaultMutationSampleSize {
+	sampleSize := testbudget.MutationSampleSize()
+	if sampleSize == 0 || len(entries) <= sampleSize {
 		return entries
 	}
 
 	rng := rand.New(rand.NewSource(42)) //nolint:gosec
 	perm := rng.Perm(len(entries))
-	out := make([]CorpusEntry, 0, defaultMutationSampleSize)
-	for _, idx := range perm[:defaultMutationSampleSize] {
+	out := make([]CorpusEntry, 0, sampleSize)
+	for _, idx := range perm[:sampleSize] {
 		out = append(out, entries[idx])
 	}
 	return out
-}
-
-func soakModeEnabled() bool {
-	v := strings.ToLower(strings.TrimSpace(os.Getenv("MUTATION_SOAK")))
-	return v == "1" || v == "true" || v == "yes" || v == "full"
 }
 
 func extractHeaderAndExpr(script string) (string, string) {

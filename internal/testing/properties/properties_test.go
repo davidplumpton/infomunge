@@ -9,14 +9,13 @@ import (
 
 	"infomunge/internal/runner"
 	"infomunge/internal/testing/exprgen"
+	"infomunge/internal/testing/testbudget"
 
 	"pgregory.net/rapid"
 )
 
-const algebraicChecks = 500
-
 func TestArithmeticIdentities(t *testing.T) {
-	setRapidChecks(t, algebraicChecks)
+	setRapidChecks(t, testbudget.PropertyChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		x := drawSmallNumberLiteral(t, "x")
@@ -28,7 +27,7 @@ func TestArithmeticIdentities(t *testing.T) {
 }
 
 func TestCommutativity(t *testing.T) {
-	setRapidChecks(t, algebraicChecks)
+	setRapidChecks(t, testbudget.PropertyChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		a := drawSmallNumberLiteral(t, "a")
@@ -39,7 +38,7 @@ func TestCommutativity(t *testing.T) {
 }
 
 func TestAssociativity(t *testing.T) {
-	setRapidChecks(t, algebraicChecks)
+	setRapidChecks(t, testbudget.PropertyChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		a := drawSmallFloatLiteral(t, "a")
@@ -71,7 +70,7 @@ func TestAssociativity(t *testing.T) {
 }
 
 func TestDefaultOperatorIdentities(t *testing.T) {
-	setRapidChecks(t, algebraicChecks)
+	setRapidChecks(t, testbudget.PropertyChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		x := drawAnyLiteral(t, "x")
@@ -85,7 +84,7 @@ func TestDefaultOperatorIdentities(t *testing.T) {
 }
 
 func TestBooleanLogicIdentities(t *testing.T) {
-	setRapidChecks(t, algebraicChecks)
+	setRapidChecks(t, testbudget.PropertyChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		x := rapid.SampledFrom([]string{"true", "false"}).Draw(t, "x")
@@ -96,7 +95,7 @@ func TestBooleanLogicIdentities(t *testing.T) {
 }
 
 func TestCollectionIdentityProperties(t *testing.T) {
-	setRapidChecks(t, algebraicChecks)
+	setRapidChecks(t, testbudget.PropertyChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		arr := drawArrayLiteral(t, "arr")
@@ -126,7 +125,7 @@ func TestCollectionIdentityProperties(t *testing.T) {
 }
 
 func TestConcatenationIdentities(t *testing.T) {
-	setRapidChecks(t, algebraicChecks)
+	setRapidChecks(t, testbudget.PropertyChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		arr := drawArrayLiteral(t, "arr")
@@ -156,7 +155,7 @@ func TestConcatenationIdentities(t *testing.T) {
 }
 
 func TestStringOperationProperties(t *testing.T) {
-	setRapidChecks(t, algebraicChecks)
+	setRapidChecks(t, testbudget.PropertyChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		s := strconv.Quote(rapid.StringMatching(`[A-Za-z0-9 ]{0,40}`).Draw(t, "s"))

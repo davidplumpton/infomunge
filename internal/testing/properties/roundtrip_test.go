@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"infomunge/internal/testing/exprgen"
+	"infomunge/internal/testing/testbudget"
 	"infomunge/pkg/formats"
 	"reflect"
 	"strconv"
@@ -13,10 +14,8 @@ import (
 	"pgregory.net/rapid"
 )
 
-const structuralChecks = 500
-
 func TestStructural_SizeOfMapEqualsOriginalLength(t *testing.T) {
-	setRapidChecks(t, structuralChecks)
+	setRapidChecks(t, testbudget.StructuralChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		arr := drawArrayLiteral(t, "arr")
@@ -45,7 +44,7 @@ func TestStructural_SizeOfMapEqualsOriginalLength(t *testing.T) {
 }
 
 func TestStructural_SizeOfFilterIsBounded(t *testing.T) {
-	setRapidChecks(t, structuralChecks)
+	setRapidChecks(t, testbudget.StructuralChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		arr := drawArrayLiteral(t, "arr")
@@ -81,7 +80,7 @@ func TestStructural_SizeOfFilterIsBounded(t *testing.T) {
 }
 
 func TestStructural_FlattenSizeLowerBound(t *testing.T) {
-	setRapidChecks(t, structuralChecks)
+	setRapidChecks(t, testbudget.StructuralChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		arr := drawArrayOfArraysLiteral(t, "arr_of_arr")
@@ -109,7 +108,7 @@ func TestStructural_FlattenSizeLowerBound(t *testing.T) {
 }
 
 func TestStructural_KeysValuesSameSize(t *testing.T) {
-	setRapidChecks(t, structuralChecks)
+	setRapidChecks(t, testbudget.StructuralChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		obj := drawObjectLiteral(t, "obj")
@@ -129,7 +128,7 @@ func TestStructural_KeysValuesSameSize(t *testing.T) {
 }
 
 func TestRoundTrip_JSONSafeValues(t *testing.T) {
-	setRapidChecks(t, structuralChecks)
+	setRapidChecks(t, testbudget.StructuralChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		valueExpr := drawJSONSafeLiteral(t, "json_safe")
@@ -159,7 +158,7 @@ func TestRoundTrip_JSONSafeValues(t *testing.T) {
 }
 
 func TestStability_ByteIdenticalAcrossRepeatedEvaluation(t *testing.T) {
-	setRapidChecks(t, structuralChecks)
+	setRapidChecks(t, testbudget.StructuralChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		tc := exprgen.SampleContext().Draw(t, "ctx")

@@ -10,11 +10,10 @@ import (
 	"infomunge/internal/evaluator"
 	"infomunge/internal/preprocessor"
 	"infomunge/internal/testing/exprgen"
+	"infomunge/internal/testing/testbudget"
 
 	"pgregory.net/rapid"
 )
-
-const noPanicChecks = 10000
 
 var validTypeNames = map[string]struct{}{
 	"Null":      {},
@@ -30,7 +29,7 @@ var validTypeNames = map[string]struct{}{
 }
 
 func TestEvaluate_NoPanics_Deterministic_AndTypeConsistent(t *testing.T) {
-	setRapidChecks(t, noPanicChecks)
+	setRapidChecks(t, testbudget.NoPanicChecks())
 
 	rapid.Check(t, func(t *rapid.T) {
 		tc := exprgen.SampleContext().Draw(t, "ctx")
