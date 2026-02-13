@@ -53,7 +53,7 @@ Feature: Assertion Matchers
       must([1, 2], beObject())
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected object, got"
 
   # Type matchers - beString
   Scenario: beString with string
@@ -79,7 +79,7 @@ Feature: Assertion Matchers
       must(42, beString())
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected string, got"
 
   # Type matchers - beNumber
   Scenario: beNumber with integer
@@ -119,7 +119,7 @@ Feature: Assertion Matchers
       must("42", beNumber())
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected number, got"
 
   # Type matchers - beBoolean
   Scenario: beBoolean with true
@@ -159,7 +159,7 @@ Feature: Assertion Matchers
       must(1, beBoolean())
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected boolean, got"
 
   # Type matchers - beNull
   Scenario: beNull with null
@@ -185,7 +185,7 @@ Feature: Assertion Matchers
       must("hello", beNull())
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected null, got"
 
   # Type matchers - beEmpty
   Scenario: beEmpty with empty string
@@ -239,7 +239,7 @@ Feature: Assertion Matchers
       must("hello", beEmpty())
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected empty string, got \"hello\""
 
   Scenario: beEmpty with non-empty array fails
     Given the following input content:
@@ -250,7 +250,7 @@ Feature: Assertion Matchers
       must([1], beEmpty())
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected empty array, got array with 1 items"
 
   # Type matchers - beBlank
   Scenario: beBlank with empty string
@@ -290,7 +290,7 @@ Feature: Assertion Matchers
       must("hello", beBlank())
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected blank string, got \"hello\""
 
   Scenario: beBlank with non-string fails
     Given the following input content:
@@ -301,7 +301,7 @@ Feature: Assertion Matchers
       must(42, beBlank())
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected string, got"
 
   # Comparison matchers - equalTo
   Scenario: equalTo with equal numbers
@@ -355,7 +355,7 @@ Feature: Assertion Matchers
       must(42, equalTo(43))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected 43, got 42"
 
   # Comparison matchers - beGreaterThan
   Scenario: beGreaterThan with greater number
@@ -381,7 +381,7 @@ Feature: Assertion Matchers
       must(5, beGreaterThan(5))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected value > 5, got 5"
 
   Scenario: beGreaterThan inclusive with equal number
     Given the following input content:
@@ -406,7 +406,7 @@ Feature: Assertion Matchers
       must(3, beGreaterThan(5))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected value > 5, got 3"
 
   # Comparison matchers - beLowerThan
   Scenario: beLowerThan with lower number
@@ -432,7 +432,7 @@ Feature: Assertion Matchers
       must(5, beLowerThan(5))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected value < 5, got 5"
 
   Scenario: beLowerThan inclusive with equal number
     Given the following input content:
@@ -457,7 +457,7 @@ Feature: Assertion Matchers
       must(10, beLowerThan(5))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected value < 5, got 10"
 
   # Comparison matchers - beOneOf
   Scenario: beOneOf with matching value
@@ -483,7 +483,7 @@ Feature: Assertion Matchers
       must("d", beOneOf(["a", "b", "c"]))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected one of [a b c], got d"
 
   # Content matchers - containStr
   Scenario: containStr with matching substring
@@ -509,7 +509,7 @@ Feature: Assertion Matchers
       must("hello world", containStr("foo"))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected string to contain \"foo\", got \"hello world\""
 
   Scenario: containStr with non-string fails
     Given the following input content:
@@ -520,7 +520,7 @@ Feature: Assertion Matchers
       must(42, containStr("4"))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected string, got"
 
   # Content matchers - containVal
   Scenario: containVal with matching value in array
@@ -546,7 +546,7 @@ Feature: Assertion Matchers
       must([1, 2, 3], containVal(4))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected array to contain 4"
 
   Scenario: containVal with non-array fails
     Given the following input content:
@@ -557,7 +557,7 @@ Feature: Assertion Matchers
       must("hello", containVal("h"))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected array, got"
 
   # Content matchers - startWith
   Scenario: startWith with matching prefix
@@ -583,7 +583,7 @@ Feature: Assertion Matchers
       must("hello world", startWith("world"))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected string to start with \"world\", got \"hello world\""
 
   # Content matchers - endWith
   Scenario: endWith with matching suffix
@@ -609,7 +609,7 @@ Feature: Assertion Matchers
       must("hello world", endWith("hello"))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected string to end with \"hello\", got \"hello world\""
 
   # Content matchers - haveSize
   Scenario: haveSize with array of correct size
@@ -663,7 +663,7 @@ Feature: Assertion Matchers
       must([1, 2, 3], haveSize(5))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected size 5, got 3"
 
   # Content matchers - haveKey
   Scenario: haveKey with existing key
@@ -689,7 +689,7 @@ Feature: Assertion Matchers
       must({name: "Alice"}, haveKey("age"))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected object to have key \"age\""
 
   Scenario: haveKey with non-object fails
     Given the following input content:
@@ -700,7 +700,7 @@ Feature: Assertion Matchers
       must([1, 2], haveKey("0"))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected object, got"
 
   # Content matchers - haveValue
   Scenario: haveValue with existing value
@@ -726,7 +726,7 @@ Feature: Assertion Matchers
       must({name: "Alice"}, haveValue("Bob"))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected object to have value Bob"
 
   # Null handling - notBeNull
   Scenario: notBeNull with non-null value
@@ -752,7 +752,7 @@ Feature: Assertion Matchers
       must(null, notBeNull())
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected non-null value, got null"
 
   # Composite matchers - eachItem
   Scenario: eachItem with all items matching
@@ -778,7 +778,7 @@ Feature: Assertion Matchers
       must([1, "two", 3], eachItem(beNumber()))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "item at index 1: expected number, got"
 
   Scenario: eachItem with non-array fails
     Given the following input content:
@@ -789,7 +789,7 @@ Feature: Assertion Matchers
       must("hello", eachItem(beString()))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected array, got"
 
   # Composite matchers - haveItem
   Scenario: haveItem with at least one matching item
@@ -815,7 +815,7 @@ Feature: Assertion Matchers
       must([1, 2, 3], haveItem(beString()))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "no items matched the given matcher"
 
   # Composite matchers - anyOf
   Scenario: anyOf with first matcher matching
@@ -855,7 +855,7 @@ Feature: Assertion Matchers
       must(true, anyOf([beString(), beNumber()]))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "value did not satisfy any of the matchers"
 
   # Composite matchers - notBe
   Scenario: notBe negates matcher that fails
@@ -881,7 +881,7 @@ Feature: Assertion Matchers
       must("hello", notBe(beString()))
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected matcher to fail, but it passed"
 
   # Multiple matchers with must
   Scenario: must with array of matchers all passing
@@ -907,7 +907,7 @@ Feature: Assertion Matchers
       must("hello", [beString(), haveSize(10)])
       """
     When I run the application and it fails
-    Then the output should contain "assertion failed"
+    Then the output should contain "expected size 10, got 5"
 
   # Complex nested matchers
   Scenario: eachItem with equalTo matcher
