@@ -111,3 +111,16 @@ Feature: Playground webapp
     When I run the server script with API key "secret-token"
     Then the response status should be 200
     And the output should contain "\"ok\":true"
+
+  Scenario: Run endpoint accepts valid bearer token when API key is configured
+    Given the server is running with API key "secret-token"
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {ok: true}
+      """
+    When I run the server script with bearer token "secret-token"
+    Then the response status should be 200
+    And the output should contain "\"ok\":true"

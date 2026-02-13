@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -170,12 +171,12 @@ func authorizedRunRequest(r *http.Request, expectedAPIKey string) bool {
 	if expectedAPIKey == "" {
 		return true
 	}
-	if r.Header.Get("X-API-Key") == expectedAPIKey {
+	if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-API-Key")), []byte(expectedAPIKey)) == 1 {
 		return true
 	}
 	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 	if len(authHeader) <= len("Bearer ") || !strings.EqualFold(authHeader[:len("Bearer ")], "Bearer ") {
 		return false
 	}
-	return strings.TrimSpace(authHeader[len("Bearer "):]) == expectedAPIKey
+	return subtle.ConstantTimeCompare([]byte(strings.TrimSpace(authHeader[len("Bearer "):])), []byte(expectedAPIKey)) == 1
 }
