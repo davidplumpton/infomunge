@@ -63,3 +63,5 @@
 [30] **Agent Mistakes Log** - 2026-02-12: Property tests reused unconstrained string literal generation and produced values like `"$(..."`, which collided with interpolation parsing when embedded in generated expressions. Why: string generators were not scoped to parser-safe source contexts. Prevention: for property-generated source literals, constrain to a safe ASCII subset unless a test is explicitly targeting interpolation/escape behavior [22].
 
 [31] **Agent Mistakes Log** - 2026-02-12: Mutation determinism checks initially treated all expressions as deterministic and failed on legitimate time/random outputs (for example `now()`). Why: deterministic invariant lacked a nondeterministic-builtin exclusion list. Prevention: keep no-panic checks universal, but gate deterministic-result assertions behind an explicit allow/deny list for known nondeterministic builtins [22].
+
+[32] **User Preferences Log** - 2026-02-13: User asked for codebase quality review focused on biggest issues and expects significant findings to be turned into detailed beads tickets immediately.
