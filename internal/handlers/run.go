@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
+	inputio "infomunge/internal/io"
 	"infomunge/internal/runner"
 	"infomunge/pkg/formats"
 )
@@ -84,9 +85,12 @@ func NormalizeMimeType(format string, label string) (string, error) {
 func BuildRunContext(inputs []RunInput) (map[string]interface{}, error) {
 	context := make(map[string]interface{})
 	for _, input := range inputs {
-		name := strings.TrimSpace(input.Name)
-		if name == "" {
-			return nil, unifiederrors.ValidationError("input name is required")
+		name, err := inputio.NormalizeAndValidateInputName(input.Name)
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := context[name]; exists {
+			return nil, unifiederrors.ValidationErrorf("duplicate input name %q", name)
 		}
 
 		mimeType, err := NormalizeMimeType(input.Format, "input")

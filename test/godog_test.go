@@ -27,19 +27,20 @@ import (
 )
 
 type testContext struct {
-	lastOutput     string
-	lastStdout     string
-	lastStderr     string
-	inputContent   string
-	payloadContent string
-	payloadMime    string
-	scriptContent  string
-	serverURL      string
-	serverClose    func()
-	serverAPIKey   string
-	lastHTTPStatus int
-	workDir        string
-	timeout        time.Duration // Timeout for script execution to prevent infinite loops
+	lastOutput      string
+	lastStdout      string
+	lastStderr      string
+	inputContent    string
+	payloadContent  string
+	payloadMime     string
+	scriptContent   string
+	serverURL       string
+	serverClose     func()
+	serverAPIKey    string
+	serverRunInputs []map[string]string
+	lastHTTPStatus  int
+	workDir         string
+	timeout         time.Duration // Timeout for script execution to prevent infinite loops
 }
 
 var (
@@ -132,6 +133,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the following input content:$`, tc.theFollowingInputContent)
 	ctx.Step(`^a script with (\d+) repeated lines$`, tc.aScriptWithRepeatedLines)
 	ctx.Step(`^I run the application with this content$`, tc.iRunTheApplicationWithThisContent)
+	ctx.Step(`^I run the application with this content and inputs and it fails:$`, tc.iRunTheApplicationWithThisContentAndInputsAndItFails)
 	ctx.Step(`^I run the application and it fails$`, tc.iRunTheApplicationAndItFails)
 	ctx.Step(`^the output should be:$`, tc.theOutputShouldBe)
 	ctx.Step(`^the error should contain "([^"]*)"$`, tc.theOutputShouldContain)
@@ -202,6 +204,8 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the response status should be (\d+)$`, tc.theResponseStatusShouldBe)
 	ctx.Step(`^I run the server script without specifying output$`, tc.iRunTheServerScriptWithoutOutput)
 	ctx.Step(`^I run the server script with output "([^"]*)"$`, tc.iRunTheServerScriptWithOutput)
+	ctx.Step(`^the server run inputs are:$`, tc.theServerRunInputsAre)
+	ctx.Step(`^I run the server script with configured inputs$`, tc.iRunTheServerScriptWithConfiguredInputs)
 	ctx.Step(`^I run the server script without an API key$`, tc.iRunTheServerScriptWithoutAPIKey)
 	ctx.Step(`^I run the server script with API key "([^"]*)"$`, tc.iRunTheServerScriptWithAPIKey)
 	ctx.Step(`^I run the server script with bearer token "([^"]*)"$`, tc.iRunTheServerScriptWithBearerToken)
@@ -277,6 +281,28 @@ func (tc *testContext) iRunTheApplicationWithThisContent() error {
 		return err
 	}
 	return tc.iRunTheApplicationWith("input.txt")
+}
+
+func (tc *testContext) iRunTheApplicationWithThisContentAndInputsAndItFails(content *godog.DocString) error {
+	if err := tc.ensureWorkspace(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
+		return err
+	}
+
+	args := []string{"-f", "input.txt"}
+	lines := strings.Split(content.Content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSuffix(line, "\r")
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		args = append(args, "-i", line)
+	}
+
+	_ = tc.runCLI(args...)
+	return nil
 }
 
 func (tc *testContext) iRunTheApplicationAndItFails() error {
@@ -1021,6 +1047,9 @@ func (tc *testContext) runServerScriptWithAPIKey(output *string, apiKey *string)
 	if output != nil {
 		payload["output"] = *output
 	}
+	if len(tc.serverRunInputs) > 0 {
+		payload["inputs"] = tc.serverRunInputs
+	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -1064,6 +1093,9 @@ func (tc *testContext) runServerScriptWithBearerToken(output *string, apiKey str
 	}
 	if output != nil {
 		payload["output"] = *output
+	}
+	if len(tc.serverRunInputs) > 0 {
+		payload["inputs"] = tc.serverRunInputs
 	}
 
 	body, err := json.Marshal(payload)
@@ -1157,6 +1189,45 @@ func (tc *testContext) iRunTheServerScriptWithOversizedBody() error {
 	}
 	tc.lastHTTPStatus = resp.StatusCode
 	tc.lastOutput = string(responseBody)
+	return nil
+}
+
+func (tc *testContext) theServerRunInputsAre(content *godog.DocString) error {
+	var inputs []map[string]string
+	if err := json.Unmarshal([]byte(content.Content), &inputs); err != nil {
+		return fmt.Errorf("invalid server run inputs JSON: %v", err)
+	}
+	tc.serverRunInputs = inputs
+	return nil
+}
+
+func (tc *testContext) iRunTheServerScriptWithConfiguredInputs() error {
+	if strings.TrimSpace(tc.scriptContent) == "" {
+		return fmt.Errorf("script is not set")
+	}
+
+	payload := map[string]interface{}{
+		"script": tc.scriptContent,
+	}
+	if len(tc.serverRunInputs) > 0 {
+		payload["inputs"] = tc.serverRunInputs
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/run", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	app := cli.NewApp()
+	config := &cli.Config{Lazy: false}
+	app.ServerHandler(config).ServeHTTP(rec, req)
+
+	tc.lastHTTPStatus = rec.Code
+	tc.lastOutput = rec.Body.String()
 	return nil
 }
 

@@ -89,3 +89,5 @@
 [43] **Agent Mistakes Log** - 2026-02-14: Added a cucumber script using multiline function arguments with commas again, and parser failed (`expected operand, found ','`). Why: ignored existing parser formatting constraint while drafting a new scenario. Prevention: keep feature-script function calls on one expression line unless there is proven multiline parser coverage for that pattern [22][39].
 
 [44] **Agent Mistakes Log** - 2026-02-13: Applied an oversized patch hunk to `internal/preprocessor/rewriter_handlers.go` that briefly corrupted the `handleCloseBrace` function body. Why: attempted a very broad single-shot patch edit instead of smaller targeted hunks. Prevention: split large refactors into scoped patches and immediately validate edited regions with focused `sed` checks before running tests [22].
+
+[45] **Agent Mistakes Log** - 2026-02-14: Ran `rg` with a search pattern beginning with `-` without using `--`, causing option parsing errors and a noisy search loop. Why: rushed CLI composition for ripgrep flags/pattern ordering. Prevention: when a pattern may begin with `-`, use `rg ... -- \"<pattern>\" <path>` and place `-g` options before `--` [22].

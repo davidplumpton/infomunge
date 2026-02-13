@@ -77,7 +77,14 @@ func (p *Parser) ParseInputs(inputs []string) (map[string]interface{}, error) {
 			return nil, unifiederrors.ValidationErrorf("invalid input format: %s (expected name=source)", input)
 		}
 
-		name, source := parts[0], parts[1]
+		name, err := NormalizeAndValidateInputName(parts[0])
+		if err != nil {
+			return nil, err
+		}
+		source := parts[1]
+		if _, exists := context[name]; exists {
+			return nil, unifiederrors.ValidationErrorf("duplicate input name %q", name)
+		}
 
 		src, err := p.ParseSource(source)
 		if err != nil {
