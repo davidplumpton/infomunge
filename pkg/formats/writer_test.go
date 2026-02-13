@@ -238,6 +238,38 @@ func TestFormat_DW(t *testing.T) {
 	})
 }
 
+func TestFormat_Flatfile(t *testing.T) {
+	t.Run("string input", func(t *testing.T) {
+		result, err := Format("HDR0001ALICE   000030NY ", "application/flatfile")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != "HDR0001ALICE   000030NY " {
+			t.Fatalf("expected passthrough flatfile string, got %q", result)
+		}
+	})
+
+	t.Run("byte slice input", func(t *testing.T) {
+		result, err := Format([]byte("DTL0002BOB     000025CA "), "application/flatfile")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != "DTL0002BOB     000025CA " {
+			t.Fatalf("unexpected formatted flatfile output: %q", result)
+		}
+	})
+
+	t.Run("unsupported type", func(t *testing.T) {
+		_, err := Format(Object{"a": 1}, "application/flatfile")
+		if err == nil {
+			t.Fatal("expected error for non-flatfile input")
+		}
+		if !strings.Contains(err.Error(), "binary output expects string or []byte") {
+			t.Fatalf("unexpected error message: %v", err)
+		}
+	})
+}
+
 func TestFormat_UnknownMimeType(t *testing.T) {
 	// Unknown mime types should return an error rather than silently falling back
 	_, err := Format(42, "application/unknown")

@@ -174,3 +174,15 @@ func TestDWFormatLookup(t *testing.T) {
 		t.Fatalf("expected application/dw for .dwl extension, got %q", got)
 	}
 }
+
+func TestFlatfileFormatLookup(t *testing.T) {
+	if got := MimeTypeForFormat("flatfile"); got != "application/flatfile" {
+		t.Fatalf("expected application/flatfile for format 'flatfile', got %q", got)
+	}
+	if got := DetectMimeType("payload.flatfile"); got != "application/flatfile" {
+		t.Fatalf("expected application/flatfile for .flatfile extension, got %q", got)
+	}
+	if got := DetectMimeType("payload.ffd"); got != "application/flatfile" {
+		t.Fatalf("expected application/flatfile for .ffd extension, got %q", got)
+	}
+}

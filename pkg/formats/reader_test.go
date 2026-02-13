@@ -193,6 +193,17 @@ func TestRead_DW(t *testing.T) {
 	}
 }
 
+func TestRead_Flatfile(t *testing.T) {
+	content := "HDR0001ALICE   000030NY \nDTL0002BOB     000025CA "
+	result, err := Read(content, "application/flatfile")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, ok := result.(string); !ok || got != content {
+		t.Fatalf("expected flatfile reader to return original content, got %#v (%T)", result, result)
+	}
+}
+
 func TestRead_XML(t *testing.T) {
 	tests := []struct {
 		name     string

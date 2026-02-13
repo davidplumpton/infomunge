@@ -96,6 +96,20 @@ Feature: I/O Functions
       "%dw 2.0\noutput application/json\n---\n42"
       """
 
+  Scenario: read flatfile content
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("HDR0001ALICE   000030NY\nDTL0002BOB     000025CA", "application/flatfile")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "HDR0001ALICE   000030NY\nDTL0002BOB     000025CA"
+      """
+
   Scenario: read with invalid JSON fails
     Given the following script:
       """
@@ -289,6 +303,20 @@ Feature: I/O Functions
     Then the output should be:
       """
       "%dw 2.0\noutput application/json\n---\n{a: 1}"
+      """
+
+  Scenario: write string to flatfile
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write("HDR0001ALICE   000030NY\nDTL0002BOB     000025CA", "application/flatfile")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "HDR0001ALICE   000030NY\nDTL0002BOB     000025CA"
       """
 
   Scenario: write requires exactly two arguments
