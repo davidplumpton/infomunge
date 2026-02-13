@@ -110,3 +110,16 @@ func Literal() *rapid.Generator[string] {
 		NullLiteral(),
 	)
 }
+
+// DWLiteral returns a generator that produces literals compatible with both
+// infomunge and DataWeave. Unlike Literal(), it only generates "null" (never
+// "nil", which DataWeave does not recognize).
+func DWLiteral() *rapid.Generator[string] {
+	return rapid.OneOf(
+		IntLiteral(),
+		FloatLiteral(),
+		StringLiteral(),
+		BoolLiteral(),
+		rapid.Just("null"),
+	)
+}

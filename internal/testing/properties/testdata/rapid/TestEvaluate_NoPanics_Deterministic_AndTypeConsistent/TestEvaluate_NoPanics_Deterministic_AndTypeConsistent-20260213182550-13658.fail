@@ -1,0 +1,34 @@
+# 2026/02/13 18:25:50.385714 [TestEvaluate_NoPanics_Deterministic_AndTypeConsistent] [rapid] draw ctx: exprgen.TestContext{Value:map[string]interface {}{"payload":map[string]interface {}{"name":""}}, JSON:"{\"name\":\"\"}", Fields:[]string{"name"}}
+# 2026/02/13 18:25:50.385724 [TestEvaluate_NoPanics_Deterministic_AndTypeConsistent] [rapid] draw expr_kind: 2
+# 2026/02/13 18:25:50.385729 [TestEvaluate_NoPanics_Deterministic_AndTypeConsistent] [rapid] draw random_expr: "payload.name[0 to 0]"
+# 2026/02/13 18:25:50.385874 [TestEvaluate_NoPanics_Deterministic_AndTypeConsistent] typeOf evaluation failed
+# expr: "typeOf(payload.name[0 to 0])"
+# ctx: map[string]interface {}{"payload":map[string]interface {}{"name":""}}
+# err: 1:28: missing ',' before newline in argument list
+# 
+v0.4.8#12915417287001875959
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x38e38e38e38e4
+0x2
+0x0
+0xc05c654ab866b
+0x10
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

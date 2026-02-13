@@ -7,22 +7,6 @@ import (
 	"pgregory.net/rapid"
 )
 
-var lambdaParamCandidates = []string{
-	"x", "y", "item", "value", "elem", "n",
-	"idx", "i", "acc", "current", "left", "right",
-}
-
-// CollectionOpGen returns a generator for collection operator expressions
-// (map, filter, reduce, flatMap) applied to array-like expressions.
-func CollectionOpGen(depth int, features Feature) *rapid.Generator[string] {
-	return collectionOpGenWithScope(depth, features, lambdaScope{})
-}
-
-// LambdaGen returns a generator for lambda expressions.
-func LambdaGen(depth int, features Feature) *rapid.Generator[string] {
-	return lambdaGenWithScope(depth, features, lambdaScope{})
-}
-
 type lambdaScope struct {
 	named         []string
 	implicitValue bool
@@ -81,7 +65,23 @@ func scopeReferenceExpr(scope lambdaScope) *rapid.Generator[string] {
 	})
 }
 
-func lambdaGenWithScope(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
+var lambdaParamCandidates = []string{
+	"x", "y", "item", "value", "elem", "n",
+	"idx", "i", "acc", "current", "left", "right",
+}
+
+// CollectionOpGen returns a generator for collection operator expressions
+// (map, filter, reduce, flatMap) applied to array-like expressions.
+func CollectionOpGen(depth int, features Feature) *rapid.Generator[string] {
+	return collectionOpGenWithScope(depth, features, lambdaScope{}, exprConfig{})
+}
+
+// LambdaGen returns a generator for lambda expressions.
+func LambdaGen(depth int, features Feature) *rapid.Generator[string] {
+	return lambdaGenWithScope(depth, features, lambdaScope{}, exprConfig{})
+}
+
+func lambdaGenWithScope(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
 	bodyDepth := depth - 1
 	if bodyDepth < 0 {
 		bodyDepth = 0
@@ -96,42 +96,42 @@ func lambdaGenWithScope(depth int, features Feature, scope lambdaScope) *rapid.G
 		}
 		params := uniqueLambdaParams(t, paramCount, scope)
 		lambdaScope := scope.withNamed(params...)
-		body := expressionAtDepthWithScope(bodyDepth, nestedFeatures, lambdaScope).Draw(t, "lambdaBody")
+		body := expressionAtDepthWithScope(bodyDepth, nestedFeatures, lambdaScope, cfg).Draw(t, "lambdaBody")
 		return fmt.Sprintf("(%s) -> %s", strings.Join(params, ", "), body)
 	})
 }
 
-func collectionOpGenWithScope(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
+func collectionOpGenWithScope(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
 	bodyDepth := depth - 1
 	if bodyDepth < 0 {
 		bodyDepth = 0
 	}
 
 	return rapid.Custom(func(t *rapid.T) string {
-		input := collectionInputExpr(t, depth, features, scope)
+		input := collectionInputExpr(t, depth, features, scope, cfg)
 		op := rapid.SampledFrom([]string{"map", "filter", "flatMap", "reduce"}).Draw(t, "collectionOp")
 		switch op {
 		case "map":
-			return mapExpr(t, input, bodyDepth, features, scope)
+			return mapExpr(t, input, bodyDepth, features, scope, cfg)
 		case "filter":
-			return filterExpr(t, input, bodyDepth, features, scope)
+			return filterExpr(t, input, bodyDepth, features, scope, cfg)
 		case "flatMap":
-			return flatMapExpr(t, input, bodyDepth, features, scope)
+			return flatMapExpr(t, input, bodyDepth, features, scope, cfg)
 		default:
-			return reduceExpr(t, input, bodyDepth, features, scope)
+			return reduceExpr(t, input, bodyDepth, features, scope, cfg)
 		}
 	})
 }
 
-func collectionInputExpr(t *rapid.T, depth int, features Feature, scope lambdaScope) string {
+func collectionInputExpr(t *rapid.T, depth int, features Feature, scope lambdaScope, cfg exprConfig) string {
 	nestedFeatures := expressionNestedFeatures(features)
 	if depth > 1 && features&FeatureCollections != 0 && rapid.IntRange(0, 3).Draw(t, "nestedCollection") == 0 {
-		return collectionOpGenWithScope(depth-1, nestedFeatures, scope).Draw(t, "nestedSource")
+		return collectionOpGenWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "nestedSource")
 	}
-	return filteredArrayExpr(max(depth-1, 0), nestedFeatures, scope).Draw(t, "arraySource")
+	return filteredArrayExpr(max(depth-1, 0), nestedFeatures, scope, cfg).Draw(t, "arraySource")
 }
 
-func mapExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope lambdaScope) string {
+func mapExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope lambdaScope, cfg exprConfig) string {
 	if features&FeatureImplicitLambda != 0 && rapid.Bool().Draw(t, "mapImplicit") {
 		implicitScope := scope.withImplicit()
 		body := scopeReferenceExpr(implicitScope).Draw(t, "mapImplicitBody")
@@ -139,23 +139,23 @@ func mapExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope la
 	}
 	params := uniqueLambdaParams(t, 1+boolToInt(rapid.Bool().Draw(t, "mapWithIndex")), scope)
 	lScope := scope.withNamed(params...)
-	body := expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features), lScope).Draw(t, "mapBody")
+	body := expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features), lScope, cfg).Draw(t, "mapBody")
 	return fmt.Sprintf("%s map (%s) -> %s", input, strings.Join(params, ", "), body)
 }
 
-func filterExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope lambdaScope) string {
+func filterExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope lambdaScope, cfg exprConfig) string {
 	if features&FeatureImplicitLambda != 0 && rapid.Bool().Draw(t, "filterImplicit") {
 		lScope := scope.withImplicit()
-		body := filterPredicateExpr(t, bodyDepth, features, lScope)
+		body := filterPredicateExpr(t, bodyDepth, features, lScope, cfg)
 		return fmt.Sprintf("%s filter %s", input, body)
 	}
 	params := uniqueLambdaParams(t, 1+boolToInt(rapid.Bool().Draw(t, "filterWithIndex")), scope)
 	lScope := scope.withNamed(params...)
-	body := filterPredicateExpr(t, bodyDepth, features, lScope)
+	body := filterPredicateExpr(t, bodyDepth, features, lScope, cfg)
 	return fmt.Sprintf("%s filter (%s) -> %s", input, strings.Join(params, ", "), body)
 }
 
-func flatMapExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope lambdaScope) string {
+func flatMapExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope lambdaScope, cfg exprConfig) string {
 	if features&FeatureImplicitLambda != 0 && rapid.Bool().Draw(t, "flatMapImplicit") {
 		implicitScope := scope.withImplicit()
 		bodyExpr := scopeReferenceExpr(implicitScope).Draw(t, "flatMapImplicitBody")
@@ -163,11 +163,11 @@ func flatMapExpr(t *rapid.T, input string, bodyDepth int, features Feature, scop
 	}
 	params := uniqueLambdaParams(t, 1+boolToInt(rapid.Bool().Draw(t, "flatMapWithIndex")), scope)
 	lScope := scope.withNamed(params...)
-	bodyExpr := expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features), lScope).Draw(t, "flatMapBody")
+	bodyExpr := expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features), lScope, cfg).Draw(t, "flatMapBody")
 	return fmt.Sprintf("%s flatMap (%s) -> [%s]", input, strings.Join(params, ", "), bodyExpr)
 }
 
-func reduceExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope lambdaScope) string {
+func reduceExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope lambdaScope, cfg exprConfig) string {
 	withIndex := rapid.Bool().Draw(t, "reduceWithIndex")
 	paramCount := 2
 	if withIndex {
@@ -184,14 +184,14 @@ func reduceExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope
 	}
 	// Occasionally emit a generated body to increase structural variety.
 	if rapid.IntRange(0, 4).Draw(t, "reduceBodyKind") == 0 {
-		body = expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features), lScope).Draw(t, "reduceBody")
+		body = expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features), lScope, cfg).Draw(t, "reduceBody")
 	}
 	return fmt.Sprintf("%s reduce (%s) -> %s", input, strings.Join(params, ", "), body)
 }
 
-func filterPredicateExpr(t *rapid.T, bodyDepth int, features Feature, scope lambdaScope) string {
+func filterPredicateExpr(t *rapid.T, bodyDepth int, features Feature, scope lambdaScope, cfg exprConfig) string {
 	if len(scope.references()) == 0 {
-		return expressionAtDepthWithScope(bodyDepth, features, scope).Draw(t, "filterExpr")
+		return expressionAtDepthWithScope(bodyDepth, features, scope, cfg).Draw(t, "filterExpr")
 	}
 	base := scopeReferenceExpr(scope).Draw(t, "filterBase")
 	switch rapid.IntRange(0, 2).Draw(t, "filterPredicateKind") {
