@@ -124,6 +124,34 @@ Feature: I/O Functions
       "serialized-java-object"
       """
 
+  Scenario: read protobuf content
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("protobuf-bytes", "application/protobuf")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "protobuf-bytes"
+      """
+
+  Scenario: read x-protobuf content
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("x-protobuf-bytes", "application/x-protobuf")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "x-protobuf-bytes"
+      """
+
   Scenario: read with invalid JSON fails
     Given the following script:
       """
@@ -345,6 +373,34 @@ Feature: I/O Functions
     Then the output should be:
       """
       "serialized-java-object"
+      """
+
+  Scenario: write string to protobuf
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write("protobuf-bytes", "application/protobuf")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "protobuf-bytes"
+      """
+
+  Scenario: write string to x-protobuf
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write("x-protobuf-bytes", "application/x-protobuf")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "x-protobuf-bytes"
       """
 
   Scenario: write requires exactly two arguments

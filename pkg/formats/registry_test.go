@@ -198,3 +198,18 @@ func TestJavaFormatLookup(t *testing.T) {
 		t.Fatalf("expected application/java for .ser extension, got %q", got)
 	}
 }
+
+func TestProtobufFormatLookup(t *testing.T) {
+	if got := MimeTypeForFormat("protobuf"); got != "application/protobuf" {
+		t.Fatalf("expected application/protobuf for format 'protobuf', got %q", got)
+	}
+	if got := DetectMimeType("payload.protobuf"); got != "application/protobuf" {
+		t.Fatalf("expected application/protobuf for .protobuf extension, got %q", got)
+	}
+	if got := DetectMimeType("payload.pb"); got != "application/protobuf" {
+		t.Fatalf("expected application/protobuf for .pb extension, got %q", got)
+	}
+	if got := DetectMimeType("payload.pbf"); got != "application/protobuf" {
+		t.Fatalf("expected application/protobuf for .pbf extension, got %q", got)
+	}
+}

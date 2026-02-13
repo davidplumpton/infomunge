@@ -215,6 +215,30 @@ func TestRead_Java(t *testing.T) {
 	}
 }
 
+func TestRead_Protobuf(t *testing.T) {
+	content := "\x0a\x05Alice\x10\x1e"
+
+	tests := []struct {
+		name     string
+		mimeType string
+	}{
+		{name: "application/protobuf", mimeType: "application/protobuf"},
+		{name: "application/x-protobuf", mimeType: "application/x-protobuf"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Read(content, tt.mimeType)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got, ok := result.(string); !ok || got != content {
+				t.Fatalf("expected protobuf reader to return original content, got %#v (%T)", result, result)
+			}
+		})
+	}
+}
+
 func TestRead_XML(t *testing.T) {
 	tests := []struct {
 		name     string

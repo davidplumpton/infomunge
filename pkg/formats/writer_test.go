@@ -302,6 +302,48 @@ func TestFormat_Java(t *testing.T) {
 	})
 }
 
+func TestFormat_Protobuf(t *testing.T) {
+	tests := []struct {
+		name     string
+		mimeType string
+	}{
+		{name: "application/protobuf", mimeType: "application/protobuf"},
+		{name: "application/x-protobuf", mimeType: "application/x-protobuf"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+"/string input", func(t *testing.T) {
+			result, err := Format("\x0a\x05Alice\x10\x1e", tt.mimeType)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != "\x0a\x05Alice\x10\x1e" {
+				t.Fatalf("expected passthrough protobuf string, got %q", result)
+			}
+		})
+
+		t.Run(tt.name+"/byte slice input", func(t *testing.T) {
+			result, err := Format([]byte{0x0a, 0x03, 0x42, 0x6f, 0x62}, tt.mimeType)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != "\x0a\x03Bob" {
+				t.Fatalf("unexpected formatted protobuf output: %q", result)
+			}
+		})
+
+		t.Run(tt.name+"/unsupported type", func(t *testing.T) {
+			_, err := Format(Object{"a": 1}, tt.mimeType)
+			if err == nil {
+				t.Fatal("expected error for non-protobuf input")
+			}
+			if !strings.Contains(err.Error(), "binary output expects string or []byte") {
+				t.Fatalf("unexpected error message: %v", err)
+			}
+		})
+	}
+}
+
 func TestFormat_UnknownMimeType(t *testing.T) {
 	// Unknown mime types should return an error rather than silently falling back
 	_, err := Format(42, "application/unknown")
