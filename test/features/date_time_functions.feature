@@ -4,7 +4,7 @@ Feature: Date/Time Functions
   I want to use the now, daysBetween, and isLeapYear functions
 
   # Now function tests
-  Scenario: now returns current time in ISO 8601 format
+  Scenario: now returns RFC3339 timestamp with UTC timezone
     Given the following script:
       """
       %im 0.1
@@ -13,8 +13,8 @@ Feature: Date/Time Functions
       now()
       """
     When I run the script
-    Then the output should contain "T"
-    And the output should contain "Z"
+    Then the output should be a valid RFC3339 timestamp
+    And the output should have UTC offset minutes 0
 
   Scenario: now returns a string
     Given the following script:
@@ -39,17 +39,6 @@ Feature: Date/Time Functions
       now(1)
       """
     Then running the script should fail with error containing "now takes no arguments"
-
-  Scenario: now output contains UTC timezone
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      now()
-      """
-    When I run the script
-    Then the output should contain "Z"
 
   # DaysBetween function tests
   Scenario: daysBetween with same dates

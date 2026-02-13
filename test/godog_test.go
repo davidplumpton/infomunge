@@ -174,6 +174,8 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the output should be false$`, tc.theOutputShouldBeFalse)
 	ctx.Step(`^the output should be null$`, tc.theOutputShouldBeNull)
 	ctx.Step(`^the output should be "([^"]*)"$`, tc.theOutputShouldBeString)
+	ctx.Step(`^the output should be a valid RFC3339 timestamp$`, tc.theOutputShouldBeValidRFC3339Timestamp)
+	ctx.Step(`^the output should have UTC offset minutes (-?\d+)$`, tc.theOutputShouldHaveUTCOffsetMinutes)
 	ctx.Step(`^the stdout should be valid JSON equal to:$`, tc.theStdoutShouldBeValidJSONEqualTo)
 	ctx.Step(`^the stderr should contain "((?:[^"\\]|\\.)*)"$`, tc.theStderrShouldContain)
 
@@ -901,6 +903,49 @@ func (tc *testContext) theOutputShouldMatchRegex(pattern string) error {
 	}
 	if !matched {
 		return fmt.Errorf("expected output %q to match pattern %q", trimmed, pattern)
+	}
+	return nil
+}
+
+func (tc *testContext) outputAsString() (string, error) {
+	trimmed := strings.TrimSpace(tc.lastOutput)
+	if trimmed == "" {
+		return "", fmt.Errorf("expected non-empty output")
+	}
+	if strings.HasPrefix(trimmed, "\"") && strings.HasSuffix(trimmed, "\"") {
+		unquoted, err := strconv.Unquote(trimmed)
+		if err != nil {
+			return "", fmt.Errorf("expected valid JSON string output, got %q: %v", trimmed, err)
+		}
+		return unquoted, nil
+	}
+	return trimmed, nil
+}
+
+func (tc *testContext) theOutputShouldBeValidRFC3339Timestamp() error {
+	value, err := tc.outputAsString()
+	if err != nil {
+		return err
+	}
+	if _, err := time.Parse(time.RFC3339Nano, value); err != nil {
+		return fmt.Errorf("expected RFC3339 timestamp, got %q: %v", value, err)
+	}
+	return nil
+}
+
+func (tc *testContext) theOutputShouldHaveUTCOffsetMinutes(expectedMinutes int) error {
+	value, err := tc.outputAsString()
+	if err != nil {
+		return err
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return fmt.Errorf("expected RFC3339 timestamp before checking offset, got %q: %v", value, err)
+	}
+	_, offsetSeconds := parsed.Zone()
+	actualMinutes := offsetSeconds / 60
+	if actualMinutes != expectedMinutes {
+		return fmt.Errorf("expected UTC offset %d minutes, got %d minutes in %q", expectedMinutes, actualMinutes, value)
 	}
 	return nil
 }
