@@ -32,7 +32,7 @@ func DecodeRunRequest(body io.Reader) (*RunRequest, error) {
 
 	var request RunRequest
 	if err := decoder.Decode(&request); err != nil {
-		return nil, unifiederrors.ValidationErrorf("invalid JSON body: %v", err)
+		return nil, unifiederrors.WrapValidationf(err, "invalid JSON body: %v", err)
 	}
 	if err := ensureEOF(decoder); err != nil {
 		return nil, err

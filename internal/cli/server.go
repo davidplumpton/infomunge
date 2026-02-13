@@ -21,6 +21,7 @@ const (
 	serverWriteTimeout      = 30 * time.Second
 	serverIdleTimeout       = 60 * time.Second
 	serverShutdownTimeout   = 5 * time.Second
+	runRequestBodyMaxBytes  = 1 * 1024 * 1024
 )
 
 func (app *App) serve(config *Config) error {
@@ -106,8 +107,14 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 			return
 		}
 
-		payload, err := handlers.DecodeRunRequest(r.Body)
+		requestBody := http.MaxBytesReader(w, r.Body, runRequestBodyMaxBytes)
+		payload, err := handlers.DecodeRunRequest(requestBody)
 		if err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				http.Error(w, fmt.Sprintf("request body exceeds %d bytes", runRequestBodyMaxBytes), http.StatusRequestEntityTooLarge)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

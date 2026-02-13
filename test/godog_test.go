@@ -167,6 +167,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I run the server script without specifying output$`, tc.iRunTheServerScriptWithoutOutput)
 	ctx.Step(`^I run the server script with output "([^"]*)"$`, tc.iRunTheServerScriptWithOutput)
 	ctx.Step(`^I run the server script with a canceled request context$`, tc.iRunTheServerScriptWithCanceledContext)
+	ctx.Step(`^I run the server script with an oversized request body$`, tc.iRunTheServerScriptWithOversizedBody)
 }
 
 // Existing steps
@@ -841,6 +842,44 @@ func (tc *testContext) iRunTheServerScriptWithCanceledContext() error {
 
 	tc.lastHTTPStatus = rec.Code
 	tc.lastOutput = rec.Body.String()
+	return nil
+}
+
+func (tc *testContext) iRunTheServerScriptWithOversizedBody() error {
+	if tc.serverURL == "" {
+		return fmt.Errorf("server is not running")
+	}
+	if strings.TrimSpace(tc.scriptContent) == "" {
+		return fmt.Errorf("script is not set")
+	}
+
+	payload := map[string]interface{}{
+		"script": tc.scriptContent,
+		"inputs": []map[string]string{
+			{
+				"name":    "payload",
+				"format":  "text/plain",
+				"content": strings.Repeat("x", 2*1024*1024),
+			},
+		},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	resp, err := http.Post(tc.serverURL+"/run", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to request /run: %v", err)
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %v", err)
+	}
+	tc.lastHTTPStatus = resp.StatusCode
+	tc.lastOutput = string(responseBody)
 	return nil
 }
 

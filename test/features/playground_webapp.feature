@@ -72,3 +72,16 @@ Feature: Playground webapp
     When I run the server script with a canceled request context
     Then the response status should be 408
     And the output should contain "request canceled"
+
+  Scenario: Run endpoint rejects oversized request bodies
+    Given the server is running
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    When I run the server script with an oversized request body
+    Then the response status should be 413
+    And the output should contain "request body exceeds"

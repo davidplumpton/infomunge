@@ -65,3 +65,5 @@
 [31] **Agent Mistakes Log** - 2026-02-12: Mutation determinism checks initially treated all expressions as deterministic and failed on legitimate time/random outputs (for example `now()`). Why: deterministic invariant lacked a nondeterministic-builtin exclusion list. Prevention: keep no-panic checks universal, but gate deterministic-result assertions behind an explicit allow/deny list for known nondeterministic builtins [22].
 
 [32] **User Preferences Log** - 2026-02-13: User asked for codebase quality review focused on biggest issues and expects significant findings to be turned into detailed beads tickets immediately.
+
+[33] **Agent Mistakes Log** - 2026-02-13: Attempted to invoke `apply_patch` through `exec_command` again while editing multiple files. Why: defaulted to a parallel shell-edit pattern and skipped the dedicated patch tool. Prevention: use the `apply_patch` tool directly for all patch hunks, then parallelize only read/test commands [22].
