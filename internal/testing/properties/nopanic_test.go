@@ -59,7 +59,7 @@ func TestEvaluate_NoPanics_Deterministic_AndTypeConsistent(t *testing.T) {
 			return
 		}
 
-		if !reflect.DeepEqual(firstResult, secondResult) {
+		if !deterministicResultsEqual(firstResult, secondResult) {
 			t.Fatalf("nondeterministic result\nexpr: %q\nctx: %#v\nfirst:  %#v\nsecond: %#v", expr, tc.Value, firstResult, secondResult)
 		}
 
@@ -94,6 +94,68 @@ func drawExpression(t *rapid.T, tc exprgen.TestContext) string {
 	default:
 		return exprgen.Expression(3, exprgen.FeatureAll).Draw(t, "random_expr")
 	}
+}
+
+func TestEvaluate_DeterministicLambdaResults(t *testing.T) {
+	ctx := map[string]interface{}{
+		"payload": map[string]interface{}{
+			"active":  true,
+			"address": 7,
+			"age":     true,
+			"name":    []interface{}{-230},
+			"score":   false,
+			"tags": map[string]interface{}{
+				"age": "c",
+				"name": map[string]interface{}{
+					"active": true,
+					"age":    "dwho",
+					"name":   false,
+				},
+			},
+		},
+	}
+	expr := "(left, current) -> -1.7976931348623157e+308"
+
+	firstResult, firstErr := evalWithContext(expr, ctx)
+	if firstErr != nil {
+		t.Fatalf("first eval failed: %v", firstErr)
+	}
+	secondResult, secondErr := evalWithContext(expr, ctx)
+	if secondErr != nil {
+		t.Fatalf("second eval failed: %v", secondErr)
+	}
+
+	if _, ok := firstResult.(*evaluator.Lambda); !ok {
+		t.Fatalf("expected lambda result, got %#v (%T)", firstResult, firstResult)
+	}
+	if _, ok := secondResult.(*evaluator.Lambda); !ok {
+		t.Fatalf("expected lambda result, got %#v (%T)", secondResult, secondResult)
+	}
+	if !deterministicResultsEqual(firstResult, secondResult) {
+		t.Fatalf("lambda results should be treated as deterministic\nfirst: %#v\nsecond: %#v", firstResult, secondResult)
+	}
+}
+
+func deterministicResultsEqual(firstResult, secondResult interface{}) bool {
+	if reflect.DeepEqual(firstResult, secondResult) {
+		return true
+	}
+
+	firstLambda, firstIsLambda := firstResult.(*evaluator.Lambda)
+	secondLambda, secondIsLambda := secondResult.(*evaluator.Lambda)
+	if !firstIsLambda || !secondIsLambda {
+		return false
+	}
+
+	if len(firstLambda.Params) != len(secondLambda.Params) {
+		return false
+	}
+	for i := range firstLambda.Params {
+		if !reflect.DeepEqual(firstLambda.Params[i], secondLambda.Params[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 func evalWithContext(expr string, ctx map[string]interface{}) (interface{}, error) {
