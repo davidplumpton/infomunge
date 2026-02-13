@@ -431,6 +431,32 @@ func TestReadWithOptions_ProtobufStructuredDescriptorSet(t *testing.T) {
 	}
 }
 
+func TestReadWithOptions_ProtobufStructuredDescriptorSetMapField(t *testing.T) {
+	content := "\x0a\x04\x08\x01\x10\x0a\x0a\x04\x08\x02\x10\x14"
+	options := Object{
+		"structured": true,
+		"descriptor": Object{
+			"set":     testMapDescriptorSetBytes(t),
+			"message": "t.M",
+		},
+	}
+
+	result, err := ReadWithOptions(content, "application/protobuf", options)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := Object{
+		"kv": Object{
+			"1": 10.0,
+			"2": 20.0,
+		},
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("expected %#v, got %#v", expected, result)
+	}
+}
+
 func TestReadWithOptions_ProtobufStructuredPackedInteroperability(t *testing.T) {
 	packedContent := "\x0a\x04\x01\x02\xac\x02"
 	unpackedContent := "\x08\x01\x08\x02\x08\xac\x02"

@@ -228,6 +228,40 @@ Feature: I/O Functions
       {"lucky_numbers":[1,150],"name":"Bob"}
       """
 
+  Scenario: read and write structured protobuf map payload with descriptor set
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read(write({kv: {"1": 10, "2": 20}}, "application/protobuf", {structured: true, descriptor: {set: "\u000a^\u000a\u0007m.proto\u0012\u0001t\"H\u000a\u0001M\u0012\u0018\u000a\u0002kv\u0018\u0001 \u0003(\u000b2\f.t.M.KvEntry\u001a)\u000a\u0007KvEntry\u0012\u000b\u000a\u0003key\u0018\u0001 \u0001(\u0005\u0012\r\u000a\u0005value\u0018\u0002 \u0001(\u0005:\u00028\u0001b\u0006proto3", message: "t.M"}}), "application/protobuf", {structured: true, descriptor: {set: "\u000a^\u000a\u0007m.proto\u0012\u0001t\"H\u000a\u0001M\u0012\u0018\u000a\u0002kv\u0018\u0001 \u0003(\u000b2\f.t.M.KvEntry\u001a)\u000a\u0007KvEntry\u0012\u000b\u000a\u0003key\u0018\u0001 \u0001(\u0005\u0012\r\u000a\u0005value\u0018\u0002 \u0001(\u0005:\u00028\u0001b\u0006proto3", message: "t.M"}})
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"kv":{"1":10,"2":20}}
+      """
+
+  Scenario: write structured protobuf map with descriptor set rejects invalid key type
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write({kv: {"abc": 10}}, "application/protobuf", {structured: true, descriptor: {set: "\u000a^\u000a\u0007m.proto\u0012\u0001t\"H\u000a\u0001M\u0012\u0018\u000a\u0002kv\u0018\u0001 \u0003(\u000b2\f.t.M.KvEntry\u001a)\u000a\u0007KvEntry\u0012\u000b\u000a\u0003key\u0018\u0001 \u0001(\u0005\u0012\r\u000a\u0005value\u0018\u0002 \u0001(\u0005:\u00028\u0001b\u0006proto3", message: "t.M"}})
+      """
+    Then running the script should fail with error containing "map key \"abc\" is invalid"
+
+  Scenario: write structured protobuf map with descriptor set rejects invalid value type
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write({kv: {"1": "ten"}}, "application/protobuf", {structured: true, descriptor: {set: "\u000a^\u000a\u0007m.proto\u0012\u0001t\"H\u000a\u0001M\u0012\u0018\u000a\u0002kv\u0018\u0001 \u0003(\u000b2\f.t.M.KvEntry\u001a)\u000a\u0007KvEntry\u0012\u000b\u000a\u0003key\u0018\u0001 \u0001(\u0005\u0012\r\u000a\u0005value\u0018\u0002 \u0001(\u0005:\u00028\u0001b\u0006proto3", message: "t.M"}})
+      """
+    Then running the script should fail with error containing "expects int32-compatible number"
+
   Scenario: read packed protobuf payload without packed schema hint
     Given the following script:
       """

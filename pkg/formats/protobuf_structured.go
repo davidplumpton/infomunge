@@ -6,6 +6,7 @@ import (
 	unifiederrors "infomunge/internal/errors"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 
 	"google.golang.org/protobuf/proto"
@@ -29,12 +30,15 @@ type protobufSchema struct {
 }
 
 type protobufField struct {
-	number   int
-	name     string
-	kind     string
-	repeated bool
-	packed   bool
-	schema   *protobufSchema
+	number         int
+	name           string
+	kind           string
+	repeated       bool
+	packed         bool
+	schema         *protobufSchema
+	mapKeyKind     string
+	mapValueKind   string
+	mapValueSchema *protobufSchema
 }
 
 func readProtobufWithOptions(content string, options Object) (interface{}, error) {
@@ -295,7 +299,22 @@ func protobufSchemaFromMessageDescriptor(message protoreflect.MessageDescriptor)
 	for i := 0; i < fields.Len(); i++ {
 		descriptorField := fields.Get(i)
 		if descriptorField.IsMap() {
-			return protobufSchema{}, unifiederrors.ValidationErrorf("protobuf descriptor field %q map type is not supported", descriptorField.FullName())
+			mapKeyKind, mapValueKind, mapValueSchema, err := protobufMapKindsFromDescriptorField(descriptorField)
+			if err != nil {
+				return protobufSchema{}, err
+			}
+			field := protobufField{
+				number:         int(descriptorField.Number()),
+				name:           string(descriptorField.Name()),
+				kind:           "map",
+				mapKeyKind:     mapKeyKind,
+				mapValueKind:   mapValueKind,
+				mapValueSchema: mapValueSchema,
+			}
+			schema.fields = append(schema.fields, field)
+			schema.byNumber[field.number] = field
+			schema.byName[field.name] = field
+			continue
 		}
 
 		kind, ok := protobufKindFromDescriptorKind(descriptorField.Kind())
@@ -341,6 +360,42 @@ func protobufSchemaFromMessageDescriptor(message protoreflect.MessageDescriptor)
 	})
 
 	return schema, nil
+}
+
+func protobufMapKindsFromDescriptorField(descriptorField protoreflect.FieldDescriptor) (string, string, *protobufSchema, error) {
+	entry := descriptorField.Message()
+	if entry == nil {
+		return "", "", nil, unifiederrors.ValidationErrorf("protobuf descriptor field %q map entry descriptor is missing", descriptorField.FullName())
+	}
+
+	keyDescriptor := entry.Fields().ByName("key")
+	valueDescriptor := entry.Fields().ByName("value")
+	if keyDescriptor == nil || valueDescriptor == nil {
+		return "", "", nil, unifiederrors.ValidationErrorf("protobuf descriptor field %q map entry must define key and value fields", descriptorField.FullName())
+	}
+
+	keyKind, ok := protobufKindFromDescriptorKind(keyDescriptor.Kind())
+	if !ok {
+		return "", "", nil, unifiederrors.ValidationErrorf("protobuf descriptor field %q map key has unsupported kind %q", descriptorField.FullName(), keyDescriptor.Kind().String())
+	}
+	if !protobufMapKeyKindAllowed(keyKind) {
+		return "", "", nil, unifiederrors.ValidationErrorf("protobuf descriptor field %q map key kind %q is not supported", descriptorField.FullName(), keyKind)
+	}
+
+	valueKind, ok := protobufKindFromDescriptorKind(valueDescriptor.Kind())
+	if !ok {
+		return "", "", nil, unifiederrors.ValidationErrorf("protobuf descriptor field %q map value has unsupported kind %q", descriptorField.FullName(), valueDescriptor.Kind().String())
+	}
+	var valueSchema *protobufSchema
+	if valueKind == "message" {
+		nested, err := protobufSchemaFromMessageDescriptor(valueDescriptor.Message())
+		if err != nil {
+			return "", "", nil, err
+		}
+		valueSchema = &nested
+	}
+
+	return keyKind, valueKind, valueSchema, nil
 }
 
 func protobufKindFromDescriptorKind(kind protoreflect.Kind) (string, bool) {
@@ -526,6 +581,20 @@ func decodeProtobufMessage(content []byte, schema protobufSchema, strict bool) (
 		}
 		offset = next
 
+		if field.kind == "map" {
+			entry, ok := value.(protobufMapEntry)
+			if !ok {
+				return nil, unifiederrors.ValidationErrorf("protobuf map field %q decode produced unexpected type %T", field.name, value)
+			}
+			existing, _ := out[field.name].(map[string]interface{})
+			if existing == nil {
+				existing = make(map[string]interface{})
+			}
+			existing[entry.key] = entry.value
+			out[field.name] = existing
+			continue
+		}
+
 		if field.repeated {
 			existing, _ := out[field.name].([]interface{})
 			if packedValues, ok := value.([]interface{}); ok {
@@ -547,6 +616,28 @@ func decodeProtobufMessage(content []byte, schema protobufSchema, strict bool) (
 }
 
 func decodeProtobufField(content []byte, offset int, field protobufField, wireType int, strict bool) (interface{}, int, error) {
+	if field.kind == "map" {
+		if wireType != 2 {
+			return nil, offset, unifiederrors.ValidationErrorf("protobuf map field %q expects wire type 2, got %d", field.name, wireType)
+		}
+		length, n := binary.Uvarint(content[offset:])
+		if n <= 0 {
+			return nil, offset, unifiederrors.ValidationErrorf("invalid protobuf length-delimited size for field %q", field.name)
+		}
+		offset += n
+		if int(length) < 0 || offset+int(length) > len(content) {
+			return nil, offset, unifiederrors.ValidationErrorf("invalid protobuf length-delimited value for field %q: truncated payload", field.name)
+		}
+		raw := content[offset : offset+int(length)]
+		offset += int(length)
+
+		entry, err := decodeProtobufMapEntry(raw, field, strict)
+		if err != nil {
+			return nil, offset, err
+		}
+		return entry, offset, nil
+	}
+
 	expectedWireType, ok := protobufWireTypeForField(field.kind)
 	if !ok {
 		return nil, offset, unifiederrors.ValidationErrorf("protobuf field %q has unsupported type %q", field.name, field.kind)
@@ -701,6 +792,74 @@ func decodeProtobufLengthDelimited(field protobufField, raw []byte, strict bool)
 	}
 }
 
+type protobufMapEntry struct {
+	key   string
+	value interface{}
+}
+
+func decodeProtobufMapEntry(raw []byte, field protobufField, strict bool) (protobufMapEntry, error) {
+	keyField := protobufField{number: 1, name: field.name + ".key", kind: field.mapKeyKind}
+	valueField := protobufField{number: 2, name: field.name + ".value", kind: field.mapValueKind, schema: field.mapValueSchema}
+
+	offset := 0
+	key := protobufDefaultMapKey(field.mapKeyKind)
+	value := protobufDefaultValueForKind(valueField)
+	keySeen := false
+	valueSeen := false
+
+	for offset < len(raw) {
+		tag, n := binary.Uvarint(raw[offset:])
+		if n <= 0 {
+			return protobufMapEntry{}, unifiederrors.ValidationErrorf("invalid protobuf map entry tag for field %q", field.name)
+		}
+		offset += n
+		fieldNumber := int(tag >> 3)
+		wireType := int(tag & 0x7)
+
+		switch fieldNumber {
+		case 1:
+			decoded, next, err := decodeProtobufField(raw, offset, keyField, wireType, strict)
+			if err != nil {
+				return protobufMapEntry{}, err
+			}
+			offset = next
+			keyAsString, err := protobufMapKeyToString(field.mapKeyKind, decoded)
+			if err != nil {
+				return protobufMapEntry{}, err
+			}
+			key = keyAsString
+			keySeen = true
+		case 2:
+			decoded, next, err := decodeProtobufField(raw, offset, valueField, wireType, strict)
+			if err != nil {
+				return protobufMapEntry{}, err
+			}
+			offset = next
+			value = decoded
+			valueSeen = true
+		default:
+			next, err := skipUnknownProtobufField(raw, offset, wireType)
+			if err != nil {
+				return protobufMapEntry{}, err
+			}
+			offset = next
+			if strict {
+				return protobufMapEntry{}, unifiederrors.ValidationErrorf("protobuf map field %q contains unknown entry field number %d", field.name, fieldNumber)
+			}
+		}
+	}
+
+	// Defaults follow protobuf map entry semantics when key/value are omitted.
+	if !keySeen {
+		key = protobufDefaultMapKey(field.mapKeyKind)
+	}
+	if !valueSeen {
+		value = protobufDefaultValueForKind(valueField)
+	}
+
+	return protobufMapEntry{key: key, value: value}, nil
+}
+
 func encodeProtobufMessage(value interface{}, schema protobufSchema, strict bool) ([]byte, error) {
 	obj, ok := value.(map[string]interface{})
 	if !ok {
@@ -719,6 +878,26 @@ func encodeProtobufMessage(value interface{}, schema protobufSchema, strict bool
 	for _, field := range schema.fields {
 		rawValue, present := obj[field.name]
 		if !present || rawValue == nil {
+			continue
+		}
+
+		if field.kind == "map" {
+			mapValue, ok := rawValue.(map[string]interface{})
+			if !ok {
+				return nil, unifiederrors.ValidationErrorf("protobuf field %q is map and expects an object, got %T", field.name, rawValue)
+			}
+			keys := make([]string, 0, len(mapValue))
+			for key := range mapValue {
+				keys = append(keys, key)
+			}
+			slices.Sort(keys)
+			for _, key := range keys {
+				encoded, err := encodeProtobufMapEntry(field, key, mapValue[key], strict)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, encoded...)
+			}
 			continue
 		}
 
@@ -752,6 +931,48 @@ func encodeProtobufMessage(value interface{}, schema protobufSchema, strict bool
 		out = append(out, encoded...)
 	}
 
+	return out, nil
+}
+
+func encodeProtobufMapEntry(field protobufField, key string, value interface{}, strict bool) ([]byte, error) {
+	typedKey, err := protobufParseMapKey(field.mapKeyKind, key)
+	if err != nil {
+		return nil, unifiederrors.ValidationErrorf("protobuf field %q map key %q is invalid for key type %q", field.name, key, field.mapKeyKind)
+	}
+
+	keyField := protobufField{
+		number: 1,
+		name:   field.name + ".key",
+		kind:   field.mapKeyKind,
+	}
+	valueField := protobufField{
+		number: 2,
+		name:   field.name + ".value",
+		kind:   field.mapValueKind,
+		schema: field.mapValueSchema,
+	}
+
+	if value == nil {
+		value = protobufDefaultValueForKind(valueField)
+	}
+
+	entry := make([]byte, 0, 24)
+	keyEncoded, err := encodeProtobufField(keyField, typedKey, strict)
+	if err != nil {
+		return nil, err
+	}
+	entry = append(entry, keyEncoded...)
+
+	valueEncoded, err := encodeProtobufField(valueField, value, strict)
+	if err != nil {
+		return nil, err
+	}
+	entry = append(entry, valueEncoded...)
+
+	tag := uint64(field.number<<3 | 2)
+	out := appendVarint(nil, tag)
+	out = appendVarint(out, uint64(len(entry)))
+	out = append(out, entry...)
 	return out, nil
 }
 
@@ -996,6 +1217,101 @@ func protobufWireTypeForField(kind string) (int, bool) {
 		return 5, true
 	default:
 		return 0, false
+	}
+}
+
+func protobufMapKeyKindAllowed(kind string) bool {
+	switch kind {
+	case "bool", "int32", "int64", "uint32", "uint64", "sint32", "sint64", "fixed32", "fixed64", "sfixed32", "sfixed64", "string":
+		return true
+	default:
+		return false
+	}
+}
+
+func protobufDefaultMapKey(kind string) string {
+	switch kind {
+	case "bool":
+		return "false"
+	case "string":
+		return ""
+	default:
+		return "0"
+	}
+}
+
+func protobufDefaultValueForKind(field protobufField) interface{} {
+	switch field.kind {
+	case "bool":
+		return false
+	case "string", "bytes":
+		return ""
+	case "message":
+		return nil
+	case "float", "double", "int32", "int64", "uint32", "uint64", "sint32", "sint64", "fixed32", "fixed64", "sfixed32", "sfixed64", "enum":
+		return float64(0)
+	default:
+		return nil
+	}
+}
+
+func protobufMapKeyToString(kind string, value interface{}) (string, error) {
+	switch kind {
+	case "string":
+		s, ok := value.(string)
+		if !ok {
+			return "", fmt.Errorf("expected string key, got %T", value)
+		}
+		return s, nil
+	case "bool":
+		b, ok := value.(bool)
+		if !ok {
+			return "", fmt.Errorf("expected bool key, got %T", value)
+		}
+		if b {
+			return "true", nil
+		}
+		return "false", nil
+	default:
+		n, err := numberToInt64(value)
+		if err != nil {
+			u, uErr := numberToUint64(value)
+			if uErr != nil {
+				return "", fmt.Errorf("expected numeric key, got %T", value)
+			}
+			return strconv.FormatUint(u, 10), nil
+		}
+		return strconv.FormatInt(n, 10), nil
+	}
+}
+
+func protobufParseMapKey(kind string, key string) (interface{}, error) {
+	switch kind {
+	case "string":
+		return key, nil
+	case "bool":
+		switch strings.TrimSpace(strings.ToLower(key)) {
+		case "true":
+			return true, nil
+		case "false":
+			return false, nil
+		default:
+			return nil, fmt.Errorf("expected bool key")
+		}
+	case "int32", "int64", "sint32", "sint64", "sfixed32", "sfixed64":
+		n, err := strconv.ParseInt(strings.TrimSpace(key), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		return float64(n), nil
+	case "uint32", "uint64", "fixed32", "fixed64":
+		n, err := strconv.ParseUint(strings.TrimSpace(key), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		return float64(n), nil
+	default:
+		return nil, fmt.Errorf("unsupported map key kind %q", kind)
 	}
 }
 

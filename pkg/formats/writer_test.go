@@ -602,6 +602,56 @@ func TestFormatWithOptions_ProtobufStructuredDescriptorSet(t *testing.T) {
 	}
 }
 
+func TestFormatWithOptions_ProtobufStructuredDescriptorSetMapField(t *testing.T) {
+	options := Object{
+		"structured": true,
+		"descriptor": Object{
+			"set":     testMapDescriptorSetBytes(t),
+			"message": "t.M",
+		},
+	}
+
+	input := Object{
+		"kv": Object{
+			"1": 10.0,
+			"2": 20.0,
+		},
+	}
+
+	result, err := FormatWithOptions(input, "application/protobuf", options)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != "\x0a\x04\x08\x01\x10\x0a\x0a\x04\x08\x02\x10\x14" {
+		t.Fatalf("unexpected protobuf output: %q", result)
+	}
+}
+
+func TestFormatWithOptions_ProtobufStructuredDescriptorSetMapFieldInvalidKey(t *testing.T) {
+	options := Object{
+		"structured": true,
+		"descriptor": Object{
+			"set":     testMapDescriptorSetBytes(t),
+			"message": "t.M",
+		},
+	}
+
+	input := Object{
+		"kv": Object{
+			"abc": 10.0,
+		},
+	}
+
+	_, err := FormatWithOptions(input, "application/protobuf", options)
+	if err == nil {
+		t.Fatal("expected error for invalid map key")
+	}
+	if !strings.Contains(err.Error(), `map key "abc" is invalid`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestFormatWithOptions_ProtobufStructuredPackedRepeated(t *testing.T) {
 	options := Object{
 		"structured": true,
