@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -199,6 +200,40 @@ func TestRead_XML(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRead_XML_Limits(t *testing.T) {
+	t.Run("attribute count limit", func(t *testing.T) {
+		var b strings.Builder
+		b.WriteString("<root")
+		for i := 0; i <= MaxXMLAttributesPerElement; i++ {
+			b.WriteString(fmt.Sprintf(` a%d="v"`, i))
+		}
+		b.WriteString("></root>")
+
+		_, err := Read(b.String(), "application/xml")
+		if err == nil || !strings.Contains(err.Error(), "attribute count exceeded") {
+			t.Fatalf("expected attribute count limit error, got: %v", err)
+		}
+	})
+
+	t.Run("element count limit", func(t *testing.T) {
+		content := "<root>" + strings.Repeat("<n/>", MaxXMLElementCount) + "</root>"
+
+		_, err := Read(content, "application/xml")
+		if err == nil || !strings.Contains(err.Error(), "element count exceeded") {
+			t.Fatalf("expected element count limit error, got: %v", err)
+		}
+	})
+
+	t.Run("text bytes per element limit", func(t *testing.T) {
+		content := "<root>" + strings.Repeat("a", MaxXMLTextBytesPerElement+1) + "</root>"
+
+		_, err := Read(content, "application/xml")
+		if err == nil || !strings.Contains(err.Error(), "text size exceeded") {
+			t.Fatalf("expected text size limit error, got: %v", err)
+		}
+	})
 }
 
 func TestRead_XML_Namespaces(t *testing.T) {

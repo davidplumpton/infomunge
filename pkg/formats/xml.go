@@ -11,10 +11,15 @@ import (
 
 // XML special key constants for attribute and text node representation
 const (
-	XMLTextKey      = "#text"  // Key for text content in element maps
+	XMLTextKey = "#text" // Key for text content in element maps
+
 	XMLNamespaceKey = "@xmlns" // Key for XML namespace declarations
 	XMLAttrPrefix   = "@"      // Prefix for XML attributes
-	MaxXMLDepth     = 512      // Maximum XML element nesting depth to prevent billion laughs attacks
+
+	MaxXMLDepth                = 512     // Maximum XML element nesting depth to prevent deep nesting attacks
+	MaxXMLElementCount         = 100000  // Maximum number of elements in a document
+	MaxXMLAttributesPerElement = 128     // Maximum number of attributes allowed on a single element
+	MaxXMLTextBytesPerElement  = 1 << 20 // Maximum text bytes allowed in one element (1 MiB)
 )
 
 func init() {
@@ -30,8 +35,10 @@ func readXML(content string) (interface{}, error) {
 
 	decoder := xml.NewDecoder(strings.NewReader(content))
 	var stack []Object
+	var textSizes []int
 	var result Object
 	var nsCtx xmlNamespaceContext
+	elementCount := 0
 
 	for {
 		token, err := decoder.Token()
@@ -48,6 +55,13 @@ func readXML(content string) (interface{}, error) {
 			if len(stack) >= MaxXMLDepth {
 				return nil, unifiederrors.ValidationErrorf("XML element nesting depth exceeded (max %d levels)", MaxXMLDepth)
 			}
+			if len(t.Attr) > MaxXMLAttributesPerElement {
+				return nil, unifiederrors.ValidationErrorf("XML element attribute count exceeded (max %d attributes)", MaxXMLAttributesPerElement)
+			}
+			elementCount++
+			if elementCount > MaxXMLElementCount {
+				return nil, unifiederrors.ValidationErrorf("XML element count exceeded (max %d elements)", MaxXMLElementCount)
+			}
 
 			newNode, elemName := handleXMLStartElement(t, &nsCtx)
 
@@ -57,15 +71,30 @@ func readXML(content string) (interface{}, error) {
 				result = Object{elemName: newNode}
 			}
 			stack = append(stack, newNode)
+			textSizes = append(textSizes, 0)
 
 		case xml.EndElement:
 			if len(stack) > 0 {
 				stack = stack[:len(stack)-1]
 			}
+			if len(textSizes) > 0 {
+				textSizes = textSizes[:len(textSizes)-1]
+			}
 			nsCtx.Pop()
 
 		case xml.CharData:
 			if str := strings.TrimSpace(string(t)); str != "" && len(stack) > 0 {
+				last := len(textSizes) - 1
+				if last >= 0 {
+					nextSize := textSizes[last] + len(str)
+					if textSizes[last] > 0 {
+						nextSize++
+					}
+					if nextSize > MaxXMLTextBytesPerElement {
+						return nil, unifiederrors.ValidationErrorf("XML text size exceeded for element (max %d bytes)", MaxXMLTextBytesPerElement)
+					}
+					textSizes[last] = nextSize
+				}
 				appendTextContent(stack[len(stack)-1], str)
 			}
 		}

@@ -422,6 +422,20 @@ Feature: XML Reading
       """
     Then running the script should fail with error containing "XML validation error"
 
+  Scenario: Error when XML element has too many attributes
+    Given the following XML input:
+      """
+      <root a0="v" a1="v" a2="v" a3="v" a4="v" a5="v" a6="v" a7="v" a8="v" a9="v" a10="v" a11="v" a12="v" a13="v" a14="v" a15="v" a16="v" a17="v" a18="v" a19="v" a20="v" a21="v" a22="v" a23="v" a24="v" a25="v" a26="v" a27="v" a28="v" a29="v" a30="v" a31="v" a32="v" a33="v" a34="v" a35="v" a36="v" a37="v" a38="v" a39="v" a40="v" a41="v" a42="v" a43="v" a44="v" a45="v" a46="v" a47="v" a48="v" a49="v" a50="v" a51="v" a52="v" a53="v" a54="v" a55="v" a56="v" a57="v" a58="v" a59="v" a60="v" a61="v" a62="v" a63="v" a64="v" a65="v" a66="v" a67="v" a68="v" a69="v" a70="v" a71="v" a72="v" a73="v" a74="v" a75="v" a76="v" a77="v" a78="v" a79="v" a80="v" a81="v" a82="v" a83="v" a84="v" a85="v" a86="v" a87="v" a88="v" a89="v" a90="v" a91="v" a92="v" a93="v" a94="v" a95="v" a96="v" a97="v" a98="v" a99="v" a100="v" a101="v" a102="v" a103="v" a104="v" a105="v" a106="v" a107="v" a108="v" a109="v" a110="v" a111="v" a112="v" a113="v" a114="v" a115="v" a116="v" a117="v" a118="v" a119="v" a120="v" a121="v" a122="v" a123="v" a124="v" a125="v" a126="v" a127="v" a128="v"></root>
+      """
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    Then running the script should fail with error containing "attribute count exceeded"
+
   Scenario: Read XML with DOCTYPE declaration
     Given the following XML input:
       """
