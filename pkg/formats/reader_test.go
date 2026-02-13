@@ -182,6 +182,17 @@ func TestRead_Avro(t *testing.T) {
 	}
 }
 
+func TestRead_DW(t *testing.T) {
+	content := "%dw 2.0\noutput application/json\n---\n{answer: 42}"
+	result, err := Read(content, "application/dw")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, ok := result.(string); !ok || got != content {
+		t.Fatalf("expected dw reader to return original content, got %#v (%T)", result, result)
+	}
+}
+
 func TestRead_XML(t *testing.T) {
 	tests := []struct {
 		name     string

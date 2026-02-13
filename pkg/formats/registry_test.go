@@ -162,3 +162,15 @@ func TestAvroFormatLookup(t *testing.T) {
 		t.Fatalf("expected application/avro for .avro extension, got %q", got)
 	}
 }
+
+func TestDWFormatLookup(t *testing.T) {
+	if got := MimeTypeForFormat("dw"); got != "application/dw" {
+		t.Fatalf("expected application/dw for format 'dw', got %q", got)
+	}
+	if got := DetectMimeType("payload.dw"); got != "application/dw" {
+		t.Fatalf("expected application/dw for .dw extension, got %q", got)
+	}
+	if got := DetectMimeType("payload.dwl"); got != "application/dw" {
+		t.Fatalf("expected application/dw for .dwl extension, got %q", got)
+	}
+}

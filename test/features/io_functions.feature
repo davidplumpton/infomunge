@@ -82,6 +82,20 @@ Feature: I/O Functions
       "hello-avro"
       """
 
+  Scenario: read dw content
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("%dw 2.0\noutput application/json\n---\n42", "application/dw")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "%dw 2.0\noutput application/json\n---\n42"
+      """
+
   Scenario: read with invalid JSON fails
     Given the following script:
       """
@@ -261,6 +275,20 @@ Feature: I/O Functions
     Then the output should be:
       """
       "avro-xyz"
+      """
+
+  Scenario: write string to dw
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write("%dw 2.0\noutput application/json\n---\n{a: 1}", "application/dw")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "%dw 2.0\noutput application/json\n---\n{a: 1}"
       """
 
   Scenario: write requires exactly two arguments
