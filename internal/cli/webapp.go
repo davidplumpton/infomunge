@@ -63,6 +63,7 @@ const playgroundHTML = `<!DOCTYPE html>
         opacity: 0.9;
       }
       .toolbar select {
+      .toolbar input {
         border: 1px solid var(--border);
         padding: 8px 10px;
         border-radius: 12px;
@@ -180,6 +181,10 @@ const playgroundHTML = `<!DOCTYPE html>
           <input id="pretty-print" type="checkbox" checked />
           Pretty print
         </label>
+        <label>
+          API key
+          <input id="api-key" type="password" placeholder="optional" />
+        </label>
       </div>
       <main class="layout">
         <section class="panel" id="inputs-panel">
@@ -210,6 +215,7 @@ payload</textarea>
       const examplePicker = document.getElementById("example-picker");
       const outputFormat = document.getElementById("output-format");
       const prettyPrint = document.getElementById("pretty-print");
+      const apiKey = document.getElementById("api-key");
       const scriptArea = document.getElementById("script");
 
       const examples = [
@@ -515,9 +521,13 @@ payload</textarea>
             }
             return;
           }
+          const headers = { "Content-Type": "application/json" };
+          if (apiKey.value) {
+            headers["X-API-Key"] = apiKey.value;
+          }
           const response = await fetch("/run", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify(payload),
           });
           const text = await response.text();

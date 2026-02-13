@@ -15,14 +15,15 @@ const defaultListenAddr = ":8080"
 
 // Config holds the application configuration
 type Config struct {
-	ScriptFile  string
-	StdinFormat string
-	Inputs      []string
-	Script      string
-	Lazy        bool
-	Server      bool
-	Listen      string
-	ShowVersion bool
+	ScriptFile   string
+	StdinFormat  string
+	Inputs       []string
+	Script       string
+	Lazy         bool
+	Server       bool
+	Listen       string
+	ServerAPIKey string
+	ShowVersion  bool
 }
 
 // App represents the CLI application
@@ -80,6 +81,7 @@ func (app *App) parseFlags(args []string) (*Config, error) {
 	lazy := fs.Bool("lazy", false, "enable lazy evaluation mode")
 	serverMode := fs.Bool("server", false, "run as an HTTP server")
 	listenAddr := fs.String("listen", defaultListenAddr, "address to listen on in server mode")
+	serverAPIKey := fs.String("api-key", "", "shared API key required for /run requests in server mode")
 	showVersion := fs.Bool("version", false, "show version information")
 	fs.Var(&inputs, "i", "input source (name=file or name=:format for stdin)")
 
@@ -108,14 +110,15 @@ func (app *App) parseFlags(args []string) (*Config, error) {
 	}
 
 	return &Config{
-		ScriptFile:  *scriptFile,
-		StdinFormat: *stdinFormat,
-		Inputs:      processedInputs,
-		Script:      script,
-		Lazy:        *lazy,
-		Server:      *serverMode,
-		Listen:      *listenAddr,
-		ShowVersion: *showVersion,
+		ScriptFile:   *scriptFile,
+		StdinFormat:  *stdinFormat,
+		Inputs:       processedInputs,
+		Script:       script,
+		Lazy:         *lazy,
+		Server:       *serverMode,
+		Listen:       *listenAddr,
+		ServerAPIKey: *serverAPIKey,
+		ShowVersion:  *showVersion,
 	}, nil
 }
 

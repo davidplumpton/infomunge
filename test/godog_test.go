@@ -32,6 +32,7 @@ type testContext struct {
 	scriptContent  string
 	serverURL      string
 	serverClose    func()
+	serverAPIKey   string
 	lastHTTPStatus int
 	timeout        time.Duration // Timeout for script execution to prevent infinite loops
 }
@@ -164,10 +165,13 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 
 	// Steps for server playground
 	ctx.Step(`^the server is running$`, tc.theServerIsRunning)
+	ctx.Step(`^the server is running with API key "([^"]*)"$`, tc.theServerIsRunningWithAPIKey)
 	ctx.Step(`^I request the playground page$`, tc.iRequestThePlaygroundPage)
 	ctx.Step(`^the response status should be (\d+)$`, tc.theResponseStatusShouldBe)
 	ctx.Step(`^I run the server script without specifying output$`, tc.iRunTheServerScriptWithoutOutput)
 	ctx.Step(`^I run the server script with output "([^"]*)"$`, tc.iRunTheServerScriptWithOutput)
+	ctx.Step(`^I run the server script without an API key$`, tc.iRunTheServerScriptWithoutAPIKey)
+	ctx.Step(`^I run the server script with API key "([^"]*)"$`, tc.iRunTheServerScriptWithAPIKey)
 	ctx.Step(`^I run the server script with a canceled request context$`, tc.iRunTheServerScriptWithCanceledContext)
 	ctx.Step(`^I run the server script with an oversized request body$`, tc.iRunTheServerScriptWithOversizedBody)
 }
@@ -796,6 +800,25 @@ func (tc *testContext) theServerIsRunning() error {
 	server := httptest.NewServer(app.ServerHandler(config))
 	tc.serverURL = server.URL
 	tc.serverClose = server.Close
+	tc.serverAPIKey = ""
+	return nil
+}
+
+func (tc *testContext) theServerIsRunningWithAPIKey(apiKey string) error {
+	if tc.serverClose != nil {
+		tc.serverClose()
+		tc.serverClose = nil
+		tc.serverURL = ""
+	}
+	app := cli.NewApp()
+	config := &cli.Config{
+		Lazy:         false,
+		ServerAPIKey: apiKey,
+	}
+	server := httptest.NewServer(app.ServerHandler(config))
+	tc.serverURL = server.URL
+	tc.serverClose = server.Close
+	tc.serverAPIKey = apiKey
 	return nil
 }
 
@@ -808,6 +831,18 @@ func (tc *testContext) iRunTheServerScriptWithOutput(output string) error {
 }
 
 func (tc *testContext) runServerScript(output *string) error {
+	return tc.runServerScriptWithAPIKey(output, nil)
+}
+
+func (tc *testContext) iRunTheServerScriptWithoutAPIKey() error {
+	return tc.runServerScriptWithAPIKey(nil, nil)
+}
+
+func (tc *testContext) iRunTheServerScriptWithAPIKey(apiKey string) error {
+	return tc.runServerScriptWithAPIKey(nil, &apiKey)
+}
+
+func (tc *testContext) runServerScriptWithAPIKey(output *string, apiKey *string) error {
 	if tc.serverURL == "" {
 		return fmt.Errorf("server is not running")
 	}
@@ -827,7 +862,16 @@ func (tc *testContext) runServerScript(output *string) error {
 		return fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	resp, err := http.Post(tc.serverURL+"/run", "application/json", bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, tc.serverURL+"/run", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if apiKey != nil {
+		req.Header.Set("X-API-Key", *apiKey)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to request /run: %v", err)
 	}

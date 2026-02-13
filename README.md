@@ -49,6 +49,12 @@ Run the HTTP server:
 ./infomunge --server --listen :8080
 ```
 
+Protect the `/run` endpoint with a shared API key:
+
+```bash
+./infomunge --server --listen :8080 --api-key your-secret
+```
+
 Open the playground at `http://localhost:8080/` to use the interactive UI. It offers input panels on the left (add, name, and format each input), a script editor in the center, and a live result panel on the right that runs through the `/run` endpoint.
 
 POST a script with optional inputs:
@@ -56,6 +62,7 @@ POST a script with optional inputs:
 ```bash
 curl -X POST http://localhost:8080/run \\
   -H 'Content-Type: application/json' \\
+  -H 'X-API-Key: your-secret' \\
   -d '{"script":"%im 0.1\\noutput application/json\\n---\\nsizeOf(payload)","output":"json","inputs":[{"name":"payload","format":"json","content":"[1,2,3]"}]}'
 ```
 

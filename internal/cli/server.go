@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -103,6 +104,10 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		if !authorizedRunRequest(r, config.ServerAPIKey) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		if err := r.Context().Err(); err != nil {
 			http.Error(w, fmt.Sprintf("request canceled: %v", err), http.StatusRequestTimeout)
 			return
@@ -164,4 +169,18 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 			log.Printf("server write error: %v", err)
 		}
 	}
+}
+
+func authorizedRunRequest(r *http.Request, expectedAPIKey string) bool {
+	if expectedAPIKey == "" {
+		return true
+	}
+	if r.Header.Get("X-API-Key") == expectedAPIKey {
+		return true
+	}
+	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
+	if len(authHeader) <= len("Bearer ") || !strings.EqualFold(authHeader[:len("Bearer ")], "Bearer ") {
+		return false
+	}
+	return strings.TrimSpace(authHeader[len("Bearer "):]) == expectedAPIKey
 }

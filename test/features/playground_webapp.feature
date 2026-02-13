@@ -85,3 +85,29 @@ Feature: Playground webapp
     When I run the server script with an oversized request body
     Then the response status should be 413
     And the output should contain "request body exceeds"
+
+  Scenario: Run endpoint rejects requests without API key when configured
+    Given the server is running with API key "secret-token"
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {ok: true}
+      """
+    When I run the server script without an API key
+    Then the response status should be 401
+    And the output should contain "unauthorized"
+
+  Scenario: Run endpoint accepts valid API key when configured
+    Given the server is running with API key "secret-token"
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {ok: true}
+      """
+    When I run the server script with API key "secret-token"
+    Then the response status should be 200
+    And the output should contain "\"ok\":true"
