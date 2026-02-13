@@ -3,6 +3,8 @@ package differential
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -137,5 +139,63 @@ func TestParseDWOutput_NormalizesNullLikeValues(t *testing.T) {
 		if got != nil {
 			t.Fatalf("expected nil for %q, got %#v", input, got)
 		}
+	}
+}
+
+func TestPrepareDWInputArgs_CreatesSortedInputFiles(t *testing.T) {
+	args, cleanup, err := prepareDWInputArgs(map[string]string{
+		"users":   `{"id":1}`,
+		"payload": `{"x":1}`,
+	})
+	if err != nil {
+		t.Fatalf("prepareDWInputArgs failed: %v", err)
+	}
+	defer cleanup()
+
+	if len(args) != 2 {
+		t.Fatalf("expected 2 args, got %d: %#v", len(args), args)
+	}
+	if !strings.HasPrefix(args[0], "-i=payload=") {
+		t.Fatalf("expected payload input first, got %q", args[0])
+	}
+	if !strings.HasPrefix(args[1], "-i=users=") {
+		t.Fatalf("expected users input second, got %q", args[1])
+	}
+
+	firstPath := strings.TrimPrefix(args[0], "-i=payload=")
+	secondPath := strings.TrimPrefix(args[1], "-i=users=")
+
+	payloadData, err := os.ReadFile(firstPath)
+	if err != nil {
+		t.Fatalf("read payload temp file: %v", err)
+	}
+	if string(payloadData) != `{"x":1}` {
+		t.Fatalf("unexpected payload file content: %q", string(payloadData))
+	}
+
+	usersData, err := os.ReadFile(secondPath)
+	if err != nil {
+		t.Fatalf("read users temp file: %v", err)
+	}
+	if string(usersData) != `{"id":1}` {
+		t.Fatalf("unexpected users file content: %q", string(usersData))
+	}
+}
+
+func TestPrepareDWInputArgs_CleanupRemovesTempDir(t *testing.T) {
+	args, cleanup, err := prepareDWInputArgs(map[string]string{"payload": `{"x":1}`})
+	if err != nil {
+		t.Fatalf("prepareDWInputArgs failed: %v", err)
+	}
+	if len(args) != 1 {
+		t.Fatalf("expected 1 arg, got %d", len(args))
+	}
+
+	path := strings.TrimPrefix(args[0], "-i=payload=")
+	dir := filepath.Dir(path)
+	cleanup()
+
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("expected temp dir %q to be removed, stat err=%v", dir, err)
 	}
 }

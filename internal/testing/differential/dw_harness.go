@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"infomunge/pkg/formats"
 	"math"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
@@ -62,38 +64,54 @@ func DWEval(script string, inputs map[string]string) (interface{}, error) {
 
 func defaultRunDWCommand(ctx context.Context, script string, inputs map[string]string) (string, string, error) {
 	args := []string{"run"}
-	var stdin string
-
-	if len(inputs) > 0 {
-		keys := make([]string, 0, len(inputs))
-		for k := range inputs {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		for _, name := range keys {
-			args = append(args, "-i", name)
-			if name == "payload" {
-				stdin = inputs[name]
-				continue
-			}
-			return "", "", fmt.Errorf("dw harness currently supports only payload input for stdin injection, got %q", name)
-		}
+	inputArgs, cleanup, err := prepareDWInputArgs(inputs)
+	if err != nil {
+		return "", "", err
 	}
+	defer cleanup()
 
+	args = append(args, inputArgs...)
 	args = append(args, script)
 	cmd := exec.CommandContext(ctx, "dw", args...)
-	if stdin != "" {
-		cmd.Stdin = strings.NewReader(stdin)
-	}
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
+	err = cmd.Run()
 	return stdout.String(), stderr.String(), err
+}
+
+func prepareDWInputArgs(inputs map[string]string) ([]string, func(), error) {
+	if len(inputs) == 0 {
+		return nil, func() {}, nil
+	}
+
+	dir, err := os.MkdirTemp("", "infomunge-dw-inputs-*")
+	if err != nil {
+		return nil, nil, fmt.Errorf("create dw harness input dir: %w", err)
+	}
+	cleanup := func() { _ = os.RemoveAll(dir) }
+
+	keys := make([]string, 0, len(inputs))
+	for k := range inputs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	args := make([]string, 0, len(inputs))
+	for idx, name := range keys {
+		filename := fmt.Sprintf("%03d_%s.input", idx, name)
+		filePath := filepath.Join(dir, filename)
+		if err := os.WriteFile(filePath, []byte(inputs[name]), 0o600); err != nil {
+			cleanup()
+			return nil, nil, fmt.Errorf("write dw harness input %q: %w", name, err)
+		}
+		args = append(args, fmt.Sprintf("-i=%s=%s", name, filePath))
+	}
+
+	return args, cleanup, nil
 }
 
 func parseDWOutput(output string) (interface{}, error) {
