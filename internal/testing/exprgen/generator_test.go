@@ -273,6 +273,26 @@ func TestExpression_DefaultProducesOperator(t *testing.T) {
 	}
 }
 
+func TestExpression_CaseProducesCaseBranches(t *testing.T) {
+	sawCase := false
+	for i := 0; i < 500; i++ {
+		var expr string
+		rapid.Check(t, func(t *rapid.T) {
+			expr = exprgen.Expression(3, exprgen.FeatureCaseExpressions).Draw(t, "expr")
+		})
+		if !exprgen.IsValid(expr) {
+			t.Fatalf("FeatureCaseExpressions produced syntactically invalid expression: %q", expr)
+		}
+		if strings.Contains(expr, " case {") && strings.Contains(expr, "->") && strings.Contains(expr, "else ->") {
+			sawCase = true
+			break
+		}
+	}
+	if !sawCase {
+		t.Fatal("500 draws with FeatureCaseExpressions never produced case branches")
+	}
+}
+
 func TestExpression_StringInterpolationProducesInterpolation(t *testing.T) {
 	sawInterpolation := false
 	for i := 0; i < 500; i++ {

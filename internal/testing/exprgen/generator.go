@@ -29,9 +29,10 @@ const (
 	FeatureImplicitLambda                          // $ and $$ in collection bodies
 	FeatureConditionals                            // if (cond) expr else expr
 	FeatureDefault                                 // expr default expr
+	FeatureCaseExpressions                         // expr case { pattern -> expr, ... }
 	FeatureStringInterpolation                     // "text $(expr) text"
 	FeatureBuiltinCalls                            // sizeOf(...), contains(...), ...
-	FeatureAll                 Feature = FeatureArithmetic | FeatureComparison | FeatureLogical | FeatureArrays | FeatureObjects | FeatureDotAccess | FeatureIndexAccess | FeatureRangeIndex | FeatureUnary | FeatureParens | FeatureLambdas | FeatureCollections | FeatureImplicitLambda | FeatureConditionals | FeatureDefault | FeatureStringInterpolation | FeatureBuiltinCalls
+	FeatureAll                 Feature = FeatureArithmetic | FeatureComparison | FeatureLogical | FeatureArrays | FeatureObjects | FeatureDotAccess | FeatureIndexAccess | FeatureRangeIndex | FeatureUnary | FeatureParens | FeatureLambdas | FeatureCollections | FeatureImplicitLambda | FeatureConditionals | FeatureDefault | FeatureCaseExpressions | FeatureStringInterpolation | FeatureBuiltinCalls
 
 	// FeatureDWCompat is the subset of features compatible with DataWeave CLI.
 	// Excludes: FeatureRangeIndex, FeatureImplicitLambda, FeatureStringInterpolation.
@@ -221,6 +222,7 @@ func expressionAtDepthWithScope(depth int, features Feature, scope lambdaScope, 
 	hasCollections := features&FeatureCollections != 0
 	hasConditionals := features&FeatureConditionals != 0
 	hasDefault := features&FeatureDefault != 0
+	hasCaseExpressions := features&FeatureCaseExpressions != 0
 	hasStringInterpolation := features&FeatureStringInterpolation != 0
 	hasBuiltinCalls := features&FeatureBuiltinCalls != 0
 
@@ -295,6 +297,11 @@ func expressionAtDepthWithScope(depth int, features Feature, scope lambdaScope, 
 	if hasDefault {
 		forms = append(forms, form{weight: 1, name: "defaultOp", gen: func(d int) *rapid.Generator[string] {
 			return filteredDefaultExpr(d, features, scope, cfg)
+		}})
+	}
+	if hasCaseExpressions {
+		forms = append(forms, form{weight: 1, name: "caseExpr", gen: func(d int) *rapid.Generator[string] {
+			return filteredCaseExpr(d, features, scope, cfg)
 		}})
 	}
 	if hasStringInterpolation {
@@ -437,6 +444,55 @@ func filteredDefaultExpr(depth int, features Feature, scope lambdaScope, cfg exp
 		right := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "right")
 		return fmt.Sprintf("%s default %s", left, right)
 	})
+}
+
+func filteredCaseExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
+	nestedFeatures := expressionNestedFeatures(features)
+	return rapid.Custom(func(t *rapid.T) string {
+		target := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "caseTarget")
+		caseCount := rapid.IntRange(1, 3).Draw(t, "caseCount")
+		clauses := make([]string, 0, caseCount+1)
+		for i := 0; i < caseCount; i++ {
+			pattern, caseScope := generateCasePattern(t, i, scope, cfg)
+			resultExpr := expressionAtDepthWithScope(depth-1, nestedFeatures, caseScope, cfg).Draw(t, fmt.Sprintf("caseResult%d", i))
+			clauses = append(clauses, fmt.Sprintf("%s -> %s", pattern, resultExpr))
+		}
+		elseExpr := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "caseElse")
+		clauses = append(clauses, fmt.Sprintf("else -> %s", elseExpr))
+		return fmt.Sprintf("%s case { %s }", target, strings.Join(clauses, ", "))
+	})
+}
+
+func generateCasePattern(t *rapid.T, idx int, scope lambdaScope, cfg exprConfig) (string, lambdaScope) {
+	switch rapid.IntRange(0, 4).Draw(t, fmt.Sprintf("casePatternKind%d", idx)) {
+	case 0:
+		return cfg.literalGen().Draw(t, fmt.Sprintf("caseLiteral%d", idx)), scope
+	case 1:
+		return "is " + caseTypeName(t, idx), scope
+	case 2:
+		varName := caseVarName(t, idx)
+		typeName := caseTypeName(t, idx)
+		if rapid.Bool().Draw(t, fmt.Sprintf("caseGuard%d", idx)) {
+			return fmt.Sprintf("%s is %s if %s != null", varName, typeName, varName), scope.withNamed(varName)
+		}
+		return fmt.Sprintf("%s is %s", varName, typeName), scope.withNamed(varName)
+	case 3:
+		varName := caseVarName(t, idx)
+		return varName, scope.withNamed(varName)
+	default:
+		if rapid.Bool().Draw(t, fmt.Sprintf("caseKeyword%d", idx)) {
+			return "case " + cfg.literalGen().Draw(t, fmt.Sprintf("caseKeywordLiteral%d", idx)), scope
+		}
+		return "is " + caseTypeName(t, idx), scope
+	}
+}
+
+func caseTypeName(t *rapid.T, idx int) string {
+	return rapid.SampledFrom([]string{"String", "Number", "Boolean", "Array", "Object", "Null"}).Draw(t, fmt.Sprintf("caseType%d", idx))
+}
+
+func caseVarName(t *rapid.T, idx int) string {
+	return rapid.SampledFrom([]string{"v", "n", "s", "item", "value"}).Draw(t, fmt.Sprintf("caseVar%d", idx))
 }
 
 func filteredStringInterpolationExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
