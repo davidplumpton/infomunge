@@ -1073,6 +1073,50 @@ func (tc *testContext) ensureWorkspace() error {
 		return fmt.Errorf("failed to create scenario workspace: %v", err)
 	}
 	tc.workDir = workDir
+
+	// Set up modules directory so module imports resolve correctly.
+	// Create a real modules/ dir, symlink project module subdirectories (dw/),
+	// and write test-only module files.
+	if err := setupWorkspaceModules(workDir); err != nil {
+		return fmt.Errorf("failed to set up workspace modules: %v", err)
+	}
+	return nil
+}
+
+func setupWorkspaceModules(workDir string) error {
+	modulesDir := filepath.Join(workDir, "modules")
+	if err := os.MkdirAll(modulesDir, 0755); err != nil {
+		return err
+	}
+
+	// Symlink project module subdirectories (e.g. dw/) into the workspace
+	projectModules, err := filepath.Abs("../modules")
+	if err != nil {
+		return nil // non-fatal: skip if can't resolve
+	}
+	entries, err := os.ReadDir(projectModules)
+	if err != nil {
+		return nil // non-fatal: skip if modules dir doesn't exist
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			src := filepath.Join(projectModules, entry.Name())
+			dst := filepath.Join(modulesDir, entry.Name())
+			_ = os.Symlink(src, dst)
+		}
+	}
+
+	// Write test-only module files used by import_directive.feature
+	testModules := map[string]string{
+		"MathUtils.im": "%im 0.1\nvar offset = 5\nvar scale = 10\nvar settings = {\n  scale: 10,\n  offset: 5\n}\nfun double(x) = x * 2\nfun triple(x) = x * 3\nfun addOffset(x) = x + offset\nfun scaleAndAdd(x) = x * scale + offset\nfun scaleAndAddSettings(x) = x * settings.scale + settings.offset\n",
+		"StringUtils.im": "%im 0.1\nfun greet(name) = \"Hello, \" ++ name\nfun shout(s) = upper(s)\n",
+		"DoBlock.im": "%im 0.1\nfun addOne(x) = do {\n  var result = x + 1\n  ---\n  result\n}\n",
+	}
+	for name, content := range testModules {
+		if err := os.WriteFile(filepath.Join(modulesDir, name), []byte(content), 0644); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
