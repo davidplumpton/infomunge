@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"infomunge/internal/evaluator"
 	"io"
 	"log"
 	"net/http"
@@ -125,14 +124,10 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 			return
 		}
 
-		context, err := handlers.BuildRunContext(payload.Inputs)
+		evalContext, err := handlers.BuildRunContext(payload.Inputs)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
-		}
-		context[evaluator.GoContextKey] = r.Context()
-		if deadline, ok := r.Context().Deadline(); ok {
-			context["__deadline"] = deadline
 		}
 		if err := r.Context().Err(); err != nil {
 			http.Error(w, fmt.Sprintf("request canceled: %v", err), http.StatusRequestTimeout)
@@ -142,7 +137,7 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 		opts := runner.RunnerOptions{
 			Lazy: config.Lazy,
 		}
-		result, _, headerOutputMimeType, evalCtx, err := runner.RunStringWithContextAndOptionsWithOutput(payload.Script, context, opts)
+		result, _, headerOutputMimeType, evalCtx, err := runner.RunStringWithGoContextAndOptionsWithOutput(r.Context(), payload.Script, evalContext, opts)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

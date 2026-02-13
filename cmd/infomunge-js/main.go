@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 
 	"github.com/gopherjs/gopherjs/js"
@@ -23,7 +24,7 @@ func runPayload(payload string) map[string]interface{} {
 		return errorResponse(err)
 	}
 
-	context, err := handlers.BuildRunContext(request.Inputs)
+	evalContext, err := handlers.BuildRunContext(request.Inputs)
 	if err != nil {
 		return errorResponse(err)
 	}
@@ -31,7 +32,7 @@ func runPayload(payload string) map[string]interface{} {
 	opts := runner.RunnerOptions{
 		BaseDir: ".",
 	}
-	result, _, headerOutputMimeType, evalCtx, err := runner.RunStringWithContextAndOptionsWithOutput(request.Script, context, opts)
+	result, _, headerOutputMimeType, evalCtx, err := runner.RunStringWithGoContextAndOptionsWithOutput(context.Background(), request.Script, evalContext, opts)
 	if err != nil {
 		return errorResponse(err)
 	}

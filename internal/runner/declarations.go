@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	goparser "go/parser"
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
@@ -11,7 +12,11 @@ import (
 // parseVarDecl parses a variable declaration line and evaluates its value.
 // baseOffset is the offset of the start of this line within fullRaw.
 // Returns the evaluated value, variable name, and any error.
-func parseVarDecl(line, trimmedLine string, baseOffset int, context map[string]interface{}, fullRaw string) (interface{}, string, error) {
+func parseVarDecl(line, trimmedLine string, baseOffset int, evalCtx map[string]interface{}, fullRaw string) (interface{}, string, error) {
+	return parseVarDeclWithGoContext(line, trimmedLine, baseOffset, evalCtx, context.Background(), fullRaw)
+}
+
+func parseVarDeclWithGoContext(line, trimmedLine string, baseOffset int, evalCtx map[string]interface{}, goCtx context.Context, fullRaw string) (interface{}, string, error) {
 	parts := strings.SplitN(trimmedLine, "=", 2)
 	if len(parts) != 2 {
 		return nil, "", unifiederrors.ParseErrorf("invalid variable declaration: missing '=' in %q", trimmedLine)
@@ -44,7 +49,7 @@ func parseVarDecl(line, trimmedLine string, baseOffset int, context map[string]i
 	leadingSpace := len(parts[1]) - len(strings.TrimLeft(parts[1], " \t"))
 	valOffset := baseOffset + lineIdx + leadingSpace
 
-	val, err := evaluator.Evaluate(parseableVal, context, mapping, valOffset, fullRaw)
+	val, err := evaluator.EvaluateWithGoContext(parseableVal, evalCtx, goCtx, mapping, valOffset, fullRaw)
 	if err != nil {
 		return nil, "", err
 	}
@@ -55,7 +60,11 @@ func parseVarDecl(line, trimmedLine string, baseOffset int, context map[string]i
 // parseVarDeclFromLines parses a variable declaration that may span multiple lines.
 // baseOffset is the offset of the start of lines[start] within fullRaw.
 // Returns the evaluated value, variable name, number of lines consumed, and any error.
-func parseVarDeclFromLines(lines []string, start int, baseOffset int, context map[string]interface{}, fullRaw string) (interface{}, string, int, error) {
+func parseVarDeclFromLines(lines []string, start int, baseOffset int, evalCtx map[string]interface{}, fullRaw string) (interface{}, string, int, error) {
+	return parseVarDeclFromLinesWithGoContext(lines, start, baseOffset, evalCtx, context.Background(), fullRaw)
+}
+
+func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset int, evalCtx map[string]interface{}, goCtx context.Context, fullRaw string) (interface{}, string, int, error) {
 	if start >= len(lines) {
 		return nil, "", 0, nil
 	}
@@ -127,7 +136,7 @@ func parseVarDeclFromLines(lines []string, start int, baseOffset int, context ma
 	}
 	valOffset := baseOffset + exprStart
 
-	val, err := evaluator.Evaluate(parseableVal, context, mapping, valOffset, fullRaw)
+	val, err := evaluator.EvaluateWithGoContext(parseableVal, evalCtx, goCtx, mapping, valOffset, fullRaw)
 	if err != nil {
 		return nil, "", len(declLines), err
 	}

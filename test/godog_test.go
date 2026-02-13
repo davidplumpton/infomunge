@@ -19,7 +19,6 @@ import (
 
 	"github.com/cucumber/godog"
 	"infomunge/internal/cli"
-	"infomunge/internal/evaluator"
 	"infomunge/internal/runner"
 	"infomunge/pkg/formats"
 )
@@ -122,6 +121,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the following script:$`, tc.theFollowingScript)
 	ctx.Step(`^I run the script$`, tc.iRunTheScript)
 	ctx.Step(`^I run the script with a canceled evaluation context$`, tc.iRunTheScriptWithCanceledEvaluationContext)
+	ctx.Step(`^I run the script with an expired evaluation deadline$`, tc.iRunTheScriptWithExpiredEvaluationDeadline)
 	ctx.Step(`^running the script should fail with error containing "([^"]*)"$`, tc.runningTheScriptShouldFailWithErrorContaining)
 
 	// Additional step for JSON input with script from input content
@@ -370,9 +370,31 @@ func (tc *testContext) iRunTheScriptWithCanceledEvaluationContext() error {
 
 	goCtx, cancel := context.WithCancel(context.Background())
 	cancel()
-	ctx[evaluator.GoContextKey] = goCtx
 
-	err := tc.runScriptWithTimeout(tc.scriptContent, ctx)
+	_, err := runner.RunStringWithGoContext(goCtx, tc.scriptContent, ctx)
+	if err == nil {
+		return fmt.Errorf("expected script to fail, but it succeeded")
+	}
+
+	tc.lastOutput = err.Error()
+	return nil
+}
+
+func (tc *testContext) iRunTheScriptWithExpiredEvaluationDeadline() error {
+	ctx := make(map[string]interface{})
+
+	if tc.payloadMime != "" {
+		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
+		if err != nil {
+			return fmt.Errorf("failed to parse payload: %v", err)
+		}
+		ctx["payload"] = payload
+	}
+
+	goCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	_, err := runner.RunStringWithGoContext(goCtx, tc.scriptContent, ctx)
 	if err == nil {
 		return fmt.Errorf("expected script to fail, but it succeeded")
 	}
@@ -624,7 +646,9 @@ func (tc *testContext) runScriptWithTimeout(scriptContent string, additionalCont
 
 	// Run script in a goroutine
 	go func() {
-		result, hasHeader, mimeType, context, err := runner.RunStringWithContextAndOptionsWithOutput(scriptContent, additionalContext, runner.RunnerOptions{})
+		goCtx, cancel := context.WithTimeout(context.Background(), tc.timeout)
+		defer cancel()
+		result, hasHeader, mimeType, context, err := runner.RunStringWithGoContextAndOptionsWithOutput(goCtx, scriptContent, additionalContext, runner.RunnerOptions{})
 		if err != nil {
 			errChan <- err
 		} else {

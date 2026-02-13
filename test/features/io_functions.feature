@@ -351,6 +351,17 @@ Feature: I/O Functions
     When I run the script with a canceled evaluation context
     Then the output should contain "context canceled"
 
+  Scenario: readUrl respects expired evaluation deadline
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      readUrl("http://1.1.1.1", "application/json")
+      """
+    When I run the script with an expired evaluation deadline
+    Then the output should contain "context deadline exceeded"
+
   Scenario: readUrl requires two arguments
     Given the following script:
       """

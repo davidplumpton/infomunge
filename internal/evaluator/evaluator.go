@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -106,24 +107,36 @@ func newPosError(msg string, pos token.Pos) error {
 }
 
 // Evaluate parses and evaluates the expression.
-func Evaluate(exprStr string, context Context, mapping []int, bodyOffset int, fullRaw string) (Value, error) {
+func Evaluate(exprStr string, evalCtx Context, mapping []int, bodyOffset int, fullRaw string) (Value, error) {
+	return EvaluateWithGoContext(exprStr, evalCtx, context.Background(), mapping, bodyOffset, fullRaw)
+}
+
+// EvaluateWithGoContext parses and evaluates the expression with Go context support.
+func EvaluateWithGoContext(exprStr string, evalCtx Context, goCtx context.Context, mapping []int, bodyOffset int, fullRaw string) (Value, error) {
+	contextWithGoCtx := withGoContext(evalCtx, goCtx)
 	ctx := &ErrorContext{
 		ExprStr:    exprStr,
 		Mapping:    mapping,
 		BodyOffset: bodyOffset,
 		FullRaw:    fullRaw,
 	}
-	return EvaluateWithContext(exprStr, context, ctx)
+	return EvaluateWithContextAndGoContext(exprStr, contextWithGoCtx, goCtx, ctx)
 }
 
 // EvaluateWithContext parses and evaluates the expression with error context.
-func EvaluateWithContext(exprStr string, context Context, errCtx *ErrorContext) (Value, error) {
+func EvaluateWithContext(exprStr string, evalCtx Context, errCtx *ErrorContext) (Value, error) {
+	return EvaluateWithContextAndGoContext(exprStr, evalCtx, context.Background(), errCtx)
+}
+
+// EvaluateWithContextAndGoContext parses and evaluates the expression with error and Go contexts.
+func EvaluateWithContextAndGoContext(exprStr string, evalCtx Context, goCtx context.Context, errCtx *ErrorContext) (Value, error) {
+	contextWithGoCtx := withGoContext(evalCtx, goCtx)
 	expr, err := parser.ParseExpr(exprStr)
 	if err != nil {
 		return nil, errCtx.FormatParseError(err, exprStr)
 	}
 
-	result, err := evalASTWithDepth(expr, context, 0)
+	result, err := evalASTWithDepth(expr, contextWithGoCtx, 0)
 	if err != nil {
 		return nil, errCtx.FormatEvalError(err)
 	}

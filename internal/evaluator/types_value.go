@@ -30,6 +30,20 @@ func GetGoContext(evalCtx Context) context.Context {
 	return context.Background()
 }
 
+func withGoContext(evalCtx Context, goCtx context.Context) Context {
+	if evalCtx == nil {
+		evalCtx = make(Context)
+	}
+	if goCtx == nil {
+		goCtx = context.Background()
+	}
+	evalCtx[GoContextKey] = goCtx
+	if deadline, ok := goCtx.Deadline(); ok {
+		evalCtx["__deadline"] = deadline
+	}
+	return evalCtx
+}
+
 // Object represents a structured data object (map with string keys).
 type Object = map[string]Value
 

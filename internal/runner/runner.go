@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
@@ -44,7 +45,7 @@ func RunWithConfig(filePath string, opts RunnerOptions) error {
 		opts.BaseDir = filepath.Dir(absPath)
 	}
 
-	return runFromStringWithConfig(string(content), nil, opts)
+	return runFromStringWithConfig(context.Background(), string(content), nil, opts)
 }
 
 // RunFromString executes an infomunge script from a string and prints formatted output.
@@ -58,11 +59,16 @@ func RunFromStringWithContext(raw string, additionalContext map[string]interface
 	if err != nil {
 		baseDir = "."
 	}
-	return runFromStringWithConfig(raw, additionalContext, RunnerOptions{BaseDir: baseDir})
+	return runFromStringWithConfig(context.Background(), raw, additionalContext, RunnerOptions{BaseDir: baseDir})
 }
 
 // RunFromStringWithContextAndOptions executes an infomunge script with additional context variables and options.
 func RunFromStringWithContextAndOptions(raw string, additionalContext map[string]interface{}, opts RunnerOptions) error {
+	return RunFromStringWithContextAndOptionsAndGoContext(context.Background(), raw, additionalContext, opts)
+}
+
+// RunFromStringWithContextAndOptionsAndGoContext executes an infomunge script with additional context variables, options, and Go context.
+func RunFromStringWithContextAndOptionsAndGoContext(goCtx context.Context, raw string, additionalContext map[string]interface{}, opts RunnerOptions) error {
 	if opts.BaseDir == "" {
 		baseDir, err := os.Getwd()
 		if err != nil {
@@ -71,17 +77,17 @@ func RunFromStringWithContextAndOptions(raw string, additionalContext map[string
 			opts.BaseDir = baseDir
 		}
 	}
-	return runFromStringWithConfig(raw, additionalContext, opts)
+	return runFromStringWithConfig(goCtx, raw, additionalContext, opts)
 }
 
 // runFromStringWithConfig executes an infomunge script with configuration.
-func runFromStringWithConfig(raw string, additionalContext map[string]interface{}, opts RunnerOptions) error {
+func runFromStringWithConfig(goCtx context.Context, raw string, additionalContext map[string]interface{}, opts RunnerOptions) error {
 	_, _, bodyOffset := preprocessor.ExtractHeaderAndBody(raw)
 	if bodyOffset == 0 {
 		return unifiederrors.ParseError("script must have a header with '---' separator")
 	}
 
-	result, hasHeader, outputMimeType, context, err := evaluateWithContext(raw, additionalContext, opts)
+	result, hasHeader, outputMimeType, context, err := evaluateWithContext(goCtx, raw, additionalContext, opts)
 	if err != nil {
 		return err
 	}
@@ -97,11 +103,16 @@ func runFromStringWithConfig(raw string, additionalContext map[string]interface{
 // RunString executes an infomunge script from a string with optional additional context.
 // The additionalContext map allows injecting variables (like "payload") into the evaluation context.
 func RunString(script string, additionalContext map[string]interface{}) (interface{}, error) {
+	return RunStringWithGoContext(context.Background(), script, additionalContext)
+}
+
+// RunStringWithGoContext executes an infomunge script from a string with optional additional context and Go context.
+func RunStringWithGoContext(goCtx context.Context, script string, additionalContext map[string]interface{}) (interface{}, error) {
 	baseDir, err := os.Getwd()
 	if err != nil {
 		baseDir = "."
 	}
-	result, _, _, err := evaluate(script, additionalContext, RunnerOptions{BaseDir: baseDir})
+	result, _, _, err := evaluate(goCtx, script, additionalContext, RunnerOptions{BaseDir: baseDir})
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +121,11 @@ func RunString(script string, additionalContext map[string]interface{}) (interfa
 
 // RunStringWithContextAndOptionsWithOutput executes a script and returns result plus output metadata.
 func RunStringWithContextAndOptionsWithOutput(script string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, map[string]interface{}, error) {
+	return RunStringWithGoContextAndOptionsWithOutput(context.Background(), script, additionalContext, opts)
+}
+
+// RunStringWithGoContextAndOptionsWithOutput executes a script and returns result plus output metadata.
+func RunStringWithGoContextAndOptionsWithOutput(goCtx context.Context, script string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, map[string]interface{}, error) {
 	if opts.BaseDir == "" {
 		baseDir, err := os.Getwd()
 		if err != nil {
@@ -118,22 +134,22 @@ func RunStringWithContextAndOptionsWithOutput(script string, additionalContext m
 			opts.BaseDir = baseDir
 		}
 	}
-	return evaluateWithContext(script, additionalContext, opts)
+	return evaluateWithContext(goCtx, script, additionalContext, opts)
 }
 
 // evaluate is the core evaluation logic shared by all runner functions.
-func evaluate(raw string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, error) {
-	result, hasHeader, outputMimeType, _, err := evaluateWithContext(raw, additionalContext, opts)
+func evaluate(goCtx context.Context, raw string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, error) {
+	result, hasHeader, outputMimeType, _, err := evaluateWithContext(goCtx, raw, additionalContext, opts)
 	return result, hasHeader, outputMimeType, err
 }
 
 // evaluateWithContext is the core evaluation logic that also returns the parsed context.
-func evaluateWithContext(raw string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, map[string]interface{}, error) {
+func evaluateWithContext(goCtx context.Context, raw string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, map[string]interface{}, error) {
 	header, body, bodyOffset := preprocessor.ExtractHeaderAndBody(raw)
 	hasHeader := bodyOffset != 0
 
 	loader := NewModuleLoader(opts.BaseDir)
-	context, outputMimeType, err := parseHeader(header, hasHeader, raw, loader)
+	context, outputMimeType, err := parseHeaderWithGoContext(header, hasHeader, goCtx, raw, loader)
 	if err != nil {
 		return nil, hasHeader, outputMimeType, nil, err
 	}
@@ -151,7 +167,7 @@ func evaluateWithContext(raw string, additionalContext map[string]interface{}, o
 	if err != nil {
 		return nil, hasHeader, outputMimeType, nil, err
 	}
-	result, err := evaluator.Evaluate(parseableExpr, context, mapping, bodyOffset, raw)
+	result, err := evaluator.EvaluateWithGoContext(parseableExpr, context, goCtx, mapping, bodyOffset, raw)
 	if err != nil {
 		return nil, hasHeader, outputMimeType, nil, err
 	}
@@ -304,8 +320,8 @@ func handleNamespaceDecl(trimmedLine string, namespaces map[string]string) error
 }
 
 // handleVariableDecl processes variable declaration
-func handleVariableDecl(line, trimmedLine string, headerOffset int, context map[string]interface{}, fullRaw string) error {
-	val, varName, err := parseVarDecl(line, trimmedLine, headerOffset, context, fullRaw)
+func handleVariableDecl(line, trimmedLine string, headerOffset int, context map[string]interface{}, goCtx context.Context, fullRaw string) error {
+	val, varName, err := parseVarDeclWithGoContext(line, trimmedLine, headerOffset, context, goCtx, fullRaw)
 	if err != nil {
 		return err
 	}
@@ -347,6 +363,7 @@ type parseState struct {
 	headerOffset   int
 	fullRaw        string
 	loader         *ModuleLoader
+	goCtx          context.Context
 }
 
 // directiveRegistration pairs a keyword with its handler function.
@@ -485,7 +502,7 @@ func parseDirectiveLine(lines []string, index int, headerOffset int, state *pars
 		return consumed, nil
 	}
 	if strings.HasPrefix(trimmedLine, "var ") {
-		val, varName, consumed, err := parseVarDeclFromLines(lines, index, state.headerOffset, state.context, state.fullRaw)
+		val, varName, consumed, err := parseVarDeclFromLinesWithGoContext(lines, index, state.headerOffset, state.context, state.goCtx, state.fullRaw)
 		if err != nil {
 			return 0, withHeaderLineContext(err, state, headerOffset, line)
 		}
@@ -531,6 +548,10 @@ func withHeaderLineContext(err error, state *parseState, headerOffset int, line 
 }
 
 func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLoader) (map[string]interface{}, string, error) {
+	return parseHeaderWithGoContext(header, hasHeader, context.Background(), fullRaw, loader)
+}
+
+func parseHeaderWithGoContext(header string, hasHeader bool, goCtx context.Context, fullRaw string, loader *ModuleLoader) (map[string]interface{}, string, error) {
 	context := make(map[string]interface{})
 	outputMimeType := "application/json"
 
@@ -544,6 +565,7 @@ func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLo
 		outputMimeType: &outputMimeType,
 		fullRaw:        fullRaw,
 		loader:         loader,
+		goCtx:          goCtx,
 	}
 
 	lines := normalizeHeaderLines(header)

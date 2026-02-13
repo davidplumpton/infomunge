@@ -67,3 +67,5 @@
 [32] **User Preferences Log** - 2026-02-13: User asked for codebase quality review focused on biggest issues and expects significant findings to be turned into detailed beads tickets immediately.
 
 [33] **Agent Mistakes Log** - 2026-02-13: Attempted to invoke `apply_patch` through `exec_command` again while editing multiple files. Why: defaulted to a parallel shell-edit pattern and skipped the dedicated patch tool. Prevention: use the `apply_patch` tool directly for all patch hunks, then parallelize only read/test commands [22].
+
+[34] **Agent Mistakes Log** - 2026-02-13: Changed widely used runner/evaluator function signatures directly (`Evaluate`, `parseHeader`, var-decl parsers), which caused broad compile fallout across tests and helpers. Why: optimized for strict API purity before checking compatibility surface. Prevention: preserve existing signatures and add context-aware variants first, then migrate call sites incrementally [22].
