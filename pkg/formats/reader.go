@@ -6,11 +6,27 @@ import (
 
 // Read parses the content based on the provided mimeType using the registered readers.
 func Read(content, mimeType string) (interface{}, error) {
+	return ReadWithOptions(content, mimeType, nil)
+}
+
+// ReadWithOptions parses content with optional format-specific options.
+func ReadWithOptions(content, mimeType string, options Object) (interface{}, error) {
 	if mimeType == "" {
 		return nil, unifiederrors.ValidationError("mimeType cannot be empty")
 	}
 	if content == "" {
 		return nil, nil
+	}
+
+	if options != nil {
+		switch mimeType {
+		case "application/flatfile":
+			return readFlatfileWithOptions(content, options)
+		default:
+			if len(options) > 0 {
+				return nil, unifiederrors.ValidationErrorf("read options are not supported for mimeType: %s", mimeType)
+			}
+		}
 	}
 
 	reader, err := GetReader(mimeType)

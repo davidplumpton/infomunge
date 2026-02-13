@@ -110,6 +110,20 @@ Feature: I/O Functions
       "HDR0001ALICE   000030NY\nDTL0002BOB     000025CA"
       """
 
+  Scenario: read flatfile content with structured schema
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("0001ALICE   000030NY\n0002BOB     000025CA", "application/flatfile", {schema: {fields: [{name: "id", length: 4, type: "int", align: "right", pad: "0"}, {name: "name", length: 8, align: "left", pad: " "}, {name: "age", length: 6, type: "int", align: "right", pad: "0"}, {name: "state", length: 2}]}})
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [{"age":30,"id":1,"name":"ALICE","state":"NY"},{"age":25,"id":2,"name":"BOB","state":"CA"}]
+      """
+
   Scenario: read java content
     Given the following script:
       """
@@ -388,6 +402,30 @@ Feature: I/O Functions
       """
       "HDR0001ALICE   000030NY\nDTL0002BOB     000025CA"
       """
+
+  Scenario: write object array to flatfile with structured schema
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write([{id: 1, name: "ALICE", age: 30, state: "NY"}, {id: 2, name: "BOB", age: 25, state: "CA"}], "application/flatfile", {schema: {fields: [{name: "id", length: 4, type: "int", align: "right", pad: "0"}, {name: "name", length: 8, align: "left", pad: " "}, {name: "age", length: 6, type: "int", align: "right", pad: "0"}, {name: "state", length: 2}]}})
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "0001ALICE   000030NY\n0002BOB     000025CA"
+      """
+
+  Scenario: read flatfile with malformed record length fails
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("0001ALICE   000030NY\nBAD", "application/flatfile", {schema: {fields: [{name: "id", length: 4}, {name: "name", length: 8}, {name: "age", length: 6}, {name: "state", length: 2}]}})
+      """
+    Then running the script should fail with error containing "record 2 has length"
 
   Scenario: write string to java
     Given the following script:

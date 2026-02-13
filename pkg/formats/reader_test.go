@@ -204,6 +204,55 @@ func TestRead_Flatfile(t *testing.T) {
 	}
 }
 
+func TestReadWithOptions_FlatfileStructured(t *testing.T) {
+	content := "0001ALICE   000030NY\n0002BOB     000025CA"
+	options := Object{
+		"schema": Object{
+			"fields": Array{
+				Object{"name": "id", "length": 4, "type": "int", "align": "right", "pad": "0"},
+				Object{"name": "name", "length": 8, "align": "left", "pad": " "},
+				Object{"name": "age", "length": 6, "type": "int", "align": "right", "pad": "0"},
+				Object{"name": "state", "length": 2},
+			},
+		},
+	}
+
+	result, err := ReadWithOptions(content, "application/flatfile", options)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := Array{
+		Object{"id": 1.0, "name": "ALICE", "age": 30.0, "state": "NY"},
+		Object{"id": 2.0, "name": "BOB", "age": 25.0, "state": "CA"},
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("expected %+v, got %+v", expected, result)
+	}
+}
+
+func TestReadWithOptions_FlatfileStructuredLengthError(t *testing.T) {
+	content := "0001ALICE   000030NY\nBAD"
+	options := Object{
+		"schema": Object{
+			"fields": Array{
+				Object{"name": "id", "length": 4},
+				Object{"name": "name", "length": 8},
+				Object{"name": "age", "length": 6},
+				Object{"name": "state", "length": 2},
+			},
+		},
+	}
+
+	_, err := ReadWithOptions(content, "application/flatfile", options)
+	if err == nil {
+		t.Fatal("expected error for malformed record length")
+	}
+	if !strings.Contains(err.Error(), "record 2 has length") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestRead_Java(t *testing.T) {
 	content := "\xac\xed\x00\x05sr\x00\x10java.lang.String"
 	result, err := Read(content, "application/java")

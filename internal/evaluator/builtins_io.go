@@ -83,17 +83,34 @@ func isPrivateIP(ip net.IP) bool {
 		ip.IsUnspecified()
 }
 
-// callBuiltinRead implements the read(content, mimeType) function.
+// callBuiltinRead implements the read(content, mimeType[, options]) function.
 func callBuiltinRead(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, newPosError("read function requires at least 2 arguments: content and mimeType", e.Pos())
+	}
+	if len(args) > 3 {
+		return nil, newPosError("read function accepts at most 3 arguments: content, mimeType, and optional options object", e.Pos())
 	}
 	content, contentIsString := args[0].(string)
 	mimeType, mimeTypeIsString := args[1].(string)
 	if !contentIsString || !mimeTypeIsString {
 		return nil, newPosError("read function arguments must be strings", e.Pos())
 	}
-	res, err := formats.Read(content, mimeType)
+
+	if len(args) == 2 {
+		res, err := formats.Read(content, mimeType)
+		if err != nil {
+			return nil, newPosError(err.Error(), e.Pos())
+		}
+		return res, nil
+	}
+
+	options, ok := args[2].(map[string]interface{})
+	if !ok {
+		return nil, newPosError(fmt.Sprintf("read expects options to be an object, got %T", args[2]), e.Pos())
+	}
+
+	res, err := formats.ReadWithOptions(content, mimeType, options)
 	if err != nil {
 		return nil, newPosError(err.Error(), e.Pos())
 	}
@@ -169,10 +186,13 @@ func callBuiltinReadUrlWithArgs(args []interface{}, e *ast.CallExpr, evalCtx map
 	return result, nil
 }
 
-// callBuiltinWrite implements the write(value, mimeType) function.
+// callBuiltinWrite implements the write(value, mimeType[, options]) function.
 func callBuiltinWrite(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 2 {
+	if len(args) < 2 {
 		return nil, newPosError("write requires exactly 2 arguments: value and mimeType", e.Pos())
+	}
+	if len(args) > 3 {
+		return nil, newPosError("write accepts at most 3 arguments: value, mimeType, and optional options object", e.Pos())
 	}
 
 	mimeType, ok := args[1].(string)
@@ -180,7 +200,20 @@ func callBuiltinWrite(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 		return nil, newPosError(fmt.Sprintf("write expects mimeType to be a string, got %T", args[1]), e.Pos())
 	}
 
-	result, err := formats.Format(args[0], mimeType)
+	if len(args) == 2 {
+		result, err := formats.Format(args[0], mimeType)
+		if err != nil {
+			return nil, newPosError(fmt.Sprintf("write error: %v", err), e.Pos())
+		}
+		return result, nil
+	}
+
+	options, ok := args[2].(map[string]interface{})
+	if !ok {
+		return nil, newPosError(fmt.Sprintf("write expects options to be an object, got %T", args[2]), e.Pos())
+	}
+
+	result, err := formats.FormatWithOptions(args[0], mimeType, options)
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("write error: %v", err), e.Pos())
 	}

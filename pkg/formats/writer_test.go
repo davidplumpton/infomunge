@@ -270,6 +270,55 @@ func TestFormat_Flatfile(t *testing.T) {
 	})
 }
 
+func TestFormatWithOptions_FlatfileStructured(t *testing.T) {
+	input := Array{
+		Object{"id": 1.0, "name": "ALICE", "age": 30.0, "state": "NY"},
+		Object{"id": 2.0, "name": "BOB", "age": 25.0, "state": "CA"},
+	}
+	options := Object{
+		"schema": Object{
+			"fields": Array{
+				Object{"name": "id", "length": 4, "type": "int", "align": "right", "pad": "0"},
+				Object{"name": "name", "length": 8, "align": "left", "pad": " "},
+				Object{"name": "age", "length": 6, "type": "int", "align": "right", "pad": "0"},
+				Object{"name": "state", "length": 2},
+			},
+		},
+	}
+
+	result, err := FormatWithOptions(input, "application/flatfile", options)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expected := "0001ALICE   000030NY\n0002BOB     000025CA"
+	if result != expected {
+		t.Fatalf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestFormatWithOptions_FlatfileStructuredLengthError(t *testing.T) {
+	input := Object{"id": 1.0, "name": "TOO-LONG-NAME", "age": 30.0, "state": "NY"}
+	options := Object{
+		"schema": Object{
+			"singleRecord": true,
+			"fields": Array{
+				Object{"name": "id", "length": 4, "type": "int", "align": "right", "pad": "0"},
+				Object{"name": "name", "length": 8, "align": "left", "pad": " "},
+				Object{"name": "age", "length": 6, "type": "int", "align": "right", "pad": "0"},
+				Object{"name": "state", "length": 2},
+			},
+		},
+	}
+
+	_, err := FormatWithOptions(input, "application/flatfile", options)
+	if err == nil {
+		t.Fatal("expected error for value overflow")
+	}
+	if !strings.Contains(err.Error(), "value length") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestFormat_Java(t *testing.T) {
 	t.Run("string input", func(t *testing.T) {
 		result, err := Format("\xac\xed\x00\x05java-object", "application/java")
