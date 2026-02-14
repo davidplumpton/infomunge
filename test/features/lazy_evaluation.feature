@@ -206,3 +206,14 @@ Feature: Lazy Evaluation
       """
       ["a!","b!","c!"]
       """
+
+  Scenario: Lazy mode flag is rejected
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      1 + 1
+      """
+    When I run the application with this content using --lazy and it fails
+    Then the error should contain "--lazy is currently unsupported"

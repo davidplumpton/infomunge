@@ -78,7 +78,7 @@ func (app *App) parseFlags(args []string) (*Config, error) {
 
 	scriptFile := fs.String("f", "", "script file to execute")
 	stdinFormat := fs.String("s", "", "read stdin as format (e.g., json), shorthand for -i payload=:format for stdin")
-	lazy := fs.Bool("lazy", false, "enable lazy evaluation mode")
+	lazy := fs.Bool("lazy", false, "deprecated: lazy mode flag is unsupported (use lazy builtins directly)")
 	serverMode := fs.Bool("server", false, "run as an HTTP server")
 	listenAddr := fs.String("listen", defaultListenAddr, "address to listen on in server mode")
 	serverAPIKey := fs.String("api-key", "", "shared API key required for /run requests in server mode")

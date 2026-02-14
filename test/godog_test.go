@@ -133,6 +133,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the following input content:$`, tc.theFollowingInputContent)
 	ctx.Step(`^a script with (\d+) repeated lines$`, tc.aScriptWithRepeatedLines)
 	ctx.Step(`^I run the application with this content$`, tc.iRunTheApplicationWithThisContent)
+	ctx.Step(`^I run the application with this content using --lazy and it fails$`, tc.iRunTheApplicationWithThisContentUsingLazyAndItFails)
 	ctx.Step(`^I run the application with this content and inputs and it fails:$`, tc.iRunTheApplicationWithThisContentAndInputsAndItFails)
 	ctx.Step(`^I run the application and it fails$`, tc.iRunTheApplicationAndItFails)
 	ctx.Step(`^the output should be:$`, tc.theOutputShouldBe)
@@ -282,6 +283,17 @@ func (tc *testContext) iRunTheApplicationWithThisContent() error {
 		return err
 	}
 	return tc.iRunTheApplicationWith("input.txt")
+}
+
+func (tc *testContext) iRunTheApplicationWithThisContentUsingLazyAndItFails() error {
+	if err := tc.ensureWorkspace(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
+		return err
+	}
+	_ = tc.runCLI("--lazy", "-f", "input.txt")
+	return nil
 }
 
 func (tc *testContext) iRunTheApplicationWithThisContentAndInputsAndItFails(content *godog.DocString) error {

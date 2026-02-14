@@ -36,13 +36,22 @@ Reduces the stream to a single value.
 
 ## CLI Usage
 
-Use the `--lazy` flag to enable lazy evaluation mode.
+The `--lazy` flag is currently unsupported and returns a validation error.
+Use lazy builtins directly in scripts instead.
 
 ```bash
-infomunge --lazy -i payload data.json "payload |> __toStream |> __lazyMap((x) -> x.field) |> __lazyFilter((x) -> x > 10)"
+infomunge -i payload data.json "%im 0.1
+output application/json
+---
+__lazyFilter(__lazyMap(__toStream(payload), (x) -> x.field), (x) -> x > 10)"
 ```
 
-Note: the flag is parsed and propagated, but there is currently no special evaluation mode beyond using the lazy builtins directly.
+Example of unsupported flag behavior:
+
+```bash
+infomunge --lazy -f script.im
+# error: --lazy is currently unsupported; use lazy_eval/force_eval and __toStream/__lazyMap/__lazyFilter/__lazyReduce builtins directly
+```
 
 ## Examples
 
@@ -75,5 +84,5 @@ This will output `[16,25]` without creating intermediate arrays.
 
 ## Limitations and Gaps
 
-- The `--lazy` flag does not currently alter evaluation behavior by itself.
+- The `--lazy` flag is intentionally rejected while lazy mode semantics are not implemented end-to-end.
 - There is no dependency graph or cycle detection for lazy expressions beyond the builtin evaluation.

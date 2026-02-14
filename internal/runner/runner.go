@@ -25,6 +25,8 @@ type RunnerOptions struct {
 	Lazy    bool
 }
 
+const lazyFlagUnsupportedMessage = "--lazy is currently unsupported; use lazy_eval/force_eval and __toStream/__lazyMap/__lazyFilter/__lazyReduce builtins directly"
+
 // Run executes the infomunge process on the given file.
 func Run(filePath string) error {
 	return RunWithConfig(filePath, RunnerOptions{})
@@ -82,6 +84,10 @@ func RunFromStringWithContextAndOptionsAndGoContext(goCtx context.Context, raw s
 
 // runFromStringWithConfig executes an infomunge script with configuration.
 func runFromStringWithConfig(goCtx context.Context, raw string, additionalContext map[string]interface{}, opts RunnerOptions) error {
+	if opts.Lazy {
+		return unifiederrors.ValidationError(lazyFlagUnsupportedMessage)
+	}
+
 	_, _, bodyOffset := preprocessor.ExtractHeaderAndBody(raw)
 	if bodyOffset == 0 {
 		return unifiederrors.ParseError("script must have a header with '---' separator")
@@ -145,6 +151,10 @@ func evaluate(goCtx context.Context, raw string, additionalContext map[string]in
 
 // evaluateWithContext is the core evaluation logic that also returns the parsed context.
 func evaluateWithContext(goCtx context.Context, raw string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, map[string]interface{}, error) {
+	if opts.Lazy {
+		return nil, false, "", nil, unifiederrors.ValidationError(lazyFlagUnsupportedMessage)
+	}
+
 	header, body, bodyOffset := preprocessor.ExtractHeaderAndBody(raw)
 	hasHeader := bodyOffset != 0
 
