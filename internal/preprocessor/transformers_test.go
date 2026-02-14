@@ -18,6 +18,7 @@ func TestReplaceImplicitLambdas(t *testing.T) {
 		{"map with implicit object body", "payload map user: $.name", "payload map (__arg) -> user: __arg.name"},
 		{"nested map", "payload map ($ map $$)", "payload map (__arg, __idx) -> (__arg map __idx)"},
 		{"already explicit", "payload map (item) -> item + 1", "payload map (item) -> item + 1"},
+		{"explicit map then implicit filter", "arr map (x) -> (x + 1) filter $ > 1", "arr map (x) -> (x + 1) filter (__arg) -> __arg > 1"},
 		{"reduce with paren no space", "data reduce($ + $$)", "data reduce (__arg, __idx) -> (__arg + __idx)"},
 		{"reduce with paren complex", `data reduce(($$ splitBy ":")[0])`, `data reduce (__arg, __idx) -> ((__idx splitBy ":")[0])`},
 	}
@@ -325,6 +326,7 @@ func TestReplaceCollectionOperator(t *testing.T) {
 		{"flatMap basic", `arr flatMap __lambda("x", x)`, `__flatMap(arr, __lambda("x", x))`, replaceFlatMapOperator},
 		// Array literals are not transformed by these functions - they expect raw input
 		{"map with literal", `[1, 2] map __lambda("x", x)`, `__map([1, 2], __lambda("x", x))`, replaceMapOperator},
+		{"map stops before next collection operator", `arr map __lambda("x", (x + 1)) filter __lambda("x", x > 1)`, `__map(arr, __lambda("x", (x + 1))) filter __lambda("x", x > 1)`, replaceMapOperator},
 	}
 
 	for _, tt := range tests {

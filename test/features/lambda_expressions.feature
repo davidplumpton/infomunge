@@ -69,6 +69,20 @@ Feature: Lambda Expression Support
       ["Hello Alice","Hello Bob"]
       """
 
+  Scenario: Explicit map lambda followed by implicit filter lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2, 3] map (x) -> (x + 1) filter $ > 2
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [3,4]
+      """
+
   Scenario: Lambda with comparison expression
     Given the following input content:
       """

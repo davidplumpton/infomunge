@@ -166,67 +166,6 @@ func matchesAt(runes []rune, i int, pattern string) bool {
 	return i+len(pattern) <= len(runes) && string(runes[i:i+len(pattern)]) == pattern
 }
 
-func scanLambdaBody(runes []rune, start int) (end int, hasArrow bool) {
-	var state ScanState
-	wasInGroup := false
-	// This scanner decides where an implicit lambda body stops.
-	// It tracks nesting and strings so commas/operators only terminate at depth 0.
-	// Special case: after closing a top-level group, we look ahead for either
-	// `->` (explicit lambda, so caller should not rewrite) or another collection
-	// operator that starts the next pipeline segment.
-	for i := start; i < len(runes); i++ {
-		ch := runes[i]
-		if state.InString() {
-			state.AdvanceRune(ch)
-			continue
-		}
-		switch ch {
-		case '(', '[', '{':
-			state.AdvanceRune(ch)
-			wasInGroup = true
-		case ')', ']', '}':
-			if state.Depth() == 0 {
-				return i, false
-			}
-			state.AdvanceRune(ch)
-			// If we just exited a group back to depth 0, check what follows
-			if state.Depth() == 0 && wasInGroup {
-				// Look ahead for "->" or collection operators after optional whitespace
-				j := i + 1
-				for j < len(runes) && (runes[j] == ' ' || runes[j] == '\t') {
-					j++
-				}
-				if j+1 < len(runes) && runes[j] == '-' && runes[j+1] == '>' {
-					// There's an arrow, continue scanning to find it
-					continue
-				}
-				// Check for collection operators that would end the body.
-				if isCollectionOperatorAtRunes(runes, j) {
-					return i + 1, false
-				}
-				// No arrow or collection operator, continue scanning
-			}
-		case ',':
-			if state.Depth() == 0 {
-				return i, false
-			}
-		case ' ':
-			// Check for collection operators at depth 0
-			if state.Depth() == 0 {
-				if isCollectionOperatorAtRunes(runes, i+1) {
-					return i, false
-				}
-			}
-		default:
-			state.AdvanceRune(ch)
-		}
-		if matchesAt(runes, i, "->") {
-			return i, true
-		}
-	}
-	return len(runes), false
-}
-
 func detectDollarParams(s string) (hasDollar, hasDoubleDollar bool) {
 	for i := 0; i < len(s); i++ {
 		if s[i] == '$' {

@@ -99,41 +99,11 @@ func replaceCollectionOperator(s string, opKey string, funcName string) string {
 					pos++
 				}
 				lambdaStart := pos
-				// Track depth fresh from the lambda start position
-				var state ScanState
-				wasInGroup := false
-				for pos < len(s) {
-					ch := s[pos]
-					if !state.InString() {
-						if ch == '(' || ch == '[' || ch == '{' {
-							state.Advance(ch)
-							wasInGroup = true
-						} else if ch == ')' || ch == ']' || ch == '}' {
-							if state.Depth() == 0 {
-								break
-							}
-							state.Advance(ch)
-							// If we just exited a group back to depth 0, check for collection operators
-							if state.Depth() == 0 && wasInGroup {
-								// Look ahead for collection operators that would start a new expression
-								j := pos + 1
-								for j < len(s) && (s[j] == ' ' || s[j] == '\t') {
-									j++
-								}
-								if isCollectionOperatorAt(s, j) {
-									pos++ // include the closing bracket
-									break
-								}
-							}
-						} else if state.Depth() == 0 && (ch == ',' || (ch == ' ' && pos+opLen <= len(s) && s[pos:pos+opLen] == opKey)) {
-							break
-						}
-					} else {
-						state.Advance(ch)
-					}
-					pos++
-				}
-				lambdaStr := strings.TrimSpace(s[lambdaStart:pos])
+				runes := []rune(s)
+				lambdaStartRune := runeIndexAtByteOffset(s, lambdaStart)
+				lambdaEndRune := scanCollectionLambdaBody(runes, lambdaStartRune)
+				lambdaStr := strings.TrimSpace(string(runes[lambdaStartRune:lambdaEndRune]))
+				pos = byteOffsetAtRuneIndex(s, lambdaEndRune)
 				result = append(result, []rune(lambdaStr)...)
 				result = append(result, ')')
 				sc.SetPos(pos)
