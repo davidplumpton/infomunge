@@ -20,19 +20,11 @@ func FormatWithOptions(result interface{}, mimeType string, options Object) (str
 	}
 
 	if options != nil {
-		switch mimeType {
-		case "application/flatfile":
-			return formatFlatfileWithOptions(result, options)
-		case "application/java":
-			return formatJavaWithOptions(result, options)
-		case "application/xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-			return formatXLSXWithOptions(result, options)
-		case "application/protobuf", "application/x-protobuf":
-			return formatProtobufWithOptions(result, options)
-		default:
-			if len(options) > 0 {
-				return "", unifiederrors.ValidationErrorf("write options are not supported for mimeType: %s", mimeType)
-			}
+		if handler, ok := getWriteOptionsHandler(mimeType); ok {
+			return handler(result, options)
+		}
+		if len(options) > 0 {
+			return "", unifiederrors.ValidationErrorf("write options are not supported for mimeType: %s", mimeType)
 		}
 	}
 

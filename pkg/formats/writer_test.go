@@ -403,6 +403,25 @@ func TestFormatWithOptions_JavaStructuredWithClassOverride(t *testing.T) {
 	}
 }
 
+func TestFormatWithOptions_XLSXAliasUsesSameOptionHandler(t *testing.T) {
+	options := Object{"unsupported": true}
+
+	_, canonicalErr := FormatWithOptions(Object{"Sheet1": Array{}}, "application/xlsx", options)
+	_, aliasErr := FormatWithOptions(Object{"Sheet1": Array{}}, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", options)
+
+	if canonicalErr == nil || aliasErr == nil {
+		t.Fatalf("expected both calls to fail, canonicalErr=%v aliasErr=%v", canonicalErr, aliasErr)
+	}
+
+	if canonicalErr.Error() != aliasErr.Error() {
+		t.Fatalf("expected identical errors for canonical/alias, got %q vs %q", canonicalErr.Error(), aliasErr.Error())
+	}
+
+	if !strings.Contains(canonicalErr.Error(), "unsupported xlsx option") {
+		t.Fatalf("expected xlsx option handler error, got %v", canonicalErr)
+	}
+}
+
 func TestFormatWithOptions_JavaStructuredClassMismatch(t *testing.T) {
 	_, err := FormatWithOptions(
 		Object{"name": "Alice"},

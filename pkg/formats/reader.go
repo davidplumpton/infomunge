@@ -19,19 +19,11 @@ func ReadWithOptions(content, mimeType string, options Object) (interface{}, err
 	}
 
 	if options != nil {
-		switch mimeType {
-		case "application/flatfile":
-			return readFlatfileWithOptions(content, options)
-		case "application/java":
-			return readJavaWithOptions(content, options)
-		case "application/xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-			return readXLSXWithOptions(content, options)
-		case "application/protobuf", "application/x-protobuf":
-			return readProtobufWithOptions(content, options)
-		default:
-			if len(options) > 0 {
-				return nil, unifiederrors.ValidationErrorf("read options are not supported for mimeType: %s", mimeType)
-			}
+		if handler, ok := getReadOptionsHandler(mimeType); ok {
+			return handler(content, options)
+		}
+		if len(options) > 0 {
+			return nil, unifiederrors.ValidationErrorf("read options are not supported for mimeType: %s", mimeType)
 		}
 	}
 

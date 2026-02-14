@@ -309,6 +309,25 @@ func TestReadWithOptions_JavaUnsupportedOption(t *testing.T) {
 	}
 }
 
+func TestReadWithOptions_XLSXAliasUsesSameOptionHandler(t *testing.T) {
+	options := Object{"unsupported": true}
+
+	_, canonicalErr := ReadWithOptions("not-an-xlsx", "application/xlsx", options)
+	_, aliasErr := ReadWithOptions("not-an-xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", options)
+
+	if canonicalErr == nil || aliasErr == nil {
+		t.Fatalf("expected both calls to fail, canonicalErr=%v aliasErr=%v", canonicalErr, aliasErr)
+	}
+
+	if canonicalErr.Error() != aliasErr.Error() {
+		t.Fatalf("expected identical errors for canonical/alias, got %q vs %q", canonicalErr.Error(), aliasErr.Error())
+	}
+
+	if !strings.Contains(canonicalErr.Error(), "unsupported xlsx option") {
+		t.Fatalf("expected xlsx option handler error, got %v", canonicalErr)
+	}
+}
+
 func TestRead_Protobuf(t *testing.T) {
 	content := "\x0a\x05Alice\x10\x1e"
 
