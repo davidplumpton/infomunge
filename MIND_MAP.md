@@ -101,3 +101,5 @@
 [49] **Agent Mistakes Log** - 2026-02-14: While replacing duplicate determinism checks, introduced unrelated placeholder type assertions in `internal/testing/properties/nopanic_test.go`, creating noisy compile risk before correction. Why: rushed a broad patch instead of minimal targeted edits. Prevention: keep refactor patches narrowly scoped to intended lines and immediately re-open edited files for sanity checks before running tests [22].
 
 [50] **User Preferences Log** - 2026-02-14: User asked to create a dedicated beads ticket for measuring cucumber-driven coverage and increasing coverage where it adds practical confidence.
+
+[51] **Agent Mistakes Log** - 2026-02-14: Ran `bd close` and `bd show` in parallel, which again produced a stale `show` status (`in_progress`) even though the close succeeded. Why: reused parallel batching with a state mutation plus immediate read. Prevention: run all beads mutations (`bd update`, `bd close`) and verification (`bd show`) strictly sequentially [22][37][38][46].
