@@ -47,6 +47,7 @@ var (
 	godogBuildOnce sync.Once
 	godogBinary    string
 	godogBuildErr  error
+	stdoutMu       sync.Mutex // Serializes scenarios that capture os.Stdout
 )
 
 func TestFeatures(t *testing.T) {
@@ -151,6 +152,8 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the following multipart input:$`, tc.theFollowingMultipartInput)
 	ctx.Step(`^the following script:$`, tc.theFollowingScript)
 	ctx.Step(`^I run the script$`, tc.iRunTheScript)
+	ctx.Step(`^I run the script through the runner output path$`, tc.iRunTheScriptThroughRunnerOutputPath)
+	ctx.Step(`^running the script through the runner output path should fail with error containing "([^"]*)"$`, tc.runningTheScriptThroughRunnerOutputPathShouldFailWithErrorContaining)
 	ctx.Step(`^I run the script with a canceled evaluation context$`, tc.iRunTheScriptWithCanceledEvaluationContext)
 	ctx.Step(`^I run the script with an expired evaluation deadline$`, tc.iRunTheScriptWithExpiredEvaluationDeadline)
 	ctx.Step(`^running the script should fail with error containing "([^"]*)"$`, tc.runningTheScriptShouldFailWithErrorContaining)
@@ -457,6 +460,72 @@ func (tc *testContext) iRunTheScript() error {
 
 	// Run the script with timeout protection
 	return tc.runScriptWithTimeout(tc.scriptContent, ctx)
+}
+
+// iRunTheScriptThroughRunnerOutputPath calls RunFromStringWithContext which
+// exercises the runner's formatOutputWithContext path (including applyXMLOutputOptions
+// and parseBoolOption) by capturing stdout.
+func (tc *testContext) iRunTheScriptThroughRunnerOutputPath() error {
+	ctx := make(map[string]interface{})
+	if tc.payloadMime != "" {
+		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
+		if err != nil {
+			return fmt.Errorf("failed to parse payload: %v", err)
+		}
+		ctx["payload"] = payload
+	}
+
+	captured, runErr := captureRunnerStdout(tc.scriptContent, ctx)
+	if runErr != nil {
+		return runErr
+	}
+	tc.lastOutput = captured
+	return nil
+}
+
+func (tc *testContext) runningTheScriptThroughRunnerOutputPathShouldFailWithErrorContaining(expected string) error {
+	ctx := make(map[string]interface{})
+	if tc.payloadMime != "" {
+		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
+		if err != nil {
+			if strings.Contains(err.Error(), expected) {
+				return nil
+			}
+			return fmt.Errorf("payload parsing failed with unexpected error: %v", err)
+		}
+		ctx["payload"] = payload
+	}
+
+	_, runErr := captureRunnerStdout(tc.scriptContent, ctx)
+	if runErr == nil {
+		return fmt.Errorf("expected script to fail, but it succeeded")
+	}
+	if !strings.Contains(runErr.Error(), expected) {
+		return fmt.Errorf("expected error to contain %q, but got: %v", expected, runErr)
+	}
+	return nil
+}
+
+// captureRunnerStdout calls RunFromStringWithContext and captures its stdout output.
+// Uses a mutex to serialize calls since os.Stdout is process-global.
+func captureRunnerStdout(script string, ctx map[string]interface{}) (string, error) {
+	stdoutMu.Lock()
+	defer stdoutMu.Unlock()
+
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		return "", fmt.Errorf("failed to create pipe: %v", err)
+	}
+	os.Stdout = w
+
+	runErr := runner.RunFromStringWithContext(script, ctx)
+
+	w.Close()
+	captured, _ := io.ReadAll(r)
+	os.Stdout = oldStdout
+
+	return string(captured), runErr
 }
 
 func (tc *testContext) iRunTheScriptWithCanceledEvaluationContext() error {
