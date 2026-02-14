@@ -196,6 +196,23 @@ Feature: Basic Operators
       "Hello World"
       """
 
+  Scenario: String Concatenation With Lambda Is Deterministic
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {
+        first: "prefix-" + ((x) -> x + 1),
+        second: "prefix-" + ((x) -> x + 1),
+        stable: ("prefix-" + ((x) -> x + 1)) == ("prefix-" + ((x) -> x + 1))
+      }
+      """
+    When I run the application with this content
+    Then the output should contain "\"first\":\"prefix-\\u003cfunction\\u003e\""
+    And the output should contain "\"second\":\"prefix-\\u003cfunction\\u003e\""
+    And the output should contain "\"stable\":true"
+
   Scenario: Relational Equality
     Given the following input content:
       """

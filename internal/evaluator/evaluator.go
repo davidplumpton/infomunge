@@ -315,11 +315,11 @@ func add(left, right Value) (Value, error) {
 			return l + r, nil
 		}
 		// String + non-string: convert right to string
-		return l + fmt.Sprintf("%v", right), nil
+		return l + coerceToString(right), nil
 	}
 	if r, okR := right.(string); okR {
 		// Non-string + string: convert left to string
-		return fmt.Sprintf("%v", left) + r, nil
+		return coerceToString(left) + r, nil
 	}
 
 	// Special case: array concatenation (supports array + array)

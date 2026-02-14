@@ -314,6 +314,9 @@ func coerceToString(value Value) string {
 	if value == nil {
 		return "null"
 	}
+	if _, ok := value.(*Lambda); ok {
+		return "<function>"
+	}
 	return fmt.Sprintf("%v", value)
 }
 

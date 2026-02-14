@@ -210,6 +210,49 @@ func TestEvaluate_LogicalOperations(t *testing.T) {
 	}
 }
 
+func TestEvaluate_StringConcatWithLambdaIsDeterministic(t *testing.T) {
+	ctx := make(map[string]interface{})
+	tests := []struct {
+		name     string
+		expr     string
+		expected string
+	}{
+		{name: "string plus lambda", expr: `"prefix-" + __lambda("x", x + 1)`, expected: "prefix-<function>"},
+		{name: "lambda plus string", expr: `__lambda("x", x + 1) + "-suffix"`, expected: "<function>-suffix"},
+	}
+
+	for _, tt := range tests {
+		mapping := make([]int, len(tt.expr))
+		for i := range mapping {
+			mapping[i] = i
+		}
+
+		first, err := Evaluate(tt.expr, ctx, mapping, 0, tt.expr)
+		if err != nil {
+			t.Fatalf("%s: first evaluation failed: %v", tt.name, err)
+		}
+		second, err := Evaluate(tt.expr, ctx, mapping, 0, tt.expr)
+		if err != nil {
+			t.Fatalf("%s: second evaluation failed: %v", tt.name, err)
+		}
+
+		firstStr, ok := first.(string)
+		if !ok {
+			t.Fatalf("%s: expected string result, got %#v (%T)", tt.name, first, first)
+		}
+		secondStr, ok := second.(string)
+		if !ok {
+			t.Fatalf("%s: expected string result, got %#v (%T)", tt.name, second, second)
+		}
+		if firstStr != secondStr {
+			t.Fatalf("%s: expected deterministic concat result, got %q and %q", tt.name, firstStr, secondStr)
+		}
+		if firstStr != tt.expected {
+			t.Fatalf("%s: expected %q, got %q", tt.name, tt.expected, firstStr)
+		}
+	}
+}
+
 func TestEvaluate_ComparisonErrors(t *testing.T) {
 	ctx := map[string]interface{}{
 		"str": "hello",
