@@ -67,3 +67,14 @@ Feature: Header Variable Declarations
       """
       {"tool":"InfoMunge","version":1}
       """
+
+  Scenario: Single-line header is normalized before evaluation
+    Given the following script:
+      """
+      %im 0.1 var message = "output application/xml is just text" var amount = 2 + 3 output application/json --- {message: message, amount: amount}
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"amount":5,"message":"output application/xml is just text"}
+      """

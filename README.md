@@ -141,6 +141,15 @@ This project uses Cucumber for Go.
 go test -v ./test
 ```
 
+Generate coverage from cucumber tests (runtime-focused packages):
+
+```bash
+timeout 5m go test -v ./test -run TestFeatures -count=1 \
+  -coverprofile=tmp/cucumber.cover \
+  -coverpkg=./internal/runner,./internal/preprocessor,./internal/evaluator,./pkg/formats
+go tool cover -func=tmp/cucumber.cover | tail -n 1
+```
+
 ### Version Control
 
 This project uses `jj` for version control.

@@ -61,3 +61,24 @@ Feature: XML Output Options
       """
       xmlns:b="http://example.com/b"
       """
+
+  Scenario: Invalid boolean option value fails parsing
+    Given the following input content:
+      """
+      %im 0.1
+      output application/xml writeDeclaration=""
+      ---
+      root: "value"
+      """
+    When I run the application and it fails
+    Then the application should fail with error containing "output option writeDeclaration"
+
+  Scenario: Invalid output option format fails parsing
+    Given the following script:
+      """
+      %im 0.1
+      output application/xml writeDeclaration
+      ---
+      root: "value"
+      """
+    Then running the script should fail with error containing "invalid output option"
