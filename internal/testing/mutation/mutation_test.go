@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime/debug"
 	"strings"
 	"testing"
@@ -15,6 +15,7 @@ import (
 
 	"infomunge/internal/preprocessor"
 	"infomunge/internal/runner"
+	"infomunge/internal/testing/determinism"
 	"infomunge/internal/testing/failures"
 	"infomunge/internal/testing/metrics"
 	"infomunge/internal/testing/testbudget"
@@ -76,7 +77,7 @@ func TestMutatedCorpusExpressions_NoPanics_AndDeterministic(t *testing.T) {
 			return
 		}
 
-		if !deterministicallyEqual(firstRes, secondRes) {
+		if !determinism.Equal(firstRes, secondRes) {
 			recordMutationFailure("mutation_determinism", baseExpr, mutatedExpr, seed, ctx, "", detectedAt)
 			t.Fatalf("nondeterministic result for mutation seed=%d mutated=%q first=%#v second=%#v", seed, mutatedExpr, firstRes, secondRes)
 		}
@@ -196,18 +197,6 @@ func safeRun(script string, ctx map[string]interface{}) (result interface{}, err
 	return result, err, nil, ""
 }
 
-func deterministicallyEqual(a, b interface{}) bool {
-	if reflect.DeepEqual(a, b) {
-		return true
-	}
-	aj, aErr := json.Marshal(a)
-	bj, bErr := json.Marshal(b)
-	if aErr != nil || bErr != nil {
-		return false
-	}
-	return string(aj) == string(bj)
-}
-
 func recordMutationFailure(property, originalExpr, mutatedExpr string, seed int64, ctx map[string]interface{}, panicStack string, detectedAt time.Time) {
 	minimizedAt := time.Now().UTC()
 	artifact := failures.Artifact{
@@ -233,7 +222,13 @@ func mutationChangesBehavior(baseRes interface{}, baseErr error, mutatedRes inte
 	if baseErr != nil && mutatedErr != nil {
 		return baseErr.Error() != mutatedErr.Error()
 	}
-	return !deterministicallyEqual(baseRes, mutatedRes)
+	return !determinism.Equal(baseRes, mutatedRes)
+}
+
+func TestMutationChangesBehavior_TreatsNaNAsDeterministic(t *testing.T) {
+	if mutationChangesBehavior(math.NaN(), nil, math.NaN(), nil) {
+		t.Fatal("expected NaN to be treated as deterministic in mutation comparator")
+	}
 }
 
 func TestMain(m *testing.M) {

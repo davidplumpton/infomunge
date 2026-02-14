@@ -3,12 +3,12 @@ package properties_test
 import (
 	"flag"
 	"fmt"
-	"reflect"
 	"runtime/debug"
 	"testing"
 
 	"infomunge/internal/evaluator"
 	"infomunge/internal/preprocessor"
+	"infomunge/internal/testing/determinism"
 	"infomunge/internal/testing/exprgen"
 	"infomunge/internal/testing/metrics"
 	"infomunge/internal/testing/testbudget"
@@ -59,7 +59,7 @@ func TestEvaluate_NoPanics_Deterministic_AndTypeConsistent(t *testing.T) {
 			return
 		}
 
-		if !deterministicResultsEqual(firstResult, secondResult) {
+		if !determinism.Equal(firstResult, secondResult) {
 			t.Fatalf("nondeterministic result\nexpr: %q\nctx: %#v\nfirst:  %#v\nsecond: %#v", expr, tc.Value, firstResult, secondResult)
 		}
 
@@ -131,31 +131,9 @@ func TestEvaluate_DeterministicLambdaResults(t *testing.T) {
 	if _, ok := secondResult.(*evaluator.Lambda); !ok {
 		t.Fatalf("expected lambda result, got %#v (%T)", secondResult, secondResult)
 	}
-	if !deterministicResultsEqual(firstResult, secondResult) {
+	if !determinism.Equal(firstResult, secondResult) {
 		t.Fatalf("lambda results should be treated as deterministic\nfirst: %#v\nsecond: %#v", firstResult, secondResult)
 	}
-}
-
-func deterministicResultsEqual(firstResult, secondResult interface{}) bool {
-	if reflect.DeepEqual(firstResult, secondResult) {
-		return true
-	}
-
-	firstLambda, firstIsLambda := firstResult.(*evaluator.Lambda)
-	secondLambda, secondIsLambda := secondResult.(*evaluator.Lambda)
-	if !firstIsLambda || !secondIsLambda {
-		return false
-	}
-
-	if len(firstLambda.Params) != len(secondLambda.Params) {
-		return false
-	}
-	for i := range firstLambda.Params {
-		if !reflect.DeepEqual(firstLambda.Params[i], secondLambda.Params[i]) {
-			return false
-		}
-	}
-	return true
 }
 
 func evalWithContext(expr string, ctx map[string]interface{}) (interface{}, error) {

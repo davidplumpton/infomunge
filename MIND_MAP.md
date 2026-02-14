@@ -97,3 +97,5 @@
 [47] **User Preferences Log** - 2026-02-14: User asked to pick the next ticket from `README.md`, `AGENTS.md`, and `MIND_MAP.md` context with preference for work already marked `in_progress`; prioritize continuing active in-flight tickets first.
 
 [48] **Agent Mistakes Log** - 2026-02-14: Ran `rg` with a pattern beginning with `--lazy` without placing `--` before the search pattern, causing option parsing failure. Why: reused a quick search template without guarding flag-like patterns. Prevention: always insert `--` before any pattern that may start with `-` (for example `rg -n -- \"--lazy\" ...`) [22][45].
+
+[49] **Agent Mistakes Log** - 2026-02-14: While replacing duplicate determinism checks, introduced unrelated placeholder type assertions in `internal/testing/properties/nopanic_test.go`, creating noisy compile risk before correction. Why: rushed a broad patch instead of minimal targeted edits. Prevention: keep refactor patches narrowly scoped to intended lines and immediately re-open edited files for sanity checks before running tests [22].
