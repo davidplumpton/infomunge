@@ -126,6 +126,17 @@ Feature: Object Functions
     When I run the application and it fails
     Then the output should contain "arrayToObject: missing key at index 0"
 
+  Scenario: arrayToObject keeps last value for duplicate keys
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      arrayToObject([{key: "a", value: 1}, {key: "a", value: 2}])
+      """
+    When I run the application with this content
+    Then the output should contain "\"a\":2"
+
   # keysOf tests
   Scenario: keysOf basic usage
     Given the following input content:
