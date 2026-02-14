@@ -103,3 +103,5 @@
 [50] **User Preferences Log** - 2026-02-14: User asked to create a dedicated beads ticket for measuring cucumber-driven coverage and increasing coverage where it adds practical confidence.
 
 [51] **Agent Mistakes Log** - 2026-02-14: Ran `bd close` and `bd show` in parallel, which again produced a stale `show` status (`in_progress`) even though the close succeeded. Why: reused parallel batching with a state mutation plus immediate read. Prevention: run all beads mutations (`bd update`, `bd close`) and verification (`bd show`) strictly sequentially [22][37][38][46].
+
+[52] **Agent Mistakes Log** - 2026-02-14: Added cucumber failure scenarios using `Given the following script` together with `When I run the application and it fails`; this mismatched harness fields and produced a misleading parse error (`script must have a header with '---' separator`). Why: mixed runner-level and CLI-level step contracts. Prevention: use `Given the following input content` for CLI failure paths and reserve `Given the following script` for in-process runner steps [22].

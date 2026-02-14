@@ -460,3 +460,35 @@ Feature: XML Reading
       """
       "content"
       """
+
+  Scenario: Round-trip XML preserves namespace declaration map
+    Given the following XML input:
+      """
+      <root xmlns="http://example.com/default" xmlns:a="http://example.com/a">
+        <a:item a:id="42">value</a:item>
+      </root>
+      """
+    And the following script:
+      """
+      %im 0.1
+      output application/xml
+      ---
+      payload
+      """
+    When I run the script
+    Then the output should contain:
+      """
+      xmlns="http://example.com/default"
+      """
+    And the output should contain:
+      """
+      xmlns:a="http://example.com/a"
+      """
+    And the output should contain:
+      """
+      <a:item
+      """
+    And the output should contain:
+      """
+      a:id="42"
+      """

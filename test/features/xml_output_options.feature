@@ -62,6 +62,40 @@ Feature: XML Output Options
       xmlns:b="http://example.com/b"
       """
 
+  Scenario: Write declared namespaces by ids filter
+    Given the following script:
+      """
+      %im 0.1
+      output application/xml writeDeclaredNamespaces="ids:a"
+      ns a http://example.com/a
+      ns b http://example.com/b
+      ---
+      root: { child: "value" }
+      """
+    When I run the script
+    Then the output should contain:
+      """
+      xmlns:a="http://example.com/a"
+      """
+    And the output should not contain "xmlns:b="
+
+  Scenario: Write declared namespaces by regex filter
+    Given the following script:
+      """
+      %im 0.1
+      output application/xml writeDeclaredNamespaces="regex:^a$"
+      ns a http://example.com/a
+      ns b http://example.com/b
+      ---
+      root: { child: "value" }
+      """
+    When I run the script
+    Then the output should contain:
+      """
+      xmlns:a="http://example.com/a"
+      """
+    And the output should not contain "xmlns:b="
+
   Scenario: Invalid boolean option value fails parsing
     Given the following input content:
       """
@@ -82,3 +116,75 @@ Feature: XML Output Options
       root: "value"
       """
     Then running the script should fail with error containing "invalid output option"
+
+  Scenario: Invalid writeDeclaredNamespaces value fails formatting
+    Given the following input content:
+      """
+      %im 0.1
+      output application/xml writeDeclaredNamespaces=invalid
+      ns a http://example.com/a
+      ---
+      root: "value"
+      """
+    When I run the application and it fails
+    Then the application should fail with error containing "invalid writeDeclaredNamespaces value"
+
+  Scenario: Empty writeDeclaredNamespaces regex fails formatting
+    Given the following input content:
+      """
+      %im 0.1
+      output application/xml writeDeclaredNamespaces="regex:"
+      ns a http://example.com/a
+      ---
+      root: "value"
+      """
+    When I run the application and it fails
+    Then the application should fail with error containing "regex cannot be empty"
+
+  Scenario: Invalid writeDeclaredNamespaces regex fails formatting
+    Given the following input content:
+      """
+      %im 0.1
+      output application/xml writeDeclaredNamespaces="regex:*"
+      ns a http://example.com/a
+      ---
+      root: "value"
+      """
+    When I run the application and it fails
+    Then the application should fail with error containing "invalid writeDeclaredNamespaces regex"
+
+  Scenario: Skip null attributes only
+    Given the following script:
+      """
+      %im 0.1
+      output application/xml skipNullOn="attributes"
+      ---
+      root: {
+        child @(drop: null, keep: "yes"): "value"
+      }
+      """
+    When I run the script
+    Then the output should contain:
+      """
+      <child keep="yes">value</child>
+      """
+    And the output should not contain "drop="
+
+  Scenario: Skip null everywhere removes null element and null attributes
+    Given the following script:
+      """
+      %im 0.1
+      output application/xml skipNullOn="everywhere"
+      ---
+      root: {
+        gone: null,
+        keep @(drop: null): "yes"
+      }
+      """
+    When I run the script
+    Then the output should contain:
+      """
+      <keep>yes</keep>
+      """
+    And the output should not contain "<gone"
+    And the output should not contain "drop="
