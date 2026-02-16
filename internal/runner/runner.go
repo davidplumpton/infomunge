@@ -310,30 +310,6 @@ func handleNamespaceDecl(trimmedLine string, namespaces map[string]string) error
 	return nil
 }
 
-// handleVariableDecl processes variable declaration
-func handleVariableDecl(line, trimmedLine string, headerOffset int, context map[string]interface{}, goCtx context.Context, fullRaw string) error {
-	val, varName, err := parseVarDeclWithGoContext(line, trimmedLine, headerOffset, context, goCtx, fullRaw)
-	if err != nil {
-		return err
-	}
-	if varName != "" {
-		context[varName] = val
-	}
-	return nil
-}
-
-// handleFunctionDecl processes function declaration
-func handleFunctionDecl(trimmedLine string, context map[string]interface{}) error {
-	fn, fnName, err := parseFunDecl(trimmedLine, nil)
-	if err != nil {
-		return err
-	}
-	if fnName != "" {
-		context[fnName] = fn
-	}
-	return nil
-}
-
 // handleTypeDecl processes type declaration
 func handleTypeDecl(trimmedLine string, context map[string]interface{}) error {
 	typeDef, typeName, err := parseTypeDecl(trimmedLine)
@@ -358,38 +334,70 @@ type parseState struct {
 }
 
 // directiveRegistration pairs a keyword with its handler function.
-// Some directives (fun/var) are parsed by dedicated multiline handlers.
+// Every directive has a real handler; multiline directives (fun/var) consume
+// multiple lines via the lines slice and index parameters.
 type directiveRegistration struct {
 	keyword string
-	handler func(line, trimmedLine string, state *parseState) error
+	handler func(lines []string, index int, state *parseState) (int, error)
 }
 
 // directiveRegistrations defines all known header directives in one place.
 var directiveRegistrations = []directiveRegistration{
-	{"output ", func(_, trimmed string, state *parseState) error {
-		return handleOutputDecl(trimmed, state.outputMimeType, state.context)
+	{"output ", func(lines []string, index int, state *parseState) (int, error) {
+		trimmed := strings.TrimSpace(lines[index])
+		return 1, handleOutputDecl(trimmed, state.outputMimeType, state.context)
 	}},
-	{"input ", func(_, trimmed string, state *parseState) error {
+	{"input ", func(lines []string, index int, state *parseState) (int, error) {
+		trimmed := strings.TrimSpace(lines[index])
 		handleInputDecl(trimmed, state.context)
-		return nil
+		return 1, nil
 	}},
-	{"%dw ", func(_, _ string, _ *parseState) error { return nil }},
-	{"%im ", func(_, _ string, _ *parseState) error { return nil }},
-	{"ns ", func(_, trimmed string, state *parseState) error {
-		return handleNamespaceDecl(trimmed, state.namespaces)
+	{"%dw ", func(_ []string, _ int, _ *parseState) (int, error) { return 1, nil }},
+	{"%im ", func(_ []string, _ int, _ *parseState) (int, error) { return 1, nil }},
+	{"ns ", func(lines []string, index int, state *parseState) (int, error) {
+		trimmed := strings.TrimSpace(lines[index])
+		return 1, handleNamespaceDecl(trimmed, state.namespaces)
 	}},
-	{"import ", func(_, trimmed string, state *parseState) error {
-		return handleImport(trimmed, state.context, state.loader)
+	{"import ", func(lines []string, index int, state *parseState) (int, error) {
+		trimmed := strings.TrimSpace(lines[index])
+		return 1, handleImport(trimmed, state.context, state.loader)
 	}},
-	{"var ", nil},
-	{"fun ", nil},
-	{"type ", func(_, trimmed string, state *parseState) error {
-		return handleTypeDecl(trimmed, state.context)
+	{"var ", func(lines []string, index int, state *parseState) (int, error) {
+		val, varName, consumed, err := parseVarDeclFromLinesWithGoContext(lines, index, state.headerOffset, state.context, state.goCtx, state.fullRaw)
+		if err != nil {
+			return 0, err
+		}
+		if varName != "" {
+			state.context[varName] = val
+		}
+		return consumed, nil
+	}},
+	{"fun ", func(lines []string, index int, state *parseState) (int, error) {
+		fn, fnName, consumed, err := parseFunDeclFromLines(lines, index, state.context)
+		if err != nil {
+			return 0, err
+		}
+		if fnName != "" {
+			state.context[fnName] = fn
+		}
+		return consumed, nil
+	}},
+	{"type ", func(lines []string, index int, state *parseState) (int, error) {
+		trimmed := strings.TrimSpace(lines[index])
+		return 1, handleTypeDecl(trimmed, state.context)
 	}},
 }
 
-// directiveKeywords are the keywords that start header directives.
-var directiveKeywords = []string{"%im ", "%dw ", "output ", "input ", "var ", "fun ", "ns ", "import ", "type "}
+// directiveKeywords are the keywords that start header directives,
+// derived from directiveRegistrations to avoid drift.
+var directiveKeywords []string
+
+func init() {
+	directiveKeywords = make([]string, len(directiveRegistrations))
+	for i, reg := range directiveRegistrations {
+		directiveKeywords[i] = reg.keyword
+	}
+}
 
 // normalizeHeader converts a single-line header into multi-line format by inserting
 // newlines before directive keywords, being careful to skip keywords inside brackets or strings.
@@ -454,36 +462,13 @@ func parseDirectiveLine(lines []string, index int, headerOffset int, state *pars
 	}
 
 	state.headerOffset = headerOffset
-	if strings.HasPrefix(trimmedLine, "fun ") {
-		fn, fnName, consumed, err := parseFunDeclFromLines(lines, index, state.context)
-		if err != nil {
-			return 0, withHeaderLineContext(err, state, headerOffset, line)
-		}
-		if fnName != "" {
-			state.context[fnName] = fn
-		}
-		return consumed, nil
-	}
-	if strings.HasPrefix(trimmedLine, "var ") {
-		val, varName, consumed, err := parseVarDeclFromLinesWithGoContext(lines, index, state.headerOffset, state.context, state.goCtx, state.fullRaw)
-		if err != nil {
-			return 0, withHeaderLineContext(err, state, headerOffset, line)
-		}
-		if varName != "" {
-			state.context[varName] = val
-		}
-		return consumed, nil
-	}
-
 	for _, directive := range directiveRegistrations {
 		if strings.HasPrefix(trimmedLine, directive.keyword) {
-			if directive.handler == nil {
-				return 0, withHeaderLineContext(unifiederrors.ParseErrorf("unrecognized header directive: %s", trimmedLine), state, headerOffset, line)
-			}
-			if err := directive.handler(line, trimmedLine, state); err != nil {
+			consumed, err := directive.handler(lines, index, state)
+			if err != nil {
 				return 0, withHeaderLineContext(err, state, headerOffset, line)
 			}
-			return 1, nil
+			return consumed, nil
 		}
 	}
 

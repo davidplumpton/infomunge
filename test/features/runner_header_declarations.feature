@@ -1,7 +1,7 @@
 Feature: Runner header declaration paths (in-process coverage)
   In order to verify runner header parsing and declaration handling logic
   As a developer
-  I want to exercise parseHeader, handleVariableDecl, handleFunctionDecl,
+  I want to exercise parseHeader, directive dispatch, variable declarations, function declarations,
   handleTypeDecl, handleNamespaceDecl, handleImport, and related helpers in-process
 
   # --- Variable declarations ---
@@ -780,4 +780,43 @@ Feature: Runner header declaration paths (in-process coverage)
     Then the output should be:
       """
       20
+      """
+
+  Scenario: Multiline var and multiline fun in one header via unified dispatch
+    Given the following script:
+      """
+      %im 0.1
+      var config =
+        {
+          greeting: "Hello",
+          name: "World"
+        }
+      fun greet(cfg) = cfg.greeting ++ ", " ++ cfg.name ++ "!"
+      output application/json
+      ---
+      greet(config)
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "Hello, World!"
+      """
+
+  Scenario: Multiline fun with balanced braces in header
+    Given the following script:
+      """
+      %im 0.1
+      fun buildPair(a, b) = {
+        first: a,
+        second: b
+      }
+      var x = 10
+      output application/json
+      ---
+      buildPair(x, x + 5)
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"first":10,"second":15}
       """
