@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/stringutils"
 )
 
 // callBuiltinLazyEval implements the lazy_eval(expr) function.
@@ -297,46 +298,15 @@ func parseGoSyntaxArrayLiteral(s string, prefix string) ([]interface{}, error) {
 func splitRespectingDepth(s string, sep rune) []string {
 	var parts []string
 	var current strings.Builder
-	depth := 0
-	inString := false
-	stringChar := byte(0)
-	escaped := false
+	var sc stringutils.ScanState
 
 	for i := 0; i < len(s); i++ {
 		ch := s[i]
-		if escaped {
-			escaped = false
-			current.WriteByte(ch)
+		sc.Advance(ch)
+		if sc.AtTopLevel() && rune(ch) == sep {
+			parts = append(parts, current.String())
+			current.Reset()
 			continue
-		}
-		if ch == '\\' && inString {
-			escaped = true
-			current.WriteByte(ch)
-			continue
-		}
-		if !inString && (ch == '"' || ch == '\'') {
-			inString = true
-			stringChar = ch
-			current.WriteByte(ch)
-			continue
-		}
-		if inString && ch == stringChar {
-			inString = false
-			current.WriteByte(ch)
-			continue
-		}
-		if !inString {
-			switch ch {
-			case '(', '[', '{':
-				depth++
-			case ')', ']', '}':
-				depth--
-			}
-			if depth == 0 && rune(ch) == sep {
-				parts = append(parts, current.String())
-				current.Reset()
-				continue
-			}
 		}
 		current.WriteByte(ch)
 	}
@@ -352,40 +322,13 @@ func splitRespectingDepth(s string, sep rune) []string {
 // (not inside braces, brackets, or parentheses), respecting string literals.
 // Returns -1 if not found.
 func indexOfAtDepthZero(s string, ch byte) int {
-	depth := 0
-	inString := false
-	stringChar := byte(0)
-	escaped := false
+	var sc stringutils.ScanState
 
 	for i := 0; i < len(s); i++ {
 		c := s[i]
-		if escaped {
-			escaped = false
-			continue
-		}
-		if c == '\\' && inString {
-			escaped = true
-			continue
-		}
-		if !inString && (c == '"' || c == '\'') {
-			inString = true
-			stringChar = c
-			continue
-		}
-		if inString && c == stringChar {
-			inString = false
-			continue
-		}
-		if !inString {
-			switch c {
-			case '(', '[', '{':
-				depth++
-			case ')', ']', '}':
-				depth--
-			}
-			if depth == 0 && c == ch {
-				return i
-			}
+		sc.Advance(c)
+		if sc.AtTopLevel() && c == ch {
+			return i
 		}
 	}
 	return -1

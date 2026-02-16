@@ -267,30 +267,12 @@ func stripLineComments(body string) string {
 // stripSingleLineComment removes a // comment from a single line,
 // respecting string literals.
 func stripSingleLineComment(line string) string {
-	inString := false
-	stringChar := byte(0)
-	escaped := false
+	var sc ScanState
 
 	for i := 0; i < len(line); i++ {
 		ch := line[i]
-		if escaped {
-			escaped = false
-			continue
-		}
-		if ch == '\\' && inString {
-			escaped = true
-			continue
-		}
-		if !inString && (ch == '"' || ch == '\'') {
-			inString = true
-			stringChar = ch
-			continue
-		}
-		if inString && ch == stringChar {
-			inString = false
-			continue
-		}
-		if !inString && ch == '/' {
+		sc.Advance(ch)
+		if !sc.InString() && ch == '/' {
 			if i+1 < len(line) && line[i+1] == '/' {
 				return line[:i] + strings.Repeat(" ", len(line)-i)
 			}

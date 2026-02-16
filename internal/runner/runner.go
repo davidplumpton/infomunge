@@ -6,6 +6,7 @@ import (
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
 	"infomunge/internal/preprocessor"
+	"infomunge/internal/stringutils"
 	"infomunge/pkg/formats"
 	"os"
 	"path/filepath"
@@ -268,33 +269,13 @@ func parseOutputOptions(input string) (map[string]string, error) {
 
 func splitOptions(input string) []string {
 	var parts []string
-	inString := false
-	escape := false
-	quote := byte(0)
+	var sc stringutils.ScanState
 	start := 0
 
 	for i := 0; i < len(input); i++ {
 		ch := input[i]
-		if escape {
-			escape = false
-			continue
-		}
-		if inString {
-			if ch == '\\' {
-				escape = true
-				continue
-			}
-			if ch == quote {
-				inString = false
-			}
-			continue
-		}
-		if ch == '"' || ch == '\'' {
-			inString = true
-			quote = ch
-			continue
-		}
-		if ch == ',' {
+		sc.Advance(ch)
+		if !sc.InString() && ch == ',' {
 			parts = append(parts, input[start:i])
 			start = i + 1
 		}
@@ -419,33 +400,14 @@ func normalizeHeader(header string) string {
 	}
 
 	var result strings.Builder
-	i := 0
-	depth := 0 // bracket depth
-	inString := false
-	stringChar := byte(0)
+	var sc stringutils.ScanState
 
-	for i < len(header) {
+	for i := 0; i < len(header); i++ {
 		ch := header[i]
+		sc.Advance(ch)
 
-		// Track string state
-		if !inString && (ch == '"' || ch == '\'') {
-			inString = true
-			stringChar = ch
-		} else if inString && ch == stringChar && !isEscaped(header, i) {
-			inString = false
-		}
-
-		// Track bracket depth
-		if !inString {
-			if ch == '(' || ch == '[' || ch == '{' {
-				depth++
-			} else if ch == ')' || ch == ']' || ch == '}' {
-				depth--
-			}
-		}
-
-		// Check for directive keywords at depth 0, outside strings
-		if depth == 0 && !inString {
+		// Check for directive keywords at top level
+		if sc.AtTopLevel() {
 			for _, kw := range directiveKeywords {
 				if i+len(kw) <= len(header) && header[i:i+len(kw)] == kw {
 					// Check word boundary before keyword
@@ -466,7 +428,6 @@ func normalizeHeader(header string) string {
 		}
 
 		result.WriteByte(ch)
-		i++
 	}
 
 	return result.String()
@@ -481,14 +442,6 @@ func isWordBoundaryChar(ch byte) bool {
 // consecutive backslashes before it. An odd number of backslashes means escaped.
 // Example: "hello\"" -> quote at end is escaped (1 backslash)
 // Example: "hello\\"  -> quote at end is NOT escaped (2 backslashes = escaped backslash)
-func isEscaped(s string, i int) bool {
-	backslashCount := 0
-	for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
-		backslashCount++
-	}
-	return backslashCount%2 == 1
-}
-
 func normalizeHeaderLines(header string) []string {
 	return strings.Split(normalizeHeader(header), "\n")
 }

@@ -6,6 +6,7 @@ import (
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
 	"infomunge/internal/preprocessor"
+	"infomunge/internal/stringutils"
 	"strings"
 )
 
@@ -287,40 +288,20 @@ func parseFunDeclFromLines(lines []string, start int, env map[string]interface{}
 
 func collapseWhitespaceOutsideStrings(input string) string {
 	var b strings.Builder
-	inSingle := false
-	inDouble := false
-	escaped := false
+	var sc stringutils.ScanState
 	lastWasSpace := false
 
 	for i := 0; i < len(input); i++ {
 		ch := input[i]
-		if inSingle || inDouble {
+		sc.Advance(ch)
+
+		if sc.InString() {
 			b.WriteByte(ch)
-			if escaped {
-				escaped = false
-				continue
-			}
-			if ch == '\\' {
-				escaped = true
-				continue
-			}
-			if inDouble && ch == '"' {
-				inDouble = false
-			} else if inSingle && ch == '\'' {
-				inSingle = false
-			}
+			lastWasSpace = false
 			continue
 		}
 
 		switch ch {
-		case '"':
-			inDouble = true
-			b.WriteByte(ch)
-			lastWasSpace = false
-		case '\'':
-			inSingle = true
-			b.WriteByte(ch)
-			lastWasSpace = false
 		case ' ', '\t', '\n', '\r':
 			if !lastWasSpace {
 				b.WriteByte(' ')
@@ -338,40 +319,11 @@ func collapseWhitespaceOutsideStrings(input string) string {
 // isDelimiterBalanced checks if brackets, braces, and parentheses are balanced,
 // respecting string literals.
 func isDelimiterBalanced(s string) bool {
-	depth := 0
-	inString := false
-	stringChar := byte(0)
-	escaped := false
-
+	var sc stringutils.ScanState
 	for i := 0; i < len(s); i++ {
-		ch := s[i]
-		if escaped {
-			escaped = false
-			continue
-		}
-		if ch == '\\' && inString {
-			escaped = true
-			continue
-		}
-		if !inString && (ch == '"' || ch == '\'') {
-			inString = true
-			stringChar = ch
-			continue
-		}
-		if inString && ch == stringChar {
-			inString = false
-			continue
-		}
-		if !inString {
-			switch ch {
-			case '(', '[', '{':
-				depth++
-			case ')', ']', '}':
-				depth--
-			}
-		}
+		sc.Advance(s[i])
 	}
-	return depth == 0
+	return sc.Depth() == 0
 }
 
 // stripLineComments removes // line comments from each line of the body,
@@ -544,34 +496,15 @@ func parseTypeProperties(propsStr string) (map[string]interface{}, error) {
 func splitPropertyPairs(s string) []string {
 	var pairs []string
 	var current strings.Builder
-	inString := false
-	escape := false
+	var sc stringutils.ScanState
 
 	for _, ch := range s {
-		if escape {
-			current.WriteRune(ch)
-			escape = false
-			continue
-		}
-
-		if ch == '\\' && inString {
-			current.WriteRune(ch)
-			escape = true
-			continue
-		}
-
-		if ch == '"' {
-			inString = !inString
-			current.WriteRune(ch)
-			continue
-		}
-
-		if ch == ',' && !inString {
+		sc.AdvanceRune(ch)
+		if !sc.InString() && ch == ',' {
 			pairs = append(pairs, current.String())
 			current.Reset()
 			continue
 		}
-
 		current.WriteRune(ch)
 	}
 
