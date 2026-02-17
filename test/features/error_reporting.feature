@@ -99,3 +99,25 @@ Feature: Error Reporting
       """
     When I run the application and it fails
     Then the error should contain "7:1:"
+
+  Scenario: Error in nested if-else reports correct line
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      if (true) (if (false) 1 + / 2 else 0) else -1
+      """
+    When I run the application and it fails
+    Then the error should contain "4:"
+
+  Scenario: Parse error after and/or rewriting reports correct position
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      a and (1 + / 2)
+      """
+    When I run the application and it fails
+    Then the error should contain "4:"

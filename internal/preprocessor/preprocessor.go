@@ -1,6 +1,8 @@
 package preprocessor
 
 import (
+	"fmt"
+
 	unifiederrors "infomunge/internal/errors"
 	"strings"
 )
@@ -93,6 +95,21 @@ func (r *rewriter) append(char byte, originalPos int) {
 func (r *rewriter) appendString(s string, originalPos int) {
 	for i := 0; i < len(s); i++ {
 		r.append(s[i], originalPos)
+	}
+}
+
+// truncate shrinks both result and mapping to length n, keeping them in sync.
+func (r *rewriter) truncate(n int) {
+	r.result = r.result[:n]
+	r.mapping = r.mapping[:n]
+}
+
+// assertMappingInvariant panics if result and mapping have different lengths.
+// This is an O(1) programming-error detector, not a user-facing error.
+func (r *rewriter) assertMappingInvariant() {
+	if len(r.result) != len(r.mapping) {
+		panic(fmt.Sprintf("mapping invariant violated: len(result)=%d, len(mapping)=%d at pos %d",
+			len(r.result), len(r.mapping), r.pos))
 	}
 }
 
@@ -225,18 +242,33 @@ func (r *rewriter) RewriteWithDepth(depth int) (string, []int, error) {
 		r.append(char, r.pos)
 	}
 
+	r.assertMappingInvariant()
+
 	result := string(r.result)
 	if containsIfKeywordOutsideStrings(result) {
 		if depth+1 > MaxRecursionDepth {
 			r.err = unifiederrors.ParseErrorf("expression exceeds maximum recursion depth of %d", MaxRecursionDepth)
 			return result, r.mapping, r.err
 		}
+		firstPassMapping := r.mapping
 		newRewriter := newRewriter(result, r.opts)
+		var secondPassMapping []int
 		var err error
-		result, r.mapping, err = newRewriter.RewriteWithDepth(depth + 1)
+		result, secondPassMapping, err = newRewriter.RewriteWithDepth(depth + 1)
 		if err != nil {
+			r.mapping = secondPassMapping
 			return result, r.mapping, err
 		}
+		// Compose mappings: secondPass → firstPass → original input
+		composed := make([]int, len(secondPassMapping))
+		for i, pos := range secondPassMapping {
+			if pos >= 0 && pos < len(firstPassMapping) {
+				composed[i] = firstPassMapping[pos]
+			} else {
+				composed[i] = pos
+			}
+		}
+		r.mapping = composed
 	}
 
 	pipeline := CreateModularPostProcessingPipeline()

@@ -479,7 +479,7 @@ func (r *rewriter) handleUpdateExprBlock() bool {
 	}
 
 	leftOp := strings.TrimSpace(string(r.result[leftStart:]))
-	r.result = r.result[:leftStart]
+	r.truncate(leftStart)
 
 	casesQuoted := strconv.Quote(casesContent)
 	output := fmt.Sprintf("__updateExpr(%s, %s)", leftOp, casesQuoted)

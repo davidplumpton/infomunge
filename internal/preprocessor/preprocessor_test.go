@@ -141,6 +141,69 @@ func TestPrepareForParsing_Mapping(t *testing.T) {
 	})
 }
 
+func TestPrepareForParsing_MappingLengthInvariant(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"simple expression", "1 + 2"},
+		{"if-else", `if (x > 0) "yes" else "no"`},
+		{"nested if-else", `if (a) if (b) "both" else "a" else "neither"`},
+		{"update expression", `x update { case v at .a -> v + 1 }`},
+		{"object literal", `{name: "Alice", age: 30}`},
+		{"while loop", `while (x > 0) { x }`},
+		{"do block", `do { var x = 1 --- x + 1 }`},
+		{"using expression", `using (x = 1) x + 1`},
+		{"and-or", `a and b or c`},
+		{"not operator", `not x`},
+		{"single quotes", `'hello'`},
+		{"break keyword", `break`},
+		{"continue keyword", `continue`},
+		{"range builtin", `range(10)`},
+		{"coerce equals", `a ~= b`},
+		{"array literal", `[1, 2, 3]`},
+		{"empty object", `{}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, mapping, err := PrepareForParsing(tt.input, Options{AllowMultilineIfElse: true})
+			if err != nil {
+				return // errors are fine; we check the invariant only on success
+			}
+			if len(result) != len(mapping) {
+				t.Errorf("mapping length mismatch: len(result)=%d, len(mapping)=%d for input %q",
+					len(result), len(mapping), tt.input)
+			}
+		})
+	}
+}
+
+func TestPrepareForParsing_MappingRangeValidity(t *testing.T) {
+	inputs := []string{
+		"1 + 2",
+		`if (x) "yes"`,
+		`{a: 1, b: 2}`,
+		`a and b`,
+		`'hello world'`,
+		`not x`,
+		`break`,
+	}
+	for _, input := range inputs {
+		t.Run(input, func(t *testing.T) {
+			result, mapping, err := PrepareForParsing(input, Options{})
+			if err != nil {
+				return
+			}
+			for i, pos := range mapping {
+				if pos < 0 || pos >= len(input) {
+					t.Errorf("mapping[%d]=%d out of range [0, %d) for input %q, result %q",
+						i, pos, len(input), input, result)
+				}
+			}
+		})
+	}
+}
+
 func TestPrepareForParsing_Newlines(t *testing.T) {
 	tests := []struct {
 		name     string
