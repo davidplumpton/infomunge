@@ -2,16 +2,16 @@
 
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+This project uses **br** (beads rust) for issue tracking.
 
 ## Quick Reference
 
 ```bash
 bv --robot-triage     # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
+br show <id>          # View issue details
+br update <id> --status in_progress  # Claim work
+br close <id>         # Complete work
+br sync               # Sync with git
 ```
 
 ## Landing the Plane (Session Completion)
@@ -23,7 +23,7 @@ Important: use jj for version control. Never use git commands. Always commit wit
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed) - Tests, linters, builds
 3. **Update issue status** - Close finished work, update in-progress items
-4. **Run bd sync** - Ensure VCS captures issue updates
+4. **Run br sync** - Ensure VCS captures issue updates
 5. **Only work on one task at a time before committing to VCS**
 6. **Clean up**
 7. **Verify** - Create an appropriate jj description and then run `jj commit -m <description>`
@@ -33,9 +33,9 @@ Important: use jj for version control. Never use git commands. Always commit wit
 
 - Check `bv --robot-triage` at session start to find available work
 - Update status as you work (in_progress → closed)
-- Create new issues with `bd create` when you discover tasks
+- Create new issues with `br create` when you discover tasks
 - Use descriptive titles and set appropriate priority/type, and dependencies between related items
-- Always `bd sync` before committing
+- Always `br sync` before committing
 - Commit between finishing one beads issue and starting another
 - Use jj commit with a description, don't use jj new with a description
 - Use a 5 minute timeout when running cucumber tests

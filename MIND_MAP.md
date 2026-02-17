@@ -28,7 +28,7 @@
 
 [13] **Version Control** - Use `jj` only; never use git commands. Commit with `jj commit -m <description>` and do not use `jj new` with a message [19].
 
-[14] **Beads Workflow** - Issue tracking via `bd` (beads): `bv --robot-triage` to find prioritized work, `bd show <id>`, `bd update <id> --status in_progress`, `bd close <id>`, `bd sync` [19].
+[14] **Beads Workflow** - Issue tracking via `br` (beads rust): `bv --robot-triage` to find prioritized work, `br show <id>`, `br update <id> --status in_progress`, `br close <id>`, `br sync` [19].
 
 [15] **Agent Constraints** - Use Go only; do not install new software; put temp files in `tmp`; run cucumber tests with a 5 minute timeout [12][14][19].
 
@@ -38,7 +38,7 @@
 
 [18] **CSV Output Constraint** - CSV output requires an array of objects; non-array results or non-object rows yield validation errors [6].
 
-[19] **Landing the Plane** - Session completion: file issues, run quality gates, update issue status, run `bd sync`, clean up, verify, then `jj commit -m <description>` [12][13][14].
+[19] **Landing the Plane** - Session completion: file issues, run quality gates, update issue status, run `br sync`, clean up, verify, then `jj commit -m <description>` [12][13][14].
 
 [20] **Multiple Inputs** - CLI supports multiple named inputs; server `/run` accepts `inputs` array with `name`, `content`, and optional `format` [4][5][10].
 
@@ -72,11 +72,11 @@
 
 [35] **Agent Mistakes Log** - 2026-02-13: Updated cucumber harness to use per-scenario work directories but kept the compiled CLI binary path relative (`../tmp/...`), causing parallel scenarios to fail with `fork/exec ... no such file or directory` when `cmd.Dir` changed. Why: overlooked path resolution behavior after setting per-scenario working directories. Prevention: use absolute paths for shared executables before running commands from scenario-specific directories [22].
 
-[36] **Agent Mistakes Log** - 2026-02-13: Created a beads issue with backticks inside a double-quoted shell command, which triggered command substitution (`test/features/...` attempted execution) and stripped key text from the issue description. Why: unsafe shell quoting while passing multiline descriptions to `bd create`. Prevention: write descriptions to a file in `tmp` and pass with `--description \"$(cat tmp/<file>)\"`; avoid backticks in shell-quoted payloads [22].
+[36] **Agent Mistakes Log** - 2026-02-13: Created a beads issue with backticks inside a double-quoted shell command, which triggered command substitution (`test/features/...` attempted execution) and stripped key text from the issue description. Why: unsafe shell quoting while passing multiline descriptions to `br create`. Prevention: write descriptions to a file in `tmp` and pass with `--description \"$(cat tmp/<file>)\"`; avoid backticks in shell-quoted payloads [22].
 
-[37] **Agent Mistakes Log** - 2026-02-13: Ran `bd update` and `bd show` in parallel, which produced a stale `show` result (`open`) due command timing. Why: parallelized a state-mutating command with a state-reading command. Prevention: for beads state changes, run mutation (`bd update`, `bd close`) first, then run verification (`bd show`) sequentially [22].
+[37] **Agent Mistakes Log** - 2026-02-13: Ran `br update` and `br show` in parallel, which produced a stale `show` result (`open`) due command timing. Why: parallelized a state-mutating command with a state-reading command. Prevention: for beads state changes, run mutation (`br update`, `br close`) first, then run verification (`br show`) sequentially [22].
 
-[38] **Agent Mistakes Log** - 2026-02-14: Repeated the `bd update`/`bd show` parallelization mistake and observed conflicting ticket status reads in the same turn. Why: defaulted to parallel command batching without excluding stateful beads operations. Prevention: treat beads status mutations as strictly sequential workflows and avoid parallel wrappers around `bd update` + `bd show` [22].
+[38] **Agent Mistakes Log** - 2026-02-14: Repeated the `br update`/`br show` parallelization mistake and observed conflicting ticket status reads in the same turn. Why: defaulted to parallel command batching without excluding stateful beads operations. Prevention: treat beads status mutations as strictly sequential workflows and avoid parallel wrappers around `br update` + `br show` [22].
 
 [39] **Agent Mistakes Log** - 2026-02-14: Added new cucumber script expressions using multi-line function argument formatting with commas; parser rejected them (`expected operand, found ','`). Why: assumed multi-line argument layout behaves like Go/JSON formatting. Prevention: keep complex function calls in feature scripts on a single expression line unless existing parser coverage confirms multiline argument separators [22].
 
@@ -92,7 +92,7 @@
 
 [45] **Agent Mistakes Log** - 2026-02-14: Ran `rg` with a search pattern beginning with `-` without using `--`, causing option parsing errors and a noisy search loop. Why: rushed CLI composition for ripgrep flags/pattern ordering. Prevention: when a pattern may begin with `-`, use `rg ... -- \"<pattern>\" <path>` and place `-g` options before `--` [22].
 
-[46] **Agent Mistakes Log** - 2026-02-14: Batched `bd update` and `bd show` in parallel again, producing contradictory status reads (`in_progress` and stale `open`) for the same ticket in one run. Why: reused parallel wrapper around a state mutation plus immediate read. Prevention: run beads mutations and status verification strictly sequentially (`bd update` first, then `bd show`) [22][37][38].
+[46] **Agent Mistakes Log** - 2026-02-14: Batched `br update` and `br show` in parallel again, producing contradictory status reads (`in_progress` and stale `open`) for the same ticket in one run. Why: reused parallel wrapper around a state mutation plus immediate read. Prevention: run beads mutations and status verification strictly sequentially (`br update` first, then `br show`) [22][37][38].
 
 [47] **User Preferences Log** - 2026-02-14: User asked to pick the next ticket from `README.md`, `AGENTS.md`, and `MIND_MAP.md` context with preference for work already marked `in_progress`; prioritize continuing active in-flight tickets first.
 
@@ -102,6 +102,6 @@
 
 [50] **User Preferences Log** - 2026-02-14: User asked to create a dedicated beads ticket for measuring cucumber-driven coverage and increasing coverage where it adds practical confidence.
 
-[51] **Agent Mistakes Log** - 2026-02-14: Ran `bd close` and `bd show` in parallel, which again produced a stale `show` status (`in_progress`) even though the close succeeded. Why: reused parallel batching with a state mutation plus immediate read. Prevention: run all beads mutations (`bd update`, `bd close`) and verification (`bd show`) strictly sequentially [22][37][38][46].
+[51] **Agent Mistakes Log** - 2026-02-14: Ran `br close` and `br show` in parallel, which again produced a stale `show` status (`in_progress`) even though the close succeeded. Why: reused parallel batching with a state mutation plus immediate read. Prevention: run all beads mutations (`br update`, `br close`) and verification (`br show`) strictly sequentially [22][37][38][46].
 
 [52] **Agent Mistakes Log** - 2026-02-14: Added cucumber failure scenarios using `Given the following script` together with `When I run the application and it fails`; this mismatched harness fields and produced a misleading parse error (`script must have a header with '---' separator`). Why: mixed runner-level and CLI-level step contracts. Prevention: use `Given the following input content` for CLI failure paths and reserve `Given the following script` for in-process runner steps [22].
