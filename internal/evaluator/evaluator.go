@@ -621,6 +621,15 @@ func extractNamespaceValue(obj map[string]interface{}) interface{} {
 
 // CoerceEquals implements the ~= coercion equality operator
 func CoerceEquals(left, right Value) bool {
+	// Guard against uncomparable types (slices, maps) that would panic with ==.
+	switch left.(type) {
+	case []interface{}, map[string]interface{}:
+		return reflect.DeepEqual(left, right)
+	}
+	switch right.(type) {
+	case []interface{}, map[string]interface{}:
+		return reflect.DeepEqual(left, right)
+	}
 	if left == right {
 		return true
 	}

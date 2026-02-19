@@ -353,6 +353,62 @@ Feature: Basic Operators
       [true,true]
       """
 
+  Scenario: Coercion equality operator ~= with arrays returns false for different arrays
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] ~= [1, 3]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      false
+      """
+
+  Scenario: Coercion equality operator ~= with identical arrays returns true
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [] ~= []
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      true
+      """
+
+  Scenario: Coercion equality operator ~= with objects returns false for different objects
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {"a": 1} ~= {"a": 2}
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      false
+      """
+
+  Scenario: Coercion equality operator ~= with identical objects returns true
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {"a": 1} ~= {"a": 1}
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      true
+      """
+
   Scenario: Algebraic identity smoke checks
     Given the following input content:
       """
