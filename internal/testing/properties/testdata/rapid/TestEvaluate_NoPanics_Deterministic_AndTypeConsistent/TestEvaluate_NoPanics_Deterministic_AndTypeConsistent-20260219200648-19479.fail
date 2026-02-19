@@ -1,0 +1,79 @@
+# 2026/02/19 20:06:48.158098 [TestEvaluate_NoPanics_Deterministic_AndTypeConsistent] [rapid] draw ctx: exprgen.TestContext{Value:map[string]interface {}{"payload":map[string]interface {}{"age":0.3459663391113281, "name":2.6732317680044125e-12}}, JSON:"{\"age\":0.3459663391113281,\"name\":2.6732317680044125e-12}", Fields:[]string{"name", "age"}}
+# 2026/02/19 20:06:48.158104 [TestEvaluate_NoPanics_Deterministic_AndTypeConsistent] [rapid] draw expr_kind: 3
+# 2026/02/19 20:06:48.158114 [TestEvaluate_NoPanics_Deterministic_AndTypeConsistent] [rapid] draw random_expr: "payload.score[\"name\"] % (x, elem) -> [null]"
+# 2026/02/19 20:06:48.158290 [TestEvaluate_NoPanics_Deterministic_AndTypeConsistent] nondeterministic error message
+# expr: "payload.score[\"name\"] % (x, elem) -> [null]"
+# ctx: map[string]interface {}{"__go_ctx__":context.backgroundCtx{emptyCtx:context.emptyCtx{}}, "payload":map[string]interface {}{"age":0.3459663391113281, "name":2.6732317680044125e-12}}
+# first err: :0:0: unsupported operation: <nil> % &{[{x Unknown <nil> false} {elem Unknown <nil> false}] {...} 0x73c73a99d740 map[]}
+# second err: :0:0: unsupported operation: <nil> % &{[{x Unknown <nil> false} {elem Unknown <nil> false}] {...} 0x73c73a99d880 map[]}
+# 
+v0.4.8#12873378001491182906
+0xf61825431ef71
+0x28a2d41d5e691
+0x1
+0x275475ddfa642
+0x17c44396e5e92e
+0x2
+0xef8d24e147a1b
+0x1d2a9c51019376
+0x2
+0xc52719dbe2722
+0x1a70210b5a852f
+0xf30b7cbfed2b4
+0x26
+0x0
+0x35
+0x78395323154ca
+0x1e9bab1228684c
+0x1e41b9f7628629
+0x3
+0x1dee025d620bab
+0x1cfdf9d1b7f8b1
+0x2
+0x24e9ce4c56d01
+0x1a18460553c231
+0x6a1622b5842d2
+0x1
+0x0
+0x10
+0x62456605ecb91
+0x12fac2ffa7e5bc
+0x9fa702c1490ba
+0x3
+0x12e49d7a76bc83
+0xa481d2acc54c0
+0x4
+0x1f6414adc9c06e
+0x18cd575e93dc50
+0x1e
+0xe
+0x1
+0x11a4d21d7000f2
+0x3
+0x1c6850e5ab2caa
+0x1
+0x2007a0b2e3386
+0x0
+0xd9086f09b138b
+0x1c
+0x10cd0d25dc4830
+0x15f2182d02de65
+0x11
+0x1
+0xf0694d43176d
+0x0
+0x101cf487cb20a9
+0x4
+0x686ac86169d06
+0x11e6031ad87bba
+0xb
+0xa95cdfca83871
+0xc63ea573356b4
+0x6
+0x1
+0xdd1d0aacffba5
+0x0
+0xe6a77365f932b
+0x4
+0x6d0b8636a5777
+0x0

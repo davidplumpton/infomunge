@@ -104,12 +104,12 @@ func (r *rewriter) truncate(n int) {
 	r.mapping = r.mapping[:n]
 }
 
-// assertMappingInvariant panics if result and mapping have different lengths.
-// This is an O(1) programming-error detector, not a user-facing error.
+// assertMappingInvariant sets r.err if result and mapping have different lengths.
+// This is an O(1) programming-error detector; callers must check r.err afterward.
 func (r *rewriter) assertMappingInvariant() {
 	if len(r.result) != len(r.mapping) {
-		panic(fmt.Sprintf("mapping invariant violated: len(result)=%d, len(mapping)=%d at pos %d",
-			len(r.result), len(r.mapping), r.pos))
+		r.err = fmt.Errorf("mapping invariant violated: len(result)=%d, len(mapping)=%d at pos %d",
+			len(r.result), len(r.mapping), r.pos)
 	}
 }
 
@@ -243,6 +243,9 @@ func (r *rewriter) RewriteWithDepth(depth int) (string, []int, error) {
 	}
 
 	r.assertMappingInvariant()
+	if r.err != nil {
+		return string(r.result), r.mapping, r.err
+	}
 
 	result := string(r.result)
 	if containsIfKeywordOutsideStrings(result) {

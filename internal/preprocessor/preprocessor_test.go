@@ -1231,3 +1231,26 @@ func TestPrepareForParsing_LongInputDoesNotTripIterationGuard(t *testing.T) {
 		t.Fatalf("unexpected error for long input: %v", err)
 	}
 }
+
+// TestMappingInvariantViolationReturnsError verifies that a corrupted rewriter
+// (mismatched result/mapping lengths) surfaces an error instead of panicking.
+func TestMappingInvariantViolationReturnsError(t *testing.T) {
+	r := newRewriter("x", Options{})
+	// Manually corrupt the state: append to result without a mapping entry.
+	r.result = append(r.result, 'x')
+	// mapping remains empty — lengths now differ.
+
+	defer func() {
+		if rec := recover(); rec != nil {
+			t.Fatalf("assertMappingInvariant panicked instead of setting r.err: %v", rec)
+		}
+	}()
+
+	r.assertMappingInvariant()
+	if r.err == nil {
+		t.Fatal("expected r.err to be set after invariant violation, got nil")
+	}
+	if !strings.Contains(r.err.Error(), "mapping invariant violated") {
+		t.Errorf("unexpected error message: %v", r.err)
+	}
+}
