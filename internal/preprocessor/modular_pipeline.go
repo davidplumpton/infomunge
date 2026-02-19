@@ -12,19 +12,21 @@ func NewModularPipeline(stages []PipelineStage) *ModularPipeline {
 	}
 }
 
-// Execute runs all pipeline stages in sequence
-func (mp *ModularPipeline) Execute(input string) (string, error) {
+// Execute runs all pipeline stages in sequence.
+// The returned mapping maps positions in the final output back to original input offsets.
+func (mp *ModularPipeline) Execute(input string, mapping []int) (string, []int, error) {
 	result := input
+	resultMapping := mapping
 
 	for _, stage := range mp.stages {
 		var err error
-		result, err = stage.Execute(result)
+		result, resultMapping, err = stage.Execute(result, resultMapping)
 		if err != nil {
-			return result, err
+			return result, resultMapping, err
 		}
 	}
 
-	return result, nil
+	return result, resultMapping, nil
 }
 
 // StageCount returns the number of stages in the pipeline

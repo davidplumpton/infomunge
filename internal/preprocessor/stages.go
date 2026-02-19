@@ -10,7 +10,7 @@ type transformHandler func(string) string
 // PipelineStage represents a group of related transformations
 type PipelineStage interface {
 	Name() string
-	Execute(input string) (string, error)
+	Execute(input string, mapping []int) (string, []int, error)
 }
 
 // basicStage is a simple pipeline stage implementation
@@ -23,12 +23,13 @@ func (bs *basicStage) Name() string {
 	return bs.name
 }
 
-func (bs *basicStage) Execute(input string) (string, error) {
+func (bs *basicStage) Execute(input string, mapping []int) (string, []int, error) {
 	result := input
 	for _, handler := range bs.handlers {
 		result = handler(result)
 	}
-	return result, nil
+	local := inferStageMapping(input, result)
+	return result, composeMappings(mapping, local), nil
 }
 
 // errorAwareHandler is a transformation function that can return errors
@@ -44,8 +45,13 @@ func (es *errorAwareStage) Name() string {
 	return es.name
 }
 
-func (es *errorAwareStage) Execute(input string) (string, error) {
-	return es.handler(input)
+func (es *errorAwareStage) Execute(input string, mapping []int) (string, []int, error) {
+	result, err := es.handler(input)
+	if err != nil {
+		return result, mapping, err
+	}
+	local := inferStageMapping(input, result)
+	return result, composeMappings(mapping, local), nil
 }
 
 // Create stages for different transformation groups

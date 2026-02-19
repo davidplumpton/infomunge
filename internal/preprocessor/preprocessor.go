@@ -275,9 +275,10 @@ func (r *rewriter) RewriteWithDepth(depth int) (string, []int, error) {
 	}
 
 	pipeline := CreateModularPostProcessingPipeline()
-	result, err := pipeline.Execute(result)
-	if err != nil {
-		return result, r.mapping, err
+	var pipelineErr error
+	result, r.mapping, pipelineErr = pipeline.Execute(result, r.mapping)
+	if pipelineErr != nil {
+		return result, r.mapping, pipelineErr
 	}
 
 	if r.err != nil {

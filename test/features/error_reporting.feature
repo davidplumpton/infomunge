@@ -98,7 +98,7 @@ Feature: Error Reporting
       }
       """
     When I run the application and it fails
-    Then the error should contain "7:1:"
+    Then the error should contain "6:1:"
 
   Scenario: Error in nested if-else reports correct line
     Given the following input content:
@@ -121,3 +121,14 @@ Feature: Error Reporting
       """
     When I run the application and it fails
     Then the error should contain "4:"
+
+  Scenario: Parse error after map operator rewriting reports exact column
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1,2,3] map ((x) -> x + )
+      """
+    When I run the application and it fails
+    Then the error should contain "4:23:"
