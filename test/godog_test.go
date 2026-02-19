@@ -205,6 +205,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the server is running$`, tc.theServerIsRunning)
 	ctx.Step(`^the server is running with API key "([^"]*)"$`, tc.theServerIsRunningWithAPIKey)
 	ctx.Step(`^I request the playground page$`, tc.iRequestThePlaygroundPage)
+	ctx.Step(`^I read the standalone playground page$`, tc.iReadTheStandalonePlaygroundPage)
 	ctx.Step(`^the response status should be (\d+)$`, tc.theResponseStatusShouldBe)
 	ctx.Step(`^I run the server script without specifying output$`, tc.iRunTheServerScriptWithoutOutput)
 	ctx.Step(`^I run the server script with output "([^"]*)"$`, tc.iRunTheServerScriptWithOutput)
@@ -1348,6 +1349,17 @@ func (tc *testContext) iRequestThePlaygroundPage() error {
 		return fmt.Errorf("failed to read response: %v", err)
 	}
 	tc.lastHTTPStatus = resp.StatusCode
+	tc.lastOutput = string(body)
+	return nil
+}
+
+func (tc *testContext) iReadTheStandalonePlaygroundPage() error {
+	body, err := os.ReadFile("../docs/playground/index.html")
+	if err != nil {
+		tc.lastHTTPStatus = 500
+		return fmt.Errorf("failed to read standalone playground page: %v", err)
+	}
+	tc.lastHTTPStatus = 200
 	tc.lastOutput = string(body)
 	return nil
 }

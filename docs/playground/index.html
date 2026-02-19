@@ -201,7 +201,15 @@ payload</textarea>
         </section>
       </main>
     </div>
-    <script src="infomunge.js"></script>
+    <script src="wasm_exec.js"></script>
+    <script>
+      const go = new Go();
+      WebAssembly.instantiateStreaming(fetch("infomunge.wasm"), go.importObject)
+        .then((result) => go.run(result.instance))
+        .catch((err) => {
+          console.error("Failed to load infomunge.wasm:", err);
+        });
+    </script>
     <script>
       const inputsList = document.getElementById("inputs-list");
       const status = document.getElementById("status");
@@ -491,7 +499,7 @@ payload</textarea>
             }
             return;
           }
-          status.textContent = "Error: infomunge.js not loaded";
+          status.textContent = "Error: infomunge.wasm not loaded";
         } catch (err) {
           status.textContent = "Error: " + err;
         }

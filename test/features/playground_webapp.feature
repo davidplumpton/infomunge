@@ -18,6 +18,14 @@ Feature: Playground webapp
     Then the response status should be 200
     And the output should contain "infomungeRun"
 
+  Scenario: Standalone playground bootstraps WebAssembly runner
+    When I read the standalone playground page
+    Then the response status should be 200
+    And the output should contain "wasm_exec.js"
+    And the output should contain "infomunge.wasm"
+    And the output should contain "new Go()"
+    And the output should contain "WebAssembly.instantiateStreaming"
+
   Scenario: Playground input cards avoid HTML interpolation of input names
     Given the server is running
     When I request the playground page

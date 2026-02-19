@@ -1,4 +1,4 @@
-.PHONY: build test test-verbose test-failures test-feature test-unit test-intensive test-fuzz test-soak playground clean
+.PHONY: build test test-verbose test-failures test-feature test-unit test-intensive test-fuzz test-soak playground playground-wasm clean
 
 # Build the infomunge binary
 build:
@@ -48,6 +48,11 @@ test-soak:
 # Run the server playground locally at http://localhost:8080
 playground:
 	go run ./cmd/infomunge --server --listen :8080
+
+# Build standalone WebAssembly playground artifacts.
+playground-wasm:
+	GOOS=js GOARCH=wasm go build -o docs/playground/infomunge.wasm ./cmd/infomunge-wasm
+	cp "$$(go env GOROOT)/lib/wasm/wasm_exec.js" docs/playground/wasm_exec.js
 
 # Clean build artifacts
 clean:

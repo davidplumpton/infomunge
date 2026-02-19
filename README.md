@@ -72,12 +72,12 @@ Notes:
 - If `format` is omitted, inputs are treated as `text/plain`.
 - `output` can be a format like `json` or a MIME type like `application/json`.
 
-### Standalone Playground (JS)
+### Standalone Playground (WASM)
 
-Build a standalone browser bundle with gopherjs (requires gopherjs installed):
+Build standalone browser assets:
 
 ```bash
-gopherjs build ./cmd/infomunge-js -o docs/playground/infomunge.js
+make playground-wasm
 ```
 
 Then open `docs/playground/index.html` in a browser. The page uses a local JS runner and does not require the server.
