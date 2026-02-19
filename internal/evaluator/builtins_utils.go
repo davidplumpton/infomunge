@@ -7,6 +7,22 @@ import (
 	"strings"
 )
 
+// requireExactArgs validates exact argument count and returns a positioned error.
+func requireExactArgs(args []interface{}, expected int, errMsg string, e *ast.CallExpr) error {
+	if len(args) != expected {
+		return newPosError(errMsg, e.Pos())
+	}
+	return nil
+}
+
+// requireMinArgs validates minimum argument count and returns a positioned error.
+func requireMinArgs(args []interface{}, min int, errMsg string, e *ast.CallExpr) error {
+	if len(args) < min {
+		return newPosError(errMsg, e.Pos())
+	}
+	return nil
+}
+
 // assertStringArg validates that an argument is a string.
 func assertStringArg(val interface{}, argIndex int, funcName string, e *ast.CallExpr) (string, error) {
 	str, ok := val.(string)

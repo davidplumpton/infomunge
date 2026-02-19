@@ -9,8 +9,8 @@ import (
 
 // callBuiltinCeil implements the ceil(number) function.
 func callBuiltinCeil(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("ceil function requires exactly 1 argument", e.Pos())
+	if err := requireExactArgs(args, 1, "ceil function requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 	num, err := toNumber(args[0], "ceil", e)
 	if err != nil {
@@ -21,8 +21,8 @@ func callBuiltinCeil(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callBuiltinFloor implements the floor(number) function.
 func callBuiltinFloor(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("floor function requires exactly 1 argument", e.Pos())
+	if err := requireExactArgs(args, 1, "floor function requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 	num, err := toNumber(args[0], "floor", e)
 	if err != nil {
@@ -33,8 +33,8 @@ func callBuiltinFloor(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 
 // callBuiltinRound implements the round(number) function.
 func callBuiltinRound(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("round function requires exactly 1 argument", e.Pos())
+	if err := requireExactArgs(args, 1, "round function requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 	num, err := toNumber(args[0], "round", e)
 	if err != nil {
@@ -45,8 +45,8 @@ func callBuiltinRound(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 
 // callBuiltinSqrt implements the sqrt(number) function.
 func callBuiltinSqrt(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("sqrt function requires exactly 1 argument", e.Pos())
+	if err := requireExactArgs(args, 1, "sqrt function requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 	num, err := toNumber(args[0], "sqrt", e)
 	if err != nil {
@@ -60,8 +60,8 @@ func callBuiltinSqrt(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callBuiltinAbs implements the abs(number) function.
 func callBuiltinAbs(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("abs function requires exactly 1 argument", e.Pos())
+	if err := requireExactArgs(args, 1, "abs function requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 	num, err := toNumber(args[0], "abs", e)
 	if err != nil {
@@ -72,8 +72,8 @@ func callBuiltinAbs(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callBuiltinMax implements the max(...numbers) or max(array) function.
 func callBuiltinMax(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) == 0 {
-		return nil, newPosError("max function requires at least 1 argument", e.Pos())
+	if err := requireMinArgs(args, 1, "max function requires at least 1 argument", e); err != nil {
+		return nil, err
 	}
 	if len(args) == 1 {
 		if arr, ok := args[0].([]interface{}); ok {
@@ -110,8 +110,8 @@ func callBuiltinMax(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callBuiltinMin implements the min(...numbers) or min(array) function.
 func callBuiltinMin(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) == 0 {
-		return nil, newPosError("min function requires at least 1 argument", e.Pos())
+	if err := requireMinArgs(args, 1, "min function requires at least 1 argument", e); err != nil {
+		return nil, err
 	}
 	if len(args) == 1 {
 		if arr, ok := args[0].([]interface{}); ok {
@@ -148,8 +148,8 @@ func callBuiltinMin(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callBuiltinPow implements the pow(base, exponent) function.
 func callBuiltinPow(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 2 {
-		return nil, newPosError("pow function requires exactly 2 arguments: base, exponent", e.Pos())
+	if err := requireExactArgs(args, 2, "pow function requires exactly 2 arguments: base, exponent", e); err != nil {
+		return nil, err
 	}
 	base, err := toNumber(args[0], "pow", e)
 	if err != nil {
@@ -182,8 +182,8 @@ func toNumber(val interface{}, funcName string, e *ast.CallExpr) (float64, error
 
 // callBuiltinSum implements the sum(array) function.
 func callBuiltinSum(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("sum requires exactly 1 argument: array", e.Pos())
+	if err := requireExactArgs(args, 1, "sum requires exactly 1 argument: array", e); err != nil {
+		return nil, err
 	}
 
 	if err := assertArg(args[0], beArray(), 1, "sum", e); err != nil {
@@ -209,8 +209,8 @@ func callBuiltinSum(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 // callBuiltinAvg implements the avg(array) function.
 // Returns the average of all numbers in the array.
 func callBuiltinAvg(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("avg requires exactly 1 argument: array", e.Pos())
+	if err := requireExactArgs(args, 1, "avg requires exactly 1 argument: array", e); err != nil {
+		return nil, err
 	}
 
 	if err := assertArg(args[0], beArray(), 1, "avg", e); err != nil {
@@ -239,8 +239,8 @@ func callBuiltinAvg(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callBuiltinIsDecimal implements the isDecimal(value) function.
 func callBuiltinIsDecimal(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("isDecimal requires exactly 1 argument", e.Pos())
+	if err := requireExactArgs(args, 1, "isDecimal requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 
 	switch args[0].(type) {
@@ -260,8 +260,8 @@ func callBuiltinIsDecimal(args []interface{}, e *ast.CallExpr) (interface{}, err
 // callBuiltinIsInteger implements the isInteger(value) function.
 // Returns true if value is an integer (no fractional part).
 func callBuiltinIsInteger(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("isInteger requires exactly 1 argument", e.Pos())
+	if err := requireExactArgs(args, 1, "isInteger requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 
 	switch v := args[0].(type) {
@@ -280,8 +280,8 @@ func callBuiltinIsInteger(args []interface{}, e *ast.CallExpr) (interface{}, err
 // callBuiltinIsEven implements the isEven(value) function.
 // Returns true if value is an even integer.
 func callBuiltinIsEven(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("isEven requires exactly 1 argument", e.Pos())
+	if err := requireExactArgs(args, 1, "isEven requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 
 	var num int64
@@ -305,8 +305,8 @@ func callBuiltinIsEven(args []interface{}, e *ast.CallExpr) (interface{}, error)
 // callBuiltinIsOdd implements the isOdd(value) function.
 // Returns true if value is an odd integer.
 func callBuiltinIsOdd(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("isOdd requires exactly 1 argument", e.Pos())
+	if err := requireExactArgs(args, 1, "isOdd requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 
 	var num int64
@@ -353,8 +353,8 @@ func callBuiltinRandom(args []interface{}, e *ast.CallExpr) (interface{}, error)
 // callBuiltinRandomInt implements the randomInt(max) function.
 // Returns a random integer from 0 to max (exclusive).
 func callBuiltinRandomInt(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("randomInt requires exactly 1 argument: max", e.Pos())
+	if err := requireExactArgs(args, 1, "randomInt requires exactly 1 argument: max", e); err != nil {
+		return nil, err
 	}
 
 	var max int64
@@ -390,8 +390,8 @@ func callBuiltinRandomInt(args []interface{}, e *ast.CallExpr) (interface{}, err
 
 // callBuiltinTo implements the to(start, end) function.
 func callBuiltinTo(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 2 {
-		return nil, newPosError("to requires exactly 2 arguments: start, end", e.Pos())
+	if err := requireExactArgs(args, 2, "to requires exactly 2 arguments: start, end", e); err != nil {
+		return nil, err
 	}
 
 	var start, end int64
@@ -430,8 +430,8 @@ func callBuiltinTo(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callBuiltinMod implements the mod(dividend, divisor) function.
 func callBuiltinMod(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 2 {
-		return nil, newPosError("mod requires exactly 2 arguments: dividend, divisor", e.Pos())
+	if err := requireExactArgs(args, 2, "mod requires exactly 2 arguments: dividend, divisor", e); err != nil {
+		return nil, err
 	}
 
 	var dividend, divisor float64

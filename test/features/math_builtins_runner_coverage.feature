@@ -47,3 +47,13 @@ Feature: Math builtins runner coverage
       randomInt(0)
       """
     Then running the script should fail with error containing "randomInt max must be greater than 0"
+
+  Scenario: math builtin type validation errors are reported consistently
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      floor("x")
+      """
+    Then running the script should fail with error containing "floor: cannot convert string to number"

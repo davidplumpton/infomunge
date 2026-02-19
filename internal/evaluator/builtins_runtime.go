@@ -29,8 +29,8 @@ func (e *UserError) Pos() token.Pos {
 
 // callBuiltinUUID implements the uuid() function.
 func callBuiltinUUID(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 0 {
-		return nil, newPosError("uuid takes no arguments", e.Pos())
+	if err := requireExactArgs(args, 0, "uuid takes no arguments", e); err != nil {
+		return nil, err
 	}
 
 	// Generate 16 random bytes for a v4 UUID
@@ -52,8 +52,8 @@ func callBuiltinUUID(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callBuiltinEvaluateCompatibilityFlag implements the evaluateCompatibilityFlag(flagName) function.
 func callBuiltinEvaluateCompatibilityFlag(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("evaluateCompatibilityFlag requires exactly 1 argument: flagName", e.Pos())
+	if err := requireExactArgs(args, 1, "evaluateCompatibilityFlag requires exactly 1 argument: flagName", e); err != nil {
+		return nil, err
 	}
 
 	flagName, ok := args[0].(string)
@@ -80,8 +80,8 @@ func callBuiltinEvaluateCompatibilityFlag(args []interface{}, e *ast.CallExpr) (
 
 // callBuiltinEnvVar implements the envVar(name) function.
 func callBuiltinEnvVar(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("envVar requires exactly 1 argument: variable name", e.Pos())
+	if err := requireExactArgs(args, 1, "envVar requires exactly 1 argument: variable name", e); err != nil {
+		return nil, err
 	}
 
 	varName, ok := args[0].(string)
@@ -98,8 +98,8 @@ func callBuiltinEnvVar(args []interface{}, e *ast.CallExpr) (interface{}, error)
 
 // callBuiltinEnvVars implements the envVars() function.
 func callBuiltinEnvVars(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 0 {
-		return nil, newPosError("envVars takes no arguments", e.Pos())
+	if err := requireExactArgs(args, 0, "envVars takes no arguments", e); err != nil {
+		return nil, err
 	}
 
 	envMap := make(map[string]interface{})
@@ -115,8 +115,8 @@ func callBuiltinEnvVars(args []interface{}, e *ast.CallExpr) (interface{}, error
 // callBuiltinLog implements the log(value) function.
 // Logs the value to stderr and returns it unchanged.
 func callBuiltinLog(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("log requires exactly 1 argument: value", e.Pos())
+	if err := requireExactArgs(args, 1, "log requires exactly 1 argument: value", e); err != nil {
+		return nil, err
 	}
 
 	fmt.Fprintln(os.Stderr, args[0])
@@ -130,8 +130,8 @@ func logWithPrefix(prefix string, value interface{}) {
 // callBuiltinLogDebug implements the logDebug(value) function.
 // Logs the value at DEBUG level and returns it unchanged.
 func callBuiltinLogDebug(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("logDebug requires exactly 1 argument: value", e.Pos())
+	if err := requireExactArgs(args, 1, "logDebug requires exactly 1 argument: value", e); err != nil {
+		return nil, err
 	}
 
 	logWithPrefix("DEBUG", args[0])
@@ -141,8 +141,8 @@ func callBuiltinLogDebug(args []interface{}, e *ast.CallExpr) (interface{}, erro
 // callBuiltinLogInfo implements the logInfo(value) function.
 // Logs the value at INFO level and returns it unchanged.
 func callBuiltinLogInfo(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("logInfo requires exactly 1 argument: value", e.Pos())
+	if err := requireExactArgs(args, 1, "logInfo requires exactly 1 argument: value", e); err != nil {
+		return nil, err
 	}
 
 	logWithPrefix("INFO", args[0])
@@ -152,8 +152,8 @@ func callBuiltinLogInfo(args []interface{}, e *ast.CallExpr) (interface{}, error
 // callBuiltinLogWarn implements the logWarn(value) function.
 // Logs the value at WARN level and returns it unchanged.
 func callBuiltinLogWarn(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("logWarn requires exactly 1 argument: value", e.Pos())
+	if err := requireExactArgs(args, 1, "logWarn requires exactly 1 argument: value", e); err != nil {
+		return nil, err
 	}
 
 	logWithPrefix("WARN", args[0])
@@ -163,8 +163,8 @@ func callBuiltinLogWarn(args []interface{}, e *ast.CallExpr) (interface{}, error
 // callBuiltinLogError implements the logError(value) function.
 // Logs the value at ERROR level and returns it unchanged.
 func callBuiltinLogError(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("logError requires exactly 1 argument: value", e.Pos())
+	if err := requireExactArgs(args, 1, "logError requires exactly 1 argument: value", e); err != nil {
+		return nil, err
 	}
 
 	logWithPrefix("ERROR", args[0])
@@ -174,8 +174,8 @@ func callBuiltinLogError(args []interface{}, e *ast.CallExpr) (interface{}, erro
 // callBuiltinLogWith implements the logWith(value, prefix) function.
 // Logs the value with a custom prefix and returns it unchanged.
 func callBuiltinLogWith(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 2 {
-		return nil, newPosError("logWith requires exactly 2 arguments: value, prefix", e.Pos())
+	if err := requireExactArgs(args, 2, "logWith requires exactly 2 arguments: value, prefix", e); err != nil {
+		return nil, err
 	}
 
 	prefix, err := assertStringArg(args[1], 2, "logWith", e)
