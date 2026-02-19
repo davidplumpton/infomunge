@@ -62,7 +62,7 @@ const playgroundHTML = `<!DOCTYPE html>
       .toolbar button:hover {
         opacity: 0.9;
       }
-      .toolbar select {
+      .toolbar select,
       .toolbar input {
         border: 1px solid var(--border);
         padding: 8px 10px;
