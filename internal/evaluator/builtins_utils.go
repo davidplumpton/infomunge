@@ -23,6 +23,23 @@ func requireMinArgs(args []interface{}, min int, errMsg string, e *ast.CallExpr)
 	return nil
 }
 
+// requireNoArgs validates that no arguments were passed.
+func requireNoArgs(args []interface{}, name string, e *ast.CallExpr) error {
+	if len(args) != 0 {
+		return newPosError(name+" takes no arguments", e.Pos())
+	}
+	return nil
+}
+
+// requireOneStringArg validates exactly 1 argument and that it is a string.
+// Returns the string value on success.
+func requireOneStringArg(args []interface{}, funcName string, e *ast.CallExpr) (string, error) {
+	if err := requireExactArgs(args, 1, funcName+" requires exactly 1 argument", e); err != nil {
+		return "", err
+	}
+	return assertStringArg(args[0], 0, funcName, e)
+}
+
 // assertStringArg validates that an argument is a string.
 func assertStringArg(val interface{}, argIndex int, funcName string, e *ast.CallExpr) (string, error) {
 	str, ok := val.(string)

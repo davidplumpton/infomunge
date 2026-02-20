@@ -11,24 +11,21 @@ import (
 
 // callBuiltinNow implements the now() function.
 func callBuiltinNow(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 0 {
-		return nil, newPosError("now takes no arguments", e.Pos())
+	if err := requireNoArgs(args, "now", e); err != nil {
+		return nil, err
 	}
-
 	return time.Now().UTC().Format(time.RFC3339Nano), nil
 }
 
 // callBuiltinDaysBetween implements the daysBetween(date1, date2) function.
 func callBuiltinDaysBetween(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 2 {
-		return nil, newPosError("daysBetween requires exactly 2 arguments: date1, date2", e.Pos())
+	if err := requireExactArgs(args, 2, "daysBetween requires exactly 2 arguments", e); err != nil {
+		return nil, err
 	}
-
 	date1Str, ok := args[0].(string)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("daysBetween expects first argument to be a date string, got %T", args[0]), e.Pos())
 	}
-
 	date2Str, ok := args[1].(string)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("daysBetween expects second argument to be a date string, got %T", args[1]), e.Pos())
@@ -55,8 +52,8 @@ func callBuiltinDaysBetween(args []interface{}, e *ast.CallExpr) (interface{}, e
 // callBuiltinIsLeapYear implements the isLeapYear(dateOrYear) function.
 // Accepts either an integer year or a date string.
 func callBuiltinIsLeapYear(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("isLeapYear requires exactly 1 argument: date or year", e.Pos())
+	if err := requireExactArgs(args, 1, "isLeapYear requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 
 	var year int
@@ -84,32 +81,32 @@ func callBuiltinIsLeapYear(args []interface{}, e *ast.CallExpr) (interface{}, er
 
 // callBuiltinToday implements the today() function.
 func callBuiltinToday(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 0 {
-		return nil, newPosError("today takes no arguments", e.Pos())
+	if err := requireNoArgs(args, "today", e); err != nil {
+		return nil, err
 	}
 	return time.Now().Format("2006-01-02"), nil
 }
 
 // callBuiltinTomorrow implements the tomorrow() function.
 func callBuiltinTomorrow(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 0 {
-		return nil, newPosError("tomorrow takes no arguments", e.Pos())
+	if err := requireNoArgs(args, "tomorrow", e); err != nil {
+		return nil, err
 	}
 	return time.Now().AddDate(0, 0, 1).Format("2006-01-02"), nil
 }
 
 // callBuiltinYesterday implements the yesterday() function.
 func callBuiltinYesterday(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 0 {
-		return nil, newPosError("yesterday takes no arguments", e.Pos())
+	if err := requireNoArgs(args, "yesterday", e); err != nil {
+		return nil, err
 	}
 	return time.Now().AddDate(0, 0, -1).Format("2006-01-02"), nil
 }
 
 // callBuiltinDate implements the date(year, month, day) function.
 func callBuiltinDate(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 3 {
-		return nil, newPosError("date requires exactly 3 arguments: year, month, day", e.Pos())
+	if err := requireExactArgs(args, 3, "date requires exactly 3 arguments: year, month, day", e); err != nil {
+		return nil, err
 	}
 
 	year, err := toInt(args[0], "date", e)
@@ -229,8 +226,8 @@ func callBuiltinDateTime(args []interface{}, e *ast.CallExpr) (interface{}, erro
 
 // callBuiltinLocalDateTime implements the localDateTime(year, month, day, hour, minutes, seconds) function.
 func callBuiltinLocalDateTime(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 6 {
-		return nil, newPosError("localDateTime requires exactly 6 arguments: year, month, day, hour, minutes, seconds", e.Pos())
+	if err := requireExactArgs(args, 6, "localDateTime requires exactly 6 arguments: year, month, day, hour, minutes, seconds", e); err != nil {
+		return nil, err
 	}
 
 	year, err := toInt(args[0], "localDateTime", e)
@@ -264,8 +261,8 @@ func callBuiltinLocalDateTime(args []interface{}, e *ast.CallExpr) (interface{},
 
 // callBuiltinLocalTime implements the localTime(hour, minutes, seconds) function.
 func callBuiltinLocalTime(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 3 {
-		return nil, newPosError("localTime requires exactly 3 arguments: hour, minutes, seconds", e.Pos())
+	if err := requireExactArgs(args, 3, "localTime requires exactly 3 arguments: hour, minutes, seconds", e); err != nil {
+		return nil, err
 	}
 
 	hour, err := toInt(args[0], "localTime", e)
@@ -287,15 +284,10 @@ func callBuiltinLocalTime(args []interface{}, e *ast.CallExpr) (interface{}, err
 
 // callBuiltinAtBeginningOfDay implements the atBeginningOfDay(dateTime) function.
 func callBuiltinAtBeginningOfDay(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("atBeginningOfDay requires exactly 1 argument: dateTime", e.Pos())
+	dateStr, err := requireOneStringArg(args, "atBeginningOfDay", e)
+	if err != nil {
+		return nil, err
 	}
-
-	dateStr, ok := args[0].(string)
-	if !ok {
-		return nil, newPosError(fmt.Sprintf("atBeginningOfDay expects a dateTime string, got %T", args[0]), e.Pos())
-	}
-
 	t, err := parseDateTime(dateStr)
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("atBeginningOfDay: %s", err), e.Pos())
@@ -307,15 +299,10 @@ func callBuiltinAtBeginningOfDay(args []interface{}, e *ast.CallExpr) (interface
 
 // callBuiltinAtBeginningOfHour implements the atBeginningOfHour(dateTime) function.
 func callBuiltinAtBeginningOfHour(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("atBeginningOfHour requires exactly 1 argument: dateTime", e.Pos())
+	dateStr, err := requireOneStringArg(args, "atBeginningOfHour", e)
+	if err != nil {
+		return nil, err
 	}
-
-	dateStr, ok := args[0].(string)
-	if !ok {
-		return nil, newPosError(fmt.Sprintf("atBeginningOfHour expects a dateTime string, got %T", args[0]), e.Pos())
-	}
-
 	t, err := parseDateTime(dateStr)
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("atBeginningOfHour: %s", err), e.Pos())
@@ -327,15 +314,10 @@ func callBuiltinAtBeginningOfHour(args []interface{}, e *ast.CallExpr) (interfac
 
 // callBuiltinAtBeginningOfMonth implements the atBeginningOfMonth(dateTime) function.
 func callBuiltinAtBeginningOfMonth(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("atBeginningOfMonth requires exactly 1 argument: dateTime", e.Pos())
+	dateStr, err := requireOneStringArg(args, "atBeginningOfMonth", e)
+	if err != nil {
+		return nil, err
 	}
-
-	dateStr, ok := args[0].(string)
-	if !ok {
-		return nil, newPosError(fmt.Sprintf("atBeginningOfMonth expects a dateTime string, got %T", args[0]), e.Pos())
-	}
-
 	t, err := parseDateTime(dateStr)
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("atBeginningOfMonth: %s", err), e.Pos())
@@ -347,15 +329,10 @@ func callBuiltinAtBeginningOfMonth(args []interface{}, e *ast.CallExpr) (interfa
 
 // callBuiltinAtBeginningOfWeek implements the atBeginningOfWeek(dateTime) function.
 func callBuiltinAtBeginningOfWeek(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("atBeginningOfWeek requires exactly 1 argument: dateTime", e.Pos())
+	dateStr, err := requireOneStringArg(args, "atBeginningOfWeek", e)
+	if err != nil {
+		return nil, err
 	}
-
-	dateStr, ok := args[0].(string)
-	if !ok {
-		return nil, newPosError(fmt.Sprintf("atBeginningOfWeek expects a dateTime string, got %T", args[0]), e.Pos())
-	}
-
 	t, err := parseDateTime(dateStr)
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("atBeginningOfWeek: %s", err), e.Pos())
@@ -369,15 +346,10 @@ func callBuiltinAtBeginningOfWeek(args []interface{}, e *ast.CallExpr) (interfac
 
 // callBuiltinAtBeginningOfYear implements the atBeginningOfYear(dateTime) function.
 func callBuiltinAtBeginningOfYear(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("atBeginningOfYear requires exactly 1 argument: dateTime", e.Pos())
+	dateStr, err := requireOneStringArg(args, "atBeginningOfYear", e)
+	if err != nil {
+		return nil, err
 	}
-
-	dateStr, ok := args[0].(string)
-	if !ok {
-		return nil, newPosError(fmt.Sprintf("atBeginningOfYear expects a dateTime string, got %T", args[0]), e.Pos())
-	}
-
 	t, err := parseDateTime(dateStr)
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("atBeginningOfYear: %s", err), e.Pos())
@@ -390,15 +362,13 @@ func callBuiltinAtBeginningOfYear(args []interface{}, e *ast.CallExpr) (interfac
 // callBuiltinDayOfWeek implements the dayOfWeek(date) function.
 // Returns the day of the week as an integer (1 = Monday, 7 = Sunday) following DataWeave convention.
 func callBuiltinDayOfWeek(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("dayOfWeek requires exactly 1 argument: date", e.Pos())
+	if err := requireExactArgs(args, 1, "dayOfWeek requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
-
 	dateStr, ok := args[0].(string)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("dayOfWeek expects a date string, got %T", args[0]), e.Pos())
 	}
-
 	t, err := parseDateTime(dateStr)
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("dayOfWeek: %s", err), e.Pos())
@@ -416,15 +386,13 @@ func callBuiltinDayOfWeek(args []interface{}, e *ast.CallExpr) (interface{}, err
 // callBuiltinDayOfYear implements the dayOfYear(date) function.
 // Returns the day of the year as an integer (1-366).
 func callBuiltinDayOfYear(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("dayOfYear requires exactly 1 argument: date", e.Pos())
+	if err := requireExactArgs(args, 1, "dayOfYear requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
-
 	dateStr, ok := args[0].(string)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("dayOfYear expects a date string, got %T", args[0]), e.Pos())
 	}
-
 	t, err := parseDateTime(dateStr)
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("dayOfYear: %s", err), e.Pos())

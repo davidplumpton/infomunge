@@ -472,6 +472,28 @@ Feature: String Functions
      When I run the application and it fails
      Then the output should contain "underscore expects a string"
 
+   Scenario: capitalize requires exactly 1 argument
+     Given the following input content:
+       """
+       %im 0.1
+       output application/json
+       ---
+       capitalize()
+       """
+     When I run the application and it fails
+     Then the output should contain "capitalize requires exactly 1 argument"
+
+   Scenario: camelize requires exactly 1 argument
+     Given the following input content:
+       """
+       %im 0.1
+       output application/json
+       ---
+       camelize()
+       """
+     When I run the application and it fails
+     Then the output should contain "camelize requires exactly 1 argument"
+
    # leftPad tests
    Scenario: leftPad basic usage
      Given the following input content:

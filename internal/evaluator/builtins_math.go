@@ -329,8 +329,8 @@ func callBuiltinIsOdd(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 
 // callBuiltinRandom implements the random() function.
 func callBuiltinRandom(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 0 {
-		return nil, newPosError("random takes no arguments", e.Pos())
+	if err := requireNoArgs(args, "random", e); err != nil {
+		return nil, err
 	}
 
 	// Get a random number between 0 and 1

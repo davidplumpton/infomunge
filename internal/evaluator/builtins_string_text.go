@@ -11,8 +11,8 @@ import (
 
 // callBuiltinIsBlank implements the isBlank(value) function.
 func callBuiltinIsBlank(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("isBlank requires exactly 1 argument", e.Pos())
+	if err := requireExactArgs(args, 1, "isBlank requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 
 	switch v := args[0].(type) {
@@ -31,8 +31,8 @@ func callBuiltinIsBlank(args []interface{}, e *ast.CallExpr) (interface{}, error
 
 // callBuiltinJoinBy implements the joinBy(array, separator) function.
 func callBuiltinJoinBy(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 2 {
-		return nil, newPosError("joinBy requires exactly 2 arguments: array, separator", e.Pos())
+	if err := requireExactArgs(args, 2, "joinBy requires exactly 2 arguments: array, separator", e); err != nil {
+		return nil, err
 	}
 
 	if err := assertArg(args[0], beArray(), 1, "joinBy", e); err != nil {
@@ -63,8 +63,8 @@ func callBuiltinJoinBy(args []interface{}, e *ast.CallExpr) (interface{}, error)
 // callBuiltinSplitBy implements the splitBy(string, separator) function.
 // The separator is treated as a regex only if it looks like a regex pattern or is a Regex object.
 func callBuiltinSplitBy(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 2 {
-		return nil, newPosError("splitBy requires exactly 2 arguments: string, separator", e.Pos())
+	if err := requireExactArgs(args, 2, "splitBy requires exactly 2 arguments: string, separator", e); err != nil {
+		return nil, err
 	}
 
 	text, ok := args[0].(string)
@@ -118,29 +118,19 @@ func looksLikeRegexPattern(pattern string) bool {
 
 // callBuiltinLower implements the lower(string) function.
 func callBuiltinLower(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("lower requires exactly 1 argument: string", e.Pos())
+	text, err := requireOneStringArg(args, "lower", e)
+	if err != nil {
+		return nil, err
 	}
-
-	text, ok := args[0].(string)
-	if !ok {
-		return nil, newPosError(fmt.Sprintf("lower expects a string, got %T", args[0]), e.Pos())
-	}
-
 	return strings.ToLower(text), nil
 }
 
 // callBuiltinUpper implements the upper(string) function.
 func callBuiltinUpper(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("upper requires exactly 1 argument: string", e.Pos())
+	text, err := requireOneStringArg(args, "upper", e)
+	if err != nil {
+		return nil, err
 	}
-
-	text, ok := args[0].(string)
-	if !ok {
-		return nil, newPosError(fmt.Sprintf("upper expects a string, got %T", args[0]), e.Pos())
-	}
-
 	return strings.ToUpper(text), nil
 }
 
@@ -182,7 +172,7 @@ func splitCamelCase(s string) []string {
 
 // callBuiltinCapitalize implements the capitalize(string) function.
 func callBuiltinCapitalize(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	text, err := assertStringArg(args[0], 0, "capitalize", e)
+	text, err := requireOneStringArg(args, "capitalize", e)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +197,7 @@ func lowercaseFirst(s string) string {
 
 // callBuiltinCamelize implements the camelize(string) function.
 func callBuiltinCamelize(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	text, err := assertStringArg(args[0], 0, "camelize", e)
+	text, err := requireOneStringArg(args, "camelize", e)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +222,7 @@ func callBuiltinCamelize(args []interface{}, e *ast.CallExpr) (interface{}, erro
 
 // callBuiltinDasherize implements the dasherize(string) function.
 func callBuiltinDasherize(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	text, err := assertStringArg(args[0], 0, "dasherize", e)
+	text, err := requireOneStringArg(args, "dasherize", e)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +240,7 @@ func callBuiltinDasherize(args []interface{}, e *ast.CallExpr) (interface{}, err
 
 // callBuiltinUnderscore implements the underscore(string) function.
 func callBuiltinUnderscore(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	text, err := assertStringArg(args[0], 0, "underscore", e)
+	text, err := requireOneStringArg(args, "underscore", e)
 	if err != nil {
 		return nil, err
 	}
@@ -269,8 +259,8 @@ func callBuiltinUnderscore(args []interface{}, e *ast.CallExpr) (interface{}, er
 // callBuiltinLeftPad implements the leftPad(string, size, padText) function.
 // Pads the string on the left with padText until the string reaches the specified size.
 func callBuiltinLeftPad(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 3 {
-		return nil, newPosError("leftPad requires exactly 3 arguments: string, size, padText", e.Pos())
+	if err := requireExactArgs(args, 3, "leftPad requires exactly 3 arguments: string, size, padText", e); err != nil {
+		return nil, err
 	}
 
 	text, err := assertStringArg(args[0], 1, "leftPad", e)
@@ -324,8 +314,8 @@ func callBuiltinLeftPad(args []interface{}, e *ast.CallExpr) (interface{}, error
 // callBuiltinRightPad implements the rightPad(string, size, padText) function.
 // Pads the string on the right with padText until the string reaches the specified size.
 func callBuiltinRightPad(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 3 {
-		return nil, newPosError("rightPad requires exactly 3 arguments: string, size, padText", e.Pos())
+	if err := requireExactArgs(args, 3, "rightPad requires exactly 3 arguments: string, size, padText", e); err != nil {
+		return nil, err
 	}
 
 	text, err := assertStringArg(args[0], 1, "rightPad", e)

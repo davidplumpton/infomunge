@@ -14,25 +14,16 @@ import (
 
 // callBuiltinToBase64 implements the toBase64(string) function.
 func callBuiltinToBase64(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("toBase64 requires exactly 1 argument: string", e.Pos())
-	}
-
-	text, err := assertStringArg(args[0], 0, "toBase64", e)
+	text, err := requireOneStringArg(args, "toBase64", e)
 	if err != nil {
 		return nil, err
 	}
-
 	return base64.StdEncoding.EncodeToString([]byte(text)), nil
 }
 
 // callBuiltinFromBase64 implements the fromBase64(string) function.
 func callBuiltinFromBase64(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("fromBase64 requires exactly 1 argument: string", e.Pos())
-	}
-
-	encoded, err := assertStringArg(args[0], 0, "fromBase64", e)
+	encoded, err := requireOneStringArg(args, "fromBase64", e)
 	if err != nil {
 		return nil, err
 	}
@@ -47,19 +38,11 @@ func callBuiltinFromBase64(args []interface{}, e *ast.CallExpr) (interface{}, er
 
 // callBuiltinHash implements the hash(string, algorithm) function.
 func callBuiltinHash(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 2 {
-		return nil, newPosError("hash requires exactly 2 arguments: string, algorithm", e.Pos())
-	}
-
-	text, err := assertStringArg(args[0], 1, "hash", e)
+	strs, err := assertStringArgs(args, 2, "hash", e)
 	if err != nil {
 		return nil, err
 	}
-
-	algorithm, err := assertStringArg(args[1], 2, "hash", e)
-	if err != nil {
-		return nil, err
-	}
+	text, algorithm := strs[0], strs[1]
 
 	normalized := strings.ToUpper(algorithm)
 	normalized = strings.ReplaceAll(normalized, "-", "")
@@ -88,25 +71,16 @@ func callBuiltinHash(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callBuiltinToHex implements the toHex(string) function.
 func callBuiltinToHex(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("toHex requires exactly 1 argument: string", e.Pos())
-	}
-
-	text, err := assertStringArg(args[0], 0, "toHex", e)
+	text, err := requireOneStringArg(args, "toHex", e)
 	if err != nil {
 		return nil, err
 	}
-
 	return hex.EncodeToString([]byte(text)), nil
 }
 
 // callBuiltinFromHex implements the fromHex(string) function.
 func callBuiltinFromHex(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("fromHex requires exactly 1 argument: string", e.Pos())
-	}
-
-	encoded, err := assertStringArg(args[0], 0, "fromHex", e)
+	encoded, err := requireOneStringArg(args, "fromHex", e)
 	if err != nil {
 		return nil, err
 	}

@@ -8,36 +8,26 @@ import (
 
 // callBuiltinPluralize implements the pluralize(string) function.
 func callBuiltinPluralize(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("pluralize requires exactly 1 argument", e.Pos())
-	}
-
-	text, err := assertStringArg(args[0], 0, "pluralize", e)
+	text, err := requireOneStringArg(args, "pluralize", e)
 	if err != nil {
 		return nil, err
 	}
-
 	return pluralizeWord(text), nil
 }
 
 // callBuiltinSingularize implements the singularize(string) function.
 func callBuiltinSingularize(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("singularize requires exactly 1 argument", e.Pos())
-	}
-
-	text, err := assertStringArg(args[0], 0, "singularize", e)
+	text, err := requireOneStringArg(args, "singularize", e)
 	if err != nil {
 		return nil, err
 	}
-
 	return singularizeWord(text), nil
 }
 
 // callBuiltinOrdinalize implements the ordinalize(number) function.
 func callBuiltinOrdinalize(args []interface{}, e *ast.CallExpr) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, newPosError("ordinalize requires exactly 1 argument", e.Pos())
+	if err := requireExactArgs(args, 1, "ordinalize requires exactly 1 argument", e); err != nil {
+		return nil, err
 	}
 
 	num, err := assertIntArg(args[0], 1, "ordinalize", e)
