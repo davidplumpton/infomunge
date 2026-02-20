@@ -60,11 +60,20 @@
       .toolbar button:hover {
         opacity: 0.9;
       }
-      .toolbar select {
+      .toolbar select,
+      .toolbar input[type="text"],
+      .toolbar input[type="password"] {
         border: 1px solid var(--border);
         padding: 8px 10px;
         border-radius: 12px;
         background: var(--panel);
+        font-size: 14px;
+      }
+      .toolbar-sep {
+        width: 1px;
+        height: 28px;
+        background: var(--border);
+        align-self: center;
       }
       .layout {
         flex: 1;
@@ -139,6 +148,9 @@
         font-size: 13px;
         color: #7b4b32;
       }
+      #server-url-input {
+        width: 200px;
+      }
       @media (max-width: 980px) {
         .layout {
           grid-template-columns: 1fr;
@@ -153,7 +165,7 @@
           <h1>InfoMunge Playground</h1>
           <p>Draft inputs, write scripts, and see results instantly.</p>
         </div>
-        <p>Standalone mode • Local JS runner</p>
+        <p id="mode-badge">Standalone mode &bull; Local WASM runner</p>
       </header>
       <div class="toolbar">
         <button id="run-script" type="button">Run Script</button>
@@ -177,6 +189,22 @@
         <label>
           <input id="pretty-print" type="checkbox" checked />
           Pretty print
+        </label>
+        <div class="toolbar-sep"></div>
+        <label>
+          Backend
+          <select id="backend-mode">
+            <option value="wasm">WASM (local)</option>
+            <option value="server">Server endpoint</option>
+          </select>
+        </label>
+        <label id="server-url-label" style="display:none">
+          Server URL
+          <input id="server-url-input" type="text" />
+        </label>
+        <label id="api-key-label" style="display:none">
+          API key
+          <input id="api-key" type="password" placeholder="optional" />
         </label>
       </div>
       <main class="layout">
@@ -218,6 +246,30 @@ payload</textarea>
       const outputFormat = document.getElementById("output-format");
       const prettyPrint = document.getElementById("pretty-print");
       const scriptArea = document.getElementById("script");
+      const backendMode = document.getElementById("backend-mode");
+      const serverUrlLabel = document.getElementById("server-url-label");
+      const serverUrlInput = document.getElementById("server-url-input");
+      const apiKeyLabel = document.getElementById("api-key-label");
+      const apiKey = document.getElementById("api-key");
+      const modeBadge = document.getElementById("mode-badge");
+
+      // Default server URL: absolute when opened as a local file, relative otherwise.
+      serverUrlInput.value =
+        window.location.protocol === "file:"
+          ? "http://localhost:8080/run"
+          : "/run";
+
+      function updateModeUI() {
+        const isServer = backendMode.value === "server";
+        serverUrlLabel.style.display = isServer ? "" : "none";
+        apiKeyLabel.style.display = isServer ? "" : "none";
+        modeBadge.textContent = isServer
+          ? "Server mode \u2022 " + (serverUrlInput.value || "/run")
+          : "Standalone mode \u2022 Local WASM runner";
+      }
+
+      backendMode.addEventListener("change", updateModeUI);
+      serverUrlInput.addEventListener("input", updateModeUI);
 
       const examples = [
         {
@@ -425,6 +477,7 @@ payload</textarea>
             json: "application/json",
             xml: "application/xml",
             csv: "application/csv",
+            "text/csv": "application/csv",
             yaml: "application/yaml",
             text: "text/plain",
           };
@@ -484,7 +537,12 @@ payload</textarea>
         status.textContent = "Running...";
         result.value = "";
         try {
-          if (window.infomungeRun) {
+          if (backendMode.value === "wasm") {
+            if (!window.infomungeRun) {
+              status.textContent =
+                "Error: WASM not loaded. Build with 'make playground-wasm' and serve over HTTP, or switch to Server endpoint mode.";
+              return;
+            }
             const response = window.infomungeRun(JSON.stringify(payload));
             const responseText = response && response.result ? response.result : "";
             const responseMimeType = response && response.mimeType ? response.mimeType : "";
@@ -497,9 +555,22 @@ payload</textarea>
               status.textContent = "Error";
               result.value = message;
             }
-            return;
+          } else {
+            const url = serverUrlInput.value.trim() || "/run";
+            const headers = { "Content-Type": "application/json" };
+            if (apiKey.value) {
+              headers["X-API-Key"] = apiKey.value;
+            }
+            const response = await fetch(url, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(payload),
+            });
+            const text = await response.text();
+            const mimeType = normalizeMimeType(output, response.headers.get("Content-Type") || "");
+            result.value = formatResultOutput(text, mimeType);
+            status.textContent = response.ok ? "Success" : "Error " + response.status;
           }
-          status.textContent = "Error: infomunge.wasm not loaded";
         } catch (err) {
           status.textContent = "Error: " + err;
         }

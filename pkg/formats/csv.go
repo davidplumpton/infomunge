@@ -15,6 +15,9 @@ func init() {
 	RegisterReader("application/csv", readCSV)
 	RegisterWriter("application/csv", formatCSV)
 	RegisterExtension(".csv", "application/csv")
+	// text/csv is widely used (RFC 4180) and treated as equivalent.
+	RegisterReader("text/csv", readCSV)
+	RegisterWriter("text/csv", formatCSV)
 }
 
 func readCSV(content string) (interface{}, error) {

@@ -447,6 +447,7 @@ payload</textarea>
             json: "application/json",
             xml: "application/xml",
             csv: "application/csv",
+            "text/csv": "application/csv",
             yaml: "application/yaml",
             text: "text/plain",
           };
