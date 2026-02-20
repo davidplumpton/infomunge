@@ -70,7 +70,7 @@ func TestMutatedCorpusExpressions_NoPanics_AndDeterministic(t *testing.T) {
 		}
 
 		if firstErr != nil {
-			if firstErr.Error() != secondErr.Error() {
+			if !determinism.EqualErrors(firstErr, secondErr) {
 				recordMutationFailure("mutation_determinism", baseExpr, mutatedExpr, seed, ctx, "", detectedAt)
 				t.Fatalf("nondeterministic error text for mutation seed=%d mutated=%q firstErr=%v secondErr=%v", seed, mutatedExpr, firstErr, secondErr)
 			}
@@ -220,7 +220,7 @@ func mutationChangesBehavior(baseRes interface{}, baseErr error, mutatedRes inte
 		return true
 	}
 	if baseErr != nil && mutatedErr != nil {
-		return baseErr.Error() != mutatedErr.Error()
+		return !determinism.EqualErrors(baseErr, mutatedErr)
 	}
 	return !determinism.Equal(baseRes, mutatedRes)
 }

@@ -53,7 +53,7 @@ func TestEvaluate_NoPanics_Deterministic_AndTypeConsistent(t *testing.T) {
 		}
 
 		if firstErr != nil {
-			if firstErr.Error() != secondErr.Error() {
+			if !determinism.EqualErrors(firstErr, secondErr) {
 				t.Fatalf("nondeterministic error message\nexpr: %q\nctx: %#v\nfirst err: %v\nsecond err: %v", expr, tc.Value, firstErr, secondErr)
 			}
 			return
