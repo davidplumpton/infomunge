@@ -468,11 +468,16 @@ payload</textarea>
           if (!line) {
             return;
           }
-          if (line.match(/^<\/.+>/)) {
+          const isClosingTag = /^<\/.+>/.test(line);
+          const isSelfClosingTag = /\/>$/.test(line);
+          const hasOpeningTag = /^<[^!?/][^>]*>/.test(line);
+          const hasInlineClose = hasOpeningTag && /<\/[^>]+>$/.test(line);
+
+          if (isClosingTag) {
             indent = Math.max(indent - 1, 0);
           }
           formatted.push("  ".repeat(indent) + line);
-          if (line.match(/^<[^!?/][^>]*[^/]>/)) {
+          if (hasOpeningTag && !isClosingTag && !isSelfClosingTag && !hasInlineClose) {
             indent++;
           }
         });

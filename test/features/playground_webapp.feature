@@ -26,6 +26,19 @@ Feature: Playground webapp
     And the output should contain "new Go()"
     And the output should contain "WebAssembly.instantiateStreaming"
 
+  Scenario: Playground XML pretty printer handles inline close tags
+    Given the server is running
+    When I request the playground page
+    Then the response status should be 200
+    And the output should contain "const hasInlineClose = hasOpeningTag &&"
+    And the output should contain "if (hasOpeningTag && !isClosingTag && !isSelfClosingTag && !hasInlineClose)"
+
+  Scenario: Standalone XML pretty printer handles inline close tags
+    When I read the standalone playground page
+    Then the response status should be 200
+    And the output should contain "const hasInlineClose = hasOpeningTag &&"
+    And the output should contain "if (hasOpeningTag && !isClosingTag && !isSelfClosingTag && !hasInlineClose)"
+
   Scenario: Playground input cards avoid HTML interpolation of input names
     Given the server is running
     When I request the playground page
