@@ -65,20 +65,26 @@ func parseVarDeclFromLines(lines []string, start int, baseOffset int, evalCtx ma
 	return parseVarDeclFromLinesWithGoContext(lines, start, baseOffset, evalCtx, context.Background(), fullRaw)
 }
 
-func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset int, evalCtx map[string]interface{}, goCtx context.Context, fullRaw string) (interface{}, string, int, error) {
+type parsedVarDecl struct {
+	varName  string
+	exprStr  string
+	consumed int
+}
+
+func parseVarDeclSource(lines []string, start int) (*parsedVarDecl, error) {
 	if start >= len(lines) {
-		return nil, "", 0, nil
+		return nil, nil
 	}
 
 	firstLine := lines[start]
 	trimmedFirst := strings.TrimSpace(firstLine)
 	if !strings.HasPrefix(trimmedFirst, "var ") {
-		return nil, "", 0, nil
+		return nil, nil
 	}
 
 	rest := strings.TrimSpace(strings.TrimPrefix(trimmedFirst, "var "))
 	if rest == "" {
-		return nil, "", 1, unifiederrors.ParseErrorf("invalid variable declaration: missing variable name in %q", trimmedFirst)
+		return nil, unifiederrors.ParseErrorf("invalid variable declaration: missing variable name in %q", trimmedFirst)
 	}
 
 	namePart := rest
@@ -87,7 +93,7 @@ func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset in
 	}
 	fields := strings.Fields(namePart)
 	if len(fields) != 1 {
-		return nil, "", 1, unifiederrors.ParseErrorf("invalid variable declaration: expected a single variable name in %q", trimmedFirst)
+		return nil, unifiederrors.ParseErrorf("invalid variable declaration: expected a single variable name in %q", trimmedFirst)
 	}
 	varName := fields[0]
 
@@ -112,21 +118,43 @@ func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset in
 	declRaw := strings.Join(declLines, "\n")
 	eqIdx := strings.Index(declRaw, "=")
 	if eqIdx < 0 {
-		return nil, "", len(declLines), unifiederrors.ParseErrorf("invalid variable declaration: missing '=' in %q", trimmedFirst)
+		return nil, unifiederrors.ParseErrorf("invalid variable declaration: missing '=' in %q", trimmedFirst)
 	}
 	exprStr := strings.TrimSpace(declRaw[eqIdx+1:])
 	if exprStr == "" {
-		return nil, "", len(declLines), unifiederrors.ParseErrorf("invalid variable declaration: missing expression for %q", varName)
+		return nil, unifiederrors.ParseErrorf("invalid variable declaration: missing expression for %q", varName)
 	}
 	if strings.ContainsAny(exprStr, "\n\r") {
 		exprStr = collapseWhitespaceOutsideStrings(exprStr)
 	}
 
-	parseableVal, mapping, err := preprocessor.PrepareForParsing(exprStr, preprocessor.Options{})
+	return &parsedVarDecl{
+		varName:  varName,
+		exprStr:  exprStr,
+		consumed: len(declLines),
+	}, nil
+}
+
+func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset int, evalCtx map[string]interface{}, goCtx context.Context, fullRaw string) (interface{}, string, int, error) {
+	spec, err := parseVarDeclSource(lines, start)
 	if err != nil {
-		return nil, "", len(declLines), unifiederrors.WrapParsef(err, "preprocessing error in variable declaration: %v", err)
+		consumed := 1
+		if spec != nil && spec.consumed > 0 {
+			consumed = spec.consumed
+		}
+		return nil, "", consumed, err
+	}
+	if spec == nil {
+		return nil, "", 0, nil
 	}
 
+	parseableVal, mapping, err := preprocessor.PrepareForParsing(spec.exprStr, preprocessor.Options{})
+	if err != nil {
+		return nil, "", spec.consumed, unifiederrors.WrapParsef(err, "preprocessing error in variable declaration: %v", err)
+	}
+
+	declRaw := strings.Join(lines[start:start+spec.consumed], "\n")
+	eqIdx := strings.Index(declRaw, "=")
 	exprStart := eqIdx + 1
 	for exprStart < len(declRaw) {
 		ch := declRaw[exprStart]
@@ -139,10 +167,10 @@ func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset in
 
 	val, err := evaluator.EvaluateWithGoContext(parseableVal, evalCtx, goCtx, mapping, valOffset, fullRaw)
 	if err != nil {
-		return nil, "", len(declLines), err
+		return nil, "", spec.consumed, err
 	}
 
-	return val, varName, len(declLines), nil
+	return val, spec.varName, spec.consumed, nil
 }
 
 func parseFunDeclLine(trimmedLine string) (string, []evaluator.ParamDef, string, error) {
@@ -227,21 +255,45 @@ func isDirectiveLine(trimmedLine string) bool {
 }
 
 func parseFunDeclFromLines(lines []string, start int, env map[string]interface{}) (*evaluator.Lambda, string, int, error) {
+	spec, err := parseFunDeclSource(lines, start)
+	if err != nil {
+		return nil, "", 0, err
+	}
+	if spec == nil {
+		return nil, "", 0, nil
+	}
+
+	fn, err := buildFunLambda(spec.params, spec.bodyStr, env)
+	if err != nil {
+		return nil, "", 0, err
+	}
+	return fn, spec.fnName, spec.consumed, nil
+}
+
+type parsedFunDecl struct {
+	fnName   string
+	params   []evaluator.ParamDef
+	bodyStr  string
+	consumed int
+}
+
+func parseFunDeclSource(lines []string, start int) (*parsedFunDecl, error) {
 	trimmedLine := strings.TrimSpace(lines[start])
 	fnName, params, bodyStr, err := parseFunDeclLine(trimmedLine)
 	if err != nil {
-		return nil, "", 0, err
+		return nil, err
 	}
 
 	// If body is complete on one line (non-empty and balanced delimiters), build immediately
 	if bodyStr != "" {
 		strippedBody := stripSingleLineComment(bodyStr)
 		if strings.TrimSpace(strippedBody) != "" && isDelimiterBalanced(strippedBody) {
-			fn, err := buildFunLambda(params, strippedBody, env)
-			if err != nil {
-				return nil, "", 0, err
-			}
-			return fn, fnName, 1, nil
+			return &parsedFunDecl{
+				fnName:   fnName,
+				params:   params,
+				bodyStr:  strippedBody,
+				consumed: 1,
+			}, nil
 		}
 	}
 
@@ -279,11 +331,12 @@ func parseFunDeclFromLines(lines []string, start int, env map[string]interface{}
 
 	bodyStr = strings.TrimSpace(strings.Join(bodyLines, "\n"))
 	bodyStr = stripLineComments(bodyStr)
-	fn, err := buildFunLambda(params, bodyStr, env)
-	if err != nil {
-		return nil, "", 0, err
-	}
-	return fn, fnName, i - start, nil
+	return &parsedFunDecl{
+		fnName:   fnName,
+		params:   params,
+		bodyStr:  bodyStr,
+		consumed: i - start,
+	}, nil
 }
 
 func collapseWhitespaceOutsideStrings(input string) string {

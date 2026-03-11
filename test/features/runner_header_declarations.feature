@@ -782,6 +782,25 @@ Feature: Runner header declaration paths (in-process coverage)
       20
       """
 
+  Scenario: Import, blank lines, comments, var, and function stay ordered through header execution
+    Given the following script:
+      """
+      %im 0.1
+      import double from modules::MathUtils
+
+      var base = 10
+      // local helper layered on imported function
+      fun scale(x) = double(x) + base
+      output application/json
+      ---
+      scale(11)
+      """
+    When I run the script
+    Then the output should be:
+      """
+      32
+      """
+
   Scenario: Multiline var and multiline fun in one header via unified dispatch
     Given the following script:
       """

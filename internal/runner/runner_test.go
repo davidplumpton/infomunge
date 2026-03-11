@@ -3,6 +3,7 @@ package runner
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -594,6 +595,72 @@ func TestParseHeader(t *testing.T) {
 			if tt.wantContextKey != "" {
 				if _, ok := ctx[tt.wantContextKey]; !ok {
 					t.Errorf("parseHeader() context should have key %q", tt.wantContextKey)
+				}
+			}
+		})
+	}
+}
+
+func TestParseHeaderDirectives(t *testing.T) {
+	tests := []struct {
+		name      string
+		header    string
+		hasHeader bool
+		wantKinds []headerDirectiveKind
+		wantErr   string
+	}{
+		{
+			name:      "parse only keeps directive order without evaluating declarations",
+			hasHeader: true,
+			header: `%im 0.1
+var broken = (
+fun wrap(x) = x
+output application/json`,
+			wantKinds: []headerDirectiveKind{
+				headerDirectiveVersion,
+				headerDirectiveVar,
+				headerDirectiveFun,
+				headerDirectiveOutput,
+			},
+		},
+		{
+			name:      "invalid variable declaration still fails during parse phase",
+			hasHeader: true,
+			header: `%im 0.1
+var broken
+output application/json`,
+			wantErr: "missing '='",
+		},
+		{
+			name:      "invalid output option still fails during parse phase",
+			hasHeader: true,
+			header: `%im 0.1
+output application/json badoption`,
+			wantErr: "invalid output option",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			directives, err := parseHeaderDirectives(tt.header, tt.hasHeader, tt.header)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("parseHeaderDirectives() expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("parseHeaderDirectives() error = %v, want substring %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseHeaderDirectives() unexpected error: %v", err)
+			}
+			if len(directives) != len(tt.wantKinds) {
+				t.Fatalf("parseHeaderDirectives() directive count = %d, want %d", len(directives), len(tt.wantKinds))
+			}
+			for i, kind := range tt.wantKinds {
+				if directives[i].kind != kind {
+					t.Fatalf("parseHeaderDirectives()[%d].kind = %q, want %q", i, directives[i].kind, kind)
 				}
 			}
 		})
