@@ -157,43 +157,10 @@ func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, [
 			buf.Truncate(leftStart)
 
 			rightStart := i + opLen
-			rightEnd := rightStart
-			depth := 0
-			inStringLocal := false
-
-			for rightEnd < len(s) {
-				ch := s[rightEnd]
-				if ch == '"' && !stringutils.IsEscapedAt(s, rightEnd) {
-					inStringLocal = !inStringLocal
-				}
-
-				if !inStringLocal {
-					if ch == '(' || ch == '[' || ch == '{' {
-						depth++
-					} else if ch == ')' || ch == ']' || ch == '}' {
-						if depth == 0 {
-							break
-						}
-						depth--
-					} else if depth == 0 && ch == ',' {
-						break
-					}
-					stopMatched := false
-					for _, stopOp := range config.RightStopOps {
-						if depth == 0 && rightEnd+len(stopOp) <= len(s) && s[rightEnd:rightEnd+len(stopOp)] == stopOp {
-							stopMatched = true
-							break
-						}
-					}
-					if stopMatched {
-						break
-					}
-				}
-				rightEnd++
-			}
-
-			rightTrimStart, rightTrimEnd := trimSpaceBounds(s, rightStart, rightEnd)
-			if rightTrimStart >= rightTrimEnd {
+			rightTrimStart, rightTrimEnd, rightEnd, ok := scanRightOperandBounds(s, rightStart, rightOperandScanConfig{
+				StopOps: config.RightStopOps,
+			})
+			if !ok {
 				buf.AppendBytes(leftBytes, leftMapping)
 				buf.AppendOriginal(s, i, i+opLen)
 				i += opLen
@@ -269,90 +236,45 @@ func replaceFindOperatorErr(s string) (string, error) {
 // replaceAsOperator converts "value as TypeExpr" to "__coerce(value, \"TypeExpr\")"
 func replaceAsOperator(s string) string {
 	var result []rune
-	inString := false
+	var topState ScanState
 	i := 0
 
 	for i < len(s) {
-		if s[i] == '"' && (i == 0 || s[i-1] != '\\') {
-			inString = !inString
-			result = append(result, '"')
-			i++
-			continue
-		}
-
-		if !inString && i+4 <= len(s) && s[i:i+4] == " as " {
-			leftStart := findLeftOperandForAs(result)
-
-			if leftStart >= len(result) {
+		if !topState.InString() && i+4 <= len(s) && s[i:i+4] == " as " {
+			leftStart, leftOp, ok := findLeftOperandBoundsRunes(result, leftOperandScanConfig{
+				CustomFinder: findTypedOperatorLeftOperandStart,
+			})
+			if !ok {
 				result = append(result, []rune(" as ")...)
 				i += 4
 				continue
 			}
 
-			leftOp := strings.TrimSpace(string(result[leftStart:]))
+			typeExpr, configArg, next, ok := scanTypedOperatorRight(s, i+4, true)
+			if !ok {
+				result = append(result, []rune(" as ")...)
+				i += 4
+				continue
+			}
+
 			result = result[:leftStart]
-
-			i += 4 // skip " as "
-
-			typeStart := i
-			for i < len(s) && IsTypeExprChar(s[i]) {
-				if i+4 <= len(s) && s[i:i+4] == "map[" {
-					break
-				}
-				i++
-			}
-
-			if i == typeStart {
-				result = append(result, []rune(leftOp)...)
-				result = append(result, []rune(" as ")...)
-				continue
-			}
-
-			typeExpr := strings.TrimSpace(s[typeStart:i])
-			if typeExpr == "" {
-				result = append(result, []rune(leftOp)...)
-				result = append(result, []rune(" as ")...)
-				continue
-			}
-
-			configStart := i
-			for configStart < len(s) && unicode.IsSpace(rune(s[configStart])) {
-				configStart++
-			}
-
-			var configArg string
-			prefixes := []string{GoObjectPrefix, GoObjectPrefixSpace}
-			for _, prefix := range prefixes {
-				if configStart+len(prefix) <= len(s) && s[configStart:configStart+len(prefix)] == prefix {
-					bracePos := configStart + len(prefix) - 1
-					sc := stringutils.NewExpressionScanner(s)
-					closePos := sc.FindMatchingCloseBracket(bracePos)
-
-					if closePos != -1 {
-						configArg = s[configStart : closePos+1]
-						i = closePos + 1
-						break
-					}
-				}
-			}
-
 			quotedType := strconv.Quote(typeExpr)
 			result = append(result, []rune("__coerce(")...)
 			result = append(result, []rune(leftOp)...)
 			result = append(result, []rune(", ")...)
 			result = append(result, []rune(quotedType)...)
-
 			if configArg != "" {
 				result = append(result, []rune(", ")...)
 				result = append(result, []rune(configArg)...)
 			}
-
 			result = append(result, ')')
+			i = next
 			continue
 		}
 
 		r, size := utf8.DecodeRuneInString(s[i:])
 		result = append(result, r)
+		topState.AdvanceRune(r)
 		i += size
 	}
 
@@ -362,60 +284,41 @@ func replaceAsOperator(s string) string {
 // replaceIsOperator converts "value is Type" to "__isType(value, \"Type\")"
 func replaceIsOperator(s string) string {
 	var result []rune
-	inString := false
+	var topState ScanState
 	i := 0
 
 	for i < len(s) {
-		if s[i] == '"' && (i == 0 || s[i-1] != '\\') {
-			inString = !inString
-			result = append(result, '"')
-			i++
-			continue
-		}
-
-		if !inString && i+4 <= len(s) && s[i:i+4] == " is " {
-			leftStart := findLeftOperandForAs(result)
-
-			if leftStart >= len(result) {
+		if !topState.InString() && i+4 <= len(s) && s[i:i+4] == " is " {
+			leftStart, leftOp, ok := findLeftOperandBoundsRunes(result, leftOperandScanConfig{
+				CustomFinder: findTypedOperatorLeftOperandStart,
+			})
+			if !ok {
 				result = append(result, []rune(" is ")...)
 				i += 4
 				continue
 			}
 
-			leftOp := strings.TrimSpace(string(result[leftStart:]))
+			typeExpr, _, next, ok := scanTypedOperatorRight(s, i+4, false)
+			if !ok {
+				result = append(result, []rune(" is ")...)
+				i += 4
+				continue
+			}
+
 			result = result[:leftStart]
-
-			i += 4 // skip " is "
-
-			typeStart := i
-			for i < len(s) && IsTypeExprChar(s[i]) {
-				i++
-			}
-
-			if i == typeStart {
-				result = append(result, []rune(leftOp)...)
-				result = append(result, []rune(" is ")...)
-				continue
-			}
-
-			typeExpr := strings.TrimSpace(s[typeStart:i])
-			if typeExpr == "" {
-				result = append(result, []rune(leftOp)...)
-				result = append(result, []rune(" is ")...)
-				continue
-			}
-
 			quotedType := strconv.Quote(typeExpr)
 			result = append(result, []rune("__isType(")...)
 			result = append(result, []rune(leftOp)...)
 			result = append(result, []rune(", ")...)
 			result = append(result, []rune(quotedType)...)
 			result = append(result, ')')
+			i = next
 			continue
 		}
 
 		r, size := utf8.DecodeRuneInString(s[i:])
 		result = append(result, r)
+		topState.AdvanceRune(r)
 		i += size
 	}
 
@@ -450,49 +353,22 @@ func replaceExponentOperator(s string) string {
 
 	for i < len(s) {
 		if !topState.InString() && i+2 <= len(s) && s[i:i+2] == "**" {
-			leftStart := stringutils.FindLeftOperandStart(result, nil)
-			if leftStart >= len(result) {
-				result = append(result, []rune("**")...)
-				i += 2
-				continue
-			}
-
-			leftOp := strings.TrimSpace(string(result[leftStart:]))
-			if leftOp == "" {
+			leftStart, leftOp, ok := findLeftOperandBoundsRunes(result, leftOperandScanConfig{})
+			if !ok {
 				result = append(result, []rune("**")...)
 				i += 2
 				continue
 			}
 
 			rightStart := i + 2
-			for rightStart < len(s) && unicode.IsSpace(rune(s[rightStart])) {
+			for rightStart < len(s) && isWhitespace(s[rightStart]) {
 				rightStart++
 			}
 
-			rightEnd := rightStart
-			var rightState ScanState
-
-			for rightEnd < len(s) {
-				ch := s[rightEnd]
-				if !rightState.InString() {
-					if ch == '(' || ch == '[' || ch == '{' {
-						rightState.Advance(ch)
-						rightEnd++
-						continue
-					}
-					if (ch == ')' || ch == ']' || ch == '}') && rightState.Depth() == 0 {
-						break
-					}
-					if rightState.Depth() == 0 && (ch == ',' || shouldStopExponentAtOperator(s, rightEnd, rightStart)) {
-						break
-					}
-				}
-				rightState.Advance(ch)
-				rightEnd++
-			}
-
-			rightOp := strings.TrimSpace(s[rightStart:rightEnd])
-			if rightOp == "" {
+			rightTrimStart, rightTrimEnd, rightEnd, ok := scanRightOperandBounds(s, rightStart, rightOperandScanConfig{
+				StopPredicate: shouldStopExponentAtOperator,
+			})
+			if !ok {
 				result = append(result, []rune("**")...)
 				i += 2
 				continue
@@ -502,7 +378,7 @@ func replaceExponentOperator(s string) string {
 			result = append(result, []rune("pow(")...)
 			result = append(result, []rune(leftOp)...)
 			result = append(result, []rune(", ")...)
-			result = append(result, []rune(rightOp)...)
+			result = append(result, []rune(s[rightTrimStart:rightTrimEnd])...)
 			result = append(result, ')')
 			i = rightEnd
 			continue
@@ -661,45 +537,6 @@ func replacePipeToFunctionOperator(s string) string {
 // isIdentStart returns true if ch can start an identifier (letter or underscore)
 func isIdentStart(ch byte) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_'
-}
-
-// findLeftOperandForAs finds the left operand for the 'as' operator.
-// It stops at word operators like 'match', 'default', etc. to ensure proper precedence.
-func findLeftOperandForAs(result []rune) int {
-	// First, find the basic left operand using default rules
-	leftStart := stringutils.FindLeftOperandStart(result, []rune{':', '&', '|'})
-
-	if leftStart >= len(result) {
-		return leftStart
-	}
-
-	// Now check if the operand contains word operators that 'as' should not cross
-	leftOp := string(result[leftStart:])
-
-	// List of word operators that 'as' should not cross (as has higher precedence)
-	wordOps := []string{
-		" match ", " matches ", " scan ",
-		" default ", " onNull ", " then ",
-		" find ", " contains ",
-		" splitBy ", " joinBy ", " replace ",
-		" and ", " or ", " && ", " || ",
-	}
-
-	// Find the last occurrence of any word operator
-	lastWordOpPos := -1
-	for _, op := range wordOps {
-		pos := strings.LastIndex(leftOp, op)
-		if pos > lastWordOpPos {
-			lastWordOpPos = pos + len(op) // Position after the operator
-		}
-	}
-
-	if lastWordOpPos > 0 {
-		// Adjust leftStart to after the word operator
-		return leftStart + lastWordOpPos
-	}
-
-	return leftStart
 }
 
 // replaceMatchOperator converts "str match pattern" to "match(str, pattern)"

@@ -183,6 +183,20 @@ Feature: Operator transformer rewrite coverage
       50
       """
 
+  Scenario: Default operator preserves as-operator precedence on rhs
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      null default "42" as Number
+      """
+    When I run the script
+    Then the output should be:
+      """
+      42
+      """
+
   # --- Type checking (is) operator edge cases ---
 
   Scenario: Is operator checks Number type

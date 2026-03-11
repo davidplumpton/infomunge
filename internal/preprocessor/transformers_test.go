@@ -418,6 +418,8 @@ func TestReplaceAsOperator(t *testing.T) {
 		{"as with expression", "(a + b) as Number", `__coerce((a + b), "Number")`},
 		{"as in string ignored", `"x as y"`, `"x as y"`},
 		{"as with optional type", "x as String?", `__coerce(x, "String?")`},
+		{"as stays on immediate rhs operand", "value default other as String", `value default __coerce(other, "String")`},
+		{"as keeps config object", `payload as String map[string]interface{}{"format": "yyyy"}`, `__coerce(payload, "String", map[string]interface{}{"format": "yyyy"})`},
 	}
 
 	for _, tt := range tests {
@@ -439,6 +441,7 @@ func TestReplaceIsOperator(t *testing.T) {
 		{"simple is", "x is String", `__isType(x, "String")`},
 		{"is with expression", "(a) is Number", `__isType((a), "Number")`},
 		{"is in string ignored", `"x is y"`, `"x is y"`},
+		{"is stays on immediate boolean operand", `left and right is String`, `left and __isType(right, "String")`},
 	}
 
 	for _, tt := range tests {
