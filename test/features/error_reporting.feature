@@ -132,3 +132,25 @@ Feature: Error Reporting
       """
     When I run the application and it fails
     Then the error should contain "4:23:"
+
+  Scenario: Parse error after default and dot-notation rewriting reports exact column
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload.user default (1 + )
+      """
+    When I run the application and it fails
+    Then the error should contain "4:27:"
+
+  Scenario: Parse error after recursive selector rewriting reports exact column
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      items..name map ((x) -> x + )
+      """
+    When I run the application and it fails
+    Then the error should contain "4:27:"

@@ -7,6 +7,8 @@ import (
 // transformHandler defines the signature for transformation functions
 type transformHandler func(string) string
 
+type mappedTransformHandler func(string) (string, []int)
+
 // PipelineStage represents a group of related transformations
 type PipelineStage interface {
 	Name() string
@@ -16,7 +18,7 @@ type PipelineStage interface {
 // basicStage is a simple pipeline stage implementation
 type basicStage struct {
 	name     string
-	handlers []transformHandler
+	handlers []mappedTransformHandler
 }
 
 func (bs *basicStage) Name() string {
@@ -25,20 +27,24 @@ func (bs *basicStage) Name() string {
 
 func (bs *basicStage) Execute(input string, mapping []int) (string, []int, error) {
 	result := input
+	resultMapping := mapping
 	for _, handler := range bs.handlers {
-		result = handler(result)
+		var local []int
+		result, local = handler(result)
+		resultMapping = composeMappings(resultMapping, local)
 	}
-	local := inferStageMapping(input, result)
-	return result, composeMappings(mapping, local), nil
+	return result, resultMapping, nil
 }
 
 // errorAwareHandler is a transformation function that can return errors
 type errorAwareHandler func(string) (string, error)
 
+type mappedErrorAwareHandler func(string) (string, []int, error)
+
 // errorAwareStage is a pipeline stage that supports error-returning handlers
 type errorAwareStage struct {
 	name    string
-	handler errorAwareHandler
+	handler mappedErrorAwareHandler
 }
 
 func (es *errorAwareStage) Name() string {
@@ -46,12 +52,32 @@ func (es *errorAwareStage) Name() string {
 }
 
 func (es *errorAwareStage) Execute(input string, mapping []int) (string, []int, error) {
-	result, err := es.handler(input)
+	result, local, err := es.handler(input)
 	if err != nil {
 		return result, mapping, err
 	}
-	local := inferStageMapping(input, result)
 	return result, composeMappings(mapping, local), nil
+}
+
+func inferMappedTransform(fn transformHandler) mappedTransformHandler {
+	return func(input string) (string, []int) {
+		result := fn(input)
+		return result, inferStageMapping(input, result)
+	}
+}
+
+func exactMappedTransform(fn mappedTransformHandler) mappedTransformHandler {
+	return fn
+}
+
+func inferMappedErrorTransform(fn errorAwareHandler) mappedErrorAwareHandler {
+	return func(input string) (string, []int, error) {
+		result, err := fn(input)
+		if err != nil {
+			return result, nil, err
+		}
+		return result, inferStageMapping(input, result), nil
+	}
 }
 
 // Create stages for different transformation groups
@@ -61,8 +87,8 @@ func (es *errorAwareStage) Execute(input string, mapping []int) (string, []int, 
 func CreateRegexLiteralStage() PipelineStage {
 	return &basicStage{
 		name: "Regex Literal Processing",
-		handlers: []transformHandler{
-			replaceRegexLiterals,
+		handlers: []mappedTransformHandler{
+			inferMappedTransform(replaceRegexLiterals),
 		},
 	}
 }
@@ -71,9 +97,9 @@ func CreateRegexLiteralStage() PipelineStage {
 func CreateStringProcessingStage() PipelineStage {
 	return &basicStage{
 		name: "String Processing",
-		handlers: []transformHandler{
-			replaceStringInterpolation,
-			replaceArrayRangeIndexing,
+		handlers: []mappedTransformHandler{
+			inferMappedTransform(replaceStringInterpolation),
+			inferMappedTransform(replaceArrayRangeIndexing),
 		},
 	}
 }
@@ -82,11 +108,11 @@ func CreateStringProcessingStage() PipelineStage {
 func CreateOperatorProcessingStage() PipelineStage {
 	return &errorAwareStage{
 		name: "Operator Processing",
-		handler: func(s string) (string, error) {
+		handler: func(s string) (string, []int, error) {
 			// Apply looping operators first
 			transforms := []struct {
 				name string
-				fn   errorAwareHandler
+				fn   mappedErrorAwareHandler
 			}{
 				{"replaceDefaultOperator", replaceDefaultOperatorErr},
 				{"replaceOnNullOperator", replaceOnNullOperatorErr},
@@ -94,23 +120,25 @@ func CreateOperatorProcessingStage() PipelineStage {
 				{"replaceToOperator", replaceToOperatorErr},
 			}
 			result := s
+			resultMapping := identityMapping(len(s))
 			for _, t := range transforms {
 				prevResult := ""
 				iterCount := 0
 				for result != prevResult {
 					if iterCount > MaxTransformIterations {
-						return result, unifiederrors.ParseErrorf("infinite loop detected in %s", t.name)
+						return result, resultMapping, unifiederrors.ParseErrorf("infinite loop detected in %s", t.name)
 					}
 					prevResult = result
-					nextResult, err := t.fn(result)
+					nextResult, local, err := t.fn(result)
 					if err != nil {
-						return result, err
+						return result, resultMapping, err
 					}
 					result = nextResult
+					resultMapping = composeMappings(resultMapping, local)
 					iterCount++
 				}
 			}
-			return result, nil
+			return result, resultMapping, nil
 		},
 	}
 }
@@ -119,17 +147,18 @@ func CreateOperatorProcessingStage() PipelineStage {
 func CreateFunctionalProcessingStage() PipelineStage {
 	return &errorAwareStage{
 		name: "Functional Processing",
-		handler: func(s string) (string, error) {
-			wrap := func(fn transformHandler) errorAwareHandler {
-				return func(input string) (string, error) {
-					return fn(input), nil
+		handler: func(s string) (string, []int, error) {
+			wrap := func(fn transformHandler) mappedErrorAwareHandler {
+				return func(input string) (string, []int, error) {
+					result := fn(input)
+					return result, inferStageMapping(input, result), nil
 				}
 			}
 
 			// Apply looping functional transformations
 			transforms := []struct {
 				name string
-				fn   errorAwareHandler
+				fn   mappedErrorAwareHandler
 			}{
 				{"replaceImplicitLambdas", wrap(replaceImplicitLambdas)},
 				{"replaceModuleCall", wrap(replaceModuleCall)},
@@ -148,20 +177,20 @@ func CreateFunctionalProcessingStage() PipelineStage {
 				{"replaceDistinctByOperator", wrap(replaceDistinctByOperator)},
 				{"replaceFilterObjectOperator", wrap(replaceFilterObjectOperator)},
 				{"replaceMapObjectOperator", wrap(replaceMapObjectOperator)},
-				{"replaceUpdateOperator", replaceUpdateOperatorErr},
+				{"replaceUpdateOperator", inferMappedErrorTransform(replaceUpdateOperatorErr)},
 				{"replaceAsOperator", wrap(replaceAsOperator)},
 				{"replaceIsOperator", wrap(replaceIsOperator)},
-				{"replaceFindOperator", replaceFindOperatorErr},
-				{"replaceContainsOperator", replaceContainsOperatorErr},
-				{"replaceSplitByOperator", replaceSplitByOperatorErr},
-				{"replaceJoinByOperator", replaceJoinByOperatorErr},
-				{"replaceConcatenateOperator", replaceConcatenateOperatorErr},
-				{"replaceRemoveOperator", replaceRemoveOperatorErr},
+				{"replaceFindOperator", inferMappedErrorTransform(replaceFindOperatorErr)},
+				{"replaceContainsOperator", inferMappedErrorTransform(replaceContainsOperatorErr)},
+				{"replaceSplitByOperator", inferMappedErrorTransform(replaceSplitByOperatorErr)},
+				{"replaceJoinByOperator", inferMappedErrorTransform(replaceJoinByOperatorErr)},
+				{"replaceConcatenateOperator", inferMappedErrorTransform(replaceConcatenateOperatorErr)},
+				{"replaceRemoveOperator", inferMappedErrorTransform(replaceRemoveOperatorErr)},
 				{"replaceExponentOperator", wrap(replaceExponentOperator)},
-				{"replaceMatchOperator", replaceMatchOperatorErr},
-				{"replaceMatchesOperator", replaceMatchesOperatorErr},
-				{"replaceModOperator", replaceModOperatorErr},
-				{"replaceRepeatOperator", replaceRepeatOperatorErr},
+				{"replaceMatchOperator", inferMappedErrorTransform(replaceMatchOperatorErr)},
+				{"replaceMatchesOperator", inferMappedErrorTransform(replaceMatchesOperatorErr)},
+				{"replaceModOperator", inferMappedErrorTransform(replaceModOperatorErr)},
+				{"replaceRepeatOperator", inferMappedErrorTransform(replaceRepeatOperatorErr)},
 				{"replaceSubstringOperator", wrap(replaceSubstringOperator)},
 				{"replaceContainsMethodCall", wrap(replaceContainsMethodCall)},
 				{"replaceFindMethodCall", wrap(replaceFindMethodCall)},
@@ -174,23 +203,25 @@ func CreateFunctionalProcessingStage() PipelineStage {
 				{"replaceAssignmentExpressions", wrap(replaceAssignmentExpressions)},
 			}
 			result := s
+			resultMapping := identityMapping(len(s))
 			for _, t := range transforms {
 				prevResult := ""
 				iterCount := 0
 				for result != prevResult {
 					if iterCount > MaxTransformIterations {
-						return result, unifiederrors.ParseErrorf("infinite loop detected in %s", t.name)
+						return result, resultMapping, unifiederrors.ParseErrorf("infinite loop detected in %s", t.name)
 					}
 					prevResult = result
-					nextResult, err := t.fn(result)
+					nextResult, local, err := t.fn(result)
 					if err != nil {
-						return result, err
+						return result, resultMapping, err
 					}
 					result = nextResult
+					resultMapping = composeMappings(resultMapping, local)
 					iterCount++
 				}
 			}
-			return result, nil
+			return result, resultMapping, nil
 		},
 	}
 }
@@ -200,10 +231,10 @@ func CreateFunctionalProcessingStage() PipelineStage {
 func CreateSelectorProcessingStage() PipelineStage {
 	return &basicStage{
 		name: "Selector Processing",
-		handlers: []transformHandler{
-			replaceFilterSelectors,
-			replaceMetadataSelectors,
-			replaceRecursiveDescent,
+		handlers: []mappedTransformHandler{
+			inferMappedTransform(replaceFilterSelectors),
+			inferMappedTransform(replaceMetadataSelectors),
+			exactMappedTransform(replaceRecursiveDescentWithMapping),
 		},
 	}
 }
@@ -212,10 +243,10 @@ func CreateSelectorProcessingStage() PipelineStage {
 func CreateSyntaxProcessingStage() PipelineStage {
 	return &basicStage{
 		name: "Syntax Processing",
-		handlers: []transformHandler{
-			replaceDotNotation,
-			replaceKeyAttributes,
-			replaceMultiStatementSequences,
+		handlers: []mappedTransformHandler{
+			exactMappedTransform(replaceDotNotationWithMapping),
+			inferMappedTransform(replaceKeyAttributes),
+			inferMappedTransform(replaceMultiStatementSequences),
 		},
 	}
 }

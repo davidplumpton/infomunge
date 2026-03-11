@@ -108,41 +108,142 @@ var binaryOperatorConfigs = map[string]stringutils.BinaryOperatorConfig{
 }
 
 func replaceConfiguredBinaryOperator(s string, key string) (string, error) {
-	config, ok := binaryOperatorConfigs[key]
-	if !ok {
+	if _, ok := binaryOperatorConfigs[key]; !ok {
 		return s, unifiederrors.ParseErrorf("missing binary operator config: %s", key)
 	}
-	return stringutils.ReplaceBinaryOperator(s, config), nil
+	result, _, err := replaceConfiguredBinaryOperatorWithMapping(s, key)
+	return result, err
+}
+
+func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, []int, error) {
+	config, ok := binaryOperatorConfigs[key]
+	if !ok {
+		return s, identityMapping(len(s)), unifiederrors.ParseErrorf("missing binary operator config: %s", key)
+	}
+
+	buf := newMappedBuffer(len(s) + len(config.FuncName) + 4)
+	inString := false
+	i := 0
+	opLen := len(config.Operator)
+	stopBytes := defaultStopBytes(config.ExtraStops)
+	if config.UseMinimalStops {
+		stopBytes = minimalStopBytes()
+	}
+
+	for i < len(s) {
+		if s[i] == '"' && !stringutils.IsEscapedAt(s, i) {
+			inString = !inString
+			buf.AppendOriginal(s, i, i+1)
+			i++
+			continue
+		}
+
+		if !inString && i+opLen <= len(s) && s[i:i+opLen] == config.Operator {
+			leftStart := findLeftOperandStartBytesWithStops(buf.bytes, stopBytes)
+			if leftStart >= buf.Len() {
+				buf.AppendOriginal(s, i, i+opLen)
+				i += opLen
+				continue
+			}
+
+			leftTrimStart, _ := trimSpaceBounds(buf.String(), leftStart, buf.Len())
+			if leftTrimStart >= buf.Len() {
+				buf.AppendOriginal(s, i, i+opLen)
+				i += opLen
+				continue
+			}
+
+			leftBytes, leftMapping := buf.Slice(leftTrimStart)
+			buf.Truncate(leftStart)
+
+			rightStart := i + opLen
+			rightEnd := rightStart
+			depth := 0
+			inStringLocal := false
+
+			for rightEnd < len(s) {
+				ch := s[rightEnd]
+				if ch == '"' && !stringutils.IsEscapedAt(s, rightEnd) {
+					inStringLocal = !inStringLocal
+				}
+
+				if !inStringLocal {
+					if ch == '(' || ch == '[' || ch == '{' {
+						depth++
+					} else if ch == ')' || ch == ']' || ch == '}' {
+						if depth == 0 {
+							break
+						}
+						depth--
+					} else if depth == 0 && ch == ',' {
+						break
+					}
+					stopMatched := false
+					for _, stopOp := range config.RightStopOps {
+						if depth == 0 && rightEnd+len(stopOp) <= len(s) && s[rightEnd:rightEnd+len(stopOp)] == stopOp {
+							stopMatched = true
+							break
+						}
+					}
+					if stopMatched {
+						break
+					}
+				}
+				rightEnd++
+			}
+
+			rightTrimStart, rightTrimEnd := trimSpaceBounds(s, rightStart, rightEnd)
+			if rightTrimStart >= rightTrimEnd {
+				buf.AppendBytes(leftBytes, leftMapping)
+				buf.AppendOriginal(s, i, i+opLen)
+				i += opLen
+				continue
+			}
+
+			buf.AppendLiteral(config.FuncName+"(", i)
+			buf.AppendBytes(leftBytes, leftMapping)
+			buf.AppendLiteral(", ", i)
+			buf.AppendOriginal(s, rightTrimStart, rightTrimEnd)
+			buf.AppendLiteral(")", rightTrimEnd-1)
+			i = rightEnd
+			continue
+		}
+
+		buf.AppendOriginal(s, i, i+1)
+		i++
+	}
+
+	return buf.String(), buf.mapping, nil
 }
 
 // replaceDefaultOperator converts "expr default value" to "__default(expr, value)"
 func replaceDefaultOperator(s string) string {
-	result, _ := replaceDefaultOperatorErr(s)
+	result, _, _ := replaceDefaultOperatorErr(s)
 	return result
 }
 
-func replaceDefaultOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpDefault)
+func replaceDefaultOperatorErr(s string) (string, []int, error) {
+	return replaceConfiguredBinaryOperatorWithMapping(s, binaryOpDefault)
 }
 
 // replaceOnNullOperator converts "expr onNull value" to "onNull(expr, value)"
 func replaceOnNullOperator(s string) string {
-	result, _ := replaceOnNullOperatorErr(s)
+	result, _, _ := replaceOnNullOperatorErr(s)
 	return result
 }
 
-func replaceOnNullOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpOnNull)
+func replaceOnNullOperatorErr(s string) (string, []int, error) {
+	return replaceConfiguredBinaryOperatorWithMapping(s, binaryOpOnNull)
 }
 
 // replaceThenOperator converts "expr then value" to "then(expr, value)"
 func replaceThenOperator(s string) string {
-	result, _ := replaceThenOperatorErr(s)
+	result, _, _ := replaceThenOperatorErr(s)
 	return result
 }
 
-func replaceThenOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpThen)
+func replaceThenOperatorErr(s string) (string, []int, error) {
+	return replaceConfiguredBinaryOperatorWithMapping(s, binaryOpThen)
 }
 
 // replaceUpdateOperator converts "obj ~ {field: value}" to "__update(obj, {field: value})"
@@ -459,12 +560,12 @@ func replaceJoinByOperatorErr(s string) (string, error) {
 
 // replaceToOperator converts "start to end" to "to(start, end)" for range expressions.
 func replaceToOperator(s string) string {
-	result, _ := replaceToOperatorErr(s)
+	result, _, _ := replaceToOperatorErr(s)
 	return result
 }
 
-func replaceToOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpTo)
+func replaceToOperatorErr(s string) (string, []int, error) {
+	return replaceConfiguredBinaryOperatorWithMapping(s, binaryOpTo)
 }
 
 // replacePipeToFunctionOperator converts "expr | funcName" to "funcName(expr)"

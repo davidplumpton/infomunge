@@ -204,6 +204,40 @@ func TestPrepareForParsing_MappingRangeValidity(t *testing.T) {
 	}
 }
 
+func TestPrepareForParsing_ExactMappingAcrossPostProcessingTransforms(t *testing.T) {
+	input := `payload.user default items..name`
+
+	result, mapping, err := PrepareForParsing(input, Options{})
+	if err != nil {
+		t.Fatalf("PrepareForParsing returned error: %v", err)
+	}
+
+	if result != `__default(payload["user"],__deep(items, "name"))` {
+		t.Fatalf("unexpected result: %q", result)
+	}
+
+	userPos := strings.Index(result, "user")
+	if userPos == -1 {
+		t.Fatalf("result missing user selector: %q", result)
+	}
+	for i := 0; i < len("user"); i++ {
+		if mapping[userPos+i] != 8+i {
+			t.Fatalf("expected mapping for user[%d] to be %d, got %d", i, 8+i, mapping[userPos+i])
+		}
+	}
+
+	namePos := strings.LastIndex(result, "name")
+	if namePos == -1 {
+		t.Fatalf("result missing recursive selector: %q", result)
+	}
+	originalNamePos := strings.LastIndex(input, "name")
+	for i := 0; i < len("name"); i++ {
+		if mapping[namePos+i] != originalNamePos+i {
+			t.Fatalf("expected mapping for name[%d] to be %d, got %d", i, originalNamePos+i, mapping[namePos+i])
+		}
+	}
+}
+
 func TestPrepareForParsing_Newlines(t *testing.T) {
 	tests := []struct {
 		name     string

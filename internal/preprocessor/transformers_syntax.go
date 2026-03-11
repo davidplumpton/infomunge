@@ -205,17 +205,25 @@ func extractInterpolationExpr(content string, pos int) (expr string, endPos int)
 
 // replaceRecursiveDescent converts "obj..field" to "__deep(obj, \"field\")"
 func replaceRecursiveDescent(s string) string {
-	var result []rune
+	result, _ := replaceRecursiveDescentWithMapping(s)
+	return result
+}
+
+func replaceRecursiveDescentWithMapping(s string) (string, []int) {
+	buf := newMappedBuffer(len(s) + 32)
 	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		if !sc.IsInString() && sc.Peek2() == ".*" {
-			leftExpr, newResult, ok := extractLeftOperand(result)
-			if !ok {
-				result = append(result, sc.NextRune())
+			leftStart := findLeftOperandStartBytesWithStops(buf.bytes, defaultStopBytes(nil))
+			if leftStart >= buf.Len() {
+				buf.AppendOriginal(s, sc.Pos(), sc.Pos()+1)
+				sc.Advance(1)
 				continue
 			}
-			result = newResult
+			leftTrimStart, _ := trimSpaceBounds(buf.String(), leftStart, buf.Len())
+			leftBytes, leftMapping := buf.Slice(leftTrimStart)
+			buf.Truncate(leftStart)
 			nextPos := sc.Pos() + 2
 			// Check if there's a field name after .*
 			if nextPos < len(s) && (IsIdentifierStart(s[nextPos]) || s[nextPos] == '@') {
@@ -225,19 +233,18 @@ func replaceRecursiveDescent(s string) string {
 				for fieldEnd < len(s) && IsIdentifierPart(s[fieldEnd]) {
 					fieldEnd++
 				}
-				fieldName := s[fieldStart:fieldEnd]
 				// Transform to __multival(obj, "field")
-				result = append(result, []rune("__multival(")...)
-				result = append(result, []rune(leftExpr)...)
-				result = append(result, []rune(", \"")...)
-				result = append(result, []rune(fieldName)...)
-				result = append(result, []rune("\")")...)
+				buf.AppendLiteral("__multival(", sc.Pos())
+				buf.AppendBytes(leftBytes, leftMapping)
+				buf.AppendLiteral(", \"", fieldStart)
+				buf.AppendOriginal(s, fieldStart, fieldEnd)
+				buf.AppendLiteral("\")", fieldEnd-1)
 				sc.SetPos(fieldEnd)
 			} else {
 				// No field name, just get all values
-				result = append(result, []rune("__objvalues(")...)
-				result = append(result, []rune(leftExpr)...)
-				result = append(result, []rune(")")...)
+				buf.AppendLiteral("__objvalues(", sc.Pos())
+				buf.AppendBytes(leftBytes, leftMapping)
+				buf.AppendLiteral(")", sc.Pos()+1)
 				sc.Advance(2)
 			}
 			continue
@@ -249,31 +256,35 @@ func replaceRecursiveDescent(s string) string {
 				fieldStart++
 			}
 			if fieldStart >= len(s) || s[fieldStart] == '.' || !IsIdentifierStart(s[fieldStart]) {
-				result = append(result, sc.NextRune())
+				buf.AppendOriginal(s, sc.Pos(), sc.Pos()+1)
+				sc.Advance(1)
 				continue
 			}
 			fieldEnd := fieldStart + 1
 			for fieldEnd < len(s) && IsIdentifierPart(s[fieldEnd]) {
 				fieldEnd++
 			}
-			fieldName := s[fieldStart:fieldEnd]
-			leftExpr, newResult, ok := extractLeftOperand(result)
-			if !ok {
-				result = append(result, sc.NextRune())
+			leftStart := findLeftOperandStartBytesWithStops(buf.bytes, defaultStopBytes(nil))
+			if leftStart >= buf.Len() {
+				buf.AppendOriginal(s, sc.Pos(), sc.Pos()+1)
+				sc.Advance(1)
 				continue
 			}
-			result = newResult
-			result = append(result, []rune("__deep(")...)
-			result = append(result, []rune(leftExpr)...)
-			result = append(result, []rune(", \"")...)
-			result = append(result, []rune(fieldName)...)
-			result = append(result, []rune("\")")...)
+			leftTrimStart, _ := trimSpaceBounds(buf.String(), leftStart, buf.Len())
+			leftBytes, leftMapping := buf.Slice(leftTrimStart)
+			buf.Truncate(leftStart)
+			buf.AppendLiteral("__deep(", sc.Pos())
+			buf.AppendBytes(leftBytes, leftMapping)
+			buf.AppendLiteral(", \"", fieldStart)
+			buf.AppendOriginal(s, fieldStart, fieldEnd)
+			buf.AppendLiteral("\")", fieldEnd-1)
 			sc.SetPos(fieldEnd)
 			continue
 		}
-		result = append(result, sc.NextRune())
+		buf.AppendOriginal(s, sc.Pos(), sc.Pos()+1)
+		sc.Advance(1)
 	}
-	return string(result)
+	return buf.String(), buf.mapping
 }
 
 // replaceFilterSelectors converts "obj[?(expr)]" to "__filter_selector(obj, __lambda(\"__arg, __idx\", expr))".
@@ -370,40 +381,51 @@ func replaceMetadataSelectors(s string) string {
 
 // replaceDotNotation converts "obj.field" to "obj[\"field\"]"
 func replaceDotNotation(s string) string {
-	var result []rune
+	result, _ := replaceDotNotationWithMapping(s)
+	return result
+}
+
+func replaceDotNotationWithMapping(s string) (string, []int) {
+	buf := newMappedBuffer(len(s) + 16)
 	sc := stringutils.NewExpressionScanner(s)
 
 	for sc.Pos() < len(s) {
 		if !sc.IsInString() && sc.Peek() == '.' && sc.Pos()+1 < len(s) && (IsIdentifierStart(s[sc.Pos()+1]) || s[sc.Pos()+1] == '@' || s[sc.Pos()+1] == '#') {
-			if len(result) > 0 {
-				lastChar := result[len(result)-1]
-				lastCharByte := byte(lastChar)
+			if buf.Len() > 0 {
+				lastCharByte := buf.bytes[buf.Len()-1]
+				lastChar := rune(lastCharByte)
 				if IsIdentifierPart(lastCharByte) || lastChar == ')' || lastChar == ']' || lastChar == '"' || lastChar == '}' {
+					dotPos := sc.Pos()
 					sc.Next()
-					isAt := false
 					isNamespace := false
+					markerPos := -1
 					if sc.Peek() == '@' {
-						isAt = true
+						markerPos = sc.Pos()
 						sc.Next()
 					} else if sc.Peek() == '#' {
 						isNamespace = true
+						markerPos = sc.Pos()
 						sc.Next()
 					}
 					fieldName := "#"
+					fieldStart := sc.Pos()
 					if !isNamespace {
-						fieldStart := sc.Pos()
 						for sc.Pos() < len(s) && IsIdentifierPart(s[sc.Pos()]) {
 							sc.Advance(1)
 						}
 						fieldName = s[fieldStart:sc.Pos()]
 					}
+					fieldEnd := sc.Pos()
 					isOptional := false
 					isAssert := false
+					suffixPos := -1
 					if !isNamespace && sc.Pos() < len(s) && s[sc.Pos()] == '?' {
 						isOptional = true
+						suffixPos = sc.Pos()
 						sc.Advance(1)
 					} else if !isNamespace && sc.Pos() < len(s) && s[sc.Pos()] == '!' {
 						isAssert = true
+						suffixPos = sc.Pos()
 						sc.Advance(1)
 					}
 					selectorSuffix := rune(0)
@@ -412,14 +434,15 @@ func replaceDotNotation(s string) string {
 					} else if isAssert {
 						selectorSuffix = '!'
 					}
-					result = appendDotNotationSelector(result, isAt, fieldName, selectorSuffix)
+					appendDotNotationSelectorWithMapping(buf, s, dotPos, markerPos, fieldStart, fieldEnd, fieldName, selectorSuffix, suffixPos, isNamespace)
 					continue
 				}
 			}
 		}
-		result = append(result, sc.NextRune())
+		buf.AppendOriginal(s, sc.Pos(), sc.Pos()+1)
+		sc.Advance(1)
 	}
-	return string(result)
+	return buf.String(), buf.mapping
 }
 
 func appendDotNotationSelector(result []rune, isAt bool, fieldName string, suffix rune) []rune {
@@ -437,6 +460,35 @@ func appendDotNotationSelector(result []rune, isAt bool, fieldName string, suffi
 	result = append(result, '"')
 	result = append(result, ']')
 	return result
+}
+
+func appendDotNotationSelectorWithMapping(buf *mappedBuffer, src string, dotPos, markerPos, fieldStart, fieldEnd int, fieldName string, suffix rune, suffixPos int, isNamespace bool) {
+	buf.AppendLiteral("[", dotPos)
+	quotePos := fieldStart
+	if markerPos >= 0 {
+		quotePos = markerPos
+	}
+	buf.AppendLiteral("\"", quotePos)
+	if isNamespace {
+		buf.AppendOriginal(src, markerPos, markerPos+1)
+	} else {
+		if markerPos >= 0 {
+			buf.AppendOriginal(src, markerPos, markerPos+1)
+		}
+		buf.AppendOriginal(src, fieldStart, fieldEnd)
+	}
+	if suffix != 0 && suffixPos >= 0 {
+		buf.AppendOriginal(src, suffixPos, suffixPos+1)
+	}
+	closePos := fieldEnd - 1
+	if suffixPos >= 0 {
+		closePos = suffixPos
+	}
+	if closePos < 0 {
+		closePos = dotPos
+	}
+	buf.AppendLiteral("\"", closePos)
+	buf.AppendLiteral("]", closePos)
 }
 
 // replaceCaseStatements converts case statements.

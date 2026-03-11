@@ -86,3 +86,14 @@ func clampIndex(pos, length int) int {
 	}
 	return pos
 }
+
+func identityMapping(length int) []int {
+	if length <= 0 {
+		return nil
+	}
+	mapping := make([]int, length)
+	for i := range mapping {
+		mapping[i] = i
+	}
+	return mapping
+}
