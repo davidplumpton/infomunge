@@ -181,7 +181,7 @@ func applyHeaderDirective(directive headerDirective, context map[string]interfac
 		var fnName string
 		var fn interface{}
 		var consumed int
-		fn, fnName, consumed, err = parseFunDeclFromLines(directive.lines, 0, context)
+		fn, fnName, consumed, err = parseFunDeclFromLinesWithSource(directive.lines, 0, context, fullRaw, directive.offset)
 		if err == nil && consumed > 0 && fnName != "" {
 			context[fnName] = fn
 		}

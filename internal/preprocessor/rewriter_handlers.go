@@ -111,24 +111,25 @@ func (r *rewriter) handleIfElse() bool {
 		return false
 	}
 
-	condition, ok := r.rewriteBranch(r.input[condStartPos+1 : condEndPos])
+	condition, conditionMapping, ok := r.rewriteBranchWithMapping(r.input[condStartPos+1:condEndPos], condStartPos+1)
 	if !ok {
 		return true
 	}
-	trueBranch, ok := r.rewriteBranch(r.input[branches.TrueStart:branches.TrueEnd])
+	trueBranch, trueMapping, ok := r.rewriteBranchWithMapping(r.input[branches.TrueStart:branches.TrueEnd], branches.TrueStart)
 	if !ok {
 		return true
 	}
 
 	falseBranch := "nil"
+	falseMapping := identityMapping(len(falseBranch))
 	if branches.FalseStart > 0 && branches.FalseEnd > 0 {
-		falseBranch, ok = r.rewriteBranch(r.input[branches.FalseStart:branches.FalseEnd])
+		falseBranch, falseMapping, ok = r.rewriteBranchWithMapping(r.input[branches.FalseStart:branches.FalseEnd], branches.FalseStart)
 		if !ok {
 			return true
 		}
 	}
 
-	r.appendIfElse(startPos, condition, trueBranch, falseBranch)
+	r.appendIfElse(startPos, condition, conditionMapping, trueBranch, trueMapping, falseBranch, falseMapping)
 	r.updatePositionAfterIfElse(branches.TrueEnd, branches.FalseStart, branches.FalseEnd)
 	return true
 }
@@ -539,27 +540,47 @@ func normalizeCondition(condition string) string {
 }
 
 func (r *rewriter) rewriteBranch(raw string) (string, bool) {
-	branch := stringutils.ReplaceOperatorsOutsideStrings(strings.TrimSpace(raw), []stringutils.OperatorReplacement{
+	rewritten, _, ok := r.rewriteBranchWithMapping(raw, 0)
+	return rewritten, ok
+}
+
+func (r *rewriter) rewriteBranchWithMapping(raw string, basePos int) (string, []int, bool) {
+	trimmed := strings.TrimSpace(raw)
+	trimStart := strings.Index(raw, trimmed)
+	if trimStart < 0 {
+		trimStart = 0
+	}
+	branchBase := basePos + trimStart
+	branch := stringutils.ReplaceOperatorsOutsideStrings(trimmed, []stringutils.OperatorReplacement{
 		{Pattern: " and ", Replacement: []rune(" && ")},
 		{Pattern: " or ", Replacement: []rune(" || ")},
 	})
+	branchMapping := inferStageMapping(trimmed, branch)
 	branchRewriter := newRewriter(branch, r.opts)
-	rewritten, _, err := branchRewriter.Rewrite()
+	rewritten, rewrittenMapping, err := branchRewriter.Rewrite()
 	if err != nil {
 		r.err = err
-		return "", false
+		return "", nil, false
 	}
-	return rewritten, true
+	composed := composeMappings(branchMapping, rewrittenMapping)
+	for i := range composed {
+		composed[i] += branchBase
+	}
+	return rewritten, composed, true
 }
 
-func (r *rewriter) appendIfElse(startPos int, condition, trueBranch, falseBranch string) {
+func (r *rewriter) appendIfElse(startPos int, condition string, conditionMapping []int, trueBranch string, trueMapping []int, falseBranch string, falseMapping []int) {
+	conditionEnd := mappedFallback(conditionMapping, startPos)
+	trueEnd := mappedFallback(trueMapping, conditionEnd)
+	falseEnd := mappedFallback(falseMapping, trueEnd)
+
 	r.appendString("__ifelse(", startPos)
-	r.appendString(condition, startPos)
-	r.appendString(", ", startPos)
-	r.appendString(trueBranch, startPos)
-	r.appendString(", ", startPos)
-	r.appendString(falseBranch, startPos)
-	r.append(')', startPos)
+	r.appendMappedString(condition, conditionMapping, startPos)
+	r.appendString(", ", conditionEnd)
+	r.appendMappedString(trueBranch, trueMapping, startPos)
+	r.appendString(", ", trueEnd)
+	r.appendMappedString(falseBranch, falseMapping, startPos)
+	r.append(')', falseEnd)
 }
 
 func (r *rewriter) appendWhile(startPos int, condition, body string) {
@@ -584,6 +605,13 @@ func skipSpace(input string, pos int, includeNewlines bool) int {
 		pos++
 	}
 	return pos
+}
+
+func mappedFallback(mapping []int, fallback int) int {
+	if len(mapping) == 0 {
+		return fallback
+	}
+	return mapping[len(mapping)-1]
 }
 
 func delimiterDepth(state ScanState, opener byte) int {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/sourcemap"
 	"strings"
 )
 
@@ -39,29 +40,28 @@ func PrepareForParsing(body string, opts Options) (string, []int, error) {
 	body = replaceRegexLiterals(body)
 	body = wrapImplicitObjectLiteralBodies(body)
 	input, wrapped := wrapTopLevelObjectLiteral(body)
-	rewriter := newRewriter(input, opts)
-	result, mapping, err := rewriter.RewriteWithDepth(0)
-	if wrapped && len(mapping) > 0 {
-		origLen := len(body)
-		closingPos := origLen + 1
-		for i, pos := range mapping {
-			if pos == 0 {
-				continue
-			}
-			if pos == closingPos {
-				if origLen > 0 {
-					mapping[i] = origLen - 1
+	inputMap := sourcemap.Identity(body)
+	if wrapped {
+		wrapperPositions := make([]int, len(input))
+		for i := range wrapperPositions {
+			switch {
+			case i == 0:
+				wrapperPositions[i] = 0
+			case i == len(input)-1:
+				if len(body) == 0 {
+					wrapperPositions[i] = 0
 				} else {
-					mapping[i] = 0
+					wrapperPositions[i] = len(body) - 1
 				}
-				continue
-			}
-			if pos > 0 {
-				mapping[i] = pos - 1
+			default:
+				wrapperPositions[i] = i - 1
 			}
 		}
+		inputMap = sourcemap.New(body, input, wrapperPositions)
 	}
-	return result, mapping, err
+	rewriter := newRewriter(input, opts)
+	result, mapping, err := rewriter.RewriteWithDepth(0)
+	return result, inputMap.Compose(result, mapping).Positions(), err
 }
 
 // Internal implementation of the rewriter
@@ -95,6 +95,16 @@ func (r *rewriter) append(char byte, originalPos int) {
 func (r *rewriter) appendString(s string, originalPos int) {
 	for i := 0; i < len(s); i++ {
 		r.append(s[i], originalPos)
+	}
+}
+
+func (r *rewriter) appendMappedString(s string, mapping []int, fallback int) {
+	for i := 0; i < len(s); i++ {
+		orig := fallback
+		if i < len(mapping) {
+			orig = mapping[i]
+		}
+		r.append(s[i], orig)
 	}
 }
 

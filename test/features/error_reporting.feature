@@ -154,3 +154,52 @@ Feature: Error Reporting
       """
     When I run the application and it fails
     Then the error should contain "4:27:"
+
+  Scenario: Parse error after top-level object wrapping reports exact column
+    Given the following input content:
+      """
+      %im 0.1
+      ---
+      name: 1 +
+      """
+    When I run the application and it fails
+    Then the error should contain "3:9:"
+
+  Scenario: Parse error in multiline header variable reports exact line
+    Given the following input content:
+      """
+      %im 0.1
+      var total =
+        1 +
+      ---
+      total
+      """
+    When I run the application and it fails
+    Then the error should contain "3:5:"
+
+  Scenario: Parse error in multiline header function reports exact line
+    Given the following input content:
+      """
+      %im 0.1
+      fun broken(x) =
+        x +
+      output application/json
+      ---
+      broken(1)
+      """
+    When I run the application and it fails
+    Then the error should contain "3:5:"
+
+  Scenario: Parse error after multiline if-else rewriting reports exact line
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      if (true)
+        1
+      else
+        2 +
+      """
+    When I run the application and it fails
+    Then the error should contain "7:5:"

@@ -6,6 +6,7 @@ import (
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
 	"infomunge/internal/preprocessor"
+	"infomunge/internal/sourcemap"
 	"infomunge/internal/stringutils"
 	"strings"
 )
@@ -46,11 +47,8 @@ func parseVarDeclWithGoContext(line, trimmedLine string, baseOffset int, evalCtx
 	if eqIdx < 0 {
 		return nil, "", unifiederrors.InternalError("internal error: malformed variable declaration")
 	}
-	lineIdx := eqIdx + 1
-	leadingSpace := len(parts[1]) - len(strings.TrimLeft(parts[1], " \t"))
-	valOffset := baseOffset + lineIdx + leadingSpace
-
-	val, err := evaluator.EvaluateWithGoContext(parseableVal, evalCtx, goCtx, mapping, valOffset, fullRaw)
+	exprMap := sourceMapForDeclExpr(fullRaw, baseOffset, line, eqIdx+1, false)
+	val, err := evaluator.EvaluateWithGoContextAndSourceMap(parseableVal, evalCtx, goCtx, exprMap.Compose(parseableVal, mapping))
 	if err != nil {
 		return nil, "", err
 	}
@@ -155,17 +153,11 @@ func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset in
 
 	declRaw := strings.Join(lines[start:start+spec.consumed], "\n")
 	eqIdx := strings.Index(declRaw, "=")
-	exprStart := eqIdx + 1
-	for exprStart < len(declRaw) {
-		ch := declRaw[exprStart]
-		if ch != ' ' && ch != '\t' && ch != '\n' && ch != '\r' {
-			break
-		}
-		exprStart++
+	exprMap := sourceMapForDeclExpr(fullRaw, baseOffset, declRaw, eqIdx+1, true)
+	if strings.ContainsAny(spec.exprStr, "\n\r") {
+		exprMap = collapseGeneratedWhitespaceMap(exprMap)
 	}
-	valOffset := baseOffset + exprStart
-
-	val, err := evaluator.EvaluateWithGoContext(parseableVal, evalCtx, goCtx, mapping, valOffset, fullRaw)
+	val, err := evaluator.EvaluateWithGoContextAndSourceMap(parseableVal, evalCtx, goCtx, exprMap.Compose(parseableVal, mapping))
 	if err != nil {
 		return nil, "", spec.consumed, err
 	}
@@ -218,7 +210,7 @@ func parseFunDeclLine(trimmedLine string) (string, []evaluator.ParamDef, string,
 	return fnName, params, bodyStr, nil
 }
 
-func buildFunLambda(params []evaluator.ParamDef, bodyStr string, env map[string]interface{}) (*evaluator.Lambda, error) {
+func buildFunLambda(params []evaluator.ParamDef, bodyStr string, env map[string]interface{}, bodyMap *sourcemap.Map) (*evaluator.Lambda, error) {
 	if bodyStr == "" {
 		return nil, unifiederrors.ParseError("invalid function declaration: empty body")
 	}
@@ -227,13 +219,16 @@ func buildFunLambda(params []evaluator.ParamDef, bodyStr string, env map[string]
 	if strings.ContainsAny(bodyStr, "\n\r") {
 		prepOpts.AllowMultilineIfElse = true
 	}
-	parseableBody, _, err := preprocessor.PrepareForParsing(bodyStr, prepOpts)
+	parseableBody, mapping, err := preprocessor.PrepareForParsing(bodyStr, prepOpts)
 	if err != nil {
 		return nil, unifiederrors.WrapParse(err, "preprocessing error in function body")
 	}
 
 	bodyAST, err := goparser.ParseExpr(parseableBody)
 	if err != nil {
+		if bodyMap != nil {
+			return nil, bodyMap.Compose(parseableBody, mapping).FormatParseError(err)
+		}
 		return nil, unifiederrors.WrapParse(err, "invalid function body")
 	}
 
@@ -255,6 +250,10 @@ func isDirectiveLine(trimmedLine string) bool {
 }
 
 func parseFunDeclFromLines(lines []string, start int, env map[string]interface{}) (*evaluator.Lambda, string, int, error) {
+	return parseFunDeclFromLinesWithSource(lines, start, env, "", 0)
+}
+
+func parseFunDeclFromLinesWithSource(lines []string, start int, env map[string]interface{}, fullRaw string, baseOffset int) (*evaluator.Lambda, string, int, error) {
 	spec, err := parseFunDeclSource(lines, start)
 	if err != nil {
 		return nil, "", 0, err
@@ -263,7 +262,14 @@ func parseFunDeclFromLines(lines []string, start int, env map[string]interface{}
 		return nil, "", 0, nil
 	}
 
-	fn, err := buildFunLambda(spec.params, spec.bodyStr, env)
+	var bodyMap *sourcemap.Map
+	if fullRaw != "" {
+		declRaw := strings.Join(lines[start:start+spec.consumed], "\n")
+		m := sourceMapForDeclExpr(fullRaw, baseOffset, declRaw, strings.Index(declRaw, "=")+1, false)
+		bodyMap = &m
+	}
+
+	fn, err := buildFunLambda(spec.params, spec.bodyStr, env, bodyMap)
 	if err != nil {
 		return nil, "", 0, err
 	}
@@ -340,9 +346,15 @@ func parseFunDeclSource(lines []string, start int) (*parsedFunDecl, error) {
 }
 
 func collapseWhitespaceOutsideStrings(input string) string {
+	collapsed, _ := collapseWhitespaceOutsideStringsWithMapping(input)
+	return collapsed
+}
+
+func collapseWhitespaceOutsideStringsWithMapping(input string) (string, []int) {
 	var b strings.Builder
 	var sc stringutils.ScanState
 	lastWasSpace := false
+	var mapping []int
 
 	for i := 0; i < len(input); i++ {
 		ch := input[i]
@@ -350,6 +362,7 @@ func collapseWhitespaceOutsideStrings(input string) string {
 
 		if sc.InString() {
 			b.WriteByte(ch)
+			mapping = append(mapping, i)
 			lastWasSpace = false
 			continue
 		}
@@ -358,15 +371,54 @@ func collapseWhitespaceOutsideStrings(input string) string {
 		case ' ', '\t', '\n', '\r':
 			if !lastWasSpace {
 				b.WriteByte(' ')
+				mapping = append(mapping, i)
 				lastWasSpace = true
 			}
 		default:
 			b.WriteByte(ch)
+			mapping = append(mapping, i)
 			lastWasSpace = false
 		}
 	}
 
-	return strings.TrimSpace(b.String())
+	collapsed := b.String()
+	start := 0
+	for start < len(collapsed) && collapsed[start] == ' ' {
+		start++
+	}
+	end := len(collapsed)
+	for end > start && collapsed[end-1] == ' ' {
+		end--
+	}
+	return collapsed[start:end], mapping[start:end]
+}
+
+func sourceMapForDeclExpr(fullRaw string, baseOffset int, declRaw string, exprStart int, collapseWhitespace bool) sourcemap.Map {
+	exprEnd := len(declRaw)
+	for exprStart < exprEnd {
+		ch := declRaw[exprStart]
+		if ch != ' ' && ch != '\t' && ch != '\n' && ch != '\r' {
+			break
+		}
+		exprStart++
+	}
+	for exprEnd > exprStart {
+		ch := declRaw[exprEnd-1]
+		if ch != ' ' && ch != '\t' && ch != '\n' && ch != '\r' {
+			break
+		}
+		exprEnd--
+	}
+	exprMap := sourcemap.Identity(fullRaw).SliceSource(baseOffset+exprStart, baseOffset+exprEnd)
+	if !collapseWhitespace {
+		return exprMap
+	}
+	return collapseGeneratedWhitespaceMap(exprMap)
+}
+
+func collapseGeneratedWhitespaceMap(exprMap sourcemap.Map) sourcemap.Map {
+	collapsed, mapping := collapseWhitespaceOutsideStringsWithMapping(exprMap.Generated())
+	return exprMap.Compose(collapsed, mapping)
 }
 
 // isDelimiterBalanced checks if brackets, braces, and parentheses are balanced,
@@ -441,7 +493,7 @@ func parseFunDecl(trimmedLine string, env map[string]interface{}) (*evaluator.La
 	}
 
 	bodyStr = stripSingleLineComment(bodyStr)
-	fn, err := buildFunLambda(params, bodyStr, env)
+	fn, err := buildFunLambda(params, bodyStr, env, nil)
 	if err != nil {
 		return nil, "", err
 	}

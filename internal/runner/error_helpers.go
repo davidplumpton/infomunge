@@ -1,10 +1,7 @@
 package runner
 
 import (
-	"fmt"
-	"strings"
-
-	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/sourcemap"
 )
 
 func leadingWhitespaceOffset(line string) int {
@@ -19,27 +16,5 @@ func leadingWhitespaceOffset(line string) int {
 }
 
 func attachLineContext(err error, source string, offset int, line string) error {
-	if err == nil {
-		return nil
-	}
-
-	unifiedErr, ok := err.(*unifiederrors.Error)
-	if !ok {
-		return err
-	}
-	if unifiedErr.Position != nil {
-		return err
-	}
-
-	lineText := strings.TrimSpace(line)
-	if lineText == "" {
-		lineText = strings.TrimSpace(unifiederrors.LineTextAtOffset(source, offset))
-	}
-	if lineText != "" && !strings.Contains(unifiedErr.Message, "(line:") {
-		unifiedErr.Message = fmt.Sprintf("%s (line: %s)", unifiedErr.Message, lineText)
-	}
-
-	pos := unifiederrors.PositionFromOffset(source, offset, "")
-	unifiedErr.WithPosition(pos)
-	return unifiedErr
+	return sourcemap.Identity(source).AttachLineContext(err, offset, line)
 }

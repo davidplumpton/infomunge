@@ -67,7 +67,7 @@ func parseModuleContent(content string, loader *ModuleLoader) (Namespace, error)
 			continue
 
 		case strings.HasPrefix(trimmedLine, "fun "):
-			fn, fnName, consumed, err := parseFunDeclFromLines(lines, i, rawNs)
+			fn, fnName, consumed, err := parseFunDeclFromLinesWithSource(lines, i, rawNs, content, offset)
 			if err != nil {
 				lineOffset := offset + leadingWhitespaceOffset(line)
 				return nil, attachLineContext(err, content, lineOffset, line)

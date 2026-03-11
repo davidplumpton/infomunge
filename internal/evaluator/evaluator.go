@@ -2,7 +2,6 @@ package evaluator
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -13,6 +12,7 @@ import (
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/sourcemap"
 )
 
 // ControlFlowSignal is used to signal break or continue in loops
@@ -81,10 +81,11 @@ func (l *Lambda) MarshalJSON() ([]byte, error) {
 
 // ErrorContext holds information needed for error reporting and location mapping
 type ErrorContext struct {
-	ExprStr    string // The original expression string (transformed)
-	Mapping    []int  // Mapping from transformed indices back to original
-	BodyOffset int    // Offset of the body in the full raw input
-	FullRaw    string // The full raw input for line/column calculation
+	ExprStr    string
+	Mapping    []int
+	BodyOffset int
+	FullRaw    string
+	SourceMap  sourcemap.Map
 }
 
 // posError represents an error with position information
@@ -113,12 +114,18 @@ func Evaluate(exprStr string, evalCtx Context, mapping []int, bodyOffset int, fu
 
 // EvaluateWithGoContext parses and evaluates the expression with Go context support.
 func EvaluateWithGoContext(exprStr string, evalCtx Context, goCtx context.Context, mapping []int, bodyOffset int, fullRaw string) (Value, error) {
+	return EvaluateWithGoContextAndSourceMap(exprStr, evalCtx, goCtx, sourcemap.New(fullRaw, exprStr, mapping).WithBaseOffset(bodyOffset))
+}
+
+// EvaluateWithGoContextAndSourceMap parses and evaluates an expression with an explicit source map.
+func EvaluateWithGoContextAndSourceMap(exprStr string, evalCtx Context, goCtx context.Context, sourceMap sourcemap.Map) (Value, error) {
 	contextWithGoCtx := withGoContext(evalCtx, goCtx)
 	ctx := &ErrorContext{
 		ExprStr:    exprStr,
-		Mapping:    mapping,
-		BodyOffset: bodyOffset,
-		FullRaw:    fullRaw,
+		Mapping:    sourceMap.Positions(),
+		BodyOffset: 0,
+		FullRaw:    "",
+		SourceMap:  sourceMap,
 	}
 	return EvaluateWithContextAndGoContext(exprStr, contextWithGoCtx, goCtx, ctx)
 }
@@ -145,69 +152,23 @@ func EvaluateWithContextAndGoContext(exprStr string, evalCtx Context, goCtx cont
 
 // FormatEvalError converts a unified error to a user-friendly error with line/column information
 func (ec *ErrorContext) FormatEvalError(err error) error {
-	// Check if it's a unified error
-	if unifiedErr, ok := err.(*unifiederrors.Error); ok && unifiedErr.Position != nil {
-		// Use the existing position information
-		return fmt.Errorf("%s:%d:%d: %s", unifiedErr.Position.Filename, unifiedErr.Position.Line, unifiedErr.Position.Column, unifiedErr.Message)
-	}
-
-	// Fallback for legacy posError (shouldn't occur with migration)
-	var pe interface{ Pos() token.Pos }
-	if errors.As(err, &pe) {
-		offset := int(pe.Pos()) - 1
-		if offset >= 0 && offset < len(ec.Mapping) {
-			originalOffset := ec.Mapping[offset] + ec.BodyOffset
-			origLine, origCol := offsetToLineCol(ec.FullRaw, originalOffset)
-			return fmt.Errorf("%d:%d: %s", origLine, origCol, err.Error())
-		}
-	}
-
-	return err
+	return ec.resolvedSourceMap().FormatEvalError(err)
 }
 
 // FormatParseError converts a parser error to a user-friendly error with line/column information
 func (ec *ErrorContext) FormatParseError(err error, exprStr string) error {
-	if len(ec.Mapping) == 0 {
-		return err
+	sm := ec.resolvedSourceMap()
+	if sm.Generated() == "" {
+		sm = sourcemap.New(ec.FullRaw, exprStr, ec.Mapping).WithBaseOffset(ec.BodyOffset)
 	}
-
-	// Try to extract position from error message (Go parser errors: "1:12: expected ...")
-	errMsg := err.Error()
-	var line, col int
-	if _, scanErr := fmt.Sscanf(errMsg, "%d:%d:", &line, &col); scanErr != nil {
-		return err
-	}
-
-	// Calculate offset in transformed string (line 1 based)
-	offset := 0
-	lines := strings.Split(exprStr, "\n")
-	for i := 0; i < line-1; i++ {
-		offset += len(lines[i]) + 1
-	}
-	offset += col - 1
-
-	if offset >= len(ec.Mapping) {
-		offset = len(ec.Mapping) - 1
-	}
-
-	originalOffset := ec.Mapping[offset] + ec.BodyOffset
-	origLine, origCol := offsetToLineCol(ec.FullRaw, originalOffset)
-
-	return fmt.Errorf("%d:%d: %s", origLine, origCol, errMsg[strings.Index(errMsg, ": ")+2:])
+	return sm.FormatParseError(err)
 }
 
-// offsetToLineCol converts a byte offset in a string to 1-based line and column numbers.
-func offsetToLineCol(s string, offset int) (line, col int) {
-	line, col = 1, 1
-	for i := 0; i < offset && i < len(s); i++ {
-		if s[i] == '\n' {
-			line++
-			col = 1
-		} else {
-			col++
-		}
+func (ec *ErrorContext) resolvedSourceMap() sourcemap.Map {
+	if ec.SourceMap.Generated() != "" || len(ec.SourceMap.Positions()) > 0 {
+		return ec.SourceMap
 	}
-	return line, col
+	return sourcemap.New(ec.FullRaw, ec.ExprStr, ec.Mapping).WithBaseOffset(ec.BodyOffset)
 }
 
 // evalAST evaluates an expression with initial depth of 0 using the visitor pattern.

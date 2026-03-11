@@ -1,24 +1,13 @@
 package preprocessor
 
+import "infomunge/internal/sourcemap"
+
 // composeMappings composes two mappings:
 // local maps stage output positions -> stage input positions,
 // prev maps stage input positions -> original input positions.
 // The returned mapping maps stage output positions -> original input positions.
 func composeMappings(prev, local []int) []int {
-	if len(local) == 0 {
-		return nil
-	}
-	if len(prev) == 0 {
-		out := make([]int, len(local))
-		copy(out, local)
-		return out
-	}
-	out := make([]int, len(local))
-	for i, pos := range local {
-		clamped := clampIndex(pos, len(prev))
-		out[i] = prev[clamped]
-	}
-	return out
+	return sourcemap.ComposePositions(prev, local)
 }
 
 // inferStageMapping creates an approximate position mapping from transformed
@@ -88,12 +77,5 @@ func clampIndex(pos, length int) int {
 }
 
 func identityMapping(length int) []int {
-	if length <= 0 {
-		return nil
-	}
-	mapping := make([]int, length)
-	for i := range mapping {
-		mapping[i] = i
-	}
-	return mapping
+	return sourcemap.IdentityPositions(length)
 }

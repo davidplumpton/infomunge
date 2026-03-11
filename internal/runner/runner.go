@@ -6,6 +6,7 @@ import (
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
 	"infomunge/internal/preprocessor"
+	"infomunge/internal/sourcemap"
 	"infomunge/internal/stringutils"
 	"infomunge/pkg/formats"
 	"os"
@@ -178,7 +179,8 @@ func evaluateWithContext(goCtx context.Context, raw string, additionalContext ma
 	if err != nil {
 		return nil, hasHeader, outputMimeType, nil, err
 	}
-	result, err := evaluator.EvaluateWithGoContext(parseableExpr, context, goCtx, mapping, bodyOffset, raw)
+	bodyMap := sourcemap.Identity(raw).SliceSource(bodyOffset, bodyOffset+len(body)).Compose(parseableExpr, mapping)
+	result, err := evaluator.EvaluateWithGoContextAndSourceMap(parseableExpr, context, goCtx, bodyMap)
 	if err != nil {
 		return nil, hasHeader, outputMimeType, nil, err
 	}
