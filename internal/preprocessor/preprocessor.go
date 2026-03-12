@@ -37,8 +37,13 @@ func PrepareForParsing(body string, opts Options) (string, []int, error) {
 
 	// Process regex literals first, before any other transformations,
 	// to prevent /[a-z]+/ from being interpreted as an array literal.
-	body = replaceRegexLiterals(body)
+	// Track exact source positions through each early transform.
+	body, regexMapping := replaceRegexLiteralsWithMapping(body)
+
+	prevBody := body
 	body = wrapImplicitObjectLiteralBodies(body)
+	wrapMapping := inferStageMapping(prevBody, body)
+
 	input, wrapped := wrapTopLevelObjectLiteral(body)
 	inputMap := sourcemap.Identity(body)
 	if wrapped {
@@ -61,7 +66,13 @@ func PrepareForParsing(body string, opts Options) (string, []int, error) {
 	}
 	rewriter := newRewriter(input, opts)
 	result, mapping, err := rewriter.RewriteWithDepth(0)
-	return result, inputMap.Compose(result, mapping).Positions(), err
+
+	// Compose full chain: result → rewriter input → post-wrap → post-regex → original
+	composed := inputMap.Compose(result, mapping).Positions()
+	composed = composeMappings(wrapMapping, composed)
+	composed = composeMappings(regexMapping, composed)
+
+	return result, composed, err
 }
 
 // Internal implementation of the rewriter

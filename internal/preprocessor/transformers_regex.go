@@ -47,8 +47,14 @@ var regexPrefixKeywords = map[string]struct{}{
 // - After identifier or closing bracket → division
 // - At start of expression → regex
 func replaceRegexLiterals(s string) string {
-	var result strings.Builder
-	result.Grow(len(s))
+	result, _ := replaceRegexLiteralsWithMapping(s)
+	return result
+}
+
+// replaceRegexLiteralsWithMapping converts /pattern/ regex literals to regex("pattern", "flags")
+// function calls, returning exact source-position mappings for the sourcemap pipeline.
+func replaceRegexLiteralsWithMapping(s string) (string, []int) {
+	buf := newMappedBuffer(len(s) + 32)
 
 	i := 0
 	inString := false
@@ -66,7 +72,7 @@ func replaceRegexLiterals(s string) string {
 		// Track string state
 		if ch == '"' && !inSingleQuoteString && !stringutils.IsEscapedAt(s, i) {
 			inString = !inString
-			result.WriteByte(ch)
+			buf.AppendOriginal(s, i, i+1)
 			if !inString {
 				lastKind = regexTokenValue
 			}
@@ -76,7 +82,7 @@ func replaceRegexLiterals(s string) string {
 
 		if ch == '\'' && !inString && !stringutils.IsEscapedAt(s, i) {
 			inSingleQuoteString = !inSingleQuoteString
-			result.WriteByte(ch)
+			buf.AppendOriginal(s, i, i+1)
 			if !inSingleQuoteString {
 				lastKind = regexTokenValue
 			}
@@ -86,13 +92,13 @@ func replaceRegexLiterals(s string) string {
 
 		// Skip if in string
 		if inString || inSingleQuoteString {
-			result.WriteByte(ch)
+			buf.AppendOriginal(s, i, i+1)
 			i++
 			continue
 		}
 
 		if isWhitespace(ch) {
-			result.WriteByte(ch)
+			buf.AppendOriginal(s, i, i+1)
 			i++
 			continue
 		}
@@ -104,7 +110,7 @@ func replaceRegexLiterals(s string) string {
 				i++
 			}
 			ident := s[start:i]
-			result.WriteString(ident)
+			buf.AppendOriginal(s, start, i)
 			if isRegexPrefixKeyword(ident) {
 				lastKind = regexTokenOperator
 			} else {
@@ -119,20 +125,20 @@ func replaceRegexLiterals(s string) string {
 			for i < len(s) && ((s[i] >= '0' && s[i] <= '9') || s[i] == '.') {
 				i++
 			}
-			result.WriteString(s[start:i])
+			buf.AppendOriginal(s, start, i)
 			lastKind = regexTokenValue
 			continue
 		}
 
 		if IsOpeningBracket(ch) || isRegexOperatorChar(ch) {
-			result.WriteByte(ch)
+			buf.AppendOriginal(s, i, i+1)
 			lastKind = regexTokenOperator
 			i++
 			continue
 		}
 
 		if IsClosingBracket(ch) {
-			result.WriteByte(ch)
+			buf.AppendOriginal(s, i, i+1)
 			lastKind = regexTokenValue
 			i++
 			continue
@@ -146,19 +152,20 @@ func replaceRegexLiterals(s string) string {
 				regexEnd, pattern, flags := parseRegexLiteral(s, i)
 				if regexEnd > i {
 					// Convert to regex function call: regex("pattern", "flags")
+					// Map all generated characters to the opening slash position.
 					escaped := escapeRegexForString(pattern)
-					result.WriteString("regex(\"")
-					result.WriteString(escaped)
-					result.WriteString("\"")
+					buf.AppendLiteral("regex(\"", i)
+					buf.AppendLiteral(escaped, i)
+					buf.AppendLiteral("\"", i)
 
 					// Add flags argument if present
 					if flags != "" {
-						result.WriteString(", \"")
-						result.WriteString(flags)
-						result.WriteString("\"")
+						buf.AppendLiteral(", \"", i)
+						buf.AppendLiteral(flags, i)
+						buf.AppendLiteral("\"", i)
 					}
 
-					result.WriteByte(')')
+					buf.AppendLiteral(")", i)
 					lastKind = regexTokenValue
 
 					i = regexEnd
@@ -167,14 +174,14 @@ func replaceRegexLiterals(s string) string {
 			}
 		}
 
-		result.WriteByte(ch)
+		buf.AppendOriginal(s, i, i+1)
 		if ch == '/' || isRegexOperatorChar(ch) {
 			lastKind = regexTokenOperator
 		}
 		i++
 	}
 
-	return result.String()
+	return buf.String(), buf.mapping
 }
 
 // IsRegexContext exposes regex context detection for comment stripping.

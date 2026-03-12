@@ -203,3 +203,25 @@ Feature: Error Reporting
       """
     When I run the application and it fails
     Then the error should contain "7:5:"
+
+  Scenario: Parse error after regex literal rewriting reports correct column
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      /abc/ + (1 + )
+      """
+    When I run the application and it fails
+    Then the error should contain "4:"
+
+  Scenario: Parse error after implicit object wrapping in map reports correct line
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1] map name: $ +
+      """
+    When I run the application and it fails
+    Then the error should contain "4:"

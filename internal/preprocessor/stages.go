@@ -88,7 +88,7 @@ func CreateRegexLiteralStage() PipelineStage {
 	return &basicStage{
 		name: "Regex Literal Processing",
 		handlers: []mappedTransformHandler{
-			inferMappedTransform(replaceRegexLiterals),
+			exactMappedTransform(replaceRegexLiteralsWithMapping),
 		},
 	}
 }
