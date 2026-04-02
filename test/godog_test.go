@@ -31,6 +31,7 @@ type testContext struct {
 	lastStdout      string
 	lastStderr      string
 	inputContent    string
+	stdinContent    string
 	payloadContent  string
 	payloadMime     string
 	scriptContent   string
@@ -133,10 +134,12 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 
 	// Steps for docstring_input.feature
 	ctx.Step(`^the following input content:$`, tc.theFollowingInputContent)
+	ctx.Step(`^the following stdin content:$`, tc.theFollowingStdinContent)
 	ctx.Step(`^a script with (\d+) repeated lines$`, tc.aScriptWithRepeatedLines)
 	ctx.Step(`^I run the application with this content$`, tc.iRunTheApplicationWithThisContent)
 	ctx.Step(`^I run the application with this content using --lazy and it fails$`, tc.iRunTheApplicationWithThisContentUsingLazyAndItFails)
 	ctx.Step(`^I run the application with this content and inputs and it fails:$`, tc.iRunTheApplicationWithThisContentAndInputsAndItFails)
+	ctx.Step(`^I run the application with this content and stdin-backed inputs and it fails:$`, tc.iRunTheApplicationWithThisContentAndStdinBackedInputsAndItFails)
 	ctx.Step(`^I run the application and it fails$`, tc.iRunTheApplicationAndItFails)
 	ctx.Step(`^the output should be:$`, tc.theOutputShouldBe)
 	ctx.Step(`^the error should contain "([^"]*)"$`, tc.theOutputShouldContain)
@@ -268,6 +271,11 @@ func (tc *testContext) theFollowingInputContent(content *godog.DocString) error 
 	return nil
 }
 
+func (tc *testContext) theFollowingStdinContent(content *godog.DocString) error {
+	tc.stdinContent = content.Content
+	return nil
+}
+
 func (tc *testContext) aScriptWithRepeatedLines(count int) error {
 	if count <= 0 {
 		return fmt.Errorf("line count must be positive, got %d", count)
@@ -324,6 +332,28 @@ func (tc *testContext) iRunTheApplicationWithThisContentAndInputsAndItFails(cont
 	}
 
 	_ = tc.runCLI(args...)
+	return nil
+}
+
+func (tc *testContext) iRunTheApplicationWithThisContentAndStdinBackedInputsAndItFails(content *godog.DocString) error {
+	if err := tc.ensureWorkspace(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
+		return err
+	}
+
+	args := []string{"-f", "input.txt"}
+	lines := strings.Split(content.Content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSuffix(line, "\r")
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		args = append(args, "-i", line)
+	}
+
+	_ = tc.runCLIWithStdin(tc.stdinContent, args...)
 	return nil
 }
 
@@ -384,6 +414,28 @@ func (tc *testContext) runCLI(args ...string) error {
 
 	cmd := exec.Command(binPath, args...)
 	cmd.Dir = tc.workDir
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err = cmd.Run()
+	tc.lastStdout = stdout.String()
+	tc.lastStderr = stderr.String()
+	tc.lastOutput = tc.lastStdout + tc.lastStderr
+	return err
+}
+
+func (tc *testContext) runCLIWithStdin(stdinContent string, args ...string) error {
+	binPath, err := ensureGodogBinary()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command(binPath, args...)
+	cmd.Dir = tc.workDir
+	cmd.Stdin = strings.NewReader(stdinContent)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

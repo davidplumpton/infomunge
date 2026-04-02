@@ -70,6 +70,21 @@ func (p *Parser) parseFile(filePath string) (*Source, error) {
 // ParseInputs processes multiple input specifications into a context map
 func (p *Parser) ParseInputs(inputs []string) (map[string]interface{}, error) {
 	context := make(map[string]interface{})
+	stdinSources := 0
+
+	for _, input := range inputs {
+		parts := strings.SplitN(input, "=", 2)
+		if len(parts) != 2 {
+			return nil, unifiederrors.ValidationErrorf("invalid input format: %s (expected name=source)", input)
+		}
+		if strings.HasPrefix(parts[1], ":") {
+			stdinSources++
+		}
+	}
+
+	if stdinSources > 1 {
+		return nil, unifiederrors.ValidationError("multiple stdin-backed inputs are not supported")
+	}
 
 	for _, input := range inputs {
 		parts := strings.SplitN(input, "=", 2)
