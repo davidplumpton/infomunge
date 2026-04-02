@@ -255,18 +255,18 @@ Feature: Basic Operators
       true
       """
 
-  Scenario: Array append with >> operator
+  Scenario: Array prepend with >> operator
     Given the following input content:
       """
       %im 0.1
       output application/json
       ---
-      [1, 2, 3] >> 4
+      0 >> [1, 2, 3]
       """
     When I run the application with this content
     Then the output should be:
       """
-      [1,2,3,4]
+      [0,1,2,3]
       """
 
   Scenario: Object key removal with - operator

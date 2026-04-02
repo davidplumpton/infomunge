@@ -1,0 +1,10 @@
+{
+  "id": 1,
+  "timestamp": "2026-02-12T08:57:06Z",
+  "property": "mutation_determinism",
+  "minimized_expression": "((trim(now())))",
+  "original_expression": "typeOf(now())",
+  "input_payload": null,
+  "seed": -3677,
+  "fingerprint": "81bfe64d1d306680db080ee12c5d3c2514920607f476f794b65595770129d6e0"
+}

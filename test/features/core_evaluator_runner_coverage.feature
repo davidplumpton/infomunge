@@ -128,7 +128,7 @@ Feature: Core evaluator runner coverage
     When I run the script
     Then the output should be false
 
-  # --- Array append operators (arrayAppend <<, appendRight >>) ---
+  # --- Array operators (append <<, prepend >>) ---
 
   Scenario: Array append with << operator
     Given the following script:
@@ -144,13 +144,13 @@ Feature: Core evaluator runner coverage
       [1,2,3]
       """
 
-  Scenario: Array append with >> operator
+  Scenario: Array prepend with >> operator
     Given the following script:
       """
       %im 0.1
       output application/json
       ---
-      [10, 20] >> 30
+      10 >> [20, 30]
       """
     When I run the script
     Then the output should be:
@@ -168,15 +168,15 @@ Feature: Core evaluator runner coverage
       """
     Then running the script should fail with error containing "<< requires array on left side"
 
-  Scenario: >> with non-array fails
+  Scenario: >> with non-array on right fails
     Given the following script:
       """
       %im 0.1
       output application/json
       ---
-      42 >> 1
+      1 >> 42
       """
-    Then running the script should fail with error containing ">> requires array on left side"
+    Then running the script should fail with error containing ">> requires array on right side"
 
   # --- Subtraction: object key removal (sub) ---
 
@@ -312,18 +312,18 @@ Feature: Core evaluator runner coverage
       [true,true,true,true,false,false]
       """
 
-  Scenario: Mixed array appends via runner
+  Scenario: Mixed array append and prepend via runner
     Given the following script:
       """
       %im 0.1
       output application/json
       ---
-      ([1] << 2) >> 3
+      0 >> ([1] << 2)
       """
     When I run the script
     Then the output should be:
       """
-      [1,2,3]
+      [0,1,2]
       """
 
   # --- Equality operators ---

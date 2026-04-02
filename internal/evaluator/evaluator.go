@@ -383,15 +383,15 @@ func geq(left, right Value) (Value, error) {
 	return numericCompare(left, right, func(l, r float64) bool { return l >= r }, ">=")
 }
 
-// appendRight implements the >> operator: array >> element → [...array, element]
-func appendRight(left, right Value) (Value, error) {
-	arr, ok := left.([]interface{})
+// prepend implements the >> operator: element >> array → [element, ...array]
+func prepend(left, right Value) (Value, error) {
+	arr, ok := right.([]interface{})
 	if !ok {
-		return nil, unifiederrors.EvalErrorf(">> requires array on left side, got %T", left)
+		return nil, unifiederrors.EvalErrorf(">> requires array on right side, got %T", right)
 	}
 	result := make([]interface{}, 0, len(arr)+1)
+	result = append(result, left)
 	result = append(result, arr...)
-	result = append(result, right)
 	return result, nil
 }
 
@@ -503,8 +503,8 @@ func evalBinaryOp(left, right Value, op token.Token, pos token.Pos) (Value, erro
 		return land(left, right)
 	case token.LOR:
 		return lor(left, right)
-	case token.SHR: // >> append: array >> element
-		return appendRight(left, right)
+	case token.SHR: // >> prepend: element >> array
+		return prepend(left, right)
 	case token.SHL: // << append: array << element
 		return arrayAppend(left, right)
 	case token.XOR: // ~= coercion equality
