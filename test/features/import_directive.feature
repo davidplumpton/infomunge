@@ -212,3 +212,23 @@ Feature: Import Directive
       """
     When I run the application and it fails
     Then the error should contain "invalid module spec"
+
+  Scenario: Script file imports resolve relative to the script directory
+    Given a file named "nested/modules/MathUtils.im" with content:
+      """
+      %im 0.1
+      fun double(x) = x * 2
+      """
+    And a file named "nested/script.im" with content:
+      """
+      %im 0.1
+      import modules::MathUtils
+      output application/json
+      ---
+      MathUtils::double(21)
+      """
+    When I run the application with "nested/script.im"
+    Then the output should be:
+      """
+      42
+      """

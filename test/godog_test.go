@@ -127,6 +127,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 
 	// Steps for read_file.feature
 	ctx.Step(`^a file named "([^"]*)" with content "([^"]*)"$`, tc.aFileNamedWithContent)
+	ctx.Step(`^a file named "([^"]*)" with content:$`, tc.aFileNamedWithDocstringContent)
 	ctx.Step(`^I run the application with "([^"]*)"$`, tc.iRunTheApplicationWith)
 	ctx.Step(`^the output should contain "((?:[^"\\]|\\.)*)"$`, tc.theOutputShouldContain)
 
@@ -229,6 +230,10 @@ func (tc *testContext) aFileNamedWithContent(fileName, content string) error {
 		return err
 	}
 	return os.WriteFile(filePath, []byte(content), 0644)
+}
+
+func (tc *testContext) aFileNamedWithDocstringContent(fileName string, content *godog.DocString) error {
+	return tc.aFileNamedWithContent(fileName, content.Content)
 }
 
 func (tc *testContext) iRunTheApplicationWith(arg string) error {

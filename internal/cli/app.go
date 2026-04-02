@@ -8,6 +8,7 @@ import (
 	"infomunge/internal/runner"
 	"infomunge/internal/version"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -137,6 +138,12 @@ func (app *App) execute(config *Config, context map[string]interface{}) error {
 		content, err := os.ReadFile(config.ScriptFile)
 		if err != nil {
 			return unifiederrors.WrapIOf(err, "error reading script file: %v", err)
+		}
+		absPath, err := filepath.Abs(config.ScriptFile)
+		if err != nil {
+			opts.BaseDir = filepath.Dir(config.ScriptFile)
+		} else {
+			opts.BaseDir = filepath.Dir(absPath)
 		}
 		return runner.RunFromStringWithContextAndOptions(string(content), context, opts)
 	}
