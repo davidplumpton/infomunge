@@ -52,6 +52,10 @@ var (
 )
 
 func TestFeatures(t *testing.T) {
+	if os.Getenv("INFOMUNGE_SKIP_GODOG") == "1" {
+		t.Skip("skipping Godog in nested go test invocation")
+	}
+
 	// Support filtering via environment variables:
 	//   GODOG_PATHS - comma-separated feature file paths (default: "features")
 	//   GODOG_TAGS  - tag expression to filter scenarios (e.g., "@fast", "@slow and not @wip")
@@ -130,6 +134,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a file named "([^"]*)" with content "([^"]*)"$`, tc.aFileNamedWithContent)
 	ctx.Step(`^a file named "([^"]*)" with content:$`, tc.aFileNamedWithDocstringContent)
 	ctx.Step(`^I run the application with "([^"]*)"$`, tc.iRunTheApplicationWith)
+	ctx.Step(`^I run "go test \./\.\.\." from the repo root$`, tc.iRunGoTestAllFromRepoRoot)
 	ctx.Step(`^the output should contain "((?:[^"\\]|\\.)*)"$`, tc.theOutputShouldContain)
 
 	// Steps for docstring_input.feature
@@ -246,6 +251,26 @@ func (tc *testContext) iRunTheApplicationWith(arg string) error {
 	err := tc.runCLI("-f", arg)
 	if err != nil {
 		return fmt.Errorf("app failed: %v, output: %s", err, tc.lastOutput)
+	}
+	return nil
+}
+
+func (tc *testContext) iRunGoTestAllFromRepoRoot() error {
+	cmd := exec.Command("go", "test", "./...")
+	cmd.Dir = ".."
+	cmd.Env = append(os.Environ(), "INFOMUNGE_SKIP_GODOG=1")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	tc.lastStdout = stdout.String()
+	tc.lastStderr = stderr.String()
+	tc.lastOutput = tc.lastStdout + tc.lastStderr
+	if err != nil {
+		return fmt.Errorf("go test ./... failed: %v, output: %s", err, tc.lastOutput)
 	}
 	return nil
 }

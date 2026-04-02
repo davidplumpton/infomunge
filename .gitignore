@@ -76,6 +76,8 @@ Formula/bd.rb
 /coverage/
 *.coverprofile
 
-tmp/
+tmp/**
+!tmp/go.mod
+!tmp/README.md
 tmp/intensive-testing/failures/
 tmp/intensive-testing/candidates/

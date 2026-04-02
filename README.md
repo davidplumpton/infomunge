@@ -141,6 +141,18 @@ This project uses Cucumber for Go.
 go test -v ./test
 ```
 
+Repo-wide package tests should also pass:
+
+```bash
+go test ./...
+```
+
+Scratch helper programs under `tmp/` are isolated in a nested Go module so they do not participate in the repo-root `go test ./...` package walk. Run them from inside `tmp/`, for example:
+
+```bash
+cd tmp && go run ./inspect.go
+```
+
 Generate coverage from cucumber tests (runtime-focused packages):
 
 ```bash

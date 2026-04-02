@@ -8,6 +8,8 @@ InfoMunge uses Go unit tests plus Godog feature tests.
 go test ./...
 ```
 
+The `tmp/` scratch area is a nested Go module, so ad hoc helpers there do not participate in repo-root package discovery. Run scratch helpers from inside `tmp/` when needed.
+
 Targeted packages:
 - `internal/evaluator/*_test.go`
 - `internal/preprocessor/*_test.go`
