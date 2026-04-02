@@ -182,6 +182,21 @@ Feature: Arrays Module
       [{"l":{"id":1},"r":{"ownerId":1}},{"l":{"id":2},"r":null},{"l":null,"r":{"ownerId":3}}]
       """
 
+  Scenario: Import a specific Arrays symbol
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      import countBy from dw::core::Arrays
+      ---
+      countBy([1, 2, 3, 4], (x) -> x > 2)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      2
+      """
+
   Scenario: partition splits items by criteria
     Given the following input content:
       """

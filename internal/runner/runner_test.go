@@ -268,6 +268,27 @@ func TestParseFunDecl(t *testing.T) {
 	}
 }
 
+func TestModuleLoaderLoadArraysModule(t *testing.T) {
+	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatalf("filepath.Abs repo root: %v", err)
+	}
+	loader := NewModuleLoader(repoRoot)
+	module, err := loader.Load("dw::core::Arrays")
+	if err != nil {
+		t.Fatalf("Load(dw::core::Arrays) unexpected error: %v", err)
+	}
+	if module == nil {
+		t.Fatal("Load(dw::core::Arrays) returned nil module")
+	}
+	if module.Name != "Arrays" {
+		t.Fatalf("Load(dw::core::Arrays) module name = %q, want %q", module.Name, "Arrays")
+	}
+	if _, ok := module.Namespace["outerJoin"]; !ok {
+		t.Fatal("Load(dw::core::Arrays) missing outerJoin")
+	}
+}
+
 func TestParseFunDeclFromLines_DoBlockSeparator(t *testing.T) {
 	lines := []string{
 		"fun addOne(x) = do {",

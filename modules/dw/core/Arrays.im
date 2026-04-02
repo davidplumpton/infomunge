@@ -39,10 +39,7 @@ fun leftJoin(left, right, leftKey, rightKey) =
         ((right filter (r) -> leftKey(l) == rightKey(r)) map (r) -> { l: l, r: r })
   )
 
-fun outerJoin(left, right, leftKey, rightKey) =
-  leftJoin(left, right, leftKey, rightKey)
-    ++ ((right filter (r) -> sizeOf(left filter (l) -> leftKey(l) == rightKey(r)) == 0)
-      map (r) -> { l: null, r: r })
+fun outerJoin(left, right, leftKey, rightKey) = leftJoin(left, right, leftKey, rightKey) ++ ((right filter (r) -> sizeOf(left filter (l) -> leftKey(l) == rightKey(r)) == 0) map (r) -> { l: null, r: r })
 
 fun partition(array, criteria) =
   {
