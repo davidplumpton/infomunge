@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"io"
-	"strconv"
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
@@ -123,57 +122,15 @@ func FormatRunResult(result interface{}, mimeType string, evalCtx map[string]int
 		}
 		xmlOpts := formats.XMLOutputOptions{
 			DeclaredNamespaces: nsMap,
-			NamespaceVars:      ExtractNamespaceVars(evalCtx),
+			NamespaceVars:      runner.ExtractNamespaceVars(evalCtx),
 			WriteDeclaration:   true,
 		}
 		if rawOpts, ok := evalCtx[runner.ContextKeyOutputOptions].(map[string]string); ok {
-			if err := ApplyXMLOutputOptions(&xmlOpts, rawOpts); err != nil {
+			if err := runner.ApplyXMLOutputOptions(&xmlOpts, rawOpts); err != nil {
 				return "", err
 			}
 		}
 		return formats.FormatXMLWithOptions(result, xmlOpts)
 	}
 	return formats.Format(result, mimeType)
-}
-
-// ExtractNamespaceVars finds all Namespace values in the eval context.
-func ExtractNamespaceVars(context map[string]interface{}) map[string]formats.Namespace {
-	if context == nil {
-		return nil
-	}
-	vars := make(map[string]formats.Namespace)
-	for k, v := range context {
-		if ns, ok := v.(formats.Namespace); ok {
-			vars[k] = ns
-		}
-	}
-	if len(vars) == 0 {
-		return nil
-	}
-	return vars
-}
-
-// ApplyXMLOutputOptions applies raw string options to XMLOutputOptions.
-func ApplyXMLOutputOptions(opts *formats.XMLOutputOptions, raw map[string]string) error {
-	for key, value := range raw {
-		switch strings.ToLower(strings.TrimSpace(key)) {
-		case "writedeclaration":
-			parsed, err := strconv.ParseBool(strings.TrimSpace(value))
-			if err != nil {
-				return unifiederrors.ParseErrorf("output option writeDeclaration: %v", err)
-			}
-			opts.WriteDeclaration = parsed
-		case "writedeclarednamespaces":
-			opts.WriteDeclaredNamespaces = value
-		case "writenilonnull":
-			parsed, err := strconv.ParseBool(strings.TrimSpace(value))
-			if err != nil {
-				return unifiederrors.ParseErrorf("output option writeNilOnNull: %v", err)
-			}
-			opts.WriteNilOnNull = parsed
-		case "skipnullon":
-			opts.SkipNullOn = value
-		}
-	}
-	return nil
 }

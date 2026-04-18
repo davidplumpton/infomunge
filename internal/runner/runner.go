@@ -452,12 +452,12 @@ func formatOutputWithContext(result interface{}, hasHeader bool, mimeType string
 		}
 		xmlOpts := formats.XMLOutputOptions{
 			DeclaredNamespaces: nsMap,
-			NamespaceVars:      extractNamespaceVars(context),
+			NamespaceVars:      ExtractNamespaceVars(context),
 			WriteDeclaration:   true,
 		}
 		if context != nil {
 			if rawOpts, ok := context[ContextKeyOutputOptions].(map[string]string); ok {
-				if err := applyXMLOutputOptions(&xmlOpts, rawOpts); err != nil {
+				if err := ApplyXMLOutputOptions(&xmlOpts, rawOpts); err != nil {
 					return err
 				}
 			}
@@ -475,7 +475,8 @@ func formatOutputWithContext(result interface{}, hasHeader bool, mimeType string
 	return nil
 }
 
-func extractNamespaceVars(context map[string]interface{}) map[string]formats.Namespace {
+// ExtractNamespaceVars finds all Namespace values in the eval context.
+func ExtractNamespaceVars(context map[string]interface{}) map[string]formats.Namespace {
 	if context == nil {
 		return nil
 	}
@@ -491,7 +492,8 @@ func extractNamespaceVars(context map[string]interface{}) map[string]formats.Nam
 	return vars
 }
 
-func applyXMLOutputOptions(opts *formats.XMLOutputOptions, raw map[string]string) error {
+// ApplyXMLOutputOptions applies raw string options to XMLOutputOptions.
+func ApplyXMLOutputOptions(opts *formats.XMLOutputOptions, raw map[string]string) error {
 	for key, value := range raw {
 		switch strings.ToLower(strings.TrimSpace(key)) {
 		case "writedeclaration":
