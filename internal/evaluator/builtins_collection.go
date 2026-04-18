@@ -81,12 +81,12 @@ func callBuiltinUnique(args []interface{}, e *ast.CallExpr) (interface{}, error)
 		return nil, newPosError(fmt.Sprintf("unique: expected array, got %T", args[0]), e.Pos())
 	}
 
-	// Use a map to track seen values
+	// Use a map to track seen values, including type to distinguish different types with same string representation
 	seen := make(map[string]bool)
 	result := make([]interface{}, 0, len(arr))
 
 	for _, item := range arr {
-		key := fmt.Sprintf("%v", item)
+		key := fmt.Sprintf("%T:%v", item, item)
 		if !seen[key] {
 			seen[key] = true
 			result = append(result, item)

@@ -199,6 +199,20 @@ Feature: Core Collection Functions
     When I run the application and it fails
     Then the output should contain "unique: argument 1 expected array, got string"
 
+  Scenario: unique distinguishes different types with same string representation
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      unique([1, "1", true, "true", null, 2, "1", 1])
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,"1",true,"true",null,2]
+      """
+
   # reverse tests
   Scenario: reverse basic usage
     Given the following input content:
