@@ -44,7 +44,7 @@ func callBuiltinDaysBetween(args []interface{}, e *ast.CallExpr) (interface{}, e
 
 	// Calculate days between
 	diff := date1.Sub(date2)
-	days := diff.Hours() / HoursPerDay
+	days := diff.Hours() / 24
 
 	return math.Round(days), nil
 }
@@ -74,7 +74,7 @@ func callBuiltinIsLeapYear(args []interface{}, e *ast.CallExpr) (interface{}, er
 		return nil, newPosError(fmt.Sprintf("isLeapYear expects a date string or integer year, got %T", args[0]), e.Pos())
 	}
 
-	isLeap := (year%LeapYearDivisor4 == 0 && year%LeapYearDivisor100 != 0) || (year%LeapYearDivisor400 == 0)
+	isLeap := (year%4 == 0 && year%100 != 0) || (year%400 == 0)
 
 	return isLeap, nil
 }
@@ -323,7 +323,7 @@ func callBuiltinAtBeginningOfMonth(args []interface{}, e *ast.CallExpr) (interfa
 		return nil, newPosError(fmt.Sprintf("atBeginningOfMonth: %s", err), e.Pos())
 	}
 
-	result := time.Date(t.Year(), t.Month(), FirstDayOfMonth, 0, 0, 0, 0, t.Location())
+	result := time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
 	return result.Format(time.RFC3339), nil
 }
 
@@ -355,7 +355,7 @@ func callBuiltinAtBeginningOfYear(args []interface{}, e *ast.CallExpr) (interfac
 		return nil, newPosError(fmt.Sprintf("atBeginningOfYear: %s", err), e.Pos())
 	}
 
-	result := time.Date(t.Year(), time.Month(FirstMonthOfYear), FirstDayOfMonth, 0, 0, 0, 0, t.Location())
+	result := time.Date(t.Year(), time.January, 1, 0, 0, 0, 0, t.Location())
 	return result.Format(time.RFC3339), nil
 }
 
@@ -377,8 +377,8 @@ func callBuiltinDayOfWeek(args []interface{}, e *ast.CallExpr) (interface{}, err
 	// Go's Weekday(): Sunday = 0, Monday = 1, ..., Saturday = 6
 	// DataWeave convention: Monday = 1, Tuesday = 2, ..., Sunday = 7
 	weekday := int(t.Weekday())
-	if weekday == SundayWeekday {
-		weekday = DaysInWeek
+	if weekday == 0 {
+		weekday = 7
 	}
 	return float64(weekday), nil
 }

@@ -120,7 +120,7 @@ func beBlank() Matcher {
 		}
 		// Check if string is empty or only whitespace
 		for _, ch := range str {
-			if ch > SpaceCharacter {
+			if ch > ' ' {
 				return &MatcherResult{Success: false, Message: fmt.Sprintf("expected blank string, got %q", str)}
 			}
 		}

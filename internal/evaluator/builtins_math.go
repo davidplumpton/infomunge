@@ -299,7 +299,7 @@ func callBuiltinIsEven(args []interface{}, e *ast.CallExpr) (interface{}, error)
 		return nil, newPosError(fmt.Sprintf("isEven expects an integer, got %T", args[0]), e.Pos())
 	}
 
-	return num%ParityDivisor == 0, nil
+	return num%2 == 0, nil
 }
 
 // callBuiltinIsOdd implements the isOdd(value) function.
@@ -324,7 +324,7 @@ func callBuiltinIsOdd(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 		return nil, newPosError(fmt.Sprintf("isOdd expects an integer, got %T", args[0]), e.Pos())
 	}
 
-	return num%ParityDivisor != 0, nil
+	return num%2 != 0, nil
 }
 
 // callBuiltinRandom implements the random() function.

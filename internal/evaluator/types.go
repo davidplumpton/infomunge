@@ -513,11 +513,11 @@ func formatNumber(num float64, pattern string) string {
 		intPart = -intPart
 	}
 
-	intStr := strconv.FormatInt(intPart, DecimalBase)
+	intStr := strconv.FormatInt(intPart, 10)
 
 	if useThousandsSep {
 		for i, ch := range intStr {
-			if i > 0 && (len(intStr)-i)%ThousandsSeparatorGroupSize == 0 {
+			if i > 0 && (len(intStr)-i)%3 == 0 {
 				result.WriteRune(',')
 			}
 			result.WriteRune(ch)
@@ -528,7 +528,7 @@ func formatNumber(num float64, pattern string) string {
 
 	if decimals > 0 {
 		result.WriteString(".")
-		fracStr := strconv.FormatFloat(fracPart, 'f', decimals, FloatBitSize)
+		fracStr := strconv.FormatFloat(fracPart, 'f', decimals, 64)
 		if len(fracStr) > 2 {
 			result.WriteString(fracStr[2:])
 		} else {
@@ -561,11 +561,11 @@ func coerceToNumber(value Value, pos token.Pos) (Value, error) {
 		return nil, newCoercionError(v, "Number", pos)
 	case bool:
 		if v {
-			return BoolTrueAsInt, nil
+			return 1, nil
 		}
-		return BoolFalseAsInt, nil
+		return 0, nil
 	case nil:
-		return BoolFalseAsInt, nil
+		return 0, nil
 	default:
 		return nil, newCoercionTypeError(value, "Number", pos)
 	}
@@ -605,7 +605,7 @@ func ParseNumericLiteral(s string) (Value, bool) {
 		}
 	}
 
-	if fv, err := strconv.ParseFloat(s, FloatBitSize); err == nil {
+	if fv, err := strconv.ParseFloat(s, 64); err == nil {
 		return fv, true
 	}
 
