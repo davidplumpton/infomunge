@@ -292,7 +292,7 @@ func parseFunDeclSource(lines []string, start int) (*parsedFunDecl, error) {
 
 	// If body is complete on one line (non-empty and balanced delimiters), build immediately
 	if bodyStr != "" {
-		strippedBody := stripSingleLineComment(bodyStr)
+		strippedBody := preprocessor.StripSingleLineComment(bodyStr)
 		if strings.TrimSpace(strippedBody) != "" && isDelimiterBalanced(strippedBody) {
 			return &parsedFunDecl{
 				fnName:   fnName,
@@ -325,7 +325,7 @@ func parseFunDeclSource(lines []string, start int) (*parsedFunDecl, error) {
 		if isDirectiveLine(trimmed) {
 			candidate := strings.TrimSpace(strings.Join(bodyLines, "\n"))
 			if candidate != "" {
-				candidate = stripLineComments(candidate)
+				candidate = preprocessor.StripLineComments(candidate)
 				if isDelimiterBalanced(candidate) {
 					break
 				}
@@ -336,7 +336,7 @@ func parseFunDeclSource(lines []string, start int) (*parsedFunDecl, error) {
 	}
 
 	bodyStr = strings.TrimSpace(strings.Join(bodyLines, "\n"))
-	bodyStr = stripLineComments(bodyStr)
+	bodyStr = preprocessor.StripLineComments(bodyStr)
 	return &parsedFunDecl{
 		fnName:   fnName,
 		params:   params,
@@ -431,59 +431,6 @@ func isDelimiterBalanced(s string) bool {
 	return sc.Depth() == 0
 }
 
-// stripLineComments removes // line comments from each line of the body,
-// respecting string literals. Line count is preserved for diagnostics.
-func stripLineComments(body string) string {
-	lines := strings.Split(body, "\n")
-	result := make([]string, 0, len(lines))
-	for _, line := range lines {
-		stripped := stripSingleLineComment(line)
-		result = append(result, stripped)
-	}
-	return strings.Join(result, "\n")
-}
-
-// stripSingleLineComment removes a // comment from a single line, respecting string literals.
-func stripSingleLineComment(line string) string {
-	inString := false
-	stringChar := byte(0)
-	escaped := false
-
-	for i := 0; i < len(line); i++ {
-		ch := line[i]
-		if escaped {
-			escaped = false
-			continue
-		}
-		if ch == '\\' && inString {
-			escaped = true
-			continue
-		}
-		if !inString && (ch == '"' || ch == '\'') {
-			inString = true
-			stringChar = ch
-			continue
-		}
-		if inString && ch == stringChar {
-			inString = false
-			continue
-		}
-		if !inString && ch == '/' {
-			if i+1 < len(line) && line[i+1] == '/' {
-				return line[:i] + strings.Repeat(" ", len(line)-i)
-			}
-			if preprocessor.IsRegexContext(line, i) {
-				regexEnd, _, _ := preprocessor.ParseRegexLiteral(line, i)
-				if regexEnd > i {
-					i = regexEnd - 1
-					continue
-				}
-			}
-		}
-	}
-	return line
-}
-
 // parseFunDecl parses a function declaration line like "fun toUser(user) = {firstName: user.name}"
 // and returns a Lambda. If env is non-nil, it's attached to the Lambda for module-local scope.
 func parseFunDecl(trimmedLine string, env map[string]interface{}) (*evaluator.Lambda, string, error) {
@@ -492,7 +439,7 @@ func parseFunDecl(trimmedLine string, env map[string]interface{}) (*evaluator.La
 		return nil, "", err
 	}
 
-	bodyStr = stripSingleLineComment(bodyStr)
+	bodyStr = preprocessor.StripSingleLineComment(bodyStr)
 	fn, err := buildFunLambda(params, bodyStr, env, nil)
 	if err != nil {
 		return nil, "", err

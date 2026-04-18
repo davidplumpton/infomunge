@@ -33,7 +33,7 @@ type Options struct {
 func PrepareForParsing(body string, opts Options) (string, []int, error) {
 	// Strip // line comments before any other processing, since the Go
 	// expression parser does not support them.
-	body = stripLineComments(body)
+	body = StripLineComments(body)
 
 	// Process regex literals first, before any other transformations,
 	// to prevent /[a-z]+/ from being interpreted as an array literal.
@@ -309,21 +309,21 @@ func (r *rewriter) RewriteWithDepth(depth int) (string, []int, error) {
 	return result, r.mapping, nil
 }
 
-// stripLineComments removes // line comments from each line, respecting
+// StripLineComments removes // line comments from each line, respecting
 // string literals. Line count is preserved for diagnostics.
-func stripLineComments(body string) string {
+func StripLineComments(body string) string {
 	lines := strings.Split(body, "\n")
 	result := make([]string, 0, len(lines))
 	for _, line := range lines {
-		stripped := stripSingleLineComment(line)
+		stripped := StripSingleLineComment(line)
 		result = append(result, stripped)
 	}
 	return strings.Join(result, "\n")
 }
 
-// stripSingleLineComment removes a // comment from a single line,
+// StripSingleLineComment removes a // comment from a single line,
 // respecting string literals.
-func stripSingleLineComment(line string) string {
+func StripSingleLineComment(line string) string {
 	var sc ScanState
 
 	for i := 0; i < len(line); i++ {
