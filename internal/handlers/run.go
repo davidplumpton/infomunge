@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/evaluator"
 	inputio "infomunge/internal/io"
 	"infomunge/internal/runner"
 	"infomunge/pkg/formats"
@@ -83,12 +84,12 @@ func NormalizeMimeType(format string, label string) (string, error) {
 }
 
 // BuildRunContext parses named inputs into an evaluation context map.
-func BuildRunContext(inputs []RunInput) (map[string]interface{}, error) {
+func BuildRunContext(inputs []RunInput) (evaluator.Context, error) {
 	if len(inputs) > maxRunInputs {
 		return nil, unifiederrors.ValidationErrorf("too many inputs: maximum %d", maxRunInputs)
 	}
 
-	context := make(map[string]interface{})
+	context := make(evaluator.Context)
 	for _, input := range inputs {
 		name, err := inputio.NormalizeAndValidateInputName(input.Name)
 		if err != nil {
@@ -114,7 +115,7 @@ func BuildRunContext(inputs []RunInput) (map[string]interface{}, error) {
 }
 
 // FormatRunResult formats the evaluation result into the appropriate output string.
-func FormatRunResult(result interface{}, mimeType string, evalCtx map[string]interface{}) (string, error) {
+func FormatRunResult(result evaluator.Value, mimeType string, evalCtx evaluator.Context) (string, error) {
 	if mimeType == "application/xml" {
 		var nsMap map[string]string
 		if namespaces, ok := evalCtx[runner.ContextKeyNamespaces].(map[string]string); ok {

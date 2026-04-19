@@ -257,7 +257,7 @@ func coerceToNamespace(value Value, pos token.Pos) (Value, error) {
 	switch v := value.(type) {
 	case formats.Namespace:
 		return v, nil
-	case map[string]interface{}:
+	case Object:
 		uriVal, ok := v["uri"]
 		if !ok {
 			return nil, newPosError("Namespace requires a uri field", pos)

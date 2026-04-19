@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"infomunge/internal/evaluator"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,8 +12,8 @@ func TestRunString(t *testing.T) {
 	tests := []struct {
 		name     string
 		script   string
-		context  map[string]interface{}
-		want     interface{}
+		context  evaluator.Context
+		want     evaluator.Value
 		wantErr  bool
 		errMatch string
 	}{
@@ -29,13 +30,13 @@ func TestRunString(t *testing.T) {
 		{
 			name:    "with context variable",
 			script:  "%im 0.1\noutput application/json\n---\npayload.value",
-			context: map[string]interface{}{"payload": map[string]interface{}{"value": 42}},
+			context: evaluator.Object{"payload": evaluator.Object{"value": 42}},
 			want:    42,
 		},
 		{
 			name:   "array map",
 			script: "%im 0.1\noutput application/json\n---\n[1, 2, 3] map $ * 2",
-			want:   []interface{}{2, 4, 6},
+			want:   evaluator.Array{2, 4, 6},
 		},
 		{
 			name:   "function declaration",
@@ -56,7 +57,7 @@ func TestRunString(t *testing.T) {
 		{
 			name:   "single-line script",
 			script: `%im 0.1 var myObject = { user : "a" } output application/json --- { myObjectExample : myObject.user }`,
-			want:   map[string]interface{}{"myObjectExample": "a"},
+			want:   evaluator.Object{"myObjectExample": "a"},
 		},
 		{
 			name:   "single-line with function",
@@ -105,8 +106,8 @@ func TestParseVarDecl(t *testing.T) {
 		name     string
 		line     string
 		trimmed  string
-		context  map[string]interface{}
-		wantVal  interface{}
+		context  evaluator.Context
+		wantVal  evaluator.Value
 		wantName string
 		wantErr  bool
 		errMatch string
@@ -115,7 +116,7 @@ func TestParseVarDecl(t *testing.T) {
 			name:     "simple integer",
 			line:     "var x = 42",
 			trimmed:  "var x = 42",
-			context:  make(map[string]interface{}),
+			context:  make(evaluator.Context),
 			wantVal:  42,
 			wantName: "x",
 		},
@@ -123,7 +124,7 @@ func TestParseVarDecl(t *testing.T) {
 			name:     "string value",
 			line:     "var name = \"hello\"",
 			trimmed:  "var name = \"hello\"",
-			context:  make(map[string]interface{}),
+			context:  make(evaluator.Context),
 			wantVal:  "hello",
 			wantName: "name",
 		},
@@ -131,7 +132,7 @@ func TestParseVarDecl(t *testing.T) {
 			name:     "expression value",
 			line:     "var result = 10 + 5",
 			trimmed:  "var result = 10 + 5",
-			context:  make(map[string]interface{}),
+			context:  make(evaluator.Context),
 			wantVal:  15,
 			wantName: "result",
 		},
@@ -139,7 +140,7 @@ func TestParseVarDecl(t *testing.T) {
 			name:     "using context",
 			line:     "var doubled = x * 2",
 			trimmed:  "var doubled = x * 2",
-			context:  map[string]interface{}{"x": 5},
+			context:  evaluator.Object{"x": 5},
 			wantVal:  10,
 			wantName: "doubled",
 		},
@@ -147,15 +148,15 @@ func TestParseVarDecl(t *testing.T) {
 			name:     "array value",
 			line:     "var arr = [1, 2, 3]",
 			trimmed:  "var arr = [1, 2, 3]",
-			context:  make(map[string]interface{}),
-			wantVal:  []interface{}{1, 2, 3},
+			context:  make(evaluator.Context),
+			wantVal:  evaluator.Array{1, 2, 3},
 			wantName: "arr",
 		},
 		{
 			name:     "missing equals sign",
 			line:     "var x",
 			trimmed:  "var x",
-			context:  make(map[string]interface{}),
+			context:  make(evaluator.Context),
 			wantErr:  true,
 			errMatch: "missing '='",
 		},
@@ -319,7 +320,7 @@ func TestParseTypeDecl(t *testing.T) {
 		line      string
 		wantName  string
 		wantBase  string
-		wantProps map[string]interface{}
+		wantProps evaluator.Object
 		wantErr   bool
 		errMatch  string
 	}{
@@ -334,7 +335,7 @@ func TestParseTypeDecl(t *testing.T) {
 			line:      `type Currency = String { format: "##.00" }`,
 			wantName:  "Currency",
 			wantBase:  "String",
-			wantProps: map[string]interface{}{"format": "##.00"},
+			wantProps: evaluator.Object{"format": "##.00"},
 		},
 		{
 			name:     "missing equals",
@@ -736,7 +737,7 @@ func TestParsePropertyValue(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
-		want    interface{}
+		want    evaluator.Value
 		wantErr bool
 	}{
 		{name: "string", input: `"hello"`, want: "hello"},
@@ -832,7 +833,7 @@ func findSubstring(s, substr string) bool {
 	return false
 }
 
-func deepEqual(a, b interface{}) bool {
+func deepEqual(a, b evaluator.Value) bool {
 	if a == nil && b == nil {
 		return true
 	}
@@ -841,8 +842,8 @@ func deepEqual(a, b interface{}) bool {
 	}
 
 	switch va := a.(type) {
-	case []interface{}:
-		vb, ok := b.([]interface{})
+	case evaluator.Array:
+		vb, ok := b.(evaluator.Array)
 		if !ok || len(va) != len(vb) {
 			return false
 		}
@@ -852,8 +853,8 @@ func deepEqual(a, b interface{}) bool {
 			}
 		}
 		return true
-	case map[string]interface{}:
-		vb, ok := b.(map[string]interface{})
+	case evaluator.Object:
+		vb, ok := b.(evaluator.Object)
 		if !ok || len(va) != len(vb) {
 			return false
 		}

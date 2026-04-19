@@ -13,7 +13,7 @@ func parseModuleContent(content string, loader *ModuleLoader) (Namespace, error)
 
 	ns := make(Namespace)
 	// For evaluation within the module, we need a raw map
-	rawNs := make(map[string]interface{})
+	rawNs := make(evaluator.Context)
 	lines := strings.Split(content, "\n")
 	offset := 0
 
@@ -100,7 +100,7 @@ func parseModuleContent(content string, loader *ModuleLoader) (Namespace, error)
 }
 
 // inferNamespaceEntry creates a NamespaceEntry by inspecting the value's type.
-func inferNamespaceEntry(v interface{}) NamespaceEntry {
+func inferNamespaceEntry(v evaluator.Value) NamespaceEntry {
 	switch val := v.(type) {
 	case *evaluator.Lambda:
 		return NewFuncEntry(val)

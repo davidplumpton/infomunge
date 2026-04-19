@@ -6,8 +6,8 @@ import (
 )
 
 // callNoArgMatcher creates a wrapper for matchers that take no arguments
-func callNoArgMatcher(name string, matcherFunc func() Matcher) func([]interface{}, *ast.CallExpr) (interface{}, error) {
-	return func(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callNoArgMatcher(name string, matcherFunc func() Matcher) func([]Value, *ast.CallExpr) (Value, error) {
+	return func(args []Value, e *ast.CallExpr) (Value, error) {
 		if len(args) != 0 {
 			return nil, newPosError(fmt.Sprintf("%s() takes no arguments", name), e.Pos())
 		}
@@ -16,47 +16,47 @@ func callNoArgMatcher(name string, matcherFunc func() Matcher) func([]interface{
 }
 
 // callBeArray creates a type matcher for arrays
-func callBeArray(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBeArray(args []Value, e *ast.CallExpr) (Value, error) {
 	return callNoArgMatcher("beArray", beArray)(args, e)
 }
 
 // callBeObject creates a type matcher for objects
-func callBeObject(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBeObject(args []Value, e *ast.CallExpr) (Value, error) {
 	return callNoArgMatcher("beObject", beObject)(args, e)
 }
 
 // callBeString creates a type matcher for strings
-func callBeString(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBeString(args []Value, e *ast.CallExpr) (Value, error) {
 	return callNoArgMatcher("beString", beString)(args, e)
 }
 
 // callBeNumber creates a type matcher for numbers
-func callBeNumber(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBeNumber(args []Value, e *ast.CallExpr) (Value, error) {
 	return callNoArgMatcher("beNumber", beNumber)(args, e)
 }
 
 // callBeBoolean creates a type matcher for booleans
-func callBeBoolean(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBeBoolean(args []Value, e *ast.CallExpr) (Value, error) {
 	return callNoArgMatcher("beBoolean", beBoolean)(args, e)
 }
 
 // callBeNull creates a type matcher for null
-func callBeNull(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBeNull(args []Value, e *ast.CallExpr) (Value, error) {
 	return callNoArgMatcher("beNull", beNull)(args, e)
 }
 
 // callBeEmpty creates a matcher for empty values
-func callBeEmpty(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBeEmpty(args []Value, e *ast.CallExpr) (Value, error) {
 	return callNoArgMatcher("beEmpty", beEmpty)(args, e)
 }
 
 // callBeBlank creates a matcher for blank strings
-func callBeBlank(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBeBlank(args []Value, e *ast.CallExpr) (Value, error) {
 	return callNoArgMatcher("beBlank", beBlank)(args, e)
 }
 
 // callEqualTo creates an equality matcher
-func callEqualTo(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callEqualTo(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("equalTo() requires exactly 1 argument", e.Pos())
 	}
@@ -64,7 +64,7 @@ func callEqualTo(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBeGreaterThan creates a greater-than matcher
-func callBeGreaterThan(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBeGreaterThan(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 1 || len(args) > 2 {
 		return nil, newPosError("beGreaterThan() requires 1 or 2 arguments", e.Pos())
 	}
@@ -80,7 +80,7 @@ func callBeGreaterThan(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBeLowerThan creates a less-than matcher
-func callBeLowerThan(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBeLowerThan(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 1 || len(args) > 2 {
 		return nil, newPosError("beLowerThan() requires 1 or 2 arguments", e.Pos())
 	}
@@ -96,11 +96,11 @@ func callBeLowerThan(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBeOneOf creates a one-of matcher
-func callBeOneOf(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBeOneOf(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("beOneOf() requires exactly 1 argument (array of options)", e.Pos())
 	}
-	options, ok := args[0].([]interface{})
+	options, ok := args[0].(Array)
 	if !ok {
 		return nil, newPosError("beOneOf() argument must be an array", e.Pos())
 	}
@@ -108,8 +108,8 @@ func callBeOneOf(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callStringMatcher creates a wrapper for string argument matchers
-func callStringMatcher(name string, matcherFunc func(string) Matcher) func([]interface{}, *ast.CallExpr) (interface{}, error) {
-	return func(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callStringMatcher(name string, matcherFunc func(string) Matcher) func([]Value, *ast.CallExpr) (Value, error) {
+	return func(args []Value, e *ast.CallExpr) (Value, error) {
 		if len(args) != 1 {
 			return nil, newPosError(fmt.Sprintf("%s() requires exactly 1 argument", name), e.Pos())
 		}
@@ -122,12 +122,12 @@ func callStringMatcher(name string, matcherFunc func(string) Matcher) func([]int
 }
 
 // callContainStr creates a string contains matcher
-func callContainStr(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callContainStr(args []Value, e *ast.CallExpr) (Value, error) {
 	return callStringMatcher("containStr", containString)(args, e)
 }
 
 // callContainVal creates an array contains matcher
-func callContainVal(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callContainVal(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("containVal() requires exactly 1 argument", e.Pos())
 	}
@@ -135,17 +135,17 @@ func callContainVal(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callStartWith creates a string prefix matcher
-func callStartWith(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callStartWith(args []Value, e *ast.CallExpr) (Value, error) {
 	return callStringMatcher("startWith", startWith)(args, e)
 }
 
 // callEndWith creates a string suffix matcher
-func callEndWith(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callEndWith(args []Value, e *ast.CallExpr) (Value, error) {
 	return callStringMatcher("endWith", endWith)(args, e)
 }
 
 // callHaveSize creates a size matcher
-func callHaveSize(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callHaveSize(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("haveSize() requires exactly 1 argument", e.Pos())
 	}
@@ -161,7 +161,7 @@ func callHaveSize(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callHaveKey creates a key matcher
-func callHaveKey(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callHaveKey(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("haveKey() requires exactly 1 argument", e.Pos())
 	}
@@ -173,7 +173,7 @@ func callHaveKey(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callHaveValue creates a value matcher
-func callHaveValue(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callHaveValue(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("haveValue() requires exactly 1 argument", e.Pos())
 	}
@@ -181,7 +181,7 @@ func callHaveValue(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callNotBeNull creates a not-null matcher
-func callNotBeNull(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callNotBeNull(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 0 {
 		return nil, newPosError("notBeNull() takes no arguments", e.Pos())
 	}
@@ -190,7 +190,7 @@ func callNotBeNull(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callMust implements the must(value, matcher(s)) function
 // It can take 2 arguments (value, matcher) or (value, array of matchers)
-func callMust(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callMust(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) < 2 || len(e.Args) > 2 {
 		return nil, newPosError("must() requires exactly 2 arguments: value and matcher(s)", e.Pos())
 	}
@@ -212,7 +212,7 @@ func callMust(e *ast.CallExpr, context map[string]interface{}, depth int) (inter
 	switch m := matcherArg.(type) {
 	case Matcher:
 		matchers = []Matcher{m}
-	case []interface{}:
+	case Array:
 		// Array of matchers
 		for i, item := range m {
 			matcher, ok := item.(Matcher)
@@ -238,7 +238,7 @@ func callMust(e *ast.CallExpr, context map[string]interface{}, depth int) (inter
 }
 
 // callEachItemMatcher implements the eachItem(matcher) function
-func callEachItemMatcher(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callEachItemMatcher(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("eachItem() requires exactly 1 argument (matcher)", e.Pos())
 	}
@@ -258,7 +258,7 @@ func callEachItemMatcher(e *ast.CallExpr, context map[string]interface{}, depth 
 }
 
 // callHaveItemMatcher implements the haveItem(matcher) function
-func callHaveItemMatcher(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callHaveItemMatcher(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("haveItem() requires exactly 1 argument (matcher)", e.Pos())
 	}
@@ -278,7 +278,7 @@ func callHaveItemMatcher(e *ast.CallExpr, context map[string]interface{}, depth 
 }
 
 // callAnyOfMatcher implements the anyOf(matchers) function
-func callAnyOfMatcher(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callAnyOfMatcher(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("anyOf() requires exactly 1 argument (array of matchers)", e.Pos())
 	}
@@ -289,7 +289,7 @@ func callAnyOfMatcher(e *ast.CallExpr, context map[string]interface{}, depth int
 		return nil, err
 	}
 
-	matchersArray, ok := matchersArg.([]interface{})
+	matchersArray, ok := matchersArg.(Array)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("expected array of matchers, got %T", matchersArg), e.Args[0].Pos())
 	}
@@ -307,7 +307,7 @@ func callAnyOfMatcher(e *ast.CallExpr, context map[string]interface{}, depth int
 }
 
 // callNotBeMatcher implements the notBe(matcher) function
-func callNotBeMatcher(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callNotBeMatcher(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("notBe() requires exactly 1 argument (matcher)", e.Pos())
 	}

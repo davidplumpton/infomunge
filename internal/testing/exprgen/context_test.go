@@ -13,7 +13,7 @@ import (
 )
 
 // evalWithContext evaluates an infomunge expression with the given context.
-func evalWithContext(expr string, ctx map[string]interface{}) (interface{}, error) {
+func evalWithContext(expr string, ctx evaluator.Context) (evaluator.Value, error) {
 	prepared, mapping, err := preprocessor.PrepareForParsing(expr, preprocessor.Options{})
 	if err != nil {
 		return nil, err
@@ -49,8 +49,8 @@ func TestSampleContext_PayloadIsObject(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tc := exprgen.SampleContext().Draw(t, "ctx")
 		payload := tc.Value["payload"]
-		if _, ok := payload.(map[string]interface{}); !ok {
-			t.Fatalf("SampleContext payload is %T, want map[string]interface{}", payload)
+		if _, ok := payload.(evaluator.Object); !ok {
+			t.Fatalf("SampleContext payload is %T, want evaluator.Object", payload)
 		}
 	})
 }
@@ -58,7 +58,7 @@ func TestSampleContext_PayloadIsObject(t *testing.T) {
 func TestSampleContext_FieldsMatchPayload(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tc := exprgen.SampleContext().Draw(t, "ctx")
-		payload := tc.Value["payload"].(map[string]interface{})
+		payload := tc.Value["payload"].(evaluator.Object)
 		if len(tc.Fields) != len(payload) {
 			t.Fatalf("Fields count %d != payload keys %d", len(tc.Fields), len(payload))
 		}
@@ -98,7 +98,7 @@ func TestSampleContext_ProducesVariety(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		rapid.Check(t, func(t *rapid.T) {
 			tc := exprgen.SampleContext().Draw(t, "ctx")
-			payload := tc.Value["payload"].(map[string]interface{})
+			payload := tc.Value["payload"].(evaluator.Object)
 			for _, v := range payload {
 				switch val := v.(type) {
 				case string:
@@ -109,11 +109,11 @@ func TestSampleContext_ProducesVariety(t *testing.T) {
 					sawBool = true
 				case nil:
 					sawNull = true
-				case map[string]interface{}:
+				case evaluator.Object:
 					if len(val) > 0 {
 						sawNested = true
 					}
-				case []interface{}:
+				case evaluator.Array:
 					sawArray = true
 				}
 			}
@@ -219,8 +219,8 @@ func TestIdentGen_ProducesVariety(t *testing.T) {
 
 func TestSampleContext_KnownEval(t *testing.T) {
 	// Construct a known context and verify identifiers evaluate correctly.
-	ctx := map[string]interface{}{
-		"payload": map[string]interface{}{
+	ctx := evaluator.Object{
+		"payload": evaluator.Object{
 			"name": "test",
 			"age":  42,
 		},
@@ -228,7 +228,7 @@ func TestSampleContext_KnownEval(t *testing.T) {
 
 	tests := []struct {
 		expr     string
-		expected interface{}
+		expected evaluator.Value
 	}{
 		{"payload.name", "test"},
 		{"payload.age", 42},

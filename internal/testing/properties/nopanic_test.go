@@ -97,16 +97,16 @@ func drawExpression(t *rapid.T, tc exprgen.TestContext) string {
 }
 
 func TestEvaluate_DeterministicLambdaResults(t *testing.T) {
-	ctx := map[string]interface{}{
-		"payload": map[string]interface{}{
+	ctx := evaluator.Object{
+		"payload": evaluator.Object{
 			"active":  true,
 			"address": 7,
 			"age":     true,
-			"name":    []interface{}{-230},
+			"name":    evaluator.Array{-230},
 			"score":   false,
-			"tags": map[string]interface{}{
+			"tags": evaluator.Object{
 				"age": "c",
-				"name": map[string]interface{}{
+				"name": evaluator.Object{
 					"active": true,
 					"age":    "dwho",
 					"name":   false,
@@ -136,7 +136,7 @@ func TestEvaluate_DeterministicLambdaResults(t *testing.T) {
 	}
 }
 
-func evalWithContext(expr string, ctx map[string]interface{}) (interface{}, error) {
+func evalWithContext(expr string, ctx evaluator.Context) (evaluator.Value, error) {
 	prepared, mapping, err := preprocessor.PrepareForParsing(expr, preprocessor.Options{})
 	if err != nil {
 		return nil, err
@@ -144,7 +144,7 @@ func evalWithContext(expr string, ctx map[string]interface{}) (interface{}, erro
 	return evaluator.Evaluate(prepared, ctx, mapping, 0, expr)
 }
 
-func safeEval(expr string, ctx map[string]interface{}) (result interface{}, err error, panicValue interface{}, panicStack string) {
+func safeEval(expr string, ctx evaluator.Context) (result evaluator.Value, err error, panicValue interface{}, panicStack string) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			panicValue = recovered

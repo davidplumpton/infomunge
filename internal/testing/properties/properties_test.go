@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"testing"
 
+	"infomunge/internal/evaluator"
 	"infomunge/internal/runner"
 	"infomunge/internal/testing/exprgen"
 	"infomunge/internal/testing/testbudget"
@@ -184,7 +185,7 @@ func TestStringOperationProperties(t *testing.T) {
 	})
 }
 
-func evalExpr(expr string) (interface{}, error) {
+func evalExpr(expr string) (evaluator.Value, error) {
 	return runner.RunString(exprgen.WrapScript(expr), nil)
 }
 

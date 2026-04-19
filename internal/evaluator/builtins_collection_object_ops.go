@@ -8,7 +8,7 @@ import (
 )
 
 // callBuiltinObjectToArray implements the objectToArray(object) function.
-func callBuiltinObjectToArray(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinObjectToArray(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("objectToArray requires exactly 1 argument: object", e.Pos())
 	}
@@ -16,7 +16,7 @@ func callBuiltinObjectToArray(args []interface{}, e *ast.CallExpr) (interface{},
 	if err := assertArg(args[0], beObject(), 1, "objectToArray", e); err != nil {
 		return nil, err
 	}
-	obj, ok := args[0].(map[string]interface{})
+	obj, ok := args[0].(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("objectToArray: expected object, got %T", args[0]), e.Pos())
 	}
@@ -27,9 +27,9 @@ func callBuiltinObjectToArray(args []interface{}, e *ast.CallExpr) (interface{},
 	}
 	sort.Strings(keys)
 
-	result := make([]interface{}, len(keys))
+	result := make(Array, len(keys))
 	for i, k := range keys {
-		result[i] = map[string]interface{}{
+		result[i] = Object{
 			"key":   k,
 			"value": obj[k],
 		}
@@ -39,7 +39,7 @@ func callBuiltinObjectToArray(args []interface{}, e *ast.CallExpr) (interface{},
 }
 
 // callBuiltinArrayToObject implements the arrayToObject(array) function.
-func callBuiltinArrayToObject(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinArrayToObject(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("arrayToObject requires exactly 1 argument: array", e.Pos())
 	}
@@ -47,14 +47,14 @@ func callBuiltinArrayToObject(args []interface{}, e *ast.CallExpr) (interface{},
 	if err := assertArg(args[0], beArray(), 1, "arrayToObject", e); err != nil {
 		return nil, err
 	}
-	arr, ok := args[0].([]interface{})
+	arr, ok := args[0].(Array)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("arrayToObject: expected array, got %T", args[0]), e.Pos())
 	}
 
-	result := make(map[string]interface{}, len(arr))
+	result := make(Object, len(arr))
 	for i, item := range arr {
-		entry, ok := item.(map[string]interface{})
+		entry, ok := item.(Object)
 		if !ok {
 			return nil, newPosError(fmt.Sprintf("arrayToObject: expected object at index %d, got %T", i, item), e.Pos())
 		}
@@ -80,7 +80,7 @@ func callBuiltinArrayToObject(args []interface{}, e *ast.CallExpr) (interface{},
 }
 
 // callBuiltinEntriesOf implements the entriesOf(object) function.
-func callBuiltinEntriesOf(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinEntriesOf(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("entriesOf requires exactly 1 argument: object", e.Pos())
 	}
@@ -88,7 +88,7 @@ func callBuiltinEntriesOf(args []interface{}, e *ast.CallExpr) (interface{}, err
 	if err := assertArg(args[0], beObject(), 1, "entriesOf", e); err != nil {
 		return nil, err
 	}
-	obj, ok := args[0].(map[string]interface{})
+	obj, ok := args[0].(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("entriesOf: expected object, got %T", args[0]), e.Pos())
 	}
@@ -101,18 +101,18 @@ func callBuiltinEntriesOf(args []interface{}, e *ast.CallExpr) (interface{}, err
 	sort.Strings(uniqueKeys)
 
 	// Create result array of {key, value} pairs, expanding XMLMultiValue
-	result := make([]interface{}, 0)
+	result := make(Array, 0)
 	for _, k := range uniqueKeys {
 		val := obj[k]
 		if multi, ok := val.(XMLMultiValue); ok {
 			for _, v := range multi {
-				result = append(result, map[string]interface{}{
+				result = append(result, Object{
 					"key":   k,
 					"value": v,
 				})
 			}
 		} else {
-			result = append(result, map[string]interface{}{
+			result = append(result, Object{
 				"key":   k,
 				"value": val,
 			})
@@ -123,7 +123,7 @@ func callBuiltinEntriesOf(args []interface{}, e *ast.CallExpr) (interface{}, err
 }
 
 // callBuiltinKeysOf implements the keysOf(object) function.
-func callBuiltinKeysOf(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinKeysOf(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("keysOf requires exactly 1 argument: object", e.Pos())
 	}
@@ -131,7 +131,7 @@ func callBuiltinKeysOf(args []interface{}, e *ast.CallExpr) (interface{}, error)
 	if err := assertArg(args[0], beObject(), 1, "keysOf", e); err != nil {
 		return nil, err
 	}
-	obj, ok := args[0].(map[string]interface{})
+	obj, ok := args[0].(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("keysOf: expected object, got %T", args[0]), e.Pos())
 	}
@@ -144,7 +144,7 @@ func callBuiltinKeysOf(args []interface{}, e *ast.CallExpr) (interface{}, error)
 	sort.Strings(uniqueKeys)
 
 	// Convert to interface array, expanding XMLMultiValue
-	result := make([]interface{}, 0)
+	result := make(Array, 0)
 	for _, k := range uniqueKeys {
 		val := obj[k]
 		if multi, ok := val.(XMLMultiValue); ok {
@@ -160,7 +160,7 @@ func callBuiltinKeysOf(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBuiltinValuesOf implements the valuesOf(object) function.
-func callBuiltinValuesOf(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinValuesOf(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("valuesOf requires exactly 1 argument: object", e.Pos())
 	}
@@ -168,7 +168,7 @@ func callBuiltinValuesOf(args []interface{}, e *ast.CallExpr) (interface{}, erro
 	if err := assertArg(args[0], beObject(), 1, "valuesOf", e); err != nil {
 		return nil, err
 	}
-	obj, ok := args[0].(map[string]interface{})
+	obj, ok := args[0].(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("valuesOf: expected object, got %T", args[0]), e.Pos())
 	}
@@ -181,7 +181,7 @@ func callBuiltinValuesOf(args []interface{}, e *ast.CallExpr) (interface{}, erro
 	sort.Strings(uniqueKeys)
 
 	// Create result array with values in key order, expanding XMLMultiValue
-	result := make([]interface{}, 0)
+	result := make(Array, 0)
 	for _, k := range uniqueKeys {
 		val := obj[k]
 		if multi, ok := val.(XMLMultiValue); ok {
@@ -197,22 +197,22 @@ func callBuiltinValuesOf(args []interface{}, e *ast.CallExpr) (interface{}, erro
 }
 
 // callBuiltinNamesOf implements the namesOf(object) function.
-func callBuiltinNamesOf(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinNamesOf(args []Value, e *ast.CallExpr) (Value, error) {
 	return callBuiltinKeysOf(args, e)
 }
 
 // callBuiltinZip implements the zip(array1, array2) function.
-func callBuiltinZip(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinZip(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("zip requires exactly 2 arguments: array1, array2", e.Pos())
 	}
 
-	arr1, ok := args[0].([]interface{})
+	arr1, ok := args[0].(Array)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("zip expects first argument to be an array, got %T", args[0]), e.Pos())
 	}
 
-	arr2, ok := args[1].([]interface{})
+	arr2, ok := args[1].(Array)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("zip expects second argument to be an array, got %T", args[1]), e.Pos())
 	}
@@ -223,9 +223,9 @@ func callBuiltinZip(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 		minLen = len(arr2)
 	}
 
-	result := make([]interface{}, minLen)
+	result := make(Array, minLen)
 	for i := 0; i < minLen; i++ {
-		pair := []interface{}{arr1[i], arr2[i]}
+		pair := Array{arr1[i], arr2[i]}
 		result[i] = pair
 	}
 
@@ -233,7 +233,7 @@ func callBuiltinZip(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinUnzip implements the unzip(array) function.
-func callBuiltinUnzip(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinUnzip(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("unzip requires exactly 1 argument: array", e.Pos())
 	}
@@ -241,17 +241,17 @@ func callBuiltinUnzip(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 	if err := assertArg(args[0], beArray(), 1, "unzip", e); err != nil {
 		return nil, err
 	}
-	arr, ok := args[0].([]interface{})
+	arr, ok := args[0].(Array)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("unzip: expected array, got %T", args[0]), e.Pos())
 	}
 
-	arr1 := make([]interface{}, len(arr))
-	arr2 := make([]interface{}, len(arr))
+	arr1 := make(Array, len(arr))
+	arr2 := make(Array, len(arr))
 
 	for i, item := range arr {
 		// Each item should be an array with 2 elements
-		pair, ok := item.([]interface{})
+		pair, ok := item.(Array)
 		if !ok || len(pair) != 2 {
 			return nil, newPosError("unzip expects array of pairs [key, value]", e.Pos())
 		}
@@ -260,11 +260,11 @@ func callBuiltinUnzip(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 	}
 
 	// Return as array of two arrays
-	return []interface{}{arr1, arr2}, nil
+	return Array{arr1, arr2}, nil
 }
 
 // callBuiltinRange implements the range(end) function.
-func callBuiltinRange(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinRange(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("range requires exactly 1 argument: end", e.Pos())
 	}
@@ -283,7 +283,7 @@ func callBuiltinRange(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 		return nil, newPosError("range end must be non-negative", e.Pos())
 	}
 
-	result := make([]interface{}, end)
+	result := make(Array, end)
 	for i := int64(0); i < end; i++ {
 		result[i] = float64(i)
 	}
@@ -292,7 +292,7 @@ func callBuiltinRange(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 }
 
 // callBuiltinConcat implements the __concat(value1, value2, ...) function (++ operator).
-func callBuiltinConcat(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinConcat(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 2 {
 		return nil, newPosError("concat requires at least 2 arguments", e.Pos())
 	}
@@ -305,9 +305,9 @@ func callBuiltinConcat(args []interface{}, e *ast.CallExpr) (interface{}, error)
 		switch arg.(type) {
 		case string:
 			hasString = true
-		case []interface{}, XMLMultiValue:
+		case Array, XMLMultiValue:
 			hasArray = true
-		case map[string]interface{}:
+		case Object:
 			hasObject = true
 		}
 	}
@@ -340,7 +340,7 @@ func callBuiltinConcat(args []interface{}, e *ast.CallExpr) (interface{}, error)
 		for _, arr := range arrays {
 			totalLen += len(arr)
 		}
-		result := make([]interface{}, 0, totalLen)
+		result := make(Array, 0, totalLen)
 		for _, arr := range arrays {
 			result = append(result, arr...)
 		}
@@ -350,16 +350,16 @@ func callBuiltinConcat(args []interface{}, e *ast.CallExpr) (interface{}, error)
 	// Check if we're concatenating objects
 	allObjects := true
 	for _, arg := range args {
-		if _, ok := arg.(map[string]interface{}); !ok {
+		if _, ok := arg.(Object); !ok {
 			allObjects = false
 			break
 		}
 	}
 
 	if allObjects {
-		result := make(map[string]interface{})
+		result := make(Object)
 		for _, arg := range args {
-			obj, ok := arg.(map[string]interface{})
+			obj, ok := arg.(Object)
 			if !ok {
 				return nil, newPosError("cannot concatenate mixed types", e.Pos())
 			}
@@ -377,13 +377,13 @@ func callBuiltinConcat(args []interface{}, e *ast.CallExpr) (interface{}, error)
 // Supports: array -- value (remove value from array)
 //
 //	object -- [keys] (remove keys from object)
-func callBuiltinRemove(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinRemove(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("remove requires exactly 2 arguments", e.Pos())
 	}
 
 	// Case 1: object -- [keys] (remove multiple keys from object)
-	if obj, ok := args[0].(map[string]interface{}); ok {
+	if obj, ok := args[0].(Object); ok {
 		keysToRemove, ok := AsArray(args[1])
 		if !ok {
 			return nil, newPosError(fmt.Sprintf("-- operator with object expects array of keys as second argument, got %T", args[1]), e.Pos())
@@ -398,7 +398,7 @@ func callBuiltinRemove(args []interface{}, e *ast.CallExpr) (interface{}, error)
 		}
 
 		// Create result object without the specified keys
-		result := make(map[string]interface{}, len(obj))
+		result := make(Object, len(obj))
 		for k, v := range obj {
 			if !removeSet[k] {
 				result[k] = v
@@ -414,7 +414,7 @@ func callBuiltinRemove(args []interface{}, e *ast.CallExpr) (interface{}, error)
 	}
 
 	valueToRemove := args[1]
-	result := make([]interface{}, 0, len(array))
+	result := make(Array, 0, len(array))
 
 	for _, item := range array {
 		if !isEqual(item, valueToRemove) {
@@ -426,7 +426,7 @@ func callBuiltinRemove(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBuiltinWith implements the with(value, replacement) function.
-func callBuiltinWith(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinWith(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("with requires exactly 2 arguments: value and replacement", e.Pos())
 	}
@@ -436,7 +436,7 @@ func callBuiltinWith(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinXsiType implements the xsiType(typeName) function.
-func callBuiltinXsiType(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinXsiType(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("xsiType requires exactly 1 argument: typeName", e.Pos())
 	}
@@ -447,7 +447,7 @@ func callBuiltinXsiType(args []interface{}, e *ast.CallExpr) (interface{}, error
 	}
 
 	// Return an object with xsi:type property
-	result := make(map[string]interface{})
+	result := make(Object)
 	result["xsi:type"] = typeName
 	return result, nil
 }

@@ -6,8 +6,8 @@ import (
 )
 
 func TestSetValueAtPath_OutOfBoundsNonTerminalIndexReturnsError(t *testing.T) {
-	value := []interface{}{
-		[]interface{}{1.0},
+	value := Array{
+		Array{1.0},
 	}
 	path := []selectorSegment{
 		{index: 5, isIndex: true},

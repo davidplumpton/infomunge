@@ -35,7 +35,7 @@ type NamespaceEntry struct {
 }
 
 // NewVarEntry creates a NamespaceEntry for a variable.
-func NewVarEntry(value interface{}) NamespaceEntry {
+func NewVarEntry(value evaluator.Value) NamespaceEntry {
 	return NamespaceEntry{Kind: EntryVar, Value: value}
 }
 
@@ -71,8 +71,8 @@ func (e NamespaceEntry) AsTypeDef() (*evaluator.TypeDef, bool) {
 type Namespace map[string]NamespaceEntry
 
 // ToContext converts the typed namespace to a raw map for use in evaluation context.
-func (ns Namespace) ToContext() map[string]interface{} {
-	result := make(map[string]interface{}, len(ns))
+func (ns Namespace) ToContext() evaluator.Context {
+	result := make(evaluator.Context, len(ns))
 	for k, entry := range ns {
 		result[k] = entry.Value
 	}

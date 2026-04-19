@@ -8,7 +8,7 @@ import (
 )
 
 // callBuiltinTrim implements the trim(string) function.
-func callBuiltinTrim(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinTrim(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "trim requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
@@ -25,7 +25,7 @@ func callBuiltinTrim(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 // For strings, it returns the number of Unicode code points (runes), not bytes.
 // For arrays, it returns the number of elements.
 // For objects, it returns the number of keys.
-func callBuiltinLength(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinLength(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "length requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
@@ -34,9 +34,9 @@ func callBuiltinLength(args []interface{}, e *ast.CallExpr) (interface{}, error)
 	case string:
 		// Count Unicode code points (runes), not bytes
 		return utf8.RuneCountInString(v), nil
-	case []interface{}:
+	case Array:
 		return len(v), nil
-	case map[string]interface{}:
+	case Object:
 		return len(v), nil
 	case nil:
 		return 0, nil
@@ -47,7 +47,7 @@ func callBuiltinLength(args []interface{}, e *ast.CallExpr) (interface{}, error)
 
 // callBuiltinRepeat implements the repeat(string, count) function.
 // Returns the string repeated count times.
-func callBuiltinRepeat(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinRepeat(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 2, "repeat requires exactly 2 arguments: string, count", e); err != nil {
 		return nil, err
 	}
@@ -70,14 +70,14 @@ func callBuiltinRepeat(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBuiltinSplit implements the split(string, separator) function.
-func callBuiltinSplit(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinSplit(args []Value, e *ast.CallExpr) (Value, error) {
 	strs, err := assertStringArgs(args, 2, "split", e)
 	if err != nil {
 		return nil, err
 	}
 
 	parts := strings.Split(strs[0], strs[1])
-	result := make([]interface{}, len(parts))
+	result := make(Array, len(parts))
 	for i, part := range parts {
 		result[i] = part
 	}
@@ -87,7 +87,7 @@ func callBuiltinSplit(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 
 // callBuiltinSubstring implements the substring(string, start, end) function.
 // Uses rune (Unicode code point) indices, not byte indices.
-func callBuiltinSubstring(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinSubstring(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return nil, newPosError("substring requires 2 or 3 arguments: string, start[, end]", e.Pos())
 	}
@@ -127,7 +127,7 @@ func callBuiltinSubstring(args []interface{}, e *ast.CallExpr) (interface{}, err
 }
 
 // callBuiltinCharAt implements the charAt(string, index) function.
-func callBuiltinCharAt(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinCharAt(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 2, "charAt requires exactly 2 arguments: string, index", e); err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func callBuiltinCharAt(args []interface{}, e *ast.CallExpr) (interface{}, error)
 
 // callBuiltinCharCodeAt implements the charCodeAt(string, index) function.
 // Uses rune (Unicode code point) indices.
-func callBuiltinCharCodeAt(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinCharCodeAt(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 2, "charCodeAt requires exactly 2 arguments: string, index", e); err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func callBuiltinCharCodeAt(args []interface{}, e *ast.CallExpr) (interface{}, er
 }
 
 // callBuiltinFromCharCode implements the fromCharCode(code) function.
-func callBuiltinFromCharCode(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinFromCharCode(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "fromCharCode requires exactly 1 argument: code", e); err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func callBuiltinFromCharCode(args []interface{}, e *ast.CallExpr) (interface{}, 
 
 // callBuiltinIndexOf implements the indexOf(source, value) function.
 // Supports strings (substring search) and arrays (value search).
-func callBuiltinIndexOf(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinIndexOf(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 2, "indexOf requires exactly 2 arguments: source, value", e); err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func callBuiltinIndexOf(args []interface{}, e *ast.CallExpr) (interface{}, error
 			return nil, err
 		}
 		return strings.Index(source, needle), nil
-	case []interface{}:
+	case Array:
 		target := args[1]
 		for i, item := range source {
 			if isEqual(item, target) {
@@ -222,7 +222,7 @@ func callBuiltinIndexOf(args []interface{}, e *ast.CallExpr) (interface{}, error
 
 // callBuiltinLastIndexOf implements the lastIndexOf(source, value) function.
 // Supports strings (substring search) and arrays (value search).
-func callBuiltinLastIndexOf(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinLastIndexOf(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 2, "lastIndexOf requires exactly 2 arguments: source, value", e); err != nil {
 		return nil, err
 	}
@@ -234,7 +234,7 @@ func callBuiltinLastIndexOf(args []interface{}, e *ast.CallExpr) (interface{}, e
 			return nil, err
 		}
 		return strings.LastIndex(source, needle), nil
-	case []interface{}:
+	case Array:
 		target := args[1]
 		for i := len(source) - 1; i >= 0; i-- {
 			if isEqual(source[i], target) {
@@ -248,7 +248,7 @@ func callBuiltinLastIndexOf(args []interface{}, e *ast.CallExpr) (interface{}, e
 }
 
 // callBuiltinToUpper implements the toUpper(string) function.
-func callBuiltinToUpper(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinToUpper(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "toUpper requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
@@ -262,7 +262,7 @@ func callBuiltinToUpper(args []interface{}, e *ast.CallExpr) (interface{}, error
 }
 
 // callBuiltinToLower implements the toLower(string) function.
-func callBuiltinToLower(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinToLower(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "toLower requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
@@ -276,7 +276,7 @@ func callBuiltinToLower(args []interface{}, e *ast.CallExpr) (interface{}, error
 }
 
 // callBuiltinAppendIfMissing implements appendIfMissing(text, suffix).
-func callBuiltinAppendIfMissing(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinAppendIfMissing(args []Value, e *ast.CallExpr) (Value, error) {
 	strs, err := assertStringArgs(args, 2, "appendIfMissing", e)
 	if err != nil {
 		return nil, err
@@ -289,7 +289,7 @@ func callBuiltinAppendIfMissing(args []interface{}, e *ast.CallExpr) (interface{
 }
 
 // callBuiltinPrependIfMissing implements prependIfMissing(text, prefix).
-func callBuiltinPrependIfMissing(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinPrependIfMissing(args []Value, e *ast.CallExpr) (Value, error) {
 	strs, err := assertStringArgs(args, 2, "prependIfMissing", e)
 	if err != nil {
 		return nil, err

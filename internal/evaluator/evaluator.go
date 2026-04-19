@@ -250,7 +250,7 @@ func evalBasicLit(e *ast.BasicLit) (Value, error) {
 }
 
 // evalIdent evaluates identifiers (variables, constants)
-func evalIdent(e *ast.Ident, context map[string]interface{}) (interface{}, error) {
+func evalIdent(e *ast.Ident, context Context) (Value, error) {
 	switch e.Name {
 	case "true":
 		return true, nil
@@ -284,9 +284,9 @@ func add(left, right Value) (Value, error) {
 	}
 
 	// Special case: array concatenation (supports array + array)
-	if l, okL := left.([]interface{}); okL {
-		if r, okR := right.([]interface{}); okR {
-			result := make([]interface{}, 0, len(l)+len(r))
+	if l, okL := left.(Array); okL {
+		if r, okR := right.(Array); okR {
+			result := make(Array, 0, len(l)+len(r))
 			result = append(result, l...)
 			result = append(result, r...)
 			return result, nil
@@ -302,9 +302,9 @@ func add(left, right Value) (Value, error) {
 // sub performs subtraction or object key removal
 func sub(left, right Value) (Value, error) {
 	// Special case: object key removal (object - "key" → object without that key)
-	if obj, ok := left.(map[string]interface{}); ok {
+	if obj, ok := left.(Object); ok {
 		if key, ok := right.(string); ok {
-			result := make(map[string]interface{}, len(obj))
+			result := make(Object, len(obj))
 			for k, v := range obj {
 				if k != key {
 					result[k] = v
@@ -385,11 +385,11 @@ func geq(left, right Value) (Value, error) {
 
 // prepend implements the >> operator: element >> array → [element, ...array]
 func prepend(left, right Value) (Value, error) {
-	arr, ok := right.([]interface{})
+	arr, ok := right.(Array)
 	if !ok {
 		return nil, unifiederrors.EvalErrorf(">> requires array on right side, got %T", right)
 	}
-	result := make([]interface{}, 0, len(arr)+1)
+	result := make(Array, 0, len(arr)+1)
 	result = append(result, left)
 	result = append(result, arr...)
 	return result, nil
@@ -397,11 +397,11 @@ func prepend(left, right Value) (Value, error) {
 
 // arrayAppend implements the << operator: array << element → [...array, element]
 func arrayAppend(left, right Value) (Value, error) {
-	arr, ok := left.([]interface{})
+	arr, ok := left.(Array)
 	if !ok {
 		return nil, unifiederrors.EvalErrorf("<< requires array on left side, got %T", left)
 	}
-	result := make([]interface{}, 0, len(arr)+1)
+	result := make(Array, 0, len(arr)+1)
 	result = append(result, arr...)
 	result = append(result, right)
 	return result, nil
@@ -533,13 +533,13 @@ func evalIndex(obj Value, idx Value, pos token.Pos) (Value, error) {
 	}
 
 	switch v := obj.(type) {
-	case []interface{}:
+	case Array:
 		return evalArrayIndex(v, idx, pos)
 	case XMLMultiValue:
-		return evalArrayIndex([]interface{}(v), idx, pos)
+		return evalArrayIndex(Array(v), idx, pos)
 	case string:
 		return evalStringIndex(v, idx, pos)
-	case map[string]interface{}:
+	case Object:
 		return evalObjectIndex(v, idx, pos)
 	default:
 		return nil, newPosError(fmt.Sprintf("cannot index into %T", obj), pos)
@@ -547,7 +547,7 @@ func evalIndex(obj Value, idx Value, pos token.Pos) (Value, error) {
 }
 
 // getObjectValue retrieves a key from an object, with namespace fallback (# -> :).
-func getObjectValue(obj map[string]interface{}, key string) (interface{}, bool) {
+func getObjectValue(obj Object, key string) (Value, bool) {
 	if val, ok := obj[key]; ok {
 		return val, true
 	}
@@ -560,12 +560,12 @@ func getObjectValue(obj map[string]interface{}, key string) (interface{}, bool) 
 }
 
 // extractNamespaceValue returns a best-effort namespace URI for an XML-like object.
-func extractNamespaceValue(obj map[string]interface{}) interface{} {
+func extractNamespaceValue(obj Object) Value {
 	nsVal, ok := obj["@xmlns"]
 	if !ok {
 		return nil
 	}
-	nsMap, ok := nsVal.(map[string]interface{})
+	nsMap, ok := nsVal.(Object)
 	if !ok {
 		return nil
 	}
@@ -584,11 +584,11 @@ func extractNamespaceValue(obj map[string]interface{}) interface{} {
 func CoerceEquals(left, right Value) bool {
 	// Guard against uncomparable types (slices, maps) that would panic with ==.
 	switch left.(type) {
-	case []interface{}, map[string]interface{}:
+	case Array, Object:
 		return reflect.DeepEqual(left, right)
 	}
 	switch right.(type) {
-	case []interface{}, map[string]interface{}:
+	case Array, Object:
 		return reflect.DeepEqual(left, right)
 	}
 	if left == right {
@@ -624,11 +624,11 @@ func tryParseNumber(v Value) (float64, bool) {
 func numericEquals(left, right Value) bool {
 	// Handle uncomparable types (slices, maps) that would panic with ==.
 	switch left.(type) {
-	case []interface{}, map[string]interface{}:
+	case Array, Object:
 		return reflect.DeepEqual(left, right)
 	}
 	switch right.(type) {
-	case []interface{}, map[string]interface{}:
+	case Array, Object:
 		return reflect.DeepEqual(left, right)
 	}
 

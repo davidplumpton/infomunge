@@ -6,8 +6,8 @@ import (
 )
 
 func TestEvaluate_ObjectBuiltins(t *testing.T) {
-	ctx := map[string]interface{}{
-		"obj": map[string]interface{}{"a": 1, "b": 2},
+	ctx := Object{
+		"obj": Object{"a": 1, "b": 2},
 	}
 	mapping := make([]int, 500)
 	for i := range mapping {
@@ -23,19 +23,19 @@ func TestEvaluate_ObjectBuiltins(t *testing.T) {
 		{
 			"mapObject simple",
 			`mapObject(obj, __lambda("v, k", []interface{}{k + "!", v * 10}))`,
-			map[string]interface{}{"a!": 10, "b!": 20},
+			Object{"a!": 10, "b!": 20},
 			false,
 		},
 		{
 			"filterObject simple",
 			`filterObject(obj, __lambda("k, v", v > 1))`,
-			map[string]interface{}{"b": 2},
+			Object{"b": 2},
 			false,
 		},
 		{
 			"pluck on object",
 			`__pluck(obj, __lambda("v, k", k))`,
-			[]interface{}{"a", "b"},
+			Array{"a", "b"},
 			false,
 		},
 		{
@@ -47,7 +47,7 @@ func TestEvaluate_ObjectBuiltins(t *testing.T) {
 		{
 			"flatten simple",
 			`flatten([]interface{}{[]interface{}{1, 2}, []interface{}{3, 4}} )`,
-			[]interface{}{1, 2, 3, 4},
+			Array{1, 2, 3, 4},
 			false,
 		},
 		{

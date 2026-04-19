@@ -10,12 +10,12 @@ import (
 // executeLambdaOnArrayElements iterates over an array, evaluates a lambda on each element,
 // and calls a callback with the element, index, and evaluated value.
 // The callback receives (element, index, evaluatedValue) and should return an error or nil.
-type lambdaElementCallback func(elem interface{}, index int, value interface{}) error
+type lambdaElementCallback func(elem Value, index int, value Value) error
 
 func executeLambdaOnArrayElements(
-	array []interface{},
+	array Array,
 	lambda *Lambda,
-	context map[string]interface{},
+	context Context,
 	depth int,
 	callback lambdaElementCallback,
 ) error {
@@ -39,7 +39,7 @@ func executeLambdaOnArrayElements(
 }
 
 // callBuiltinFilterSelector implements DataWeave-style selector filter: source[?(expr)].
-func callBuiltinFilterSelector(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinFilterSelector(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("selector filter requires exactly 2 arguments: source, lambda", e.Pos())
 	}
@@ -61,8 +61,8 @@ func callBuiltinFilterSelector(e *ast.CallExpr, context map[string]interface{}, 
 	}
 
 	if arr, ok := AsArray(source); ok {
-		result := make([]interface{}, 0, len(arr))
-		err := executeLambdaOnArrayElements(arr, lambda, context, depth, func(elem interface{}, _ int, cond interface{}) error {
+		result := make(Array, 0, len(arr))
+		err := executeLambdaOnArrayElements(arr, lambda, context, depth, func(elem Value, _ int, cond Value) error {
 			condBool, ok := cond.(bool)
 			if !ok {
 				return newPosError(fmt.Sprintf("selector filter lambda must return a boolean, got %T", cond), e.Args[1].Pos())
@@ -92,7 +92,7 @@ func callBuiltinFilterSelector(e *ast.CallExpr, context map[string]interface{}, 
 	}
 	sort.Strings(keys)
 
-	result := make(map[string]interface{})
+	result := make(Object)
 	for idx, key := range keys {
 		val := obj[key]
 		lambdaContext := copyContext(context)
@@ -117,7 +117,7 @@ func callBuiltinFilterSelector(e *ast.CallExpr, context map[string]interface{}, 
 }
 
 // callBuiltinMetadata implements DataWeave-style metadata selector: value.^meta.
-func callBuiltinMetadata(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinMetadata(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("metadata selector requires exactly 2 arguments: value, metadata", e.Pos())
 	}
@@ -135,21 +135,21 @@ func callBuiltinMetadata(args []interface{}, e *ast.CallExpr) (interface{}, erro
 		switch v := value.(type) {
 		case string:
 			return len(v), nil
-		case []interface{}:
+		case Array:
 			return len(v), nil
 		case XMLMultiValue:
 			return len(v), nil
-		case map[string]interface{}:
+		case Object:
 			return len(v), nil
 		default:
 			return nil, nil
 		}
 	case "attributes":
-		obj, ok := value.(map[string]interface{})
+		obj, ok := value.(Object)
 		if !ok {
 			return nil, nil
 		}
-		attrs := make(map[string]interface{})
+		attrs := make(Object)
 		for k, v := range obj {
 			if strings.HasPrefix(k, "@") && k != "@xmlns" {
 				attrs[k] = v
@@ -157,13 +157,13 @@ func callBuiltinMetadata(args []interface{}, e *ast.CallExpr) (interface{}, erro
 		}
 		return attrs, nil
 	case "namespaces":
-		obj, ok := value.(map[string]interface{})
+		obj, ok := value.(Object)
 		if !ok {
 			return nil, nil
 		}
 		return obj["@xmlns"], nil
 	case "text":
-		obj, ok := value.(map[string]interface{})
+		obj, ok := value.(Object)
 		if !ok {
 			return nil, nil
 		}
@@ -178,19 +178,19 @@ func callBuiltinMetadata(args []interface{}, e *ast.CallExpr) (interface{}, erro
 // and returns true if newValue should replace currentValue.
 func findExtremumByLambda(
 	funcName string,
-	array []interface{},
+	array Array,
 	lambda *Lambda,
-	predicate func(new, current interface{}) (bool, error),
-	context map[string]interface{},
+	predicate func(new, current Value) (bool, error),
+	context Context,
 	depth int,
 	e *ast.CallExpr,
-) (interface{}, error) {
+) (Value, error) {
 	if len(array) == 0 {
 		return nil, newPosError(fmt.Sprintf("%s: cannot find extremum of empty array", funcName), e.Args[0].Pos())
 	}
 
-	var extremumElement interface{} = array[0]
-	var extremumValue interface{}
+	var extremumElement Value = array[0]
+	var extremumValue Value
 
 	for i, elem := range array {
 		lambdaContext := copyContext(context)
@@ -223,14 +223,14 @@ func findExtremumByLambda(
 }
 
 // callBuiltinMaxBy implements the __maxBy(array, lambda) function.
-func callBuiltinMaxBy(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinMaxBy(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	array, lambda, err := evalArrayAndLambda("maxBy", e, context, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
 
 	// Predicate: newValue should replace currentValue if it's greater
-	predicate := func(newValue, currentValue interface{}) (bool, error) {
+	predicate := func(newValue, currentValue Value) (bool, error) {
 		cmp, err := compareValues(newValue, currentValue)
 		if err != nil {
 			return false, err
@@ -242,14 +242,14 @@ func callBuiltinMaxBy(e *ast.CallExpr, context map[string]interface{}, depth int
 }
 
 // callBuiltinMinBy implements the __minBy(array, lambda) function.
-func callBuiltinMinBy(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinMinBy(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	array, lambda, err := evalArrayAndLambda("minBy", e, context, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
 
 	// Predicate: newValue should replace currentValue if it's less
-	predicate := func(newValue, currentValue interface{}) (bool, error) {
+	predicate := func(newValue, currentValue Value) (bool, error) {
 		cmp, err := compareValues(newValue, currentValue)
 		if err != nil {
 			return false, err
@@ -261,15 +261,15 @@ func callBuiltinMinBy(e *ast.CallExpr, context map[string]interface{}, depth int
 }
 
 // callBuiltinOrderBy implements the __orderBy(array, lambda) function.
-func callBuiltinOrderBy(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinOrderBy(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	array, lambda, err := evalArrayAndLambda("orderBy", e, context, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
 
 	type elementWithKey struct {
-		element interface{}
-		key     interface{}
+		element Value
+		key     Value
 		index   int
 	}
 
@@ -304,7 +304,7 @@ func callBuiltinOrderBy(e *ast.CallExpr, context map[string]interface{}, depth i
 	})
 
 	// Extract sorted elements
-	result := make([]interface{}, len(elements))
+	result := make(Array, len(elements))
 	for i, ek := range elements {
 		result[i] = ek.element
 	}
@@ -313,16 +313,16 @@ func callBuiltinOrderBy(e *ast.CallExpr, context map[string]interface{}, depth i
 }
 
 // callBuiltinDistinctBy implements the __distinctBy(array, lambda) function.
-func callBuiltinDistinctBy(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinDistinctBy(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	array, lambda, err := evalArrayAndLambda("distinctBy", e, context, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
 
 	seenValues := make(map[string]bool)
-	result := make([]interface{}, 0, len(array))
+	result := make(Array, 0, len(array))
 
-	err = executeLambdaOnArrayElements(array, lambda, context, depth, func(elem interface{}, _ int, key interface{}) error {
+	err = executeLambdaOnArrayElements(array, lambda, context, depth, func(elem Value, _ int, key Value) error {
 		// Convert key to string for tracking uniqueness
 		keyStr := fmt.Sprintf("%v", key)
 		if !seenValues[keyStr] {
@@ -335,14 +335,14 @@ func callBuiltinDistinctBy(e *ast.CallExpr, context map[string]interface{}, dept
 }
 
 // callBuiltinSome implements the some(array, lambda) function.
-func callBuiltinSome(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinSome(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	array, lambda, err := evalArrayAndLambda("some", e, context, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
 
 	found := false
-	err = executeLambdaOnArrayElements(array, lambda, context, depth, func(_ interface{}, _ int, result interface{}) error {
+	err = executeLambdaOnArrayElements(array, lambda, context, depth, func(_ Value, _ int, result Value) error {
 		if boolResult, ok := result.(bool); ok && boolResult {
 			found = true
 		}
@@ -355,14 +355,14 @@ func callBuiltinSome(e *ast.CallExpr, context map[string]interface{}, depth int)
 }
 
 // callBuiltinEvery implements the every(array, lambda) function.
-func callBuiltinEvery(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinEvery(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	array, lambda, err := evalArrayAndLambda("every", e, context, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
 
 	allTrue := true
-	err = executeLambdaOnArrayElements(array, lambda, context, depth, func(_ interface{}, _ int, result interface{}) error {
+	err = executeLambdaOnArrayElements(array, lambda, context, depth, func(_ Value, _ int, result Value) error {
 		if boolResult, ok := result.(bool); ok && !boolResult {
 			allTrue = false
 		}
@@ -375,7 +375,7 @@ func callBuiltinEvery(e *ast.CallExpr, context map[string]interface{}, depth int
 }
 
 // callBuiltinFilterObject implements the __filterObject(object, lambda) function.
-func callBuiltinFilterObject(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinFilterObject(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("filterObject requires exactly 2 arguments: object, lambda", e.Pos())
 	}
@@ -387,7 +387,7 @@ func callBuiltinFilterObject(e *ast.CallExpr, context map[string]interface{}, de
 	}
 
 	// Check that the first argument is an object
-	obj, ok := objVal.(map[string]interface{})
+	obj, ok := objVal.(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("filterObject expects an object, got %T", objVal), e.Args[0].Pos())
 	}
@@ -408,7 +408,7 @@ func callBuiltinFilterObject(e *ast.CallExpr, context map[string]interface{}, de
 		return nil, newPosError(fmt.Sprintf("filterObject lambda must have 2 or 3 parameters, got %d", lambda.ParamCount()), e.Args[1].Pos())
 	}
 
-	result := make(map[string]interface{})
+	result := make(Object)
 	index := 0
 
 	// Default to DataWeave order (value, key) unless lambda explicitly uses
@@ -450,7 +450,7 @@ func callBuiltinFilterObject(e *ast.CallExpr, context map[string]interface{}, de
 	return result, nil
 }
 
-func evaluateFilterObjectCond(key string, value interface{}, index int, isDataWeaveOrder bool, lambda *Lambda, context map[string]interface{}, depth int, e *ast.CallExpr) (bool, error) {
+func evaluateFilterObjectCond(key string, value Value, index int, isDataWeaveOrder bool, lambda *Lambda, context Context, depth int, e *ast.CallExpr) (bool, error) {
 	lambdaContext := copyContext(context)
 	if isDataWeaveOrder {
 		lambdaContext[lambda.ParamName(0)] = value
@@ -479,7 +479,7 @@ func evaluateFilterObjectCond(key string, value interface{}, index int, isDataWe
 	return condBool, nil
 }
 
-func mergeIntoResult(result map[string]interface{}, key string, value interface{}) {
+func mergeIntoResult(result Object, key string, value Value) {
 	if existing, ok := result[key]; ok {
 		switch v := existing.(type) {
 		case XMLMultiValue:
@@ -493,25 +493,25 @@ func mergeIntoResult(result map[string]interface{}, key string, value interface{
 }
 
 // callBuiltinGroupBy implements the __groupBy(array, lambda) function.
-func callBuiltinGroupBy(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinGroupBy(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	array, lambda, err := evalArrayAndLambda("groupBy", e, context, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(map[string]interface{})
+	result := make(Object)
 
-	err = executeLambdaOnArrayElements(array, lambda, context, depth, func(elem interface{}, _ int, key interface{}) error {
+	err = executeLambdaOnArrayElements(array, lambda, context, depth, func(elem Value, _ int, key Value) error {
 		// Convert key to string for use as object key
 		keyStr := fmt.Sprintf("%v", key)
 
 		// Get or create the group for this key
 		if _, exists := result[keyStr]; !exists {
-			result[keyStr] = make([]interface{}, 0)
+			result[keyStr] = make(Array, 0)
 		}
 
 		// Append element to the group with proper type checking
-		groupVal, ok := result[keyStr].([]interface{})
+		groupVal, ok := result[keyStr].(Array)
 		if !ok {
 			return newPosError("groupBy: internal error - unexpected type for group", e.Fun.Pos())
 		}
@@ -522,7 +522,7 @@ func callBuiltinGroupBy(e *ast.CallExpr, context map[string]interface{}, depth i
 }
 
 // callBuiltinPluck implements the __pluck(source, selector) function.
-func callBuiltinPluck(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinPluck(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("pluck requires exactly 2 arguments: source, selector", e.Pos())
 	}
@@ -538,7 +538,7 @@ func callBuiltinPluck(e *ast.CallExpr, context map[string]interface{}, depth int
 	}
 
 	// Case 1: Source is an Object
-	if obj, ok := sourceVal.(map[string]interface{}); ok {
+	if obj, ok := sourceVal.(Object); ok {
 		if lambda, ok := selectorVal.(*Lambda); ok {
 			// Object + Lambda (DataWeave style pluck)
 			return pluckObject(obj, lambda, context, depth, e)
@@ -547,7 +547,7 @@ func callBuiltinPluck(e *ast.CallExpr, context map[string]interface{}, depth int
 	}
 
 	// Case 2: Source is an Array
-	if arr, ok := sourceVal.([]interface{}); ok {
+	if arr, ok := sourceVal.(Array); ok {
 		if keyStr, ok := selectorVal.(string); ok {
 			// Array + String (existing field extraction logic)
 			return pluckArray(arr, keyStr, e)
@@ -562,7 +562,7 @@ func callBuiltinPluck(e *ast.CallExpr, context map[string]interface{}, depth int
 	return nil, newPosError(fmt.Sprintf("pluck expects an array or object, got %T", sourceVal), e.Args[0].Pos())
 }
 
-func pluckObject(obj map[string]interface{}, lambda *Lambda, context map[string]interface{}, depth int, e *ast.CallExpr) (interface{}, error) {
+func pluckObject(obj Object, lambda *Lambda, context Context, depth int, e *ast.CallExpr) (Value, error) {
 	// Default to DataWeave order (value, key) unless lambda explicitly uses
 	// legacy names (key, value) or (k, v).
 	isDataWeaveOrder := !shouldUseLegacyObjectLambdaOrder(lambda)
@@ -573,7 +573,7 @@ func pluckObject(obj map[string]interface{}, lambda *Lambda, context map[string]
 	}
 	sort.Strings(keys)
 
-	result := make([]interface{}, 0, len(obj))
+	result := make(Array, 0, len(obj))
 	index := 0
 	for _, k := range keys {
 		value := obj[k]
@@ -598,7 +598,7 @@ func pluckObject(obj map[string]interface{}, lambda *Lambda, context map[string]
 	return result, nil
 }
 
-func evaluatePluckLambda(key string, value interface{}, index int, isDataWeaveOrder bool, lambda *Lambda, context map[string]interface{}, depth int) (interface{}, error) {
+func evaluatePluckLambda(key string, value Value, index int, isDataWeaveOrder bool, lambda *Lambda, context Context, depth int) (Value, error) {
 	lambdaContext := copyContext(context)
 
 	if isDataWeaveOrder {
@@ -623,11 +623,11 @@ func evaluatePluckLambda(key string, value interface{}, index int, isDataWeaveOr
 }
 
 // pluckArray extracts nested properties from array elements using dot notation
-func pluckArray(arr []interface{}, keyStr string, e *ast.CallExpr) (interface{}, error) {
+func pluckArray(arr Array, keyStr string, e *ast.CallExpr) (Value, error) {
 	// Split the key for nested property access
 	keyParts := strings.Split(keyStr, ".")
 
-	result := make([]interface{}, 0, len(arr))
+	result := make(Array, 0, len(arr))
 
 	for _, item := range arr {
 		// Navigate nested properties
@@ -639,7 +639,7 @@ func pluckArray(arr []interface{}, keyStr string, e *ast.CallExpr) (interface{},
 			}
 
 			// Try to access as map
-			if m, ok := current.(map[string]interface{}); ok {
+			if m, ok := current.(Object); ok {
 				current = m[part]
 			} else {
 				// Property doesn't exist or current is not a map

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"infomunge/internal/evaluator"
 	"infomunge/internal/runner"
 	"infomunge/internal/testing/exprgen"
 	"infomunge/internal/testing/failures"
@@ -74,7 +75,7 @@ func TestDifferential_InfomungeVsDataWeave(t *testing.T) {
 }
 
 // safeEvalInfomunge evaluates a script in infomunge with panic recovery.
-func safeEvalInfomunge(script string, ctx map[string]interface{}) (result interface{}, err error) {
+func safeEvalInfomunge(script string, ctx evaluator.Context) (result evaluator.Value, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("panic: %v\n%s", recovered, debug.Stack())

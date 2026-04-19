@@ -8,7 +8,7 @@ func TestEvaluate_Arithmetic(t *testing.T) {
 	tests := []struct {
 		name     string
 		expr     string
-		expected interface{}
+		expected Value
 	}{
 		{"int addition", "2 + 3", 5},
 		{"int subtraction", "10 - 4", 6},
@@ -24,7 +24,7 @@ func TestEvaluate_Arithmetic(t *testing.T) {
 		{"complex expression", "(2 + 3) * 4", 20},
 	}
 
-	ctx := make(map[string]interface{})
+	ctx := make(Context)
 	mapping := make([]int, 100)
 	for i := range mapping {
 		mapping[i] = i
@@ -52,7 +52,7 @@ func TestEvaluate_ArithmeticErrors(t *testing.T) {
 		{"division by zero float", "5.0 / 0.0"},
 	}
 
-	ctx := make(map[string]interface{})
+	ctx := make(Context)
 	mapping := make([]int, 100)
 	for i := range mapping {
 		mapping[i] = i
@@ -72,7 +72,7 @@ func TestEvaluate_MathFunctions(t *testing.T) {
 	tests := []struct {
 		name     string
 		expr     string
-		expected interface{}
+		expected Value
 	}{
 		{"ceil positive", "ceil(2.3)", 3.0},
 		{"ceil integer", "ceil(5.0)", 5.0},
@@ -93,7 +93,7 @@ func TestEvaluate_MathFunctions(t *testing.T) {
 		{"pow with ints", "pow(3, 2)", 9.0},
 	}
 
-	ctx := make(map[string]interface{})
+	ctx := make(Context)
 	mapping := make([]int, 100)
 	for i := range mapping {
 		mapping[i] = i
@@ -127,7 +127,7 @@ func TestEvaluate_MathFunctionsErrors(t *testing.T) {
 		{"pow three args", "pow(2, 3, 4)"},
 	}
 
-	ctx := make(map[string]interface{})
+	ctx := make(Context)
 	mapping := make([]int, 100)
 	for i := range mapping {
 		mapping[i] = i
@@ -147,7 +147,7 @@ func TestEvaluate_MathEdgeCases(t *testing.T) {
 	tests := []struct {
 		name     string
 		expr     string
-		expected interface{}
+		expected Value
 	}{
 		{"mod 10 3", "mod(10, 3)", 1.0},
 		{"mod 7 2", "mod(7, 2)", 1.0},
@@ -157,7 +157,7 @@ func TestEvaluate_MathEdgeCases(t *testing.T) {
 		{"isOdd 4", "isOdd(4)", false},
 	}
 
-	ctx := make(map[string]interface{})
+	ctx := make(Context)
 	mapping := make([]int, 100)
 	for i := range mapping {
 		mapping[i] = i
@@ -180,7 +180,7 @@ func TestEvaluate_LogicalOperations(t *testing.T) {
 	tests := []struct {
 		name     string
 		expr     string
-		expected interface{}
+		expected Value
 	}{
 		{"and true true", "true && true", true},
 		{"and true false", "true && false", false},
@@ -191,7 +191,7 @@ func TestEvaluate_LogicalOperations(t *testing.T) {
 		{"inequality", "5 == 6", false},
 	}
 
-	ctx := make(map[string]interface{})
+	ctx := make(Context)
 	mapping := make([]int, 100)
 	for i := range mapping {
 		mapping[i] = i
@@ -211,7 +211,7 @@ func TestEvaluate_LogicalOperations(t *testing.T) {
 }
 
 func TestEvaluate_StringConcatWithLambdaIsDeterministic(t *testing.T) {
-	ctx := make(map[string]interface{})
+	ctx := make(Context)
 	tests := []struct {
 		name     string
 		expr     string
@@ -254,9 +254,9 @@ func TestEvaluate_StringConcatWithLambdaIsDeterministic(t *testing.T) {
 }
 
 func TestEvaluate_ComparisonErrors(t *testing.T) {
-	ctx := map[string]interface{}{
+	ctx := Object{
 		"str": "hello",
-		"arr": []interface{}{1, 2, 3},
+		"arr": Array{1, 2, 3},
 	}
 	mapping := make([]int, 100)
 	for i := range mapping {

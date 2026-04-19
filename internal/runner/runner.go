@@ -58,7 +58,7 @@ func RunFromString(raw string) error {
 }
 
 // RunFromStringWithContext executes an infomunge script with additional context variables.
-func RunFromStringWithContext(raw string, additionalContext map[string]interface{}) error {
+func RunFromStringWithContext(raw string, additionalContext evaluator.Context) error {
 	baseDir, err := os.Getwd()
 	if err != nil {
 		baseDir = "."
@@ -67,12 +67,12 @@ func RunFromStringWithContext(raw string, additionalContext map[string]interface
 }
 
 // RunFromStringWithContextAndOptions executes an infomunge script with additional context variables and options.
-func RunFromStringWithContextAndOptions(raw string, additionalContext map[string]interface{}, opts RunnerOptions) error {
+func RunFromStringWithContextAndOptions(raw string, additionalContext evaluator.Context, opts RunnerOptions) error {
 	return RunFromStringWithContextAndOptionsAndGoContext(context.Background(), raw, additionalContext, opts)
 }
 
 // RunFromStringWithContextAndOptionsAndGoContext executes an infomunge script with additional context variables, options, and Go context.
-func RunFromStringWithContextAndOptionsAndGoContext(goCtx context.Context, raw string, additionalContext map[string]interface{}, opts RunnerOptions) error {
+func RunFromStringWithContextAndOptionsAndGoContext(goCtx context.Context, raw string, additionalContext evaluator.Context, opts RunnerOptions) error {
 	if opts.BaseDir == "" {
 		baseDir, err := os.Getwd()
 		if err != nil {
@@ -85,7 +85,7 @@ func RunFromStringWithContextAndOptionsAndGoContext(goCtx context.Context, raw s
 }
 
 // runFromStringWithConfig executes an infomunge script with configuration.
-func runFromStringWithConfig(goCtx context.Context, raw string, additionalContext map[string]interface{}, opts RunnerOptions) error {
+func runFromStringWithConfig(goCtx context.Context, raw string, additionalContext evaluator.Context, opts RunnerOptions) error {
 	if opts.Lazy {
 		return unifiederrors.ValidationError(lazyFlagUnsupportedMessage)
 	}
@@ -110,12 +110,12 @@ func runFromStringWithConfig(goCtx context.Context, raw string, additionalContex
 
 // RunString executes an infomunge script from a string with optional additional context.
 // The additionalContext map allows injecting variables (like "payload") into the evaluation context.
-func RunString(script string, additionalContext map[string]interface{}) (interface{}, error) {
+func RunString(script string, additionalContext evaluator.Context) (evaluator.Value, error) {
 	return RunStringWithGoContext(context.Background(), script, additionalContext)
 }
 
 // RunStringWithGoContext executes an infomunge script from a string with optional additional context and Go context.
-func RunStringWithGoContext(goCtx context.Context, script string, additionalContext map[string]interface{}) (interface{}, error) {
+func RunStringWithGoContext(goCtx context.Context, script string, additionalContext evaluator.Context) (evaluator.Value, error) {
 	baseDir, err := os.Getwd()
 	if err != nil {
 		baseDir = "."
@@ -128,12 +128,12 @@ func RunStringWithGoContext(goCtx context.Context, script string, additionalCont
 }
 
 // RunStringWithContextAndOptionsWithOutput executes a script and returns result plus output metadata.
-func RunStringWithContextAndOptionsWithOutput(script string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, map[string]interface{}, error) {
+func RunStringWithContextAndOptionsWithOutput(script string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, evaluator.Context, error) {
 	return RunStringWithGoContextAndOptionsWithOutput(context.Background(), script, additionalContext, opts)
 }
 
 // RunStringWithGoContextAndOptionsWithOutput executes a script and returns result plus output metadata.
-func RunStringWithGoContextAndOptionsWithOutput(goCtx context.Context, script string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, map[string]interface{}, error) {
+func RunStringWithGoContextAndOptionsWithOutput(goCtx context.Context, script string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, evaluator.Context, error) {
 	if opts.BaseDir == "" {
 		baseDir, err := os.Getwd()
 		if err != nil {
@@ -146,13 +146,13 @@ func RunStringWithGoContextAndOptionsWithOutput(goCtx context.Context, script st
 }
 
 // evaluate is the core evaluation logic shared by all runner functions.
-func evaluate(goCtx context.Context, raw string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, error) {
+func evaluate(goCtx context.Context, raw string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, error) {
 	result, hasHeader, outputMimeType, _, err := evaluateWithContext(goCtx, raw, additionalContext, opts)
 	return result, hasHeader, outputMimeType, err
 }
 
 // evaluateWithContext is the core evaluation logic that also returns the parsed context.
-func evaluateWithContext(goCtx context.Context, raw string, additionalContext map[string]interface{}, opts RunnerOptions) (interface{}, bool, string, map[string]interface{}, error) {
+func evaluateWithContext(goCtx context.Context, raw string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, evaluator.Context, error) {
 	if opts.Lazy {
 		return nil, false, "", nil, unifiederrors.ValidationError(lazyFlagUnsupportedMessage)
 	}
@@ -189,7 +189,7 @@ func evaluateWithContext(goCtx context.Context, raw string, additionalContext ma
 }
 
 // handleOutputDecl processes output directive and captures output options.
-func handleOutputDecl(trimmedLine string, outputMimeType *string, context map[string]interface{}) error {
+func handleOutputDecl(trimmedLine string, outputMimeType *string, context evaluator.Context) error {
 	rest := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "output "))
 	if rest == "" {
 		*outputMimeType = ""
@@ -214,7 +214,7 @@ func handleOutputDecl(trimmedLine string, outputMimeType *string, context map[st
 }
 
 // handleInputDecl processes input directive.
-func handleInputDecl(trimmedLine string, context map[string]interface{}) {
+func handleInputDecl(trimmedLine string, context evaluator.Context) {
 	inputMimeType := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "input "))
 	if inputMimeType != "" {
 		context["__input_mime__"] = inputMimeType
@@ -313,7 +313,7 @@ func handleNamespaceDecl(trimmedLine string, namespaces map[string]string) error
 }
 
 // handleTypeDecl processes type declaration
-func handleTypeDecl(trimmedLine string, context map[string]interface{}) error {
+func handleTypeDecl(trimmedLine string, context evaluator.Context) error {
 	typeDef, typeName, err := parseTypeDecl(trimmedLine)
 	if err != nil {
 		return err
@@ -381,11 +381,11 @@ func normalizeHeaderLines(header string) []string {
 	return strings.Split(normalizeHeader(header), "\n")
 }
 
-func formatOutput(result interface{}, hasHeader bool, mimeType string) error {
+func formatOutput(result evaluator.Value, hasHeader bool, mimeType string) error {
 	return formatOutputWithContext(result, hasHeader, mimeType, nil)
 }
 
-func ResolveResult(result interface{}) (interface{}, error) {
+func ResolveResult(result evaluator.Value) (evaluator.Value, error) {
 	switch r := result.(type) {
 	case *evaluator.LazyValue:
 		resolved, err := r.GetValue()
@@ -394,7 +394,7 @@ func ResolveResult(result interface{}) (interface{}, error) {
 		}
 		return ResolveResult(resolved)
 	case *evaluator.StreamWithError:
-		var values []interface{}
+		var values evaluator.Array
 		for val := range r.Stream {
 			values = append(values, val)
 		}
@@ -403,7 +403,7 @@ func ResolveResult(result interface{}) (interface{}, error) {
 		}
 		return values, nil
 	case chan evaluator.Value:
-		var values []interface{}
+		var values evaluator.Array
 		for val := range r {
 			values = append(values, val)
 		}
@@ -414,11 +414,11 @@ func ResolveResult(result interface{}) (interface{}, error) {
 }
 
 // formatOutputWithContext formats output with optional context (for namespaces, etc).
-func formatOutputWithContext(result interface{}, hasHeader bool, mimeType string, context map[string]interface{}) error {
+func formatOutputWithContext(result evaluator.Value, hasHeader bool, mimeType string, context evaluator.Context) error {
 	// Check if result is a stream (lazy evaluation result)
 	switch r := result.(type) {
 	case *evaluator.StreamWithError:
-		var values []interface{}
+		var values evaluator.Array
 		for val := range r.Stream {
 			values = append(values, val)
 		}
@@ -427,7 +427,7 @@ func formatOutputWithContext(result interface{}, hasHeader bool, mimeType string
 		}
 		result = values
 	case chan evaluator.Value:
-		var values []interface{}
+		var values evaluator.Array
 		for val := range r {
 			values = append(values, val)
 		}
@@ -476,7 +476,7 @@ func formatOutputWithContext(result interface{}, hasHeader bool, mimeType string
 }
 
 // ExtractNamespaceVars finds all Namespace values in the eval context.
-func ExtractNamespaceVars(context map[string]interface{}) map[string]formats.Namespace {
+func ExtractNamespaceVars(context evaluator.Context) map[string]formats.Namespace {
 	if context == nil {
 		return nil
 	}

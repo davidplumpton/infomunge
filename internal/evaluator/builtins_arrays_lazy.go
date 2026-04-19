@@ -7,7 +7,7 @@ import (
 )
 
 // callBuiltinToStream implements the __toStream(array) function.
-func callBuiltinToStream(e *ast.CallExpr, evalCtx map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinToStream(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("__toStream expects 1 argument", e.Pos())
 	}
@@ -39,7 +39,7 @@ func callBuiltinToStream(e *ast.CallExpr, evalCtx map[string]interface{}, depth 
 }
 
 // callBuiltinLazyMap implements the __lazyMap(lazyStream, lambda) function.
-func callBuiltinLazyMap(e *ast.CallExpr, evalCtx map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinLazyMap(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("__lazyMap expects 2 arguments", e.Pos())
 	}
@@ -68,7 +68,7 @@ func callBuiltinLazyMap(e *ast.CallExpr, evalCtx map[string]interface{}, depth i
 }
 
 // callBuiltinLazyFilter implements the __lazyFilter(lazyStream, lambda) function.
-func callBuiltinLazyFilter(e *ast.CallExpr, evalCtx map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinLazyFilter(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("__lazyFilter expects 2 arguments", e.Pos())
 	}
@@ -97,7 +97,7 @@ func callBuiltinLazyFilter(e *ast.CallExpr, evalCtx map[string]interface{}, dept
 }
 
 // callBuiltinLazyReduce implements the __lazyReduce(lazyStream, lambda, initial) function.
-func callBuiltinLazyReduce(e *ast.CallExpr, evalCtx map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinLazyReduce(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
 	if len(e.Args) != 3 {
 		return nil, newPosError("__lazyReduce expects 3 arguments", e.Pos())
 	}

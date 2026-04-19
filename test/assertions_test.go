@@ -5,11 +5,11 @@ import (
 	"testing"
 )
 
-func evaluate(expr string) (interface{}, error) {
-	return evaluateWithContext(expr, make(map[string]interface{}))
+func evaluate(expr string) (evaluator.Value, error) {
+	return evaluateWithContext(expr, make(evaluator.Context))
 }
 
-func evaluateWithContext(expr string, context map[string]interface{}) (interface{}, error) {
+func evaluateWithContext(expr string, context evaluator.Context) (evaluator.Value, error) {
 	ctx := &evaluator.ErrorContext{
 		ExprStr:    expr,
 		Mapping:    make([]int, len(expr)),
@@ -28,13 +28,13 @@ func TestTypeMatchers(t *testing.T) {
 	tests := []struct {
 		name    string
 		expr    string
-		context map[string]interface{}
+		context evaluator.Context
 		wantErr bool
 	}{
 		{
 			name:    "beArray matches array",
 			expr:    `must(arr, beArray())`,
-			context: map[string]interface{}{"arr": []interface{}{1.0, 2.0, 3.0}},
+			context: evaluator.Context{"arr": evaluator.Array{1.0, 2.0, 3.0}},
 		},
 		{
 			name:    "beArray fails for non-array",
@@ -44,12 +44,12 @@ func TestTypeMatchers(t *testing.T) {
 		{
 			name:    "beObject matches object",
 			expr:    `must(obj, beObject())`,
-			context: map[string]interface{}{"obj": map[string]interface{}{"x": 1.0}},
+			context: evaluator.Context{"obj": evaluator.Context{"x": 1.0}},
 		},
 		{
 			name:    "beObject fails for non-object",
 			expr:    `must(arr, beObject())`,
-			context: map[string]interface{}{"arr": []interface{}{1.0, 2.0}},
+			context: evaluator.Context{"arr": evaluator.Array{1.0, 2.0}},
 			wantErr: true,
 		},
 		{
@@ -95,7 +95,7 @@ func TestTypeMatchers(t *testing.T) {
 		{
 			name:    "beEmpty matches empty array",
 			expr:    `must(emptyArr, beEmpty())`,
-			context: map[string]interface{}{"emptyArr": []interface{}{}},
+			context: evaluator.Context{"emptyArr": evaluator.Array{}},
 		},
 		{
 			name:    "beEmpty fails for non-empty",
@@ -141,7 +141,7 @@ func TestComparisonMatchers(t *testing.T) {
 	tests := []struct {
 		name    string
 		expr    string
-		context map[string]interface{}
+		context evaluator.Context
 		wantErr bool
 	}{
 		{
@@ -182,12 +182,12 @@ func TestComparisonMatchers(t *testing.T) {
 		{
 			name:    "beOneOf with matching value",
 			expr:    `must(v, beOneOf(opts))`,
-			context: map[string]interface{}{"v": 2.0, "opts": []interface{}{1.0, 2.0, 3.0}},
+			context: evaluator.Context{"v": 2.0, "opts": evaluator.Array{1.0, 2.0, 3.0}},
 		},
 		{
 			name:    "beOneOf with non-matching value",
 			expr:    `must(v, beOneOf(opts))`,
-			context: map[string]interface{}{"v": 5.0, "opts": []interface{}{1.0, 2.0, 3.0}},
+			context: evaluator.Context{"v": 5.0, "opts": evaluator.Array{1.0, 2.0, 3.0}},
 			wantErr: true,
 		},
 	}
@@ -195,7 +195,7 @@ func TestComparisonMatchers(t *testing.T) {
 	for _, tt := range tests {
 		ctx := tt.context
 		if ctx == nil {
-			ctx = make(map[string]interface{})
+			ctx = make(evaluator.Context)
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := evaluateWithContext(tt.expr, ctx)
@@ -265,29 +265,29 @@ func TestCollectionMatchers(t *testing.T) {
 	tests := []struct {
 		name    string
 		expr    string
-		context map[string]interface{}
+		context evaluator.Context
 		wantErr bool
 	}{
 		{
 			name:    "containVal matches array element",
 			expr:    `must(arr, containVal(2))`,
-			context: map[string]interface{}{"arr": []interface{}{1.0, 2.0, 3.0}},
+			context: evaluator.Context{"arr": evaluator.Array{1.0, 2.0, 3.0}},
 		},
 		{
 			name:    "containVal fails for missing element",
 			expr:    `must(arr, containVal(5))`,
-			context: map[string]interface{}{"arr": []interface{}{1.0, 2.0, 3.0}},
+			context: evaluator.Context{"arr": evaluator.Array{1.0, 2.0, 3.0}},
 			wantErr: true,
 		},
 		{
 			name:    "haveSize matches array length",
 			expr:    `must(arr, haveSize(3))`,
-			context: map[string]interface{}{"arr": []interface{}{1.0, 2.0, 3.0}},
+			context: evaluator.Context{"arr": evaluator.Array{1.0, 2.0, 3.0}},
 		},
 		{
 			name:    "haveSize fails for wrong length",
 			expr:    `must(arr, haveSize(4))`,
-			context: map[string]interface{}{"arr": []interface{}{1.0, 2.0, 3.0}},
+			context: evaluator.Context{"arr": evaluator.Array{1.0, 2.0, 3.0}},
 			wantErr: true,
 		},
 		{
@@ -297,23 +297,23 @@ func TestCollectionMatchers(t *testing.T) {
 		{
 			name:    "haveKey matches object key",
 			expr:    `must(obj, haveKey("x"))`,
-			context: map[string]interface{}{"obj": map[string]interface{}{"x": 1.0, "y": 2.0}},
+			context: evaluator.Context{"obj": evaluator.Context{"x": 1.0, "y": 2.0}},
 		},
 		{
 			name:    "haveKey fails for missing key",
 			expr:    `must(obj, haveKey("z"))`,
-			context: map[string]interface{}{"obj": map[string]interface{}{"x": 1.0, "y": 2.0}},
+			context: evaluator.Context{"obj": evaluator.Context{"x": 1.0, "y": 2.0}},
 			wantErr: true,
 		},
 		{
 			name:    "haveValue matches object value",
 			expr:    `must(obj, haveValue(1))`,
-			context: map[string]interface{}{"obj": map[string]interface{}{"x": 1.0, "y": 2.0}},
+			context: evaluator.Context{"obj": evaluator.Context{"x": 1.0, "y": 2.0}},
 		},
 		{
 			name:    "haveValue fails for missing value",
 			expr:    `must(obj, haveValue(3))`,
-			context: map[string]interface{}{"obj": map[string]interface{}{"x": 1.0, "y": 2.0}},
+			context: evaluator.Context{"obj": evaluator.Context{"x": 1.0, "y": 2.0}},
 			wantErr: true,
 		},
 	}
@@ -337,7 +337,7 @@ func TestMatcherCombinators(t *testing.T) {
 	tests := []struct {
 		name    string
 		expr    string
-		context map[string]interface{}
+		context evaluator.Context
 		wantErr bool
 	}{
 		{
@@ -352,23 +352,23 @@ func TestMatcherCombinators(t *testing.T) {
 		{
 			name:    "eachItem validates all array items",
 			expr:    `must(arr, eachItem(beNumber()))`,
-			context: map[string]interface{}{"arr": []interface{}{1.0, 2.0, 3.0}},
+			context: evaluator.Context{"arr": evaluator.Array{1.0, 2.0, 3.0}},
 		},
 		{
 			name:    "eachItem fails when one item doesn't match",
 			expr:    `must(arr, eachItem(beNumber()))`,
-			context: map[string]interface{}{"arr": []interface{}{1.0, "two", 3.0}},
+			context: evaluator.Context{"arr": evaluator.Array{1.0, "two", 3.0}},
 			wantErr: true,
 		},
 		{
 			name:    "haveItem finds matching item",
 			expr:    `must(arr, haveItem(equalTo(2)))`,
-			context: map[string]interface{}{"arr": []interface{}{1.0, 2.0, 3.0}},
+			context: evaluator.Context{"arr": evaluator.Array{1.0, 2.0, 3.0}},
 		},
 		{
 			name:    "haveItem fails when no item matches",
 			expr:    `must(arr, haveItem(equalTo(5)))`,
-			context: map[string]interface{}{"arr": []interface{}{1.0, 2.0, 3.0}},
+			context: evaluator.Context{"arr": evaluator.Array{1.0, 2.0, 3.0}},
 			wantErr: true,
 		},
 	}
@@ -377,7 +377,7 @@ func TestMatcherCombinators(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := tt.context
 			if ctx == nil {
-				ctx = make(map[string]interface{})
+				ctx = make(evaluator.Context)
 			}
 			result, err := evaluateWithContext(tt.expr, ctx)
 			if (err != nil) != tt.wantErr {

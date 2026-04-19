@@ -13,7 +13,7 @@ import (
 )
 
 // callBuiltinToBase64 implements the toBase64(string) function.
-func callBuiltinToBase64(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinToBase64(args []Value, e *ast.CallExpr) (Value, error) {
 	text, err := requireOneStringArg(args, "toBase64", e)
 	if err != nil {
 		return nil, err
@@ -22,7 +22,7 @@ func callBuiltinToBase64(args []interface{}, e *ast.CallExpr) (interface{}, erro
 }
 
 // callBuiltinFromBase64 implements the fromBase64(string) function.
-func callBuiltinFromBase64(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinFromBase64(args []Value, e *ast.CallExpr) (Value, error) {
 	encoded, err := requireOneStringArg(args, "fromBase64", e)
 	if err != nil {
 		return nil, err
@@ -37,7 +37,7 @@ func callBuiltinFromBase64(args []interface{}, e *ast.CallExpr) (interface{}, er
 }
 
 // callBuiltinHash implements the hash(string, algorithm) function.
-func callBuiltinHash(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinHash(args []Value, e *ast.CallExpr) (Value, error) {
 	strs, err := assertStringArgs(args, 2, "hash", e)
 	if err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func callBuiltinHash(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinToHex implements the toHex(string) function.
-func callBuiltinToHex(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinToHex(args []Value, e *ast.CallExpr) (Value, error) {
 	text, err := requireOneStringArg(args, "toHex", e)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func callBuiltinToHex(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 }
 
 // callBuiltinFromHex implements the fromHex(string) function.
-func callBuiltinFromHex(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinFromHex(args []Value, e *ast.CallExpr) (Value, error) {
 	encoded, err := requireOneStringArg(args, "fromHex", e)
 	if err != nil {
 		return nil, err

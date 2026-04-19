@@ -2,6 +2,7 @@ package failures
 
 import (
 	"encoding/json"
+	"infomunge/internal/evaluator"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,11 +16,11 @@ func TestSaveAndLoadArtifactsRoundTrip(t *testing.T) {
 		Property:            "no-panic",
 		MinimizedExpression: "payload.a + 1",
 		OriginalExpression:  "((payload.a + payload.b) * 2) / 3",
-		InputPayload: map[string]interface{}{
+		InputPayload: evaluator.Object{
 			"a": float64(1),
 			"b": "x",
 		},
-		Expected: map[string]interface{}{
+		Expected: evaluator.Object{
 			"type": "Number",
 		},
 		Actual:     "panic",
@@ -100,7 +101,7 @@ func TestSaveArtifactDeduplicatesByFingerprint(t *testing.T) {
 		Property:            "no-panic",
 		MinimizedExpression: "payload[0] + 1",
 		OriginalExpression:  "payload[0] + payload[1] + payload[2]",
-		InputPayload:        []interface{}{float64(1), float64(2)},
+		InputPayload:        evaluator.Array{float64(1), float64(2)},
 		Expected:            "result-or-error",
 		Actual:              "panic",
 		Seed:                100,
@@ -109,7 +110,7 @@ func TestSaveArtifactDeduplicatesByFingerprint(t *testing.T) {
 		Property:            "no-panic",
 		MinimizedExpression: "payload[0] + 1",
 		OriginalExpression:  "completely different source expression",
-		InputPayload:        map[string]interface{}{"x": float64(9)},
+		InputPayload:        evaluator.Object{"x": float64(9)},
 		Expected:            "something else",
 		Actual:              "different output",
 		Seed:                999,

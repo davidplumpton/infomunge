@@ -13,7 +13,7 @@ import (
 )
 
 // callBuiltinAssign implements the __assign(varName, value) function.
-func callBuiltinAssign(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinAssign(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("assignment requires exactly 2 arguments: variable name and value", e.Pos())
 	}
@@ -43,7 +43,7 @@ func callBuiltinAssign(e *ast.CallExpr, context map[string]interface{}, depth in
 }
 
 // callBuiltinDo implements the __do(declarations, expression) function.
-func callBuiltinDo(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinDo(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("do block requires exactly 2 arguments: declarations and expression", e.Pos())
 	}
@@ -90,7 +90,7 @@ func callBuiltinDo(e *ast.CallExpr, context map[string]interface{}, depth int) (
 
 // parseVarDeclaration parses a var declaration and adds it to the context.
 // Format: var name = expression
-func parseVarDeclaration(line string, context map[string]interface{}, depth int) error {
+func parseVarDeclaration(line string, context Context, depth int) error {
 	rest := strings.TrimPrefix(line, "var ")
 	parts := strings.SplitN(rest, "=", 2)
 	if len(parts) != 2 {
@@ -117,7 +117,7 @@ func parseVarDeclaration(line string, context map[string]interface{}, depth int)
 
 // parseFunDeclaration parses a fun declaration and adds it to the context.
 // Format: fun name(params) = body
-func parseFunDeclaration(line string, context map[string]interface{}) error {
+func parseFunDeclaration(line string, context Context) error {
 	rest := strings.TrimPrefix(line, "fun ")
 
 	parenIdx := strings.Index(rest, "(")
@@ -173,7 +173,7 @@ func parseFunParams(paramsStr string) []ParamDef {
 }
 
 // parseDoDeclarations parses and evaluates declarations (var, fun) in a do block
-func parseDoDeclarations(declsStr string, context map[string]interface{}, depth int) error {
+func parseDoDeclarations(declsStr string, context Context, depth int) error {
 	for _, line := range strings.Split(declsStr, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {

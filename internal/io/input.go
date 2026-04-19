@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/evaluator"
 	"infomunge/pkg/formats"
 )
 
@@ -68,8 +69,8 @@ func (p *Parser) parseFile(filePath string) (*Source, error) {
 }
 
 // ParseInputs processes multiple input specifications into a context map
-func (p *Parser) ParseInputs(inputs []string) (map[string]interface{}, error) {
-	context := make(map[string]interface{})
+func (p *Parser) ParseInputs(inputs []string) (evaluator.Context, error) {
+	context := make(evaluator.Context)
 	stdinSources := 0
 
 	for _, input := range inputs {

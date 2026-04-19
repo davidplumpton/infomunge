@@ -3,6 +3,7 @@ package differential
 import (
 	"context"
 	"errors"
+	"infomunge/internal/evaluator"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,9 +34,9 @@ func TestDWEval_ParsesJSONOutput(t *testing.T) {
 		t.Fatalf("DWEval failed: %v", err)
 	}
 
-	if err := StructuralCompare(got, map[string]interface{}{
+	if err := StructuralCompare(got, evaluator.Object{
 		"a": float64(1),
-		"b": []interface{}{true, nil},
+		"b": evaluator.Array{true, nil},
 	}); err != nil {
 		t.Fatalf("unexpected parsed result: %v", err)
 	}
@@ -89,11 +90,11 @@ func TestStructuralCompare_NumberTolerance(t *testing.T) {
 }
 
 func TestStructuralCompare_ObjectKeyOrderAndMissingNull(t *testing.T) {
-	left := map[string]interface{}{
+	left := evaluator.Object{
 		"a": float64(1),
 		"b": nil,
 	}
-	right := map[string]interface{}{
+	right := evaluator.Object{
 		"b": nil,
 		"a": float64(1),
 	}
@@ -101,22 +102,22 @@ func TestStructuralCompare_ObjectKeyOrderAndMissingNull(t *testing.T) {
 		t.Fatalf("key order should be ignored: %v", err)
 	}
 
-	missingLeft := map[string]interface{}{"a": float64(1)}
-	missingRight := map[string]interface{}{"a": float64(1), "b": nil}
+	missingLeft := evaluator.Object{"a": float64(1)}
+	missingRight := evaluator.Object{"a": float64(1), "b": nil}
 	if err := StructuralCompare(missingLeft, missingRight); err != nil {
 		t.Fatalf("missing key should match explicit null: %v", err)
 	}
 }
 
 func TestStructuralCompare_MismatchHasPath(t *testing.T) {
-	left := map[string]interface{}{
-		"a": []interface{}{
-			map[string]interface{}{"x": float64(1)},
+	left := evaluator.Object{
+		"a": evaluator.Array{
+			evaluator.Object{"x": float64(1)},
 		},
 	}
-	right := map[string]interface{}{
-		"a": []interface{}{
-			map[string]interface{}{"x": float64(2)},
+	right := evaluator.Object{
+		"a": evaluator.Array{
+			evaluator.Object{"x": float64(2)},
 		},
 	}
 

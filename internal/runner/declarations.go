@@ -14,11 +14,11 @@ import (
 // parseVarDecl parses a variable declaration line and evaluates its value.
 // baseOffset is the offset of the start of this line within fullRaw.
 // Returns the evaluated value, variable name, and any error.
-func parseVarDecl(line, trimmedLine string, baseOffset int, evalCtx map[string]interface{}, fullRaw string) (interface{}, string, error) {
+func parseVarDecl(line, trimmedLine string, baseOffset int, evalCtx evaluator.Context, fullRaw string) (evaluator.Value, string, error) {
 	return parseVarDeclWithGoContext(line, trimmedLine, baseOffset, evalCtx, context.Background(), fullRaw)
 }
 
-func parseVarDeclWithGoContext(line, trimmedLine string, baseOffset int, evalCtx map[string]interface{}, goCtx context.Context, fullRaw string) (interface{}, string, error) {
+func parseVarDeclWithGoContext(line, trimmedLine string, baseOffset int, evalCtx evaluator.Context, goCtx context.Context, fullRaw string) (evaluator.Value, string, error) {
 	parts := strings.SplitN(trimmedLine, "=", 2)
 	if len(parts) != 2 {
 		return nil, "", unifiederrors.ParseErrorf("invalid variable declaration: missing '=' in %q", trimmedLine)
@@ -59,7 +59,7 @@ func parseVarDeclWithGoContext(line, trimmedLine string, baseOffset int, evalCtx
 // parseVarDeclFromLines parses a variable declaration that may span multiple lines.
 // baseOffset is the offset of the start of lines[start] within fullRaw.
 // Returns the evaluated value, variable name, number of lines consumed, and any error.
-func parseVarDeclFromLines(lines []string, start int, baseOffset int, evalCtx map[string]interface{}, fullRaw string) (interface{}, string, int, error) {
+func parseVarDeclFromLines(lines []string, start int, baseOffset int, evalCtx evaluator.Context, fullRaw string) (evaluator.Value, string, int, error) {
 	return parseVarDeclFromLinesWithGoContext(lines, start, baseOffset, evalCtx, context.Background(), fullRaw)
 }
 
@@ -133,7 +133,7 @@ func parseVarDeclSource(lines []string, start int) (*parsedVarDecl, error) {
 	}, nil
 }
 
-func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset int, evalCtx map[string]interface{}, goCtx context.Context, fullRaw string) (interface{}, string, int, error) {
+func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset int, evalCtx evaluator.Context, goCtx context.Context, fullRaw string) (evaluator.Value, string, int, error) {
 	spec, err := parseVarDeclSource(lines, start)
 	if err != nil {
 		consumed := 1
@@ -210,7 +210,7 @@ func parseFunDeclLine(trimmedLine string) (string, []evaluator.ParamDef, string,
 	return fnName, params, bodyStr, nil
 }
 
-func buildFunLambda(params []evaluator.ParamDef, bodyStr string, env map[string]interface{}, bodyMap *sourcemap.Map) (*evaluator.Lambda, error) {
+func buildFunLambda(params []evaluator.ParamDef, bodyStr string, env evaluator.Context, bodyMap *sourcemap.Map) (*evaluator.Lambda, error) {
 	if bodyStr == "" {
 		return nil, unifiederrors.ParseError("invalid function declaration: empty body")
 	}
@@ -249,11 +249,11 @@ func isDirectiveLine(trimmedLine string) bool {
 	return false
 }
 
-func parseFunDeclFromLines(lines []string, start int, env map[string]interface{}) (*evaluator.Lambda, string, int, error) {
+func parseFunDeclFromLines(lines []string, start int, env evaluator.Context) (*evaluator.Lambda, string, int, error) {
 	return parseFunDeclFromLinesWithSource(lines, start, env, "", 0)
 }
 
-func parseFunDeclFromLinesWithSource(lines []string, start int, env map[string]interface{}, fullRaw string, baseOffset int) (*evaluator.Lambda, string, int, error) {
+func parseFunDeclFromLinesWithSource(lines []string, start int, env evaluator.Context, fullRaw string, baseOffset int) (*evaluator.Lambda, string, int, error) {
 	spec, err := parseFunDeclSource(lines, start)
 	if err != nil {
 		return nil, "", 0, err
@@ -433,7 +433,7 @@ func isDelimiterBalanced(s string) bool {
 
 // parseFunDecl parses a function declaration line like "fun toUser(user) = {firstName: user.name}"
 // and returns a Lambda. If env is non-nil, it's attached to the Lambda for module-local scope.
-func parseFunDecl(trimmedLine string, env map[string]interface{}) (*evaluator.Lambda, string, error) {
+func parseFunDecl(trimmedLine string, env evaluator.Context) (*evaluator.Lambda, string, error) {
 	fnName, params, bodyStr, err := parseFunDeclLine(trimmedLine)
 	if err != nil {
 		return nil, "", err
@@ -469,7 +469,7 @@ func parseTypeDecl(trimmedLine string) (*evaluator.TypeDef, string, error) {
 	}
 
 	var baseType string
-	var properties map[string]interface{}
+	var properties evaluator.Object
 
 	braceIdx := strings.Index(rhs, "{")
 	if braceIdx < 0 {
@@ -501,7 +501,7 @@ func parseTypeDecl(trimmedLine string) (*evaluator.TypeDef, string, error) {
 }
 
 // parseTypeProperties parses a properties block like "{ format: \"##.00\", locale: \"en_US\" }".
-func parseTypeProperties(propsStr string) (map[string]interface{}, error) {
+func parseTypeProperties(propsStr string) (evaluator.Context, error) {
 	propsStr = strings.TrimSpace(propsStr)
 	if !strings.HasPrefix(propsStr, "{") || !strings.HasSuffix(propsStr, "}") {
 		return nil, unifiederrors.ParseError("properties must be enclosed in braces")
@@ -509,10 +509,10 @@ func parseTypeProperties(propsStr string) (map[string]interface{}, error) {
 
 	inner := strings.TrimSpace(propsStr[1 : len(propsStr)-1])
 	if inner == "" {
-		return make(map[string]interface{}), nil
+		return make(evaluator.Context), nil
 	}
 
-	properties := make(map[string]interface{})
+	properties := make(evaluator.Context)
 	pairs := splitPropertyPairs(inner)
 
 	for _, pair := range pairs {
@@ -568,7 +568,7 @@ func splitPropertyPairs(s string) []string {
 }
 
 // parsePropertyValue parses a property value (string, number, or boolean).
-func parsePropertyValue(s string) (interface{}, error) {
+func parsePropertyValue(s string) (evaluator.Value, error) {
 	s = strings.TrimSpace(s)
 
 	if strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\"") && len(s) >= 2 {
@@ -609,7 +609,7 @@ func parseNamespaceDecl(trimmedLine string) (string, string, error) {
 }
 
 // handleImport processes an import directive and adds symbols to the context.
-func handleImport(line string, context map[string]interface{}, loader *ModuleLoader) error {
+func handleImport(line string, context evaluator.Context, loader *ModuleLoader) error {
 	if loader == nil {
 		return unifiederrors.ParseError("imports are not available in this context")
 	}

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/evaluator"
 )
 
 type headerDirectiveKind string
@@ -28,11 +29,11 @@ type headerDirective struct {
 	offset  int
 }
 
-func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLoader) (map[string]interface{}, string, error) {
+func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLoader) (evaluator.Context, string, error) {
 	return parseHeaderWithGoContext(header, hasHeader, context.Background(), fullRaw, loader)
 }
 
-func parseHeaderWithGoContext(header string, hasHeader bool, goCtx context.Context, fullRaw string, loader *ModuleLoader) (map[string]interface{}, string, error) {
+func parseHeaderWithGoContext(header string, hasHeader bool, goCtx context.Context, fullRaw string, loader *ModuleLoader) (evaluator.Context, string, error) {
 	directives, err := parseHeaderDirectives(header, hasHeader, fullRaw)
 	if err != nil {
 		return nil, "", err
@@ -137,8 +138,8 @@ func validateOutputDirective(trimmedLine string) error {
 	return err
 }
 
-func applyHeaderDirectives(directives []headerDirective, goCtx context.Context, fullRaw string, loader *ModuleLoader) (map[string]interface{}, string, error) {
-	context := make(map[string]interface{})
+func applyHeaderDirectives(directives []headerDirective, goCtx context.Context, fullRaw string, loader *ModuleLoader) (evaluator.Context, string, error) {
+	context := make(evaluator.Context)
 	namespaces := make(map[string]string)
 	outputMimeType := "application/json"
 
@@ -155,7 +156,7 @@ func applyHeaderDirectives(directives []headerDirective, goCtx context.Context, 
 	return context, outputMimeType, nil
 }
 
-func applyHeaderDirective(directive headerDirective, context map[string]interface{}, namespaces map[string]string, outputMimeType *string, goCtx context.Context, fullRaw string, loader *ModuleLoader) error {
+func applyHeaderDirective(directive headerDirective, context evaluator.Context, namespaces map[string]string, outputMimeType *string, goCtx context.Context, fullRaw string, loader *ModuleLoader) error {
 	var err error
 
 	switch directive.kind {
@@ -170,7 +171,7 @@ func applyHeaderDirective(directive headerDirective, context map[string]interfac
 	case headerDirectiveImport:
 		err = handleImport(directive.trimmed, context, loader)
 	case headerDirectiveVar:
-		var val interface{}
+		var val evaluator.Value
 		var varName string
 		var consumed int
 		val, varName, consumed, err = parseVarDeclFromLinesWithGoContext(directive.lines, 0, directive.offset, context, goCtx, fullRaw)
@@ -179,7 +180,7 @@ func applyHeaderDirective(directive headerDirective, context map[string]interfac
 		}
 	case headerDirectiveFun:
 		var fnName string
-		var fn interface{}
+		var fn evaluator.Value
 		var consumed int
 		fn, fnName, consumed, err = parseFunDeclFromLinesWithSource(directive.lines, 0, context, fullRaw, directive.offset)
 		if err == nil && consumed > 0 && fnName != "" {

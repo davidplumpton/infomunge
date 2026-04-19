@@ -26,7 +26,7 @@ const (
 // Helper functions for common error patterns
 
 // newTypeMismatchError creates a type mismatch error
-func newTypeMismatchError(funcName string, expected string, got interface{}, pos token.Pos) error {
+func newTypeMismatchError(funcName string, expected string, got Value, pos token.Pos) error {
 	return newPosError(fmt.Sprintf(MsgTypeMismatch, funcName, expected, got), pos)
 }
 
@@ -46,27 +46,27 @@ func newIndexOutOfRangeError(funcName string, index int, pos token.Pos) error {
 }
 
 // newInvalidValueError creates an invalid value error
-func newInvalidValueError(what string, value interface{}, pos token.Pos) error {
+func newInvalidValueError(what string, value Value, pos token.Pos) error {
 	return newPosError(fmt.Sprintf(MsgInvalidValue, what, value), pos)
 }
 
 // newCoercionError creates a coercion error
-func newCoercionError(value interface{}, targetType string, pos token.Pos) error {
+func newCoercionError(value Value, targetType string, pos token.Pos) error {
 	return newPosError(fmt.Sprintf(MsgCannotCoerce, value, targetType), pos)
 }
 
 // newCoercionTypeError creates a coercion error with type info
-func newCoercionTypeError(value interface{}, targetType string, pos token.Pos) error {
+func newCoercionTypeError(value Value, targetType string, pos token.Pos) error {
 	return newPosError(fmt.Sprintf(MsgCannotCoerceType, value, targetType), pos)
 }
 
 // newElementNotNumberError creates an element not number error
-func newElementNotNumberError(funcName string, index int, got interface{}, pos token.Pos) error {
+func newElementNotNumberError(funcName string, index int, got Value, pos token.Pos) error {
 	return newPosError(fmt.Sprintf(MsgElementNotNumber, funcName, index, got), pos)
 }
 
 // newUnsupportedTypeError creates an unsupported type error
-func newUnsupportedTypeError(funcName string, got interface{}, pos token.Pos) error {
+func newUnsupportedTypeError(funcName string, got Value, pos token.Pos) error {
 	return newPosError(fmt.Sprintf(MsgUnsupportedType, funcName, got), pos)
 }
 
@@ -91,6 +91,6 @@ func newLambdaParamCountError(funcName string, expected string, got int, pos tok
 }
 
 // newLambdaWrongReturnError creates a lambda wrong return type error
-func newLambdaWrongReturnError(funcName string, expected string, got interface{}, pos token.Pos) error {
+func newLambdaWrongReturnError(funcName string, expected string, got Value, pos token.Pos) error {
 	return newPosError(fmt.Sprintf(MsgLambdaWrongReturn, funcName, expected, got), pos)
 }

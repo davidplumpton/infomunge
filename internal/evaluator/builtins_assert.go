@@ -6,7 +6,7 @@ import (
 )
 
 // callBuiltinAssert implements the assert(value, matcher, [message]) function.
-func callBuiltinAssert(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinAssert(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return nil, newPosError("assert expects 2 or 3 arguments: value, matcher, [message]", e.Pos())
 	}
@@ -39,6 +39,6 @@ func callBuiltinAssert(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBuiltinAssertThat is an alias for assert for better readability in some contexts.
-func callBuiltinAssertThat(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinAssertThat(args []Value, e *ast.CallExpr) (Value, error) {
 	return callBuiltinAssert(args, e)
 }

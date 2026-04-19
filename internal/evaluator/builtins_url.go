@@ -10,7 +10,7 @@ import (
 )
 
 // callBuiltinParseURI implements parseURI(uri).
-func callBuiltinParseURI(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinParseURI(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("parseURI requires exactly 1 argument: uri", e.Pos())
 	}
@@ -25,12 +25,12 @@ func callBuiltinParseURI(args []interface{}, e *ast.CallExpr) (interface{}, erro
 		return nil, newPosError(fmt.Sprintf("parseURI expects a valid URI: %v", err), e.Pos())
 	}
 
-	result := map[string]interface{}{
+	result := Object{
 		"scheme":   parsed.Scheme,
 		"host":     parsed.Hostname(),
 		"path":     parsed.Path,
 		"fragment": parsed.Fragment,
-		"query":    map[string]interface{}{},
+		"query":    Object{},
 		"user":     nil,
 		"password": nil,
 		"port":     nil,
@@ -56,13 +56,13 @@ func callBuiltinParseURI(args []interface{}, e *ast.CallExpr) (interface{}, erro
 		return nil, newPosError(fmt.Sprintf("parseURI failed to parse query: %v", err), e.Pos())
 	}
 
-	query := map[string]interface{}{}
+	query := Object{}
 	for key, values := range queryValues {
 		if len(values) == 1 {
 			query[key] = values[0]
 			continue
 		}
-		items := make([]interface{}, len(values))
+		items := make(Array, len(values))
 		for i, value := range values {
 			items[i] = value
 		}
@@ -74,12 +74,12 @@ func callBuiltinParseURI(args []interface{}, e *ast.CallExpr) (interface{}, erro
 }
 
 // callBuiltinCompose implements compose(parts).
-func callBuiltinCompose(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinCompose(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("compose requires exactly 1 argument: parts", e.Pos())
 	}
 
-	parts, ok := args[0].(map[string]interface{})
+	parts, ok := args[0].(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("compose expects an object, got %T", args[0]), e.Pos())
 	}
@@ -149,7 +149,7 @@ func callBuiltinCompose(args []interface{}, e *ast.CallExpr) (interface{}, error
 }
 
 // callBuiltinEncodeURI implements encodeURI(uri).
-func callBuiltinEncodeURI(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinEncodeURI(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("encodeURI requires exactly 1 argument: uri", e.Pos())
 	}
@@ -164,7 +164,7 @@ func callBuiltinEncodeURI(args []interface{}, e *ast.CallExpr) (interface{}, err
 }
 
 // callBuiltinDecodeURI implements decodeURI(uri).
-func callBuiltinDecodeURI(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinDecodeURI(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("decodeURI requires exactly 1 argument: uri", e.Pos())
 	}
@@ -182,7 +182,7 @@ func callBuiltinDecodeURI(args []interface{}, e *ast.CallExpr) (interface{}, err
 }
 
 // callBuiltinEncodeURIComponent implements encodeURIComponent(component).
-func callBuiltinEncodeURIComponent(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinEncodeURIComponent(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("encodeURIComponent requires exactly 1 argument: component", e.Pos())
 	}
@@ -196,7 +196,7 @@ func callBuiltinEncodeURIComponent(args []interface{}, e *ast.CallExpr) (interfa
 }
 
 // callBuiltinDecodeURIComponent implements decodeURIComponent(component).
-func callBuiltinDecodeURIComponent(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinDecodeURIComponent(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("decodeURIComponent requires exactly 1 argument: component", e.Pos())
 	}
@@ -213,7 +213,7 @@ func callBuiltinDecodeURIComponent(args []interface{}, e *ast.CallExpr) (interfa
 	return decoded, nil
 }
 
-func optionalStringField(parts map[string]interface{}, key, funcName string, e *ast.CallExpr) (string, error) {
+func optionalStringField(parts Object, key, funcName string, e *ast.CallExpr) (string, error) {
 	val, ok := parts[key]
 	if !ok || val == nil {
 		return "", nil
@@ -225,7 +225,7 @@ func optionalStringField(parts map[string]interface{}, key, funcName string, e *
 	return str, nil
 }
 
-func optionalPortField(parts map[string]interface{}, key, funcName string, e *ast.CallExpr) (string, error) {
+func optionalPortField(parts Object, key, funcName string, e *ast.CallExpr) (string, error) {
 	val, ok := parts[key]
 	if !ok || val == nil {
 		return "", nil
@@ -251,7 +251,7 @@ func optionalPortField(parts map[string]interface{}, key, funcName string, e *as
 	}
 }
 
-func composeQuery(parts map[string]interface{}, e *ast.CallExpr) (string, error) {
+func composeQuery(parts Object, e *ast.CallExpr) (string, error) {
 	val, ok := parts["query"]
 	if !ok || val == nil {
 		return "", nil
@@ -261,7 +261,7 @@ func composeQuery(parts map[string]interface{}, e *ast.CallExpr) (string, error)
 		return strings.TrimPrefix(raw, "?"), nil
 	}
 
-	queryObj, ok := val.(map[string]interface{})
+	queryObj, ok := val.(Object)
 	if !ok {
 		return "", newPosError(fmt.Sprintf("compose expects \"query\" to be a string or object, got %T", val), e.Pos())
 	}
@@ -269,7 +269,7 @@ func composeQuery(parts map[string]interface{}, e *ast.CallExpr) (string, error)
 	values := url.Values{}
 	for key, raw := range queryObj {
 		switch v := raw.(type) {
-		case []interface{}:
+		case Array:
 			for _, item := range v {
 				values.Add(key, fmt.Sprintf("%v", item))
 			}

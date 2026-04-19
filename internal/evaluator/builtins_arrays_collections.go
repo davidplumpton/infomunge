@@ -20,11 +20,11 @@ func callBuiltinSafeAccess(args []Value, e *ast.CallExpr) (Value, error) {
 
 	// Try to index into obj with key
 	switch v := obj.(type) {
-	case map[string]interface{}:
+	case Object:
 		if strKey, ok := key.(string); ok {
 			return v[strKey], nil
 		}
-	case []interface{}:
+	case Array:
 		if intKey, ok := key.(int); ok {
 			if intKey < 0 {
 				intKey += len(v)
@@ -71,7 +71,7 @@ func callBuiltinSlice(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError("slice end must be a number", e.Args[2].Pos())
 	}
 
-	if arrayVal, ok := args[0].([]interface{}); ok {
+	if arrayVal, ok := args[0].(Array); ok {
 		if start < 0 {
 			start = len(arrayVal) + start
 		}
@@ -85,7 +85,7 @@ func callBuiltinSlice(args []Value, e *ast.CallExpr) (Value, error) {
 			end = len(arrayVal)
 		}
 		if start > end {
-			return []interface{}{}, nil
+			return Array{}, nil
 		}
 		return arrayVal[start:end], nil
 	} else if strVal, ok := args[0].(string); ok {
@@ -111,9 +111,9 @@ func callBuiltinSlice(args []Value, e *ast.CallExpr) (Value, error) {
 }
 
 // callBuiltinMapInternal is a helper for internal map operations
-func callBuiltinMapInternal(array []interface{}, lambda *Lambda, context map[string]interface{}, depth int) (interface{}, error) {
-	result := make([]interface{}, 0, len(array))
-	err := executeLambdaOnArrayElements(array, lambda, context, depth, func(_ interface{}, _ int, mappedVal interface{}) error {
+func callBuiltinMapInternal(array Array, lambda *Lambda, context Context, depth int) (Value, error) {
+	result := make(Array, 0, len(array))
+	err := executeLambdaOnArrayElements(array, lambda, context, depth, func(_ Value, _ int, mappedVal Value) error {
 		result = append(result, mappedVal)
 		return nil
 	})
@@ -121,7 +121,7 @@ func callBuiltinMapInternal(array []interface{}, lambda *Lambda, context map[str
 }
 
 // callBuiltinPrepend implements the prepend(array, value) function.
-func callBuiltinPrepend(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinPrepend(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 2, "prepend", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -129,19 +129,19 @@ func callBuiltinPrepend(args []interface{}, e *ast.CallExpr) (interface{}, error
 	if err := assertArg(args[0], beArray(), 1, "prepend", e); err != nil {
 		return nil, err
 	}
-	arr, ok := args[0].([]interface{})
+	arr, ok := args[0].(Array)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("prepend: expected array, got %T", args[0]), e.Pos())
 	}
 
-	result := make([]interface{}, 0, len(arr)+1)
+	result := make(Array, 0, len(arr)+1)
 	result = append(result, args[1])
 	result = append(result, arr...)
 	return result, nil
 }
 
 // callBuiltinAppend implements the append(array, value) function.
-func callBuiltinAppend(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinAppend(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 2, "append", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -149,19 +149,19 @@ func callBuiltinAppend(args []interface{}, e *ast.CallExpr) (interface{}, error)
 	if err := assertArg(args[0], beArray(), 1, "append", e); err != nil {
 		return nil, err
 	}
-	arr, ok := args[0].([]interface{})
+	arr, ok := args[0].(Array)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("append: expected array, got %T", args[0]), e.Pos())
 	}
 
-	result := make([]interface{}, 0, len(arr)+1)
+	result := make(Array, 0, len(arr)+1)
 	result = append(result, arr...)
 	result = append(result, args[1])
 	return result, nil
 }
 
 // callBuiltinFirst implements the first(array) function.
-func callBuiltinFirst(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinFirst(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 1, "first", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func callBuiltinFirst(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 	if err := assertArg(args[0], beArray(), 1, "first", e); err != nil {
 		return nil, err
 	}
-	arr, ok := args[0].([]interface{})
+	arr, ok := args[0].(Array)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("first: expected array, got %T", args[0]), e.Pos())
 	}
@@ -181,7 +181,7 @@ func callBuiltinFirst(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 }
 
 // callBuiltinLast implements the last(array) function.
-func callBuiltinLast(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinLast(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 1, "last", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func callBuiltinLast(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	if err := assertArg(args[0], beArray(), 1, "last", e); err != nil {
 		return nil, err
 	}
-	arr, ok := args[0].([]interface{})
+	arr, ok := args[0].(Array)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("last: expected array, got %T", args[0]), e.Pos())
 	}
@@ -202,7 +202,7 @@ func callBuiltinLast(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callBuiltinTake implements the take(array, count) function.
 // Returns the first 'count' elements of the array.
-func callBuiltinTake(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinTake(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 2, "take", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func callBuiltinTake(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	if err := assertArg(args[0], beArray(), 1, "take", e); err != nil {
 		return nil, err
 	}
-	arr, ok := args[0].([]interface{})
+	arr, ok := args[0].(Array)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("take: expected array, got %T", args[0]), e.Pos())
 	}
@@ -221,7 +221,7 @@ func callBuiltinTake(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	}
 
 	if count <= 0 {
-		return []interface{}{}, nil
+		return Array{}, nil
 	}
 	if count >= len(arr) {
 		return arr, nil
@@ -231,7 +231,7 @@ func callBuiltinTake(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 
 // callBuiltinDrop implements the drop(array, count) function.
 // Returns the array with the first 'count' elements removed.
-func callBuiltinDrop(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinDrop(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 2, "drop", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func callBuiltinDrop(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	if err := assertArg(args[0], beArray(), 1, "drop", e); err != nil {
 		return nil, err
 	}
-	arr, ok := args[0].([]interface{})
+	arr, ok := args[0].(Array)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("drop: expected array, got %T", args[0]), e.Pos())
 	}
@@ -253,7 +253,7 @@ func callBuiltinDrop(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 		return arr, nil
 	}
 	if count >= len(arr) {
-		return []interface{}{}, nil
+		return Array{}, nil
 	}
 	return arr[count:], nil
 }

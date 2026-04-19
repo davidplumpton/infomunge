@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"infomunge/internal/evaluator"
 	"pgregory.net/rapid"
 )
 
@@ -16,7 +17,7 @@ var defaultContextFieldNames = []string{
 // (for passing to the runner) and the JSON string (for CLI input).
 type TestContext struct {
 	// Value is the Go map suitable for passing as an evaluator context.
-	Value map[string]interface{}
+	Value evaluator.Context
 	// JSON is the JSON-encoded string of Value["payload"].
 	JSON string
 	// Fields lists the top-level field names available in the payload.
@@ -28,7 +29,7 @@ type TestContext struct {
 func SampleContext() *rapid.Generator[TestContext] {
 	return rapid.Custom(func(t *rapid.T) TestContext {
 		payload := samplePayload(t)
-		ctx := map[string]interface{}{
+		ctx := evaluator.Context{
 			"payload": payload,
 		}
 		jsonBytes, err := json.Marshal(payload)
@@ -37,7 +38,7 @@ func SampleContext() *rapid.Generator[TestContext] {
 		}
 
 		var fields []string
-		if obj, ok := payload.(map[string]interface{}); ok {
+		if obj, ok := payload.(evaluator.Object); ok {
 			for k := range obj {
 				fields = append(fields, k)
 			}
@@ -54,7 +55,7 @@ func SampleContext() *rapid.Generator[TestContext] {
 // samplePayload generates a payload value: an object with mixed field types.
 func samplePayload(t *rapid.T) interface{} {
 	nFields := rapid.IntRange(1, 6).Draw(t, "nFields")
-	obj := make(map[string]interface{}, nFields)
+	obj := make(evaluator.Object, nFields)
 	for i := 0; i < nFields; i++ {
 		key := fieldName(i)
 		obj[key] = sampleValue(t, 2)
@@ -99,9 +100,9 @@ func sampleValue(t *rapid.T, depth int) interface{} {
 		case 0:
 			return nil
 		case 1:
-			return map[string]interface{}{}
+			return evaluator.Object{}
 		default:
-			return []interface{}{}
+			return evaluator.Array{}
 		}
 	}
 }
@@ -127,7 +128,7 @@ func samplePrimitive(t *rapid.T) interface{} {
 // sampleNestedObject generates a small object (1-3 fields).
 func sampleNestedObject(t *rapid.T, depth int) interface{} {
 	nFields := rapid.IntRange(1, 3).Draw(t, "nestedFields")
-	obj := make(map[string]interface{}, nFields)
+	obj := make(evaluator.Object, nFields)
 	for i := 0; i < nFields; i++ {
 		key := fieldName(i)
 		obj[key] = sampleValue(t, depth)
@@ -141,21 +142,21 @@ func sampleArray(t *rapid.T, depth int) interface{} {
 	switch strategy {
 	case 0: // array of primitives
 		n := rapid.IntRange(0, 4).Draw(t, "arrLen")
-		arr := make([]interface{}, n)
+		arr := make(evaluator.Array, n)
 		for i := range arr {
 			arr[i] = samplePrimitive(t)
 		}
 		return arr
 	case 1: // array of objects
 		n := rapid.IntRange(1, 3).Draw(t, "arrLen")
-		arr := make([]interface{}, n)
+		arr := make(evaluator.Array, n)
 		for i := range arr {
 			arr[i] = sampleNestedObject(t, depth)
 		}
 		return arr
 	default: // mixed
 		n := rapid.IntRange(0, 4).Draw(t, "arrLen")
-		arr := make([]interface{}, n)
+		arr := make(evaluator.Array, n)
 		for i := range arr {
 			arr[i] = sampleValue(t, depth)
 		}

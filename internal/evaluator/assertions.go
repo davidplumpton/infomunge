@@ -13,7 +13,7 @@ type MatcherResult struct {
 }
 
 // Matcher represents a matcher function that validates a value
-type Matcher func(interface{}) *MatcherResult
+type Matcher func(Value) *MatcherResult
 
 // Matched is a variable that represents a successful match
 var Matched = &MatcherResult{Success: true, Message: ""}
@@ -21,13 +21,13 @@ var Matched = &MatcherResult{Success: true, Message: ""}
 // assertion functions return Matcher objects that can be applied to values
 
 // typeError creates a failed MatcherResult for type mismatch
-func typeError(expected string, value interface{}) *MatcherResult {
+func typeError(expected string, value Value) *MatcherResult {
 	return &MatcherResult{Success: false, Message: fmt.Sprintf("expected %s, got %T", expected, value)}
 }
 
 // typeMatcherFactory creates a type matcher that validates via type assertion
-func typeMatcherFactory(typeName string, checker func(interface{}) bool) Matcher {
-	return func(value interface{}) *MatcherResult {
+func typeMatcherFactory(typeName string, checker func(Value) bool) Matcher {
+	return func(value Value) *MatcherResult {
 		if checker(value) {
 			return Matched
 		}
@@ -37,23 +37,23 @@ func typeMatcherFactory(typeName string, checker func(interface{}) bool) Matcher
 
 // beArray validates that a given value is of type Array
 func beArray() Matcher {
-	return typeMatcherFactory("array", func(v interface{}) bool {
-		_, ok := v.([]interface{})
+	return typeMatcherFactory("array", func(v Value) bool {
+		_, ok := v.(Array)
 		return ok
 	})
 }
 
 // beObject validates that a given value is of type Object
 func beObject() Matcher {
-	return typeMatcherFactory("object", func(v interface{}) bool {
-		_, ok := v.(map[string]interface{})
+	return typeMatcherFactory("object", func(v Value) bool {
+		_, ok := v.(Object)
 		return ok
 	})
 }
 
 // beString validates that a given value is of type String
 func beString() Matcher {
-	return typeMatcherFactory("string", func(v interface{}) bool {
+	return typeMatcherFactory("string", func(v Value) bool {
 		_, ok := v.(string)
 		return ok
 	})
@@ -61,7 +61,7 @@ func beString() Matcher {
 
 // beNumber validates that a given value is of type Number
 func beNumber() Matcher {
-	return typeMatcherFactory("number", func(v interface{}) bool {
+	return typeMatcherFactory("number", func(v Value) bool {
 		switch v.(type) {
 		case float64, int:
 			return true
@@ -73,7 +73,7 @@ func beNumber() Matcher {
 
 // beBoolean validates that a given value is of type Boolean
 func beBoolean() Matcher {
-	return typeMatcherFactory("boolean", func(v interface{}) bool {
+	return typeMatcherFactory("boolean", func(v Value) bool {
 		_, ok := v.(bool)
 		return ok
 	})
@@ -81,26 +81,26 @@ func beBoolean() Matcher {
 
 // beNull validates that a given value is of type Null
 func beNull() Matcher {
-	return typeMatcherFactory("null", func(v interface{}) bool {
+	return typeMatcherFactory("null", func(v Value) bool {
 		return v == nil
 	})
 }
 
 // beEmpty validates that the value (String, Object or Array) is empty
 func beEmpty() Matcher {
-	return func(value interface{}) *MatcherResult {
+	return func(value Value) *MatcherResult {
 		switch v := value.(type) {
 		case string:
 			if len(v) == 0 {
 				return Matched
 			}
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected empty string, got %q", v)}
-		case []interface{}:
+		case Array:
 			if len(v) == 0 {
 				return Matched
 			}
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected empty array, got array with %d items", len(v))}
-		case map[string]interface{}:
+		case Object:
 			if len(v) == 0 {
 				return Matched
 			}
@@ -113,7 +113,7 @@ func beEmpty() Matcher {
 
 // beBlank validates that the String value is blank (empty or whitespace)
 func beBlank() Matcher {
-	return func(value interface{}) *MatcherResult {
+	return func(value Value) *MatcherResult {
 		str, ok := value.(string)
 		if !ok {
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected string, got %T", value)}
@@ -129,8 +129,8 @@ func beBlank() Matcher {
 }
 
 // equalTo validates that a value is equal to another one
-func equalTo(expected interface{}) Matcher {
-	return func(value interface{}) *MatcherResult {
+func equalTo(expected Value) Matcher {
+	return func(value Value) *MatcherResult {
 		if isEqual(value, expected) {
 			return Matched
 		}
@@ -139,8 +139,8 @@ func equalTo(expected interface{}) Matcher {
 }
 
 // beGreaterThan validates that the asserted Comparable value is greater than the given one
-func beGreaterThan(threshold interface{}, inclusive bool) Matcher {
-	return func(value interface{}) *MatcherResult {
+func beGreaterThan(threshold Value, inclusive bool) Matcher {
+	return func(value Value) *MatcherResult {
 		cmp, err := compareValues(value, threshold)
 		if err != nil {
 			return &MatcherResult{Success: false, Message: err.Error()}
@@ -161,8 +161,8 @@ func beGreaterThan(threshold interface{}, inclusive bool) Matcher {
 }
 
 // beLowerThan validates that the asserted Comparable value is lower than the given one
-func beLowerThan(threshold interface{}, inclusive bool) Matcher {
-	return func(value interface{}) *MatcherResult {
+func beLowerThan(threshold Value, inclusive bool) Matcher {
+	return func(value Value) *MatcherResult {
 		cmp, err := compareValues(value, threshold)
 		if err != nil {
 			return &MatcherResult{Success: false, Message: err.Error()}
@@ -183,8 +183,8 @@ func beLowerThan(threshold interface{}, inclusive bool) Matcher {
 }
 
 // beOneOf validates that the value is contained in the given Array
-func beOneOf(options []interface{}) Matcher {
-	return func(value interface{}) *MatcherResult {
+func beOneOf(options Array) Matcher {
+	return func(value Value) *MatcherResult {
 		for _, opt := range options {
 			if isEqual(value, opt) {
 				return Matched
@@ -196,7 +196,7 @@ func beOneOf(options []interface{}) Matcher {
 
 // contain validates that the asserted String contains the given String
 func containString(substr string) Matcher {
-	return func(value interface{}) *MatcherResult {
+	return func(value Value) *MatcherResult {
 		str, ok := value.(string)
 		if !ok {
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected string, got %T", value)}
@@ -211,9 +211,9 @@ func containString(substr string) Matcher {
 }
 
 // containValue validates that the asserted Array contains the given value
-func containValue(needle interface{}) Matcher {
-	return func(value interface{}) *MatcherResult {
-		arr, ok := value.([]interface{})
+func containValue(needle Value) Matcher {
+	return func(value Value) *MatcherResult {
+		arr, ok := value.(Array)
 		if !ok {
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected array, got %T", value)}
 		}
@@ -228,7 +228,7 @@ func containValue(needle interface{}) Matcher {
 
 // startWith validates that the asserted String starts with the given String
 func startWith(prefix string) Matcher {
-	return func(value interface{}) *MatcherResult {
+	return func(value Value) *MatcherResult {
 		str, ok := value.(string)
 		if !ok {
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected string, got %T", value)}
@@ -242,7 +242,7 @@ func startWith(prefix string) Matcher {
 
 // endWith validates that the asserted String ends with the given String
 func endWith(suffix string) Matcher {
-	return func(value interface{}) *MatcherResult {
+	return func(value Value) *MatcherResult {
 		str, ok := value.(string)
 		if !ok {
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected string, got %T", value)}
@@ -256,14 +256,14 @@ func endWith(suffix string) Matcher {
 
 // haveSize validates that the array/string/object has the given size
 func haveSize(expectedSize int) Matcher {
-	return func(value interface{}) *MatcherResult {
+	return func(value Value) *MatcherResult {
 		var size int
 		switch v := value.(type) {
 		case string:
 			size = len(v)
-		case []interface{}:
+		case Array:
 			size = len(v)
-		case map[string]interface{}:
+		case Object:
 			size = len(v)
 		default:
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected string, array, or object, got %T", value)}
@@ -278,8 +278,8 @@ func haveSize(expectedSize int) Matcher {
 
 // haveKey validates that the Object has the given key
 func haveKey(key string) Matcher {
-	return func(value interface{}) *MatcherResult {
-		obj, ok := value.(map[string]interface{})
+	return func(value Value) *MatcherResult {
+		obj, ok := value.(Object)
 		if !ok {
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected object, got %T", value)}
 		}
@@ -291,9 +291,9 @@ func haveKey(key string) Matcher {
 }
 
 // haveValue validates that the Object has the given value
-func haveValue(expectedVal interface{}) Matcher {
-	return func(value interface{}) *MatcherResult {
-		obj, ok := value.(map[string]interface{})
+func haveValue(expectedVal Value) Matcher {
+	return func(value Value) *MatcherResult {
+		obj, ok := value.(Object)
 		if !ok {
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected object, got %T", value)}
 		}
@@ -308,8 +308,8 @@ func haveValue(expectedVal interface{}) Matcher {
 
 // eachItem validates that each item of the array satisfies the given matcher
 func eachItem(matcher Matcher) Matcher {
-	return func(value interface{}) *MatcherResult {
-		arr, ok := value.([]interface{})
+	return func(value Value) *MatcherResult {
+		arr, ok := value.(Array)
 		if !ok {
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected array, got %T", value)}
 		}
@@ -325,8 +325,8 @@ func eachItem(matcher Matcher) Matcher {
 
 // haveItem validates that at least one item of the array satisfies the given matcher
 func haveItem(matcher Matcher) Matcher {
-	return func(value interface{}) *MatcherResult {
-		arr, ok := value.([]interface{})
+	return func(value Value) *MatcherResult {
+		arr, ok := value.(Array)
 		if !ok {
 			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected array, got %T", value)}
 		}
@@ -342,7 +342,7 @@ func haveItem(matcher Matcher) Matcher {
 
 // anyOf validates that the value satisfies at least one of the given matchers
 func anyOf(matchers []Matcher) Matcher {
-	return func(value interface{}) *MatcherResult {
+	return func(value Value) *MatcherResult {
 		for _, matcher := range matchers {
 			result := matcher(value)
 			if result.Success {
@@ -355,7 +355,7 @@ func anyOf(matchers []Matcher) Matcher {
 
 // notBe validates that the value doesn't satisfy the given matcher
 func notBe(matcher Matcher) Matcher {
-	return func(value interface{}) *MatcherResult {
+	return func(value Value) *MatcherResult {
 		result := matcher(value)
 		if !result.Success {
 			return Matched
@@ -366,7 +366,7 @@ func notBe(matcher Matcher) Matcher {
 
 // notBeNull validates that a given value isn't of type Null
 func notBeNull() Matcher {
-	return func(value interface{}) *MatcherResult {
+	return func(value Value) *MatcherResult {
 		if value != nil {
 			return Matched
 		}
@@ -376,7 +376,7 @@ func notBeNull() Matcher {
 
 // Helper functions
 
-func isEqual(a, b interface{}) bool {
+func isEqual(a, b Value) bool {
 	// Handle nil cases
 	if a == nil && b == nil {
 		return true
@@ -407,8 +407,8 @@ func isEqual(a, b interface{}) bool {
 	}
 
 	// For arrays
-	aArr, aIsArr := a.([]interface{})
-	bArr, bIsArr := b.([]interface{})
+	aArr, aIsArr := a.(Array)
+	bArr, bIsArr := b.(Array)
 	if aIsArr && bIsArr {
 		if len(aArr) != len(bArr) {
 			return false
@@ -422,8 +422,8 @@ func isEqual(a, b interface{}) bool {
 	}
 
 	// For objects
-	aObj, aIsObj := a.(map[string]interface{})
-	bObj, bIsObj := b.(map[string]interface{})
+	aObj, aIsObj := a.(Object)
+	bObj, bIsObj := b.(Object)
 	if aIsObj && bIsObj {
 		if len(aObj) != len(bObj) {
 			return false
@@ -440,7 +440,7 @@ func isEqual(a, b interface{}) bool {
 	return false
 }
 
-func compareValues(a, b interface{}) (int, error) {
+func compareValues(a, b Value) (int, error) {
 	// Try numeric comparison first
 	aNum, aIsNum := ToFloat(a)
 	bNum, bIsNum := ToFloat(b)

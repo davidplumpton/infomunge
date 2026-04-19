@@ -14,12 +14,12 @@ import (
 
 // evalExpr evaluates an infomunge expression by running it through the
 // preprocessor first (to handle array/object literals), then evaluating.
-func evalExpr(expr string) (interface{}, error) {
+func evalExpr(expr string) (evaluator.Value, error) {
 	prepared, mapping, err := preprocessor.PrepareForParsing(expr, preprocessor.Options{})
 	if err != nil {
 		return nil, err
 	}
-	return evaluator.Evaluate(prepared, make(map[string]interface{}), mapping, 0, expr)
+	return evaluator.Evaluate(prepared, make(evaluator.Context), mapping, 0, expr)
 }
 
 // --- Operator generators ---
@@ -209,7 +209,7 @@ func TestExpr_KnownExamples(t *testing.T) {
 	tests := []struct {
 		name     string
 		expr     string
-		expected interface{}
+		expected evaluator.Value
 	}{
 		{"simple add", "1 + 2", 3},
 		{"nested ops", "(1 + 2) * 3", 9},
@@ -217,7 +217,7 @@ func TestExpr_KnownExamples(t *testing.T) {
 		{"logical", "true && false", false},
 		{"negation", "-(1)", -1},
 		{"not", "!(true)", false},
-		{"empty array", "[]", []interface{}{}},
+		{"empty array", "[]", evaluator.Array{}},
 		{"complex", "(1 + 2) * -(3) > 0 && !(false)", false},
 	}
 
@@ -228,8 +228,8 @@ func TestExpr_KnownExamples(t *testing.T) {
 				t.Fatalf("eval %q: %v", tt.expr, err)
 			}
 			// For slices, just check type (deep equality is complex for interface{})
-			if _, ok := tt.expected.([]interface{}); ok {
-				if _, ok2 := result.([]interface{}); !ok2 {
+			if _, ok := tt.expected.(evaluator.Array); ok {
+				if _, ok2 := result.(evaluator.Array); !ok2 {
 					t.Fatalf("eval %q = %v (%T), want slice", tt.expr, result, result)
 				}
 				return

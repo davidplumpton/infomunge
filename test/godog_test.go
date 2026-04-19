@@ -22,6 +22,7 @@ import (
 
 	"github.com/cucumber/godog"
 	"infomunge/internal/cli"
+	"infomunge/internal/evaluator"
 	"infomunge/internal/runner"
 	"infomunge/pkg/formats"
 )
@@ -530,7 +531,7 @@ func (tc *testContext) theFollowingScript(content *godog.DocString) error {
 
 func (tc *testContext) iRunTheScript() error {
 	// Build context with payload
-	ctx := make(map[string]interface{})
+	ctx := make(evaluator.Context)
 
 	// Parse and inject payload if mime type was set (input step was called)
 	if tc.payloadMime != "" {
@@ -549,7 +550,7 @@ func (tc *testContext) iRunTheScript() error {
 // exercises the runner's formatOutputWithContext path (including applyXMLOutputOptions
 // and parseBoolOption) by capturing stdout.
 func (tc *testContext) iRunTheScriptThroughRunnerOutputPath() error {
-	ctx := make(map[string]interface{})
+	ctx := make(evaluator.Context)
 	if tc.payloadMime != "" {
 		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
 		if err != nil {
@@ -567,7 +568,7 @@ func (tc *testContext) iRunTheScriptThroughRunnerOutputPath() error {
 }
 
 func (tc *testContext) runningTheScriptThroughRunnerOutputPathShouldFailWithErrorContaining(expected string) error {
-	ctx := make(map[string]interface{})
+	ctx := make(evaluator.Context)
 	if tc.payloadMime != "" {
 		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
 		if err != nil {
@@ -591,7 +592,7 @@ func (tc *testContext) runningTheScriptThroughRunnerOutputPathShouldFailWithErro
 
 // captureRunnerStdout calls RunFromStringWithContext and captures its stdout output.
 // Uses a mutex to serialize calls since os.Stdout is process-global.
-func captureRunnerStdout(script string, ctx map[string]interface{}) (string, error) {
+func captureRunnerStdout(script string, ctx evaluator.Context) (string, error) {
 	stdoutMu.Lock()
 	defer stdoutMu.Unlock()
 
@@ -612,7 +613,7 @@ func captureRunnerStdout(script string, ctx map[string]interface{}) (string, err
 }
 
 func (tc *testContext) iRunTheScriptWithCanceledEvaluationContext() error {
-	ctx := make(map[string]interface{})
+	ctx := make(evaluator.Context)
 
 	if tc.payloadMime != "" {
 		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
@@ -635,7 +636,7 @@ func (tc *testContext) iRunTheScriptWithCanceledEvaluationContext() error {
 }
 
 func (tc *testContext) iRunTheScriptWithExpiredEvaluationDeadline() error {
-	ctx := make(map[string]interface{})
+	ctx := make(evaluator.Context)
 
 	if tc.payloadMime != "" {
 		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
@@ -659,7 +660,7 @@ func (tc *testContext) iRunTheScriptWithExpiredEvaluationDeadline() error {
 
 func (tc *testContext) runningTheScriptShouldFailWithErrorContaining(expected string) error {
 	// Build context with payload
-	ctx := make(map[string]interface{})
+	ctx := make(evaluator.Context)
 
 	// Parse and inject payload if mime type was set (input step was called)
 	if tc.payloadMime != "" {
@@ -692,7 +693,7 @@ func (tc *testContext) runningTheScriptShouldFailWithErrorContaining(expected st
 
 func (tc *testContext) iRunTheApplicationWithThisJSONInput(jsonInput *godog.DocString) error {
 	// Build context with payload
-	ctx := make(map[string]interface{})
+	ctx := make(evaluator.Context)
 
 	// Parse JSON input as payload
 	payload, err := formats.Read(jsonInput.Content, "application/json")
@@ -739,7 +740,7 @@ func (tc *testContext) theOutputShouldContainLambda() error {
 
 func (tc *testContext) theOutputShouldBeValidJSON() error {
 	// Parse output as JSON to verify it's valid
-	var result interface{}
+	var result evaluator.Value
 	if err := json.Unmarshal([]byte(tc.lastOutput), &result); err != nil {
 		return fmt.Errorf("expected valid JSON, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
 	}
@@ -748,7 +749,7 @@ func (tc *testContext) theOutputShouldBeValidJSON() error {
 
 func (tc *testContext) theOutputShouldBeValidJSONWithArrayLength(lengthStr string) error {
 	// Parse output as JSON to verify it's valid and is an array of expected length
-	var arr []interface{}
+	var arr evaluator.Array
 	if err := json.Unmarshal([]byte(tc.lastOutput), &arr); err != nil {
 		return fmt.Errorf("expected valid JSON array, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
 	}
@@ -780,7 +781,7 @@ func (tc *testContext) theOutputShouldNotContain(notExpected string) error {
 }
 
 func (tc *testContext) theOutputShouldBeValidJSONWithKeys(keysStr string) error {
-	var obj map[string]interface{}
+	var obj evaluator.Context
 	if err := json.Unmarshal([]byte(tc.lastOutput), &obj); err != nil {
 		return fmt.Errorf("expected valid JSON object, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
 	}
@@ -824,7 +825,7 @@ func (tc *testContext) iSetTheExecutionTimeoutToSeconds(seconds string) error {
 
 // theOutputShouldBeValidJSONWithNumber validates that the output is a specific JSON number
 func (tc *testContext) theOutputShouldBeValidJSONWithNumber(numStr string) error {
-	var num interface{}
+	var num evaluator.Value
 	if err := json.Unmarshal([]byte(tc.lastOutput), &num); err != nil {
 		return fmt.Errorf("expected valid JSON number, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
 	}
@@ -846,7 +847,7 @@ func (tc *testContext) theOutputShouldBeValidJSONWithNumber(numStr string) error
 }
 
 func (tc *testContext) theOutputShouldBeValidJSONWithNumberCloseTo(numStr string) error {
-	var num interface{}
+	var num evaluator.Value
 	if err := json.Unmarshal([]byte(tc.lastOutput), &num); err != nil {
 		return fmt.Errorf("expected valid JSON number, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
 	}
@@ -870,7 +871,7 @@ func (tc *testContext) theOutputShouldBeValidJSONWithNumberCloseTo(numStr string
 }
 
 func (tc *testContext) theOutputShouldBeValidJSONBoolean() error {
-	var value interface{}
+	var value evaluator.Value
 	if err := json.Unmarshal([]byte(tc.lastOutput), &value); err != nil {
 		return fmt.Errorf("expected valid JSON boolean, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
 	}
@@ -882,19 +883,19 @@ func (tc *testContext) theOutputShouldBeValidJSONBoolean() error {
 }
 
 // runScriptWithTimeout runs a script with the configured timeout
-func (tc *testContext) runScriptWithTimeout(scriptContent string, additionalContext map[string]interface{}) error {
+func (tc *testContext) runScriptWithTimeout(scriptContent string, additionalContext evaluator.Context) error {
 	type runResult struct {
-		result    interface{}
+		result    evaluator.Value
 		hasHeader bool
 		mimeType  string
-		context   map[string]interface{}
+		context   evaluator.Context
 	}
 	resultChan := make(chan runResult, 1)
 	errChan := make(chan error, 1)
 
 	// Inject deadline into context for while loop timeout detection
 	if additionalContext == nil {
-		additionalContext = make(map[string]interface{})
+		additionalContext = make(evaluator.Context)
 	}
 	additionalContext["__deadline"] = time.Now().Add(tc.timeout)
 
@@ -958,7 +959,7 @@ func (tc *testContext) runScriptWithTimeout(scriptContent string, additionalCont
 	}
 }
 
-func extractNamespaceVars(context map[string]interface{}) map[string]formats.Namespace {
+func extractNamespaceVars(context evaluator.Context) map[string]formats.Namespace {
 	if context == nil {
 		return nil
 	}
@@ -1032,12 +1033,12 @@ func (tc *testContext) theOutputShouldBeString(expected string) error {
 }
 
 func (tc *testContext) theStdoutShouldBeValidJSONEqualTo(expected *godog.DocString) error {
-	var got interface{}
+	var got evaluator.Value
 	if err := json.Unmarshal([]byte(tc.lastStdout), &got); err != nil {
 		return fmt.Errorf("expected stdout to be valid JSON, but got invalid JSON: %v, stdout: %s, stderr: %s", err, tc.lastStdout, tc.lastStderr)
 	}
 
-	var want interface{}
+	var want evaluator.Value
 	if err := json.Unmarshal([]byte(expected.Content), &want); err != nil {
 		return fmt.Errorf("expected JSON literal in step is invalid: %v, content: %s", err, expected.Content)
 	}
@@ -1206,7 +1207,7 @@ func (tc *testContext) runServerScriptWithAPIKey(output *string, apiKey *string)
 		return fmt.Errorf("script is not set")
 	}
 
-	payload := map[string]interface{}{
+	payload := evaluator.Context{
 		"script": tc.scriptContent,
 	}
 	if output != nil {
@@ -1253,7 +1254,7 @@ func (tc *testContext) runServerScriptWithBearerToken(output *string, apiKey str
 		return fmt.Errorf("script is not set")
 	}
 
-	payload := map[string]interface{}{
+	payload := evaluator.Context{
 		"script": tc.scriptContent,
 	}
 	if output != nil {
@@ -1295,7 +1296,7 @@ func (tc *testContext) iRunTheServerScriptWithCanceledContext() error {
 		return fmt.Errorf("script is not set")
 	}
 
-	payload := map[string]interface{}{
+	payload := evaluator.Context{
 		"script": tc.scriptContent,
 	}
 	body, err := json.Marshal(payload)
@@ -1327,7 +1328,7 @@ func (tc *testContext) iRunTheServerScriptWithOversizedBody() error {
 		return fmt.Errorf("script is not set")
 	}
 
-	payload := map[string]interface{}{
+	payload := evaluator.Context{
 		"script": tc.scriptContent,
 		"inputs": []map[string]string{
 			{
@@ -1392,7 +1393,7 @@ func (tc *testContext) iRunTheServerScriptWithConfiguredInputs() error {
 		return fmt.Errorf("script is not set")
 	}
 
-	payload := map[string]interface{}{
+	payload := evaluator.Context{
 		"script": tc.scriptContent,
 	}
 	if len(tc.serverRunInputs) > 0 {

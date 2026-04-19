@@ -13,12 +13,12 @@ import (
 
 // evalLiteral evaluates an expression string using the infomunge evaluator
 // with an empty context and identity mapping.
-func evalLiteral(expr string) (interface{}, error) {
+func evalLiteral(expr string) (evaluator.Value, error) {
 	mapping := make([]int, len(expr)+10)
 	for i := range mapping {
 		mapping[i] = i
 	}
-	return evaluator.Evaluate(expr, make(map[string]interface{}), mapping, 0, expr)
+	return evaluator.Evaluate(expr, make(evaluator.Context), mapping, 0, expr)
 }
 
 // --- Property tests: parsing validity ---
@@ -196,7 +196,7 @@ func TestLiteral_KnownExamples(t *testing.T) {
 	tests := []struct {
 		name     string
 		lit      string
-		expected interface{}
+		expected evaluator.Value
 	}{
 		{"zero int", "0", 0},
 		{"positive int", "42", 42},

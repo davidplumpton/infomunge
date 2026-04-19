@@ -178,9 +178,9 @@ func KindOf(v Value) ValueKind {
 		return KindFloat
 	case string:
 		return KindString
-	case []interface{}, XMLMultiValue:
+	case Array, XMLMultiValue:
 		return KindArray
-	case map[string]interface{}:
+	case Object:
 		return KindObject
 	case *Lambda:
 		return KindLambda
@@ -241,10 +241,10 @@ func AsBool(v Value) (bool, bool) {
 // AsArray extracts an Array from a Value, returning false if not an array.
 func AsArray(v Value) (Array, bool) {
 	switch arr := v.(type) {
-	case []interface{}:
+	case Array:
 		return arr, true
 	case XMLMultiValue:
-		return []interface{}(arr), true
+		return Array(arr), true
 	default:
 		return nil, false
 	}
@@ -252,7 +252,7 @@ func AsArray(v Value) (Array, bool) {
 
 // AsObject extracts an Object from a Value, returning false if not an object.
 func AsObject(v Value) (Object, bool) {
-	o, ok := v.(map[string]interface{})
+	o, ok := v.(Object)
 	return o, ok
 }
 

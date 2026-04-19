@@ -8,7 +8,7 @@ import (
 )
 
 // callBuiltinToRadix implements toRadix(number, radix).
-func callBuiltinToRadix(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinToRadix(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("toRadix requires exactly 2 arguments: number, radix", e.Pos())
 	}
@@ -30,7 +30,7 @@ func callBuiltinToRadix(args []interface{}, e *ast.CallExpr) (interface{}, error
 }
 
 // callBuiltinFromRadix implements fromRadix(text, radix).
-func callBuiltinFromRadix(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinFromRadix(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("fromRadix requires exactly 2 arguments: text, radix", e.Pos())
 	}
@@ -62,17 +62,17 @@ func callBuiltinFromRadix(args []interface{}, e *ast.CallExpr) (interface{}, err
 }
 
 // callBuiltinToBinary implements toBinary(number).
-func callBuiltinToBinary(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinToBinary(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("toBinary requires exactly 1 argument: number", e.Pos())
 	}
-	return callBuiltinToRadix([]interface{}{args[0], 2}, e)
+	return callBuiltinToRadix(Array{args[0], 2}, e)
 }
 
 // callBuiltinFromBinary implements fromBinary(text).
-func callBuiltinFromBinary(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinFromBinary(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("fromBinary requires exactly 1 argument: text", e.Pos())
 	}
-	return callBuiltinFromRadix([]interface{}{args[0], 2}, e)
+	return callBuiltinFromRadix(Array{args[0], 2}, e)
 }

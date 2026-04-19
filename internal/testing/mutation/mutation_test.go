@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"infomunge/internal/evaluator"
 	"infomunge/internal/preprocessor"
 	"infomunge/internal/runner"
 	"infomunge/internal/testing/determinism"
@@ -163,11 +164,11 @@ func buildScript(header, expr string) string {
 	return header + "\n---\n" + expr
 }
 
-func buildInputContext(inputs map[string]string) map[string]interface{} {
+func buildInputContext(inputs map[string]string) evaluator.Context {
 	if len(inputs) == 0 {
 		return nil
 	}
-	ctx := make(map[string]interface{}, len(inputs))
+	ctx := make(evaluator.Context, len(inputs))
 	for name, raw := range inputs {
 		value := strings.TrimSpace(raw)
 		if parsed, err := tryParseJSON(value); err == nil {
@@ -179,13 +180,13 @@ func buildInputContext(inputs map[string]string) map[string]interface{} {
 	return ctx
 }
 
-func tryParseJSON(raw string) (interface{}, error) {
+func tryParseJSON(raw string) (evaluator.Value, error) {
 	var out interface{}
 	err := json.Unmarshal([]byte(raw), &out)
 	return out, err
 }
 
-func safeRun(script string, ctx map[string]interface{}) (result interface{}, err error, panicValue interface{}, panicStack string) {
+func safeRun(script string, ctx evaluator.Context) (result evaluator.Value, err error, panicValue interface{}, panicStack string) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			panicValue = recovered
@@ -197,7 +198,7 @@ func safeRun(script string, ctx map[string]interface{}) (result interface{}, err
 	return result, err, nil, ""
 }
 
-func recordMutationFailure(property, originalExpr, mutatedExpr string, seed int64, ctx map[string]interface{}, panicStack string, detectedAt time.Time) {
+func recordMutationFailure(property, originalExpr, mutatedExpr string, seed int64, ctx evaluator.Context, panicStack string, detectedAt time.Time) {
 	minimizedAt := time.Now().UTC()
 	artifact := failures.Artifact{
 		Property:            property,

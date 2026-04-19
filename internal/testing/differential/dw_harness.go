@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"infomunge/internal/evaluator"
 	"infomunge/pkg/formats"
 	"math"
 	"os"
@@ -36,7 +37,7 @@ func DWAvailable() bool {
 
 // DWEval executes a DataWeave script with optional named inputs and returns
 // a normalized parsed value from stdout.
-func DWEval(script string, inputs map[string]string) (interface{}, error) {
+func DWEval(script string, inputs map[string]string) (evaluator.Value, error) {
 	if strings.TrimSpace(script) == "" {
 		return nil, errors.New("dw script cannot be empty")
 	}
@@ -114,7 +115,7 @@ func prepareDWInputArgs(inputs map[string]string) ([]string, func(), error) {
 	return args, cleanup, nil
 }
 
-func parseDWOutput(output string) (interface{}, error) {
+func parseDWOutput(output string) (evaluator.Value, error) {
 	trimmed := strings.TrimSpace(output)
 	if trimmed == "" {
 		return nil, nil
@@ -180,14 +181,14 @@ func normalizeValue(v interface{}) interface{} {
 		return float64(val)
 	case float64:
 		return val
-	case []interface{}:
-		out := make([]interface{}, len(val))
+	case evaluator.Array:
+		out := make(evaluator.Array, len(val))
 		for i := range val {
 			out[i] = normalizeValue(val[i])
 		}
 		return out
-	case map[string]interface{}:
-		out := make(map[string]interface{}, len(val))
+	case evaluator.Object:
+		out := make(evaluator.Object, len(val))
 		for k, inner := range val {
 			out[k] = normalizeValue(inner)
 		}
@@ -219,16 +220,16 @@ func compareValues(path string, left, right interface{}) error {
 		}
 	}
 
-	if lObj, ok := left.(map[string]interface{}); ok {
-		rObj, ok := right.(map[string]interface{})
+	if lObj, ok := left.(evaluator.Object); ok {
+		rObj, ok := right.(evaluator.Object)
 		if !ok {
 			return fmt.Errorf("%s: type mismatch infomunge=%T dw=%T", path, left, right)
 		}
 		return compareObjects(path, lObj, rObj)
 	}
 
-	if lArr, ok := left.([]interface{}); ok {
-		rArr, ok := right.([]interface{})
+	if lArr, ok := left.(evaluator.Array); ok {
+		rArr, ok := right.(evaluator.Array)
 		if !ok {
 			return fmt.Errorf("%s: type mismatch infomunge=%T dw=%T", path, left, right)
 		}
@@ -250,7 +251,7 @@ func compareValues(path string, left, right interface{}) error {
 	return fmt.Errorf("%s: value mismatch infomunge=%#v dw=%#v", path, left, right)
 }
 
-func compareObjects(path string, left, right map[string]interface{}) error {
+func compareObjects(path string, left, right evaluator.Object) error {
 	keys := make(map[string]struct{}, len(left)+len(right))
 	for k := range left {
 		keys[k] = struct{}{}

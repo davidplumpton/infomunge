@@ -1,6 +1,7 @@
 package failures
 
 import (
+	"infomunge/internal/evaluator"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +18,7 @@ func TestGenerateScenarioProducesValidGherkin(t *testing.T) {
 		Property:            "no-panic",
 		MinimizedExpression: "payload.a + 1",
 		OriginalExpression:  "payload.a + payload.b",
-		InputPayload: map[string]interface{}{
+		InputPayload: evaluator.Object{
 			"a": float64(2),
 		},
 		Seed: 99,
@@ -62,7 +63,7 @@ func TestGenerateAllCandidatesSkipsExisting(t *testing.T) {
 		Property:            "no-panic",
 		MinimizedExpression: "payload.a + 1",
 		OriginalExpression:  "payload.a + payload.b",
-		InputPayload:        map[string]interface{}{"a": float64(1)},
+		InputPayload:        evaluator.Object{"a": float64(1)},
 		Seed:                1,
 	})
 	if err != nil {
@@ -72,7 +73,7 @@ func TestGenerateAllCandidatesSkipsExisting(t *testing.T) {
 		Property:            "determinism",
 		MinimizedExpression: "payload.b * 2",
 		OriginalExpression:  "payload.b * 2 + 0",
-		InputPayload:        map[string]interface{}{"b": float64(2)},
+		InputPayload:        evaluator.Object{"b": float64(2)},
 		Seed:                2,
 	})
 	if err != nil {
@@ -83,7 +84,7 @@ func TestGenerateAllCandidatesSkipsExisting(t *testing.T) {
 		ID:                  1,
 		Property:            "no-panic",
 		MinimizedExpression: "payload.a + 1",
-		InputPayload:        map[string]interface{}{"a": float64(1)},
+		InputPayload:        evaluator.Object{"a": float64(1)},
 	})
 	if err != nil {
 		t.Fatalf("WriteCandidateScenarioToDir(existing): %v", err)

@@ -9,7 +9,7 @@ type reduceSetup struct {
 	accParamIdx  int
 	elemParamIdx int
 	hasInitial   bool
-	initialValue interface{}
+	initialValue Value
 }
 
 func determineReduceSetup(lambda *Lambda) reduceSetup {
@@ -40,7 +40,7 @@ func determineReduceSetup(lambda *Lambda) reduceSetup {
 	return setup
 }
 
-func handleReduceEmptyArray(array []interface{}, setup reduceSetup, pos token.Pos) (interface{}, bool, error) {
+func handleReduceEmptyArray(array Array, setup reduceSetup, pos token.Pos) (Value, bool, error) {
 	if len(array) != 0 {
 		return nil, false, nil
 	}
@@ -50,14 +50,14 @@ func handleReduceEmptyArray(array []interface{}, setup reduceSetup, pos token.Po
 	return nil, true, newPosError("reduce cannot be applied to an empty array without an initial value", pos)
 }
 
-func reduceInitialAccumulator(array []interface{}, setup reduceSetup) (interface{}, int) {
+func reduceInitialAccumulator(array Array, setup reduceSetup) (Value, int) {
 	if setup.hasInitial {
 		return setup.initialValue, 0
 	}
 	return array[0], 1
 }
 
-func runReduce(array []interface{}, lambda *Lambda, context map[string]interface{}, depth int, setup reduceSetup) (interface{}, error) {
+func runReduce(array Array, lambda *Lambda, context Context, depth int, setup reduceSetup) (Value, error) {
 	accumulator, startIdx := reduceInitialAccumulator(array, setup)
 	for i := startIdx; i < len(array); i++ {
 		lambdaContext := copyContext(context)
@@ -99,7 +99,7 @@ func runReduce(array []interface{}, lambda *Lambda, context map[string]interface
 //     starts from second element.
 //
 // Returns an error if the array is empty and no initial value is provided.
-func callBuiltinReduce(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinReduce(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	array, lambda, err := evalArrayAndLambda("reduce", e, context, depth, 2, 3)
 	if err != nil {
 		return nil, err

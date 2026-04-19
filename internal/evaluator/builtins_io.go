@@ -84,7 +84,7 @@ func isPrivateIP(ip net.IP) bool {
 }
 
 // callBuiltinRead implements the read(content, mimeType[, options]) function.
-func callBuiltinRead(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinRead(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 2 {
 		return nil, newPosError("read function requires at least 2 arguments: content and mimeType", e.Pos())
 	}
@@ -105,7 +105,7 @@ func callBuiltinRead(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 		return res, nil
 	}
 
-	options, ok := args[2].(map[string]interface{})
+	options, ok := args[2].(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("read expects options to be an object, got %T", args[2]), e.Pos())
 	}
@@ -118,8 +118,8 @@ func callBuiltinRead(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinReadUrl implements the readUrl(url, mimeType) function.
-func callBuiltinReadUrl(e *ast.CallExpr, evalCtx map[string]interface{}, depth int) (interface{}, error) {
-	args := make([]interface{}, 0, len(e.Args))
+func callBuiltinReadUrl(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
+	args := make(Array, 0, len(e.Args))
 	for _, argExpr := range e.Args {
 		arg, err := evalASTWithDepth(argExpr, evalCtx, depth+1)
 		if err != nil {
@@ -130,7 +130,7 @@ func callBuiltinReadUrl(e *ast.CallExpr, evalCtx map[string]interface{}, depth i
 	return callBuiltinReadUrlWithArgs(args, e, evalCtx)
 }
 
-func callBuiltinReadUrlWithArgs(args []interface{}, e *ast.CallExpr, evalCtx map[string]interface{}) (interface{}, error) {
+func callBuiltinReadUrlWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("readUrl requires exactly 2 arguments: url and mimeType", e.Pos())
 	}
@@ -187,7 +187,7 @@ func callBuiltinReadUrlWithArgs(args []interface{}, e *ast.CallExpr, evalCtx map
 }
 
 // callBuiltinWrite implements the write(value, mimeType[, options]) function.
-func callBuiltinWrite(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinWrite(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 2 {
 		return nil, newPosError("write requires exactly 2 arguments: value and mimeType", e.Pos())
 	}
@@ -208,7 +208,7 @@ func callBuiltinWrite(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 		return result, nil
 	}
 
-	options, ok := args[2].(map[string]interface{})
+	options, ok := args[2].(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("write expects options to be an object, got %T", args[2]), e.Pos())
 	}

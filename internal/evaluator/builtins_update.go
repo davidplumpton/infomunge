@@ -13,7 +13,7 @@ import (
 )
 
 // callBuiltinUpdateExpr implements the __updateExpr(value, casesString) function.
-func callBuiltinUpdateExpr(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinUpdateExpr(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("update expression requires exactly 2 arguments: value and cases", e.Pos())
 	}
@@ -44,7 +44,7 @@ func callBuiltinUpdateExpr(e *ast.CallExpr, context map[string]interface{}, dept
 }
 
 // applyUpdateCases parses and applies update case statements to a value
-func applyUpdateCases(value interface{}, casesStr string, context map[string]interface{}, depth int) (interface{}, error) {
+func applyUpdateCases(value Value, casesStr string, context Context, depth int) (Value, error) {
 	// Parse case statements line by line
 	lines := strings.Split(casesStr, "\n")
 	result := deepCopy(value) // Start with a copy of the value
@@ -92,7 +92,7 @@ func applyUpdateCases(value interface{}, casesStr string, context map[string]int
 }
 
 // applyUpdateCase applies a single update case to a value
-func applyUpdateCase(value interface{}, varName, selector, expression string, context map[string]interface{}, depth int) (interface{}, error) {
+func applyUpdateCase(value Value, varName, selector, expression string, context Context, depth int) (Value, error) {
 	// Parse the selector path
 	path, err := parseSelectorPath(selector)
 	if err != nil {
@@ -184,11 +184,11 @@ func parseSelectorPath(selector string) ([]selectorSegment, error) {
 }
 
 // getValueAtPath retrieves a value at the given selector path
-func getValueAtPath(value interface{}, path []selectorSegment) (interface{}, error) {
+func getValueAtPath(value Value, path []selectorSegment) (Value, error) {
 	current := value
 	for _, seg := range path {
 		if seg.isIndex {
-			arr, ok := current.([]interface{})
+			arr, ok := current.(Array)
 			if !ok {
 				return nil, unifiederrors.EvalError("expected array for index selector")
 			}
@@ -197,7 +197,7 @@ func getValueAtPath(value interface{}, path []selectorSegment) (interface{}, err
 			}
 			current = arr[seg.index]
 		} else {
-			obj, ok := current.(map[string]interface{})
+			obj, ok := current.(Object)
 			if !ok {
 				return nil, unifiederrors.EvalError("expected object for field selector")
 			}
@@ -213,19 +213,19 @@ func getValueAtPath(value interface{}, path []selectorSegment) (interface{}, err
 
 // setValueAtPath sets a value at the given selector path, returning a new value with the update applied
 // updateArrayElement updates an element in an array at the given index.
-func updateArrayElement(arr []interface{}, index int, newValue interface{}) ([]interface{}, error) {
+func updateArrayElement(arr Array, index int, newValue Value) (Array, error) {
 	if index < 0 || index >= len(arr) {
 		return nil, unifiederrors.EvalErrorf("index out of bounds: %d", index)
 	}
-	newArr := make([]interface{}, len(arr))
+	newArr := make(Array, len(arr))
 	copy(newArr, arr)
 	newArr[index] = newValue
 	return newArr, nil
 }
 
 // updateObjectField updates a field in an object.
-func updateObjectField(obj map[string]interface{}, fieldName string, newValue interface{}) map[string]interface{} {
-	newObj := make(map[string]interface{})
+func updateObjectField(obj Object, fieldName string, newValue Value) Object {
+	newObj := make(Object)
 	for k, v := range obj {
 		newObj[k] = v
 	}
@@ -233,7 +233,7 @@ func updateObjectField(obj map[string]interface{}, fieldName string, newValue in
 	return newObj
 }
 
-func setValueAtPath(value interface{}, path []selectorSegment, newValue interface{}, depth int) (interface{}, error) {
+func setValueAtPath(value Value, path []selectorSegment, newValue Value, depth int) (Value, error) {
 	if depth > MaxEvalDepth {
 		return nil, unifiederrors.EvalErrorf("update path depth limit exceeded (max %d)", MaxEvalDepth)
 	}
@@ -246,7 +246,7 @@ func setValueAtPath(value interface{}, path []selectorSegment, newValue interfac
 	isTerminal := len(path) == 1
 
 	if seg.isIndex {
-		arr, ok := value.([]interface{})
+		arr, ok := value.(Array)
 		if !ok {
 			return nil, unifiederrors.EvalError("expected array for index selector")
 		}
@@ -263,7 +263,7 @@ func setValueAtPath(value interface{}, path []selectorSegment, newValue interfac
 		return updateArrayElement(arr, seg.index, childValue)
 	}
 
-	obj, ok := value.(map[string]interface{})
+	obj, ok := value.(Object)
 	if !ok {
 		return nil, unifiederrors.EvalError("expected object for field selector")
 	}
@@ -282,16 +282,16 @@ func setValueAtPath(value interface{}, path []selectorSegment, newValue interfac
 }
 
 // deepCopy creates a deep copy of a value
-func deepCopy(value interface{}) interface{} {
+func deepCopy(value Value) Value {
 	switch v := value.(type) {
-	case map[string]interface{}:
-		newMap := make(map[string]interface{})
+	case Object:
+		newMap := make(Object)
 		for k, val := range v {
 			newMap[k] = deepCopy(val)
 		}
 		return newMap
-	case []interface{}:
-		newArr := make([]interface{}, len(v))
+	case Array:
+		newArr := make(Array, len(v))
 		for i, val := range v {
 			newArr[i] = deepCopy(val)
 		}

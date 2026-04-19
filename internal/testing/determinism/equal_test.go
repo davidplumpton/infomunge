@@ -12,11 +12,11 @@ func TestEqualTreatsNaNAsDeterministic(t *testing.T) {
 		t.Fatal("expected NaN and NaN to be deterministic equals")
 	}
 
-	first := map[string]interface{}{
-		"value": []interface{}{math.NaN()},
+	first := evaluator.Object{
+		"value": evaluator.Array{math.NaN()},
 	}
-	second := map[string]interface{}{
-		"value": []interface{}{math.NaN()},
+	second := evaluator.Object{
+		"value": evaluator.Array{math.NaN()},
 	}
 	if !Equal(first, second) {
 		t.Fatal("expected nested NaN values to be deterministic equals")

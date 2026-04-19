@@ -14,7 +14,7 @@ import (
 )
 
 // callBuiltinLazyEval implements the lazy_eval(expr) function.
-func callBuiltinLazyEval(e *ast.CallExpr, evalCtx map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinLazyEval(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("lazy_eval requires exactly 1 argument: expression", e.Pos())
 	}
@@ -39,7 +39,7 @@ func callBuiltinForceEval(values []Value, e *ast.CallExpr) (Value, error) {
 }
 
 // callBuiltinDefault implements the __default(value, defaultValue) function.
-func callBuiltinDefault(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinDefault(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("default operator requires exactly 2 arguments: value, defaultValue", e.Pos())
 	}
@@ -56,7 +56,7 @@ func callBuiltinDefault(e *ast.CallExpr, context map[string]interface{}, depth i
 }
 
 // callBuiltinLambdaAST implements the __lambda(paramNames, body) function.
-func callBuiltinLambdaAST(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinLambdaAST(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("lambda expression requires exactly 2 arguments: paramNames, body", e.Pos())
 	}
@@ -111,7 +111,7 @@ func callBuiltinLambdaAST(e *ast.CallExpr, context map[string]interface{}, depth
 }
 
 // parseDefaultValue parses a string representation of a default value.
-func parseDefaultValue(s string) (interface{}, error) {
+func parseDefaultValue(s string) (Value, error) {
 	s = strings.TrimSpace(s)
 
 	// Check for quoted string
@@ -136,12 +136,12 @@ func parseDefaultValue(s string) (interface{}, error) {
 
 	// Check for empty array
 	if s == "[]" {
-		return []interface{}{}, nil
+		return Array{}, nil
 	}
 
 	// Check for empty object
 	if s == "{}" {
-		return map[string]interface{}{}, nil
+		return Object{}, nil
 	}
 
 	// Object literal: {key: value, ...}
@@ -170,13 +170,13 @@ func parseDefaultValue(s string) (interface{}, error) {
 }
 
 // parseDefaultObjectLiteral parses an object literal like {total: 0, count: 0}.
-func parseDefaultObjectLiteral(s string) (map[string]interface{}, error) {
+func parseDefaultObjectLiteral(s string) (Object, error) {
 	inner := strings.TrimSpace(s[1 : len(s)-1])
 	if inner == "" {
-		return map[string]interface{}{}, nil
+		return Object{}, nil
 	}
 
-	result := make(map[string]interface{})
+	result := make(Object)
 	pairs := splitRespectingDepth(inner, ',')
 
 	for _, pair := range pairs {
@@ -202,13 +202,13 @@ func parseDefaultObjectLiteral(s string) (map[string]interface{}, error) {
 }
 
 // parseDefaultArrayLiteral parses an array literal like [1, 2, 3].
-func parseDefaultArrayLiteral(s string) ([]interface{}, error) {
+func parseDefaultArrayLiteral(s string) (Array, error) {
 	inner := strings.TrimSpace(s[1 : len(s)-1])
 	if inner == "" {
-		return []interface{}{}, nil
+		return Array{}, nil
 	}
 
-	var result []interface{}
+	var result Array
 	items := splitRespectingDepth(inner, ',')
 
 	for _, item := range items {
@@ -227,16 +227,16 @@ func parseDefaultArrayLiteral(s string) ([]interface{}, error) {
 }
 
 // parseGoSyntaxObjectLiteral parses a Go-syntax object literal like
-// map[string]interface{}{"sum": 0, "count": 1,}.
-func parseGoSyntaxObjectLiteral(s string, prefix string) (map[string]interface{}, error) {
+// Object{"sum": 0, "count": 1,}.
+func parseGoSyntaxObjectLiteral(s string, prefix string) (Object, error) {
 	inner := strings.TrimSpace(s[len(prefix) : len(s)-1])
 	inner = strings.TrimSuffix(strings.TrimSpace(inner), ",")
 	inner = strings.TrimSpace(inner)
 	if inner == "" {
-		return map[string]interface{}{}, nil
+		return Object{}, nil
 	}
 
-	result := make(map[string]interface{})
+	result := make(Object)
 	pairs := splitRespectingDepth(inner, ',')
 
 	for _, pair := range pairs {
@@ -267,15 +267,15 @@ func parseGoSyntaxObjectLiteral(s string, prefix string) (map[string]interface{}
 }
 
 // parseGoSyntaxArrayLiteral parses a Go-syntax array literal like []interface{}{1, 2, 3,}.
-func parseGoSyntaxArrayLiteral(s string, prefix string) ([]interface{}, error) {
+func parseGoSyntaxArrayLiteral(s string, prefix string) (Array, error) {
 	inner := strings.TrimSpace(s[len(prefix) : len(s)-1])
 	inner = strings.TrimSuffix(strings.TrimSpace(inner), ",")
 	inner = strings.TrimSpace(inner)
 	if inner == "" {
-		return []interface{}{}, nil
+		return Array{}, nil
 	}
 
-	var result []interface{}
+	var result Array
 	items := splitRespectingDepth(inner, ',')
 
 	for _, item := range items {
@@ -366,7 +366,7 @@ func exprToString(expr ast.Expr) string {
 }
 
 // callBuiltinModCall implements __modcall("Module", "func", args...) for module function calls.
-func callBuiltinModCall(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinModCall(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) < 2 {
 		return nil, newPosError("__modcall requires at least 2 arguments: module name and function name", e.Pos())
 	}
@@ -391,7 +391,7 @@ func callBuiltinModCall(e *ast.CallExpr, context map[string]interface{}, depth i
 		return nil, newPosError(fmt.Sprintf("module %q not found", modName), e.Pos())
 	}
 
-	ns, ok := modVal.(map[string]interface{})
+	ns, ok := modVal.(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("%q is not a module namespace", modName), e.Pos())
 	}
@@ -406,7 +406,7 @@ func callBuiltinModCall(e *ast.CallExpr, context map[string]interface{}, depth i
 		return nil, newPosError(fmt.Sprintf("%s::%s is not a function", modName, funcName), e.Pos())
 	}
 
-	args := make([]interface{}, 0, len(e.Args)-2)
+	args := make([]Value, 0, len(e.Args)-2)
 	for _, argExpr := range e.Args[2:] {
 		v, err := evalASTWithDepth(argExpr, context, depth+1)
 		if err != nil {
@@ -419,8 +419,8 @@ func callBuiltinModCall(e *ast.CallExpr, context map[string]interface{}, depth i
 }
 
 // callUserLambda invokes a user-defined Lambda with the given arguments.
-func callUserLambda(l *Lambda, args []interface{}, callingContext map[string]interface{}, depth int) (interface{}, error) {
-	base := make(map[string]interface{})
+func callUserLambda(l *Lambda, args []Value, callingContext Context, depth int) (Value, error) {
+	base := make(Context)
 
 	if l.Env != nil {
 		for k, v := range l.Env {
@@ -441,7 +441,7 @@ func callUserLambda(l *Lambda, args []interface{}, callingContext map[string]int
 	return evalASTWithDepth(l.BodyAST, base, depth)
 }
 
-func callBuiltinCoerce(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinCoerce(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) < 2 || len(e.Args) > 3 {
 		return nil, newPosError("as operator requires 2 or 3 arguments: value, type[, config]", e.Pos())
 	}
@@ -489,7 +489,7 @@ func callBuiltinCoerce(e *ast.CallExpr, context map[string]interface{}, depth in
 		// If it's nil, treat as empty properties
 		if propsVal == nil {
 			properties = nil
-		} else if p, ok := propsVal.(map[string]interface{}); ok {
+		} else if p, ok := propsVal.(Object); ok {
 			properties = p
 		} else if p, ok := propsVal.(Object); ok {
 			properties = p
@@ -501,7 +501,7 @@ func callBuiltinCoerce(e *ast.CallExpr, context map[string]interface{}, depth in
 	return coerceToTypeWithVisited(value, typeName, context, e.Args[1].Pos(), nil, properties)
 }
 
-func callBuiltinCase(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinCase(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("__case requires exactly 2 arguments: value, cases", e.Pos())
 	}
@@ -517,7 +517,7 @@ func callBuiltinCase(e *ast.CallExpr, context map[string]interface{}, depth int)
 	}
 
 	for _, elt := range casesAST.Elts {
-		// Each element is map[string]interface{}{ "pattern": "...", "result": ... }
+		// Each element is Object{ "pattern": "...", "result": ... }
 		caseMapAST, ok := elt.(*ast.CompositeLit)
 		if !ok {
 			continue
@@ -573,7 +573,7 @@ func callBuiltinCase(e *ast.CallExpr, context map[string]interface{}, depth int)
 }
 
 // matchLiteral attempts to match a value against a literal pattern.
-func matchLiteral(val interface{}, pattern string) bool {
+func matchLiteral(val Value, pattern string) bool {
 	if strings.Contains(pattern, " is ") || pattern == "else" {
 		return false
 	}
@@ -590,7 +590,7 @@ func matchLiteral(val interface{}, pattern string) bool {
 
 // matchTypePattern matches a type pattern like "s is String" or "is String".
 // Returns the updated context and whether it matched.
-func matchTypePattern(val interface{}, pattern string, context map[string]interface{}) (map[string]interface{}, bool) {
+func matchTypePattern(val Value, pattern string, context Context) (Context, bool) {
 	isIdx := strings.Index(pattern, " is ")
 	startsIs := strings.HasPrefix(pattern, "is ")
 	if isIdx == -1 && !startsIs {
@@ -619,7 +619,7 @@ func matchTypePattern(val interface{}, pattern string, context map[string]interf
 }
 
 // evaluateIfCondition evaluates the guard condition in a pattern match.
-func evaluateIfCondition(condStr string, matchContext map[string]interface{}, pos token.Pos) (bool, error) {
+func evaluateIfCondition(condStr string, matchContext Context, pos token.Pos) (bool, error) {
 	condAST, err := goparser.ParseExpr(condStr)
 	if err != nil {
 		return false, newPosError(fmt.Sprintf("invalid case condition: %v", err), pos)
@@ -635,7 +635,7 @@ func evaluateIfCondition(condStr string, matchContext map[string]interface{}, po
 	return condBool, nil
 }
 
-func matchPattern(val interface{}, patternStr string, context map[string]interface{}, pos token.Pos) (map[string]interface{}, bool, error) {
+func matchPattern(val Value, patternStr string, context Context, pos token.Pos) (Context, bool, error) {
 	if patternStr == "else" {
 		return context, true, nil
 	}
@@ -644,7 +644,7 @@ func matchPattern(val interface{}, patternStr string, context map[string]interfa
 	ifParts := strings.SplitN(p, " if ", 2)
 	p = strings.TrimSpace(ifParts[0])
 
-	var matchContext map[string]interface{}
+	var matchContext Context
 	matched := false
 
 	// Try literal match first
@@ -712,7 +712,7 @@ func isSimpleIdentifier(s string) bool {
 	return true
 }
 
-func callBuiltinOnNull(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinOnNull(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("onNull requires exactly 2 arguments: value, lambda", e.Pos())
 	}
@@ -749,7 +749,7 @@ func callBuiltinOnNull(e *ast.CallExpr, context map[string]interface{}, depth in
 	return evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
 }
 
-func callBuiltinThen(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinThen(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("then requires exactly 2 arguments: value, lambda", e.Pos())
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 // evalArrayIndex handles indexing into arrays (and XMLMultiValue).
-func evalArrayIndex(arr []interface{}, idx Value, pos token.Pos) (Value, error) {
+func evalArrayIndex(arr Array, idx Value, pos token.Pos) (Value, error) {
 	switch i := idx.(type) {
 	case int:
 		if i < 0 {
@@ -27,7 +27,7 @@ func evalArrayIndex(arr []interface{}, idx Value, pos token.Pos) (Value, error) 
 
 // evalArrayStringIndex handles string-based indexing into arrays, including
 // presence (?) and assert (!) selectors and field extraction.
-func evalArrayStringIndex(arr []interface{}, key string, pos token.Pos) (Value, error) {
+func evalArrayStringIndex(arr Array, key string, pos token.Pos) (Value, error) {
 	if strings.HasSuffix(key, "?") {
 		return evalArrayPresenceSelector(arr, strings.TrimSuffix(key, "?")), nil
 	}
@@ -35,9 +35,9 @@ func evalArrayStringIndex(arr []interface{}, key string, pos token.Pos) (Value, 
 		return evalArrayAssertSelector(arr, strings.TrimSuffix(key, "!"), pos)
 	}
 	// DataWeave compatibility: applying a string index to an array extracts that field from all elements
-	result := make([]interface{}, 0, len(arr))
+	result := make(Array, 0, len(arr))
 	for _, item := range arr {
-		if itemMap, ok := item.(map[string]interface{}); ok {
+		if itemMap, ok := item.(Object); ok {
 			val, _ := getObjectValue(itemMap, key)
 			result = append(result, val)
 		} else {
@@ -49,10 +49,10 @@ func evalArrayStringIndex(arr []interface{}, key string, pos token.Pos) (Value, 
 
 // evalArrayPresenceSelector returns a boolean for each array item indicating
 // whether the given key exists.
-func evalArrayPresenceSelector(arr []interface{}, key string) []interface{} {
-	result := make([]interface{}, 0, len(arr))
+func evalArrayPresenceSelector(arr Array, key string) Array {
+	result := make(Array, 0, len(arr))
 	for _, item := range arr {
-		if itemMap, ok := item.(map[string]interface{}); ok {
+		if itemMap, ok := item.(Object); ok {
 			_, exists := getObjectValue(itemMap, key)
 			result = append(result, exists)
 		} else {
@@ -64,10 +64,10 @@ func evalArrayPresenceSelector(arr []interface{}, key string) []interface{} {
 
 // evalArrayAssertSelector extracts the given key from each array item,
 // returning an error if any item is not an object or is missing the key.
-func evalArrayAssertSelector(arr []interface{}, key string, pos token.Pos) ([]interface{}, error) {
-	result := make([]interface{}, 0, len(arr))
+func evalArrayAssertSelector(arr Array, key string, pos token.Pos) (Array, error) {
+	result := make(Array, 0, len(arr))
 	for idx, item := range arr {
-		itemMap, ok := item.(map[string]interface{})
+		itemMap, ok := item.(Object)
 		if !ok {
 			return nil, newPosError(fmt.Sprintf("assert selector failed: expected object at index %d", idx), pos)
 		}
@@ -98,7 +98,7 @@ func evalStringIndex(s string, idx Value, pos token.Pos) (Value, error) {
 
 // evalObjectIndex handles indexing into maps/objects, including special keys
 // (#, @), presence/assert selectors, and ordinal indexing.
-func evalObjectIndex(obj map[string]interface{}, idx Value, pos token.Pos) (Value, error) {
+func evalObjectIndex(obj Object, idx Value, pos token.Pos) (Value, error) {
 	switch i := idx.(type) {
 	case string:
 		return evalObjectStringIndex(obj, i, pos)
@@ -111,12 +111,12 @@ func evalObjectIndex(obj map[string]interface{}, idx Value, pos token.Pos) (Valu
 
 // evalObjectStringIndex handles string-based object access including special
 // keys (#, @) and presence/assert selectors.
-func evalObjectStringIndex(obj map[string]interface{}, key string, pos token.Pos) (Value, error) {
+func evalObjectStringIndex(obj Object, key string, pos token.Pos) (Value, error) {
 	if key == "#" {
 		return extractNamespaceValue(obj), nil
 	}
 	if key == "@" {
-		attrs := make(map[string]interface{})
+		attrs := make(Object)
 		for k, val := range obj {
 			if strings.HasPrefix(k, "@") {
 				attrs[k] = val
@@ -142,7 +142,7 @@ func evalObjectStringIndex(obj map[string]interface{}, key string, pos token.Pos
 }
 
 // evalObjectOrdinalIndex accesses an object by sorted key position.
-func evalObjectOrdinalIndex(obj map[string]interface{}, i int, pos token.Pos) (Value, error) {
+func evalObjectOrdinalIndex(obj Object, i int, pos token.Pos) (Value, error) {
 	keys := make([]string, 0, len(obj))
 	for k := range obj {
 		keys = append(keys, k)

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/evaluator"
 	input "infomunge/internal/io"
 	"infomunge/internal/runner"
 	"infomunge/internal/version"
@@ -124,12 +125,12 @@ func (app *App) parseFlags(args []string) (*Config, error) {
 }
 
 // prepareInputs processes all input specifications
-func (app *App) prepareInputs(config *Config) (map[string]interface{}, error) {
+func (app *App) prepareInputs(config *Config) (evaluator.Context, error) {
 	return app.parser.ParseInputs(config.Inputs)
 }
 
 // execute runs the script with the given context
-func (app *App) execute(config *Config, context map[string]interface{}) error {
+func (app *App) execute(config *Config, context evaluator.Context) error {
 	opts := runner.RunnerOptions{
 		Lazy: config.Lazy,
 	}

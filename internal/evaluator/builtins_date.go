@@ -10,7 +10,7 @@ import (
 )
 
 // callBuiltinNow implements the now() function.
-func callBuiltinNow(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinNow(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireNoArgs(args, "now", e); err != nil {
 		return nil, err
 	}
@@ -18,7 +18,7 @@ func callBuiltinNow(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinDaysBetween implements the daysBetween(date1, date2) function.
-func callBuiltinDaysBetween(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinDaysBetween(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 2, "daysBetween requires exactly 2 arguments", e); err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func callBuiltinDaysBetween(args []interface{}, e *ast.CallExpr) (interface{}, e
 
 // callBuiltinIsLeapYear implements the isLeapYear(dateOrYear) function.
 // Accepts either an integer year or a date string.
-func callBuiltinIsLeapYear(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinIsLeapYear(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "isLeapYear requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func callBuiltinIsLeapYear(args []interface{}, e *ast.CallExpr) (interface{}, er
 }
 
 // callBuiltinToday implements the today() function.
-func callBuiltinToday(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinToday(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireNoArgs(args, "today", e); err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func callBuiltinToday(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 }
 
 // callBuiltinTomorrow implements the tomorrow() function.
-func callBuiltinTomorrow(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinTomorrow(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireNoArgs(args, "tomorrow", e); err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func callBuiltinTomorrow(args []interface{}, e *ast.CallExpr) (interface{}, erro
 }
 
 // callBuiltinYesterday implements the yesterday() function.
-func callBuiltinYesterday(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinYesterday(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireNoArgs(args, "yesterday", e); err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func callBuiltinYesterday(args []interface{}, e *ast.CallExpr) (interface{}, err
 }
 
 // callBuiltinDate implements the date(year, month, day) function.
-func callBuiltinDate(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinDate(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 3, "date requires exactly 3 arguments: year, month, day", e); err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func callBuiltinDate(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinTime implements the time(hour, minutes, seconds, timezone) function.
-func callBuiltinTime(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinTime(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 3 || len(args) > 4 {
 		return nil, newPosError("time requires 3-4 arguments: hour, minutes, seconds[, timezone]", e.Pos())
 	}
@@ -170,7 +170,7 @@ func callBuiltinTime(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinDateTime implements the dateTime(year, month, day, hour, minutes, seconds, timezone) function.
-func callBuiltinDateTime(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinDateTime(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 6 || len(args) > 7 {
 		return nil, newPosError("dateTime requires 6-7 arguments: year, month, day, hour, minutes, seconds[, timezone]", e.Pos())
 	}
@@ -225,7 +225,7 @@ func callBuiltinDateTime(args []interface{}, e *ast.CallExpr) (interface{}, erro
 }
 
 // callBuiltinLocalDateTime implements the localDateTime(year, month, day, hour, minutes, seconds) function.
-func callBuiltinLocalDateTime(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinLocalDateTime(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 6, "localDateTime requires exactly 6 arguments: year, month, day, hour, minutes, seconds", e); err != nil {
 		return nil, err
 	}
@@ -260,7 +260,7 @@ func callBuiltinLocalDateTime(args []interface{}, e *ast.CallExpr) (interface{},
 }
 
 // callBuiltinLocalTime implements the localTime(hour, minutes, seconds) function.
-func callBuiltinLocalTime(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinLocalTime(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 3, "localTime requires exactly 3 arguments: hour, minutes, seconds", e); err != nil {
 		return nil, err
 	}
@@ -283,7 +283,7 @@ func callBuiltinLocalTime(args []interface{}, e *ast.CallExpr) (interface{}, err
 }
 
 // callBuiltinAtBeginningOfDay implements the atBeginningOfDay(dateTime) function.
-func callBuiltinAtBeginningOfDay(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinAtBeginningOfDay(args []Value, e *ast.CallExpr) (Value, error) {
 	dateStr, err := requireOneStringArg(args, "atBeginningOfDay", e)
 	if err != nil {
 		return nil, err
@@ -298,7 +298,7 @@ func callBuiltinAtBeginningOfDay(args []interface{}, e *ast.CallExpr) (interface
 }
 
 // callBuiltinAtBeginningOfHour implements the atBeginningOfHour(dateTime) function.
-func callBuiltinAtBeginningOfHour(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinAtBeginningOfHour(args []Value, e *ast.CallExpr) (Value, error) {
 	dateStr, err := requireOneStringArg(args, "atBeginningOfHour", e)
 	if err != nil {
 		return nil, err
@@ -313,7 +313,7 @@ func callBuiltinAtBeginningOfHour(args []interface{}, e *ast.CallExpr) (interfac
 }
 
 // callBuiltinAtBeginningOfMonth implements the atBeginningOfMonth(dateTime) function.
-func callBuiltinAtBeginningOfMonth(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinAtBeginningOfMonth(args []Value, e *ast.CallExpr) (Value, error) {
 	dateStr, err := requireOneStringArg(args, "atBeginningOfMonth", e)
 	if err != nil {
 		return nil, err
@@ -328,7 +328,7 @@ func callBuiltinAtBeginningOfMonth(args []interface{}, e *ast.CallExpr) (interfa
 }
 
 // callBuiltinAtBeginningOfWeek implements the atBeginningOfWeek(dateTime) function.
-func callBuiltinAtBeginningOfWeek(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinAtBeginningOfWeek(args []Value, e *ast.CallExpr) (Value, error) {
 	dateStr, err := requireOneStringArg(args, "atBeginningOfWeek", e)
 	if err != nil {
 		return nil, err
@@ -345,7 +345,7 @@ func callBuiltinAtBeginningOfWeek(args []interface{}, e *ast.CallExpr) (interfac
 }
 
 // callBuiltinAtBeginningOfYear implements the atBeginningOfYear(dateTime) function.
-func callBuiltinAtBeginningOfYear(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinAtBeginningOfYear(args []Value, e *ast.CallExpr) (Value, error) {
 	dateStr, err := requireOneStringArg(args, "atBeginningOfYear", e)
 	if err != nil {
 		return nil, err
@@ -361,7 +361,7 @@ func callBuiltinAtBeginningOfYear(args []interface{}, e *ast.CallExpr) (interfac
 
 // callBuiltinDayOfWeek implements the dayOfWeek(date) function.
 // Returns the day of the week as an integer (1 = Monday, 7 = Sunday) following DataWeave convention.
-func callBuiltinDayOfWeek(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinDayOfWeek(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "dayOfWeek requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
@@ -385,7 +385,7 @@ func callBuiltinDayOfWeek(args []interface{}, e *ast.CallExpr) (interface{}, err
 
 // callBuiltinDayOfYear implements the dayOfYear(date) function.
 // Returns the day of the year as an integer (1-366).
-func callBuiltinDayOfYear(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinDayOfYear(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "dayOfYear requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
@@ -418,7 +418,7 @@ func parseDateTime(s string) (time.Time, error) {
 }
 
 // toInt converts a value to an int for date/time functions.
-func toInt(val interface{}, funcName string, e *ast.CallExpr) (int, error) {
+func toInt(val Value, funcName string, e *ast.CallExpr) (int, error) {
 	switch v := val.(type) {
 	case int:
 		return v, nil

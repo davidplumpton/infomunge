@@ -40,8 +40,8 @@ func equalValues(first, second interface{}) bool {
 			return true
 		}
 		return left == right
-	case []interface{}:
-		right, ok := second.([]interface{})
+	case evaluator.Array:
+		right, ok := second.(evaluator.Array)
 		if !ok || len(left) != len(right) {
 			return false
 		}
@@ -51,8 +51,8 @@ func equalValues(first, second interface{}) bool {
 			}
 		}
 		return true
-	case map[string]interface{}:
-		right, ok := second.(map[string]interface{})
+	case evaluator.Object:
+		right, ok := second.(evaluator.Object)
 		if !ok || len(left) != len(right) {
 			return false
 		}

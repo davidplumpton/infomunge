@@ -9,7 +9,7 @@ import (
 )
 
 // validateArgCount checks that args has the expected count and returns an error if not.
-func validateArgCount(args []interface{}, expected int, funcName string, pos token.Pos) error {
+func validateArgCount(args []Value, expected int, funcName string, pos token.Pos) error {
 	if len(args) != expected {
 		return newArgCountError(funcName, expected, pos)
 	}
@@ -17,18 +17,18 @@ func validateArgCount(args []interface{}, expected int, funcName string, pos tok
 }
 
 // callBuiltinSizeOf implements the sizeOf(value) function.
-func callBuiltinSizeOf(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinSizeOf(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 1, "sizeOf", e.Pos()); err != nil {
 		return nil, err
 	}
 	switch v := args[0].(type) {
 	case string:
 		return len(v), nil
-	case []interface{}:
+	case Array:
 		return len(v), nil
 	case XMLMultiValue:
 		return len(v), nil
-	case map[string]interface{}:
+	case Object:
 		return len(v), nil
 	case nil:
 		return 0, nil
@@ -38,7 +38,7 @@ func callBuiltinSizeOf(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBuiltinFlatten implements the flatten(array) function.
-func callBuiltinFlatten(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinFlatten(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 1, "flatten", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -51,9 +51,9 @@ func callBuiltinFlatten(args []interface{}, e *ast.CallExpr) (interface{}, error
 		return nil, newPosError(fmt.Sprintf("flatten: expected array, got %T", args[0]), e.Pos())
 	}
 
-	result := make([]interface{}, 0)
-	var flattenHelper func([]interface{})
-	flattenHelper = func(items []interface{}) {
+	result := make(Array, 0)
+	var flattenHelper func(Array)
+	flattenHelper = func(items Array) {
 		for _, item := range items {
 			if nested, ok := AsArray(item); ok {
 				flattenHelper(nested)
@@ -68,7 +68,7 @@ func callBuiltinFlatten(args []interface{}, e *ast.CallExpr) (interface{}, error
 }
 
 // callBuiltinUnique implements the unique(array) function.
-func callBuiltinUnique(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinUnique(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 1, "unique", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func callBuiltinUnique(args []interface{}, e *ast.CallExpr) (interface{}, error)
 
 	// Use a map to track seen values, including type to distinguish different types with same string representation
 	seen := make(map[string]bool)
-	result := make([]interface{}, 0, len(arr))
+	result := make(Array, 0, len(arr))
 
 	for _, item := range arr {
 		key := fmt.Sprintf("%T:%v", item, item)
@@ -97,7 +97,7 @@ func callBuiltinUnique(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBuiltinDistinct implements the distinct(array) function.
-func callBuiltinDistinct(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinDistinct(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 1, "distinct", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func callBuiltinDistinct(args []interface{}, e *ast.CallExpr) (interface{}, erro
 
 	// Use a map to track seen values, including type to distinguish different types with same string representation
 	seen := make(map[string]bool)
-	result := make([]interface{}, 0, len(arr))
+	result := make(Array, 0, len(arr))
 
 	for _, item := range arr {
 		key := fmt.Sprintf("%T:%v", item, item)
@@ -126,7 +126,7 @@ func callBuiltinDistinct(args []interface{}, e *ast.CallExpr) (interface{}, erro
 }
 
 // callBuiltinReverse implements the reverse(array) function.
-func callBuiltinReverse(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinReverse(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 1, "reverse", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func callBuiltinReverse(args []interface{}, e *ast.CallExpr) (interface{}, error
 		return nil, newPosError(fmt.Sprintf("reverse: expected array, got %T", args[0]), e.Pos())
 	}
 
-	result := make([]interface{}, len(arr))
+	result := make(Array, len(arr))
 	for i, item := range arr {
 		result[len(arr)-1-i] = item
 	}
@@ -147,7 +147,7 @@ func callBuiltinReverse(args []interface{}, e *ast.CallExpr) (interface{}, error
 }
 
 // callBuiltinSort implements the sort(array) function.
-func callBuiltinSort(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinSort(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 1, "sort", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func callBuiltinSort(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	}
 
 	// Create a copy to avoid mutating the original
-	result := make([]interface{}, len(arr))
+	result := make(Array, len(arr))
 	copy(result, arr)
 
 	// Check if all elements are numbers or all are strings
@@ -214,7 +214,7 @@ func callBuiltinSort(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinJoin implements the join(array, separator) function.
-func callBuiltinJoin(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinJoin(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 2, "join", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -244,7 +244,7 @@ func callBuiltinJoin(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinKeys implements the keys(object) function.
-func callBuiltinKeys(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinKeys(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 1, "keys", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -252,7 +252,7 @@ func callBuiltinKeys(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	if err := assertArg(args[0], beObject(), 1, "keys", e); err != nil {
 		return nil, err
 	}
-	obj, ok := args[0].(map[string]interface{})
+	obj, ok := args[0].(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("keys: expected object, got %T", args[0]), e.Pos())
 	}
@@ -265,7 +265,7 @@ func callBuiltinKeys(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	// Sort keys alphabetically for deterministic output
 	sort.Strings(keys)
 
-	result := make([]interface{}, len(keys))
+	result := make(Array, len(keys))
 	for i, k := range keys {
 		result[i] = k
 	}
@@ -274,7 +274,7 @@ func callBuiltinKeys(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinValues implements the values(object) function.
-func callBuiltinValues(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinValues(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 1, "values", e.Pos()); err != nil {
 		return nil, err
 	}
@@ -282,7 +282,7 @@ func callBuiltinValues(args []interface{}, e *ast.CallExpr) (interface{}, error)
 	if err := assertArg(args[0], beObject(), 1, "values", e); err != nil {
 		return nil, err
 	}
-	obj, ok := args[0].(map[string]interface{})
+	obj, ok := args[0].(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("values: expected object, got %T", args[0]), e.Pos())
 	}
@@ -294,7 +294,7 @@ func callBuiltinValues(args []interface{}, e *ast.CallExpr) (interface{}, error)
 	}
 	sort.Strings(keys)
 
-	result := make([]interface{}, len(keys))
+	result := make(Array, len(keys))
 	for i, k := range keys {
 		result[i] = obj[k]
 	}
@@ -303,19 +303,19 @@ func callBuiltinValues(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBuiltinMerge implements the merge(obj1, obj2, ...) function.
-func callBuiltinMerge(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinMerge(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 1 {
 		return nil, newPosError("merge requires at least 1 argument", e.Pos())
 	}
 
-	result := make(map[string]interface{})
+	result := make(Object)
 
 	// Merge all objects in order
 	for _, arg := range args {
 		if arg == nil {
 			continue
 		}
-		obj, ok := arg.(map[string]interface{})
+		obj, ok := arg.(Object)
 		if !ok {
 			return nil, newPosError(fmt.Sprintf("merge expects objects, got %T", arg), e.Pos())
 		}
@@ -329,7 +329,7 @@ func callBuiltinMerge(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 }
 
 // callBuiltinWithAttrs implements the __with_attrs(value, attrs) function.
-func callBuiltinWithAttrs(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinWithAttrs(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("__with_attrs requires exactly 2 arguments: value and attributes", e.Pos())
 	}
@@ -341,22 +341,22 @@ func callBuiltinWithAttrs(args []interface{}, e *ast.CallExpr) (interface{}, err
 		return value, nil
 	}
 
-	attrs, ok := attrsVal.(map[string]interface{})
+	attrs, ok := attrsVal.(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("__with_attrs expects an attributes object, got %T", attrsVal), e.Pos())
 	}
 
-	var result map[string]interface{}
+	var result Object
 
-	if obj, ok := value.(map[string]interface{}); ok {
+	if obj, ok := value.(Object); ok {
 		// Copy original object
-		result = make(map[string]interface{}, len(obj)+len(attrs))
+		result = make(Object, len(obj)+len(attrs))
 		for k, v := range obj {
 			result[k] = v
 		}
 	} else {
 		// Wrap non-object value in #text
-		result = make(map[string]interface{}, 1+len(attrs))
+		result = make(Object, 1+len(attrs))
 		if value != nil {
 			result["#text"] = value
 		}
@@ -375,22 +375,22 @@ func callBuiltinWithAttrs(args []interface{}, e *ast.CallExpr) (interface{}, err
 }
 
 // callBuiltinUpdate implements the __update(obj1, obj2) function (~ operator).
-func callBuiltinUpdate(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinUpdate(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 2, "update operator (~)", e.Pos()); err != nil {
 		return nil, err
 	}
 
-	left, ok := args[0].(map[string]interface{})
+	left, ok := args[0].(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("update operator (~) expects an object on the left, got %T", args[0]), e.Pos())
 	}
 
-	right, ok := args[1].(map[string]interface{})
+	right, ok := args[1].(Object)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("update operator (~) expects an object on the right, got %T", args[1]), e.Pos())
 	}
 
-	result := make(map[string]interface{})
+	result := make(Object)
 
 	// Copy left object
 	for k, v := range left {
@@ -406,7 +406,7 @@ func callBuiltinUpdate(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBuiltinTypeOf implements the typeOf(value) function.
-func callBuiltinTypeOf(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinTypeOf(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("typeOf function requires exactly 1 argument", e.Pos())
 	}
@@ -414,7 +414,7 @@ func callBuiltinTypeOf(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBuiltinIsType implements the __isType(value, typeName) function (is operator).
-func callBuiltinIsType(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinIsType(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("is operator requires exactly 2 arguments: value is Type", e.Pos())
 	}
@@ -429,7 +429,7 @@ func callBuiltinIsType(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBuiltinIsEmpty implements the isEmpty(value) function.
-func callBuiltinIsEmpty(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinIsEmpty(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("isEmpty function requires exactly 1 argument", e.Pos())
 	}
@@ -438,11 +438,11 @@ func callBuiltinIsEmpty(args []interface{}, e *ast.CallExpr) (interface{}, error
 		return true, nil
 	case string:
 		return len(v) == 0, nil
-	case []interface{}:
+	case Array:
 		return len(v) == 0, nil
 	case XMLMultiValue:
 		return len(v) == 0, nil
-	case map[string]interface{}:
+	case Object:
 		return len(v) == 0, nil
 	default:
 		return false, nil
@@ -450,7 +450,7 @@ func callBuiltinIsEmpty(args []interface{}, e *ast.CallExpr) (interface{}, error
 }
 
 // callBuiltinDeep implements the __deep(root, fieldName) function (.. operator).
-func callBuiltinDeep(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinDeep(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("recursive descent (..) requires exactly 2 arguments: root, fieldName", e.Pos())
 	}
@@ -460,7 +460,7 @@ func callBuiltinDeep(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 		return nil, err
 	}
 
-	result := make([]interface{}, 0)
+	result := make(Array, 0)
 	if err := deepCollect(args[0], fieldName, &result, 0, e.Pos()); err != nil {
 		return nil, err
 	}
@@ -468,13 +468,13 @@ func callBuiltinDeep(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // deepCollect recursively collects all values for the given field name.
-func deepCollect(node interface{}, field string, out *[]interface{}, depth int, pos token.Pos) error {
+func deepCollect(node Value, field string, out *Array, depth int, pos token.Pos) error {
 	if depth > MaxDeepDepth {
 		return newPosError("deep search depth limit exceeded", pos)
 	}
 
 	switch v := node.(type) {
-	case map[string]interface{}:
+	case Object:
 		// If object has the field, add it to results
 		if val, ok := v[field]; ok {
 			*out = append(*out, val)
@@ -486,7 +486,7 @@ func deepCollect(node interface{}, field string, out *[]interface{}, depth int, 
 			}
 		}
 
-	case []interface{}:
+	case Array:
 		// Recurse into each array element
 		for _, elem := range v {
 			if err := deepCollect(elem, field, out, depth+1, pos); err != nil {
@@ -499,7 +499,7 @@ func deepCollect(node interface{}, field string, out *[]interface{}, depth int, 
 }
 
 // callBuiltinObjectValues implements the __objvalues(object) function (.* operator).
-func callBuiltinObjectValues(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinObjectValues(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("multi-value selector (.*) requires exactly 1 argument: object", e.Pos())
 	}
@@ -507,9 +507,9 @@ func callBuiltinObjectValues(args []interface{}, e *ast.CallExpr) (interface{}, 
 	obj := args[0]
 
 	switch v := obj.(type) {
-	case map[string]interface{}:
+	case Object:
 		// Return all values from the object
-		result := make([]interface{}, 0, len(v))
+		result := make(Array, 0, len(v))
 		// Use sorted keys for deterministic ordering
 		keys := make([]string, 0, len(v))
 		for k := range v {
@@ -520,7 +520,7 @@ func callBuiltinObjectValues(args []interface{}, e *ast.CallExpr) (interface{}, 
 			result = append(result, v[k])
 		}
 		return result, nil
-	case []interface{}:
+	case Array:
 		// For arrays, return the array itself
 		return v, nil
 	case nil:
@@ -533,7 +533,7 @@ func callBuiltinObjectValues(args []interface{}, e *ast.CallExpr) (interface{}, 
 // callBuiltinMultival implements the __multival(object, "field") function (.*field selector).
 // For an object: returns [obj[field]] if field exists, else []
 // For an array: returns array of item[field] for each item in the array
-func callBuiltinMultival(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinMultival(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("multi-value field selector (.*field) requires 2 arguments: object, field", e.Pos())
 	}
@@ -545,20 +545,20 @@ func callBuiltinMultival(args []interface{}, e *ast.CallExpr) (interface{}, erro
 	}
 
 	switch v := obj.(type) {
-	case map[string]interface{}:
+	case Object:
 		// For a single object, return [obj[field]] if exists
 		if val, exists := v[field]; exists {
 			if arr, ok := AsArray(val); ok {
 				return arr, nil
 			}
-			return []interface{}{val}, nil
+			return Array{val}, nil
 		}
-		return []interface{}{}, nil
-	case []interface{}:
+		return Array{}, nil
+	case Array:
 		// For an array, extract field from each object
-		result := make([]interface{}, 0, len(v))
+		result := make(Array, 0, len(v))
 		for _, item := range v {
-			if itemMap, ok := item.(map[string]interface{}); ok {
+			if itemMap, ok := item.(Object); ok {
 				if val, exists := itemMap[field]; exists {
 					result = append(result, val)
 				}
@@ -567,9 +567,9 @@ func callBuiltinMultival(args []interface{}, e *ast.CallExpr) (interface{}, erro
 		return result, nil
 	case XMLMultiValue:
 		// For an array, extract field from each object
-		result := make([]interface{}, 0, len(v))
+		result := make(Array, 0, len(v))
 		for _, item := range v {
-			if itemMap, ok := item.(map[string]interface{}); ok {
+			if itemMap, ok := item.(Object); ok {
 				if val, exists := itemMap[field]; exists {
 					result = append(result, val)
 				}
@@ -577,7 +577,7 @@ func callBuiltinMultival(args []interface{}, e *ast.CallExpr) (interface{}, erro
 		}
 		return result, nil
 	case nil:
-		return []interface{}{}, nil
+		return Array{}, nil
 	default:
 		return nil, newPosError(fmt.Sprintf("multi-value field selector (.*field) expects an object or array, got %T", obj), e.Pos())
 	}
@@ -585,8 +585,8 @@ func callBuiltinMultival(args []interface{}, e *ast.CallExpr) (interface{}, erro
 
 // callBuiltinFind implements the find(source, value, [flags]) function.
 // findInArray returns indices of elements matching searchValue.
-func findInArray(arr []interface{}, searchValue interface{}) []interface{} {
-	result := make([]interface{}, 0)
+func findInArray(arr Array, searchValue Value) Array {
+	result := make(Array, 0)
 	for i, item := range arr {
 		if isEqual(item, searchValue) {
 			result = append(result, float64(i))
@@ -596,22 +596,22 @@ func findInArray(arr []interface{}, searchValue interface{}) []interface{} {
 }
 
 // findRegexInString finds all regex matches and returns their start/end positions.
-func findRegexInString(s, pattern, flags string) ([]interface{}, bool) {
+func findRegexInString(s, pattern, flags string) (Array, bool) {
 	re, err := compileRegex(pattern, flags)
 	if err != nil {
 		return nil, false
 	}
 	matches := re.FindAllStringIndex(s, -1)
-	result := make([]interface{}, len(matches))
+	result := make(Array, len(matches))
 	for i, match := range matches {
-		result[i] = []interface{}{float64(match[0]), float64(match[1])}
+		result[i] = Array{float64(match[0]), float64(match[1])}
 	}
 	return result, true
 }
 
 // findSubstringInString finds all occurrences of a substring and returns their positions.
-func findSubstringInString(s, searchStr string) []interface{} {
-	result := make([]interface{}, 0)
+func findSubstringInString(s, searchStr string) Array {
+	result := make(Array, 0)
 	if len(searchStr) == 0 {
 		return result
 	}
@@ -633,7 +633,7 @@ func looksLikeRegex(pattern string) bool {
 		(len(pattern) > 1 && strings.Contains(pattern, "."))
 }
 
-func callBuiltinFind(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinFind(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return nil, newPosError("find requires 2 or 3 arguments: source, value, [flags]", e.Pos())
 	}
@@ -649,16 +649,16 @@ func callBuiltinFind(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	}
 
 	switch s := source.(type) {
-	case []interface{}:
+	case Array:
 		return findInArray(s, searchValue), nil
 
 	case string:
 		// Handle Regex object
 		if r, ok := searchValue.(*Regex); ok {
 			matches := r.Re.FindAllStringIndex(s, -1)
-			result := make([]interface{}, len(matches))
+			result := make(Array, len(matches))
 			for i, match := range matches {
-				result[i] = []interface{}{float64(match[0]), float64(match[1])}
+				result[i] = Array{float64(match[0]), float64(match[1])}
 			}
 			return result, nil
 		}

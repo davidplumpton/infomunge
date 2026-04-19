@@ -8,7 +8,7 @@ func TestEvaluate_BasicLiterals(t *testing.T) {
 	tests := []struct {
 		name     string
 		expr     string
-		expected interface{}
+		expected Value
 	}{
 		{"integer", "42", 42},
 		{"float", "3.14", 3.14},
@@ -19,7 +19,7 @@ func TestEvaluate_BasicLiterals(t *testing.T) {
 		{"nil", "nil", nil},
 	}
 
-	ctx := make(map[string]interface{})
+	ctx := make(Context)
 	mapping := []int{0}
 	for i := 1; i < 100; i++ {
 		mapping = append(mapping, i)
@@ -39,7 +39,7 @@ func TestEvaluate_BasicLiterals(t *testing.T) {
 }
 
 func TestEvaluate_CompositeLiterals(t *testing.T) {
-	ctx := make(map[string]interface{})
+	ctx := make(Context)
 	mapping := make([]int, 200)
 	for i := range mapping {
 		mapping[i] = i
@@ -50,7 +50,7 @@ func TestEvaluate_CompositeLiterals(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		m, ok := result.(map[string]interface{})
+		m, ok := result.(Object)
 		if !ok {
 			t.Fatalf("expected map, got %T", result)
 		}
@@ -64,7 +64,7 @@ func TestEvaluate_CompositeLiterals(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		arr, ok := result.([]interface{})
+		arr, ok := result.(Array)
 		if !ok {
 			t.Fatalf("expected array, got %T", result)
 		}
@@ -75,7 +75,7 @@ func TestEvaluate_CompositeLiterals(t *testing.T) {
 }
 
 func TestEvaluate_NilSafety(t *testing.T) {
-	ctx := map[string]interface{}{
+	ctx := Object{
 		"nullVal": nil,
 	}
 	mapping := make([]int, 100)

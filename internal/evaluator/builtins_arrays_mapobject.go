@@ -9,9 +9,9 @@ import (
 
 // extractMapObjectResult extracts key-value pairs from the lambda result.
 // Returns a map of entries and a bool indicating if the entry should be skipped.
-func extractMapObjectResult(mapResult interface{}, pos token.Pos) (map[string]interface{}, bool, error) {
+func extractMapObjectResult(mapResult Value, pos token.Pos) (Object, bool, error) {
 	switch result := mapResult.(type) {
-	case []interface{}:
+	case Array:
 		if len(result) != 2 {
 			return nil, false, newPosError("mapObject lambda returning array must have exactly 2 elements [key, value]", pos)
 		}
@@ -19,9 +19,9 @@ func extractMapObjectResult(mapResult interface{}, pos token.Pos) (map[string]in
 		if !ok {
 			return nil, false, newPosError(fmt.Sprintf("mapObject lambda key must be a string, got %T", result[0]), pos)
 		}
-		return map[string]interface{}{key: result[1]}, false, nil
+		return Object{key: result[1]}, false, nil
 
-	case map[string]interface{}:
+	case Object:
 		if len(result) == 0 {
 			return nil, true, nil // Skip empty objects
 		}
@@ -32,7 +32,7 @@ func extractMapObjectResult(mapResult interface{}, pos token.Pos) (map[string]in
 	}
 }
 
-func evalMapObjectInputs(e *ast.CallExpr, context map[string]interface{}, depth int) (map[string]interface{}, *Lambda, error) {
+func evalMapObjectInputs(e *ast.CallExpr, context Context, depth int) (Object, *Lambda, error) {
 	if len(e.Args) != 2 {
 		return nil, nil, newPosError("mapObject requires exactly 2 arguments: object, lambda", e.Pos())
 	}
@@ -41,7 +41,7 @@ func evalMapObjectInputs(e *ast.CallExpr, context map[string]interface{}, depth 
 	if err != nil {
 		return nil, nil, err
 	}
-	obj, ok := objVal.(map[string]interface{})
+	obj, ok := objVal.(Object)
 	if !ok {
 		return nil, nil, newPosError(fmt.Sprintf("mapObject expects an object, got %T", objVal), e.Args[0].Pos())
 	}
@@ -61,7 +61,7 @@ func evalMapObjectInputs(e *ast.CallExpr, context map[string]interface{}, depth 
 	return obj, lambda, nil
 }
 
-func mapObjectLambdaContext(context map[string]interface{}, param0, param1 string, key string, value interface{}, dwOrder bool) map[string]interface{} {
+func mapObjectLambdaContext(context Context, param0, param1 string, key string, value Value, dwOrder bool) Object {
 	lambdaContext := copyContext(context)
 	if dwOrder {
 		lambdaContext[param0], lambdaContext[param1] = value, key
@@ -71,11 +71,11 @@ func mapObjectLambdaContext(context map[string]interface{}, param0, param1 strin
 	return lambdaContext
 }
 
-func applyMapObject(obj map[string]interface{}, lambda *Lambda, context map[string]interface{}, depth int, pos token.Pos) (map[string]interface{}, error) {
+func applyMapObject(obj Object, lambda *Lambda, context Context, depth int, pos token.Pos) (Object, error) {
 	param0, param1 := lambda.ParamName(0), lambda.ParamName(1)
 	dwOrder := !shouldUseLegacyObjectLambdaOrder(lambda)
 	keys := sortedKeys(obj)
-	result := make(map[string]interface{})
+	result := make(Object)
 
 	for _, key := range keys {
 		value := obj[key]
@@ -96,7 +96,7 @@ func applyMapObject(obj map[string]interface{}, lambda *Lambda, context map[stri
 	return result, nil
 }
 
-func applyAndMerge(value interface{}, key string, result map[string]interface{}, lambda *Lambda, context map[string]interface{}, param0, param1 string, dwOrder bool, depth int, pos token.Pos) error {
+func applyAndMerge(value Value, key string, result Object, lambda *Lambda, context Context, param0, param1 string, dwOrder bool, depth int, pos token.Pos) error {
 	lambdaContext := mapObjectLambdaContext(context, param0, param1, key, value, dwOrder)
 
 	mapResult, err := evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
@@ -147,7 +147,7 @@ func applyAndMerge(value interface{}, key string, result map[string]interface{},
 //
 //	{"a": 1, "b": 2} mapObject (value, key) -> {(upper(key)): value * 2}
 //	// Returns: {"A": 2, "B": 4}
-func callBuiltinMapObject(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinMapObject(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	obj, lambda, err := evalMapObjectInputs(e, context, depth)
 	if err != nil {
 		return nil, err
@@ -157,7 +157,7 @@ func callBuiltinMapObject(e *ast.CallExpr, context map[string]interface{}, depth
 }
 
 // sortedKeys returns the keys of the map in sorted order.
-func sortedKeys(m map[string]interface{}) []string {
+func sortedKeys(m Object) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)

@@ -7,7 +7,7 @@ import (
 )
 
 // callBuiltinPluralize implements the pluralize(string) function.
-func callBuiltinPluralize(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinPluralize(args []Value, e *ast.CallExpr) (Value, error) {
 	text, err := requireOneStringArg(args, "pluralize", e)
 	if err != nil {
 		return nil, err
@@ -16,7 +16,7 @@ func callBuiltinPluralize(args []interface{}, e *ast.CallExpr) (interface{}, err
 }
 
 // callBuiltinSingularize implements the singularize(string) function.
-func callBuiltinSingularize(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinSingularize(args []Value, e *ast.CallExpr) (Value, error) {
 	text, err := requireOneStringArg(args, "singularize", e)
 	if err != nil {
 		return nil, err
@@ -25,7 +25,7 @@ func callBuiltinSingularize(args []interface{}, e *ast.CallExpr) (interface{}, e
 }
 
 // callBuiltinOrdinalize implements the ordinalize(number) function.
-func callBuiltinOrdinalize(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinOrdinalize(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "ordinalize requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}

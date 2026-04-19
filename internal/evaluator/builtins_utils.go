@@ -8,7 +8,7 @@ import (
 )
 
 // requireExactArgs validates exact argument count and returns a positioned error.
-func requireExactArgs(args []interface{}, expected int, errMsg string, e *ast.CallExpr) error {
+func requireExactArgs(args []Value, expected int, errMsg string, e *ast.CallExpr) error {
 	if len(args) != expected {
 		return newPosError(errMsg, e.Pos())
 	}
@@ -16,7 +16,7 @@ func requireExactArgs(args []interface{}, expected int, errMsg string, e *ast.Ca
 }
 
 // requireMinArgs validates minimum argument count and returns a positioned error.
-func requireMinArgs(args []interface{}, min int, errMsg string, e *ast.CallExpr) error {
+func requireMinArgs(args []Value, min int, errMsg string, e *ast.CallExpr) error {
 	if len(args) < min {
 		return newPosError(errMsg, e.Pos())
 	}
@@ -24,7 +24,7 @@ func requireMinArgs(args []interface{}, min int, errMsg string, e *ast.CallExpr)
 }
 
 // requireNoArgs validates that no arguments were passed.
-func requireNoArgs(args []interface{}, name string, e *ast.CallExpr) error {
+func requireNoArgs(args []Value, name string, e *ast.CallExpr) error {
 	if len(args) != 0 {
 		return newPosError(name+" takes no arguments", e.Pos())
 	}
@@ -33,7 +33,7 @@ func requireNoArgs(args []interface{}, name string, e *ast.CallExpr) error {
 
 // requireOneStringArg validates exactly 1 argument and that it is a string.
 // Returns the string value on success.
-func requireOneStringArg(args []interface{}, funcName string, e *ast.CallExpr) (string, error) {
+func requireOneStringArg(args []Value, funcName string, e *ast.CallExpr) (string, error) {
 	if err := requireExactArgs(args, 1, funcName+" requires exactly 1 argument", e); err != nil {
 		return "", err
 	}
@@ -41,7 +41,7 @@ func requireOneStringArg(args []interface{}, funcName string, e *ast.CallExpr) (
 }
 
 // assertStringArg validates that an argument is a string.
-func assertStringArg(val interface{}, argIndex int, funcName string, e *ast.CallExpr) (string, error) {
+func assertStringArg(val Value, argIndex int, funcName string, e *ast.CallExpr) (string, error) {
 	str, ok := val.(string)
 	if !ok {
 		msg := fmt.Sprintf("%s expects a string", funcName)
@@ -54,7 +54,7 @@ func assertStringArg(val interface{}, argIndex int, funcName string, e *ast.Call
 }
 
 // assertStringArgs validates that multiple arguments are strings.
-func assertStringArgs(args []interface{}, count int, funcName string, e *ast.CallExpr) ([]string, error) {
+func assertStringArgs(args []Value, count int, funcName string, e *ast.CallExpr) ([]string, error) {
 	if len(args) != count {
 		return nil, newPosError(fmt.Sprintf("%s requires exactly %d argument(s)", funcName, count), e.Pos())
 	}
@@ -71,7 +71,7 @@ func assertStringArgs(args []interface{}, count int, funcName string, e *ast.Cal
 }
 
 // assertIntArg validates that an argument is an integer.
-func assertIntArg(val interface{}, argIndex int, funcName string, e *ast.CallExpr) (int, error) {
+func assertIntArg(val Value, argIndex int, funcName string, e *ast.CallExpr) (int, error) {
 	i, ok := val.(int)
 	if !ok {
 		return 0, newPosError(fmt.Sprintf("%s expects an integer as argument %d, got %T", funcName, argIndex, val), e.Pos())
@@ -80,7 +80,7 @@ func assertIntArg(val interface{}, argIndex int, funcName string, e *ast.CallExp
 }
 
 // assertArg validates an argument using a matcher.
-func assertArg(val interface{}, matcher Matcher, argIndex int, funcName string, e *ast.CallExpr) error {
+func assertArg(val Value, matcher Matcher, argIndex int, funcName string, e *ast.CallExpr) error {
 	result := matcher(val)
 	if !result.Success {
 		msg := fmt.Sprintf("%s: argument %d %s", funcName, argIndex, result.Message)

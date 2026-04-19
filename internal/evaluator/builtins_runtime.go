@@ -28,7 +28,7 @@ func (e *UserError) Pos() token.Pos {
 }
 
 // callBuiltinUUID implements the uuid() function.
-func callBuiltinUUID(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinUUID(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 0, "uuid takes no arguments", e); err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func callBuiltinUUID(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 }
 
 // callBuiltinEvaluateCompatibilityFlag implements the evaluateCompatibilityFlag(flagName) function.
-func callBuiltinEvaluateCompatibilityFlag(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinEvaluateCompatibilityFlag(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "evaluateCompatibilityFlag requires exactly 1 argument: flagName", e); err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func callBuiltinEvaluateCompatibilityFlag(args []interface{}, e *ast.CallExpr) (
 	}
 
 	// Define default compatibility flags
-	compatibilityFlags := map[string]interface{}{
+	compatibilityFlags := Object{
 		"allowUndefinedProperties": true,
 		"allowNullArithmetic":      false,
 		"allowImplicitConversion":  true,
@@ -79,7 +79,7 @@ func callBuiltinEvaluateCompatibilityFlag(args []interface{}, e *ast.CallExpr) (
 }
 
 // callBuiltinEnvVar implements the envVar(name) function.
-func callBuiltinEnvVar(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinEnvVar(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "envVar requires exactly 1 argument: variable name", e); err != nil {
 		return nil, err
 	}
@@ -97,12 +97,12 @@ func callBuiltinEnvVar(args []interface{}, e *ast.CallExpr) (interface{}, error)
 }
 
 // callBuiltinEnvVars implements the envVars() function.
-func callBuiltinEnvVars(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinEnvVars(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 0, "envVars takes no arguments", e); err != nil {
 		return nil, err
 	}
 
-	envMap := make(map[string]interface{})
+	envMap := make(Object)
 	for _, env := range os.Environ() {
 		parts := strings.SplitN(env, "=", 2)
 		if len(parts) == 2 {
@@ -114,7 +114,7 @@ func callBuiltinEnvVars(args []interface{}, e *ast.CallExpr) (interface{}, error
 
 // callBuiltinLog implements the log(value) function.
 // Logs the value to stderr and returns it unchanged.
-func callBuiltinLog(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinLog(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "log requires exactly 1 argument: value", e); err != nil {
 		return nil, err
 	}
@@ -123,13 +123,13 @@ func callBuiltinLog(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	return args[0], nil
 }
 
-func logWithPrefix(prefix string, value interface{}) {
+func logWithPrefix(prefix string, value Value) {
 	fmt.Fprintf(os.Stderr, "[%s] %v\n", prefix, value)
 }
 
 // callBuiltinLogDebug implements the logDebug(value) function.
 // Logs the value at DEBUG level and returns it unchanged.
-func callBuiltinLogDebug(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinLogDebug(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "logDebug requires exactly 1 argument: value", e); err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func callBuiltinLogDebug(args []interface{}, e *ast.CallExpr) (interface{}, erro
 
 // callBuiltinLogInfo implements the logInfo(value) function.
 // Logs the value at INFO level and returns it unchanged.
-func callBuiltinLogInfo(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinLogInfo(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "logInfo requires exactly 1 argument: value", e); err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func callBuiltinLogInfo(args []interface{}, e *ast.CallExpr) (interface{}, error
 
 // callBuiltinLogWarn implements the logWarn(value) function.
 // Logs the value at WARN level and returns it unchanged.
-func callBuiltinLogWarn(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinLogWarn(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "logWarn requires exactly 1 argument: value", e); err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func callBuiltinLogWarn(args []interface{}, e *ast.CallExpr) (interface{}, error
 
 // callBuiltinLogError implements the logError(value) function.
 // Logs the value at ERROR level and returns it unchanged.
-func callBuiltinLogError(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinLogError(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "logError requires exactly 1 argument: value", e); err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func callBuiltinLogError(args []interface{}, e *ast.CallExpr) (interface{}, erro
 
 // callBuiltinLogWith implements the logWith(value, prefix) function.
 // Logs the value with a custom prefix and returns it unchanged.
-func callBuiltinLogWith(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinLogWith(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 2, "logWith requires exactly 2 arguments: value, prefix", e); err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func callBuiltinLogWith(args []interface{}, e *ast.CallExpr) (interface{}, error
 }
 
 // callBuiltinTry implements the try(delegate) function.
-func callBuiltinTry(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinTry(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("try requires exactly 1 argument: a delegate function", e.Pos())
 	}
@@ -199,7 +199,7 @@ func callBuiltinTry(e *ast.CallExpr, context map[string]interface{}, depth int) 
 	if err != nil {
 		// Build error object based on error type
 		errorObj := buildErrorObject(err)
-		return map[string]interface{}{
+		return Object{
 			"success": false,
 			"error":   errorObj,
 		}, nil
@@ -207,24 +207,24 @@ func callBuiltinTry(e *ast.CallExpr, context map[string]interface{}, depth int) 
 
 	// If result is a zero-argument lambda, invoke it
 	if lambda, ok := result.(*Lambda); ok && lambda.ParamCount() == 0 {
-		result, err = callUserDefinedFunction(lambda, []interface{}{}, e, context, depth)
+		result, err = callUserDefinedFunction(lambda, Array{}, e, context, depth)
 		if err != nil {
 			errorObj := buildErrorObject(err)
-			return map[string]interface{}{
+			return Object{
 				"success": false,
 				"error":   errorObj,
 			}, nil
 		}
 	}
 
-	return map[string]interface{}{
+	return Object{
 		"success": true,
 		"result":  result,
 	}, nil
 }
 
 // callBuiltinOrElse implements the orElse(previous, orElse) function.
-func callBuiltinOrElse(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinOrElse(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("orElse requires exactly 2 arguments: previous TryResult, orElse value or function", e.Pos())
 	}
@@ -235,7 +235,7 @@ func callBuiltinOrElse(e *ast.CallExpr, context map[string]interface{}, depth in
 		return nil, err
 	}
 
-	tryResult, ok := prev.(map[string]interface{})
+	tryResult, ok := prev.(Object)
 	if !ok {
 		return nil, newPosError("orElse: first argument must be a TryResult object", e.Pos())
 	}
@@ -258,14 +258,14 @@ func callBuiltinOrElse(e *ast.CallExpr, context map[string]interface{}, depth in
 
 	// If orElse is a zero-argument lambda, invoke it
 	if lambda, ok := orElseVal.(*Lambda); ok && lambda.ParamCount() == 0 {
-		return callUserDefinedFunction(lambda, []interface{}{}, e, context, depth)
+		return callUserDefinedFunction(lambda, Array{}, e, context, depth)
 	}
 
 	return orElseVal, nil
 }
 
 // callBuiltinOrElseTry implements the orElseTry(previous, orElse) function.
-func callBuiltinOrElseTry(e *ast.CallExpr, context map[string]interface{}, depth int) (interface{}, error) {
+func callBuiltinOrElseTry(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("orElseTry requires exactly 2 arguments: previous TryResult, orElse function", e.Pos())
 	}
@@ -276,7 +276,7 @@ func callBuiltinOrElseTry(e *ast.CallExpr, context map[string]interface{}, depth
 		return nil, err
 	}
 
-	tryResult, ok := prev.(map[string]interface{})
+	tryResult, ok := prev.(Object)
 	if !ok {
 		return nil, newPosError("orElseTry: first argument must be a TryResult object", e.Pos())
 	}
@@ -296,7 +296,7 @@ func callBuiltinOrElseTry(e *ast.CallExpr, context map[string]interface{}, depth
 	if err != nil {
 		// orElse evaluation itself failed
 		errorObj := buildErrorObject(err)
-		return map[string]interface{}{
+		return Object{
 			"success": false,
 			"error":   errorObj,
 		}, nil
@@ -304,32 +304,32 @@ func callBuiltinOrElseTry(e *ast.CallExpr, context map[string]interface{}, depth
 
 	// If orElse is a zero-argument lambda, invoke it
 	if lambda, ok := orElseVal.(*Lambda); ok && lambda.ParamCount() == 0 {
-		result, err := callUserDefinedFunction(lambda, []interface{}{}, e, context, depth)
+		result, err := callUserDefinedFunction(lambda, Array{}, e, context, depth)
 		if err != nil {
 			errorObj := buildErrorObject(err)
-			return map[string]interface{}{
+			return Object{
 				"success": false,
 				"error":   errorObj,
 			}, nil
 		}
-		return map[string]interface{}{
+		return Object{
 			"success": true,
 			"result":  result,
 		}, nil
 	}
 
-	return map[string]interface{}{
+	return Object{
 		"success": true,
 		"result":  orElseVal,
 	}, nil
 }
 
 // buildErrorObject creates the error object structure for TryResult.
-func buildErrorObject(err error) map[string]interface{} {
-	errorObj := map[string]interface{}{
+func buildErrorObject(err error) Object {
+	errorObj := Object{
 		"message":  err.Error(),
 		"location": "Unknown location",
-		"stack":    []interface{}{},
+		"stack":    Array{},
 	}
 
 	// Check for UserError (from fail())
@@ -351,7 +351,7 @@ func buildErrorObject(err error) map[string]interface{} {
 }
 
 // callBuiltinFail implements the fail(message) function.
-func callBuiltinFail(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinFail(args []Value, e *ast.CallExpr) (Value, error) {
 	message := "Error" // default message
 	if len(args) > 1 {
 		return nil, newPosError("fail accepts at most 1 argument: message", e.Pos())

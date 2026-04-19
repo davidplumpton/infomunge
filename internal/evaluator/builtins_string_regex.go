@@ -10,7 +10,7 @@ import (
 
 // callBuiltinRegex implements the regex(pattern, flags) function.
 // It compiles the regex and returns a Regex value.
-func callBuiltinRegex(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinRegex(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 1 || len(args) > 2 {
 		return nil, newPosError("regex requires 1 or 2 arguments: pattern, [flags]", e.Pos())
 	}
@@ -42,7 +42,7 @@ func callBuiltinRegex(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 }
 
 // helper to get a compiled regex from either a Regex object or a string pattern
-func getCompiledRegex(arg interface{}, explicitFlags string, pos token.Pos) (*regexp.Regexp, error) {
+func getCompiledRegex(arg Value, explicitFlags string, pos token.Pos) (*regexp.Regexp, error) {
 	switch v := arg.(type) {
 	case *Regex:
 		// If explicit flags are provided with a Regex object, it's ambiguous/unsupported
@@ -62,7 +62,7 @@ func getCompiledRegex(arg interface{}, explicitFlags string, pos token.Pos) (*re
 }
 
 // callBuiltinStartsWith implements the startsWith(string, prefix) function.
-func callBuiltinStartsWith(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinStartsWith(args []Value, e *ast.CallExpr) (Value, error) {
 	strs, err := assertStringArgs(args, 2, "startsWith", e)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func callBuiltinStartsWith(args []interface{}, e *ast.CallExpr) (interface{}, er
 }
 
 // callBuiltinEndsWith implements the endsWith(string, suffix) function.
-func callBuiltinEndsWith(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinEndsWith(args []Value, e *ast.CallExpr) (Value, error) {
 	strs, err := assertStringArgs(args, 2, "endsWith", e)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func callBuiltinEndsWith(args []interface{}, e *ast.CallExpr) (interface{}, erro
 
 // callBuiltinContains implements the contains(string, pattern) function.
 // For strings, the pattern is treated as a regex only if it looks like a regex pattern or is a Regex object.
-func callBuiltinContains(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinContains(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("contains requires exactly 2 arguments", e.Pos())
 	}
@@ -110,7 +110,7 @@ func callBuiltinContains(args []interface{}, e *ast.CallExpr) (interface{}, erro
 		}
 		// Fall back to substring matching
 		return strings.Contains(first, pattern), nil
-	case []interface{}:
+	case Array:
 		for _, item := range first {
 			if isEqual(item, args[1]) {
 				return true, nil
@@ -124,7 +124,7 @@ func callBuiltinContains(args []interface{}, e *ast.CallExpr) (interface{}, erro
 
 // callBuiltinReplace implements the replace(string, pattern, replacement) function.
 // The pattern is treated as a regex only if it looks like a regex pattern or is a Regex object.
-func callBuiltinReplace(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinReplace(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 3 {
 		return nil, newPosError("replace requires exactly 3 arguments: string, pattern, replacement", e.Pos())
 	}
@@ -163,7 +163,7 @@ func callBuiltinReplace(args []interface{}, e *ast.CallExpr) (interface{}, error
 }
 
 // callBuiltinMatch implements the match(string, regex) function.
-func callBuiltinMatch(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinMatch(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return nil, newPosError("match requires 2 or 3 arguments: string, regex, [flags]", e.Pos())
 	}
@@ -193,7 +193,7 @@ func callBuiltinMatch(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 	}
 
 	// Return the capture groups (excluding the full match at index 0)
-	result := make([]interface{}, len(matches)-1)
+	result := make(Array, len(matches)-1)
 	for i := 1; i < len(matches); i++ {
 		result[i-1] = matches[i]
 	}
@@ -201,7 +201,7 @@ func callBuiltinMatch(args []interface{}, e *ast.CallExpr) (interface{}, error) 
 }
 
 // callBuiltinMatches implements the matches(string, regex) function.
-func callBuiltinMatches(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinMatches(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return nil, newPosError("matches requires 2 or 3 arguments: string, regex, [flags]", e.Pos())
 	}
@@ -230,7 +230,7 @@ func callBuiltinMatches(args []interface{}, e *ast.CallExpr) (interface{}, error
 }
 
 // callBuiltinScan implements the scan(string, regex) function.
-func callBuiltinScan(args []interface{}, e *ast.CallExpr) (interface{}, error) {
+func callBuiltinScan(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return nil, newPosError("scan requires 2 or 3 arguments: string, regex, [flags]", e.Pos())
 	}
@@ -257,18 +257,18 @@ func callBuiltinScan(args []interface{}, e *ast.CallExpr) (interface{}, error) {
 	// Find all matches
 	matches := re.FindAllStringSubmatch(text, -1)
 	if matches == nil {
-		return make([]interface{}, 0), nil
+		return make(Array, 0), nil
 	}
 
 	// Convert matches to result
-	result := make([]interface{}, len(matches))
+	result := make(Array, len(matches))
 	for i, match := range matches {
 		if len(match) == 1 {
 			// Single match, return the string directly
 			result[i] = match[0]
 		} else {
 			// Multiple capture groups, return as array
-			groups := make([]interface{}, len(match)-1)
+			groups := make(Array, len(match)-1)
 			for j := 1; j < len(match); j++ {
 				groups[j-1] = match[j]
 			}
