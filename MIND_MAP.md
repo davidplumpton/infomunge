@@ -111,3 +111,5 @@
 [54] **Agent Mistakes Log** - 2026-04-19: Ran `rg` with `--` before later `-g` flags while searching for `exprToString`, so ripgrep treated `-g` and `*.go` as paths and returned noisy errors. Why: inserted the end-of-options marker too early when guarding a pattern search. Prevention: keep all ripgrep flags before `--`, and only then pass the search pattern and paths [22].
 
 [55] **User Preferences Log** - 2026-04-19: User asked for a fresh-eyes audit that starts from `README.md`, `AGENTS.md`, and `MIND_MAP.md` context and turns substantiated quality findings into concrete beads tickets.
+
+[56] **Agent Mistakes Log** - 2026-04-19: Repeated the ripgrep flag-order mistake while searching for `dw::core` references, placing `--` before `-g` filters and getting noisy `No such file or directory` errors. Why: reused the guarded-pattern template without keeping glob flags ahead of the end-of-options marker. Prevention: for ripgrep, place every option such as `-g` before `--`, then pass the pattern and paths [22][54].

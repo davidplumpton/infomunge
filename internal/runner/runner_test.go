@@ -477,6 +477,21 @@ fun double(x) = x * 2
 		}
 	})
 
+	t.Run("Resolve standard module from arbitrary base dir", func(t *testing.T) {
+		loader := NewModuleLoader(tmpDir)
+		name, path, err := loader.Resolve("dw::core::Arrays")
+		if err != nil {
+			t.Errorf("Resolve() unexpected error: %v", err)
+			return
+		}
+		if name != "Arrays" {
+			t.Errorf("Resolve() name = %q, want %q", name, "Arrays")
+		}
+		if path != "dw::core::Arrays" {
+			t.Errorf("Resolve() path = %q, want %q", path, "dw::core::Arrays")
+		}
+	})
+
 	t.Run("Resolve not found", func(t *testing.T) {
 		loader := NewModuleLoader(tmpDir)
 		_, _, err := loader.Resolve("NonExistent")
@@ -531,6 +546,21 @@ fun double(x) = x * 2
 		m2, _ := loader.Load("MyModule")
 		if m1 != m2 {
 			t.Errorf("Load() should return cached module on second call")
+		}
+	})
+
+	t.Run("Load standard module from arbitrary base dir", func(t *testing.T) {
+		loader := NewModuleLoader(tmpDir)
+		m, err := loader.Load("dw::core::Arrays")
+		if err != nil {
+			t.Errorf("Load() unexpected error: %v", err)
+			return
+		}
+		if m.Name != "Arrays" {
+			t.Errorf("Load() module name = %q, want %q", m.Name, "Arrays")
+		}
+		if _, ok := m.Namespace["countBy"]; !ok {
+			t.Errorf("Load() module should have countBy function")
 		}
 	})
 }

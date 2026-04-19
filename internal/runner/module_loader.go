@@ -43,6 +43,10 @@ func (l *ModuleLoader) Resolve(moduleSpec string) (moduleName string, path strin
 	}
 	moduleName = parts[len(parts)-1]
 
+	if isStandardModule(moduleSpec) {
+		return moduleName, moduleSpec, nil
+	}
+
 	relPath := filepath.Join(parts...) + ".im"
 
 	for _, searchPath := range l.SearchPaths {
@@ -75,13 +79,25 @@ func (l *ModuleLoader) Load(moduleSpec string) (*Module, error) {
 	l.loading[path] = true
 	defer delete(l.loading, path)
 
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return nil, unifiederrors.WrapIOf(err, "failed to read module %s", moduleSpec)
+	var content string
+	if isStandardModule(moduleSpec) {
+		content, err = standardModuleSource(moduleSpec)
+		if err != nil {
+			return nil, unifiederrors.WrapParsef(err, "failed to load standard module %s", moduleSpec)
+		}
+	} else {
+		rawContent, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return nil, unifiederrors.WrapIOf(readErr, "failed to read module %s", moduleSpec)
+		}
+		content = string(rawContent)
 	}
 
-	ns, err := parseModuleContent(string(content), l)
+	ns, err := parseModuleContent(content, l)
 	if err != nil {
+		if isStandardModule(moduleSpec) {
+			return nil, unifiederrors.WrapParsef(err, "failed to parse standard module %s", moduleSpec)
+		}
 		return nil, unifiederrors.WrapParsef(err, "failed to parse module %s", moduleSpec)
 	}
 

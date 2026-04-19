@@ -232,3 +232,18 @@ Feature: Import Directive
       """
       42
       """
+
+  Scenario: Script outside repo-root layout can still import embedded standard modules
+    Given a file named "isolated/script.im" with content:
+      """
+      %im 0.1
+      import * from dw::core::Arrays
+      output application/json
+      ---
+      countBy([1,2,3], (x) -> x > 1)
+      """
+    When I run the application with "isolated/script.im"
+    Then the output should be:
+      """
+      2
+      """
