@@ -113,3 +113,5 @@
 [55] **User Preferences Log** - 2026-04-19: User asked for a fresh-eyes audit that starts from `README.md`, `AGENTS.md`, and `MIND_MAP.md` context and turns substantiated quality findings into concrete beads tickets.
 
 [56] **Agent Mistakes Log** - 2026-04-19: Repeated the ripgrep flag-order mistake while searching for `dw::core` references, placing `--` before `-g` filters and getting noisy `No such file or directory` errors. Why: reused the guarded-pattern template without keeping glob flags ahead of the end-of-options marker. Prevention: for ripgrep, place every option such as `-g` before `--`, then pass the pattern and paths [22][54].
+
+[57] **Agent Mistakes Log** - 2026-04-19: Ran `jj describe` and `jj commit` in parallel, which raced on JJ's ref lock and caused the description update to fail while the commit succeeded. Why: treated stateful JJ mutations as parallel-safe. Prevention: run JJ metadata and commit commands sequentially, especially `jj describe`, `jj commit`, and other operations that write refs [22].
