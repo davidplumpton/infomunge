@@ -109,6 +109,7 @@ func callBuiltinLambdaAST(e *ast.CallExpr, context Context, depth int) (Value, e
 		Params:  params,
 		Body:    bodyStr,
 		BodyAST: bodyExpr, // Store the AST for later evaluation
+		Env:     context,
 	}, nil
 }
 
@@ -395,30 +396,18 @@ func callBuiltinModCall(e *ast.CallExpr, context Context, depth int) (Value, err
 		args = append(args, v)
 	}
 
-	return callUserLambda(l, args, context, depth+1)
+	return callUserLambda(l, args, depth+1)
 }
 
 // callUserLambda invokes a user-defined Lambda with the given arguments.
-func callUserLambda(l *Lambda, args []Value, callingContext Context, depth int) (Value, error) {
-	base := make(Context)
-
-	if l.Env != nil {
-		for k, v := range l.Env {
-			base[k] = v
+func callUserLambda(l *Lambda, args []Value, depth int) (Value, error) {
+	return evalLambdaWithBindingsAtDepth(l, depth, func(base Context) {
+		for i, param := range l.Params {
+			if i < len(args) {
+				base[param.Name] = args[i]
+			}
 		}
-	}
-
-	for k, v := range callingContext {
-		base[k] = v
-	}
-
-	for i, param := range l.Params {
-		if i < len(args) {
-			base[param.Name] = args[i]
-		}
-	}
-
-	return evalASTWithDepth(l.BodyAST, base, depth)
+	})
 }
 
 func callBuiltinCoerce(e *ast.CallExpr, context Context, depth int) (Value, error) {
@@ -725,8 +714,7 @@ func callBuiltinOnNull(e *ast.CallExpr, context Context, depth int) (Value, erro
 	}
 
 	// Execute the lambda with a clean context
-	lambdaContext := copyContext(context)
-	return evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+	return evalLambdaWithBindingsAtDepth(lambda, depth+1, nil)
 }
 
 func callBuiltinThen(e *ast.CallExpr, context Context, depth int) (Value, error) {
@@ -762,7 +750,7 @@ func callBuiltinThen(e *ast.CallExpr, context Context, depth int) (Value, error)
 	}
 
 	// Execute the lambda with the value as parameter
-	lambdaContext := copyContext(context)
-	lambdaContext[lambda.ParamName(0)] = value
-	return evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+	return evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+		lambdaContext[lambda.ParamName(0)] = value
+	})
 }

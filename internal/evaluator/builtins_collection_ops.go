@@ -20,13 +20,12 @@ func executeLambdaOnArrayElements(
 	callback lambdaElementCallback,
 ) error {
 	for i, elem := range array {
-		lambdaContext := copyContext(context)
-		lambdaContext[lambda.ParamName(0)] = elem
-		if lambda.ParamCount() > 1 {
-			lambdaContext[lambda.ParamName(1)] = i
-		}
-
-		value, err := evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+		value, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+			lambdaContext[lambda.ParamName(0)] = elem
+			if lambda.ParamCount() > 1 {
+				lambdaContext[lambda.ParamName(1)] = i
+			}
+		})
 		if err != nil {
 			return err
 		}
@@ -95,12 +94,12 @@ func callBuiltinFilterSelector(e *ast.CallExpr, context Context, depth int) (Val
 	result := make(Object)
 	for idx, key := range keys {
 		val := obj[key]
-		lambdaContext := copyContext(context)
-		lambdaContext[lambda.ParamName(0)] = val
-		if lambda.ParamCount() > 1 {
-			lambdaContext[lambda.ParamName(1)] = idx
-		}
-		condVal, err := evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+		condVal, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+			lambdaContext[lambda.ParamName(0)] = val
+			if lambda.ParamCount() > 1 {
+				lambdaContext[lambda.ParamName(1)] = idx
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -193,13 +192,12 @@ func findExtremumByLambda(
 	var extremumValue Value
 
 	for i, elem := range array {
-		lambdaContext := copyContext(context)
-		lambdaContext[lambda.ParamName(0)] = elem
-		if lambda.ParamCount() > 1 {
-			lambdaContext[lambda.ParamName(1)] = i
-		}
-
-		value, err := evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+		value, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+			lambdaContext[lambda.ParamName(0)] = elem
+			if lambda.ParamCount() > 1 {
+				lambdaContext[lambda.ParamName(1)] = i
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -275,13 +273,12 @@ func callBuiltinOrderBy(e *ast.CallExpr, context Context, depth int) (Value, err
 
 	elements := make([]elementWithKey, len(array))
 	for i, elem := range array {
-		lambdaContext := copyContext(context)
-		lambdaContext[lambda.ParamName(0)] = elem
-		if lambda.ParamCount() > 1 {
-			lambdaContext[lambda.ParamName(1)] = i
-		}
-
-		key, err := evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+		key, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+			lambdaContext[lambda.ParamName(0)] = elem
+			if lambda.ParamCount() > 1 {
+				lambdaContext[lambda.ParamName(1)] = i
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -451,22 +448,21 @@ func callBuiltinFilterObject(e *ast.CallExpr, context Context, depth int) (Value
 }
 
 func evaluateFilterObjectCond(key string, value Value, index int, isDataWeaveOrder bool, lambda *Lambda, context Context, depth int, e *ast.CallExpr) (bool, error) {
-	lambdaContext := copyContext(context)
-	if isDataWeaveOrder {
-		lambdaContext[lambda.ParamName(0)] = value
-		lambdaContext[lambda.ParamName(1)] = key
-		if lambda.ParamCount() > 2 {
-			lambdaContext[lambda.ParamName(2)] = index
+	condVal, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+		if isDataWeaveOrder {
+			lambdaContext[lambda.ParamName(0)] = value
+			lambdaContext[lambda.ParamName(1)] = key
+			if lambda.ParamCount() > 2 {
+				lambdaContext[lambda.ParamName(2)] = index
+			}
+			return
 		}
-	} else {
 		lambdaContext[lambda.ParamName(0)] = key
 		lambdaContext[lambda.ParamName(1)] = value
 		if lambda.ParamCount() > 2 {
 			lambdaContext[lambda.ParamName(2)] = index
 		}
-	}
-
-	condVal, err := evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+	})
 	if err != nil {
 		return false, err
 	}
@@ -599,17 +595,17 @@ func pluckObject(obj Object, lambda *Lambda, context Context, depth int, e *ast.
 }
 
 func evaluatePluckLambda(key string, value Value, index int, isDataWeaveOrder bool, lambda *Lambda, context Context, depth int) (Value, error) {
-	lambdaContext := copyContext(context)
-
-	if isDataWeaveOrder {
-		lambdaContext[lambda.ParamName(0)] = value
-		if lambda.ParamCount() > 1 {
-			lambdaContext[lambda.ParamName(1)] = key
+	return evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+		if isDataWeaveOrder {
+			lambdaContext[lambda.ParamName(0)] = value
+			if lambda.ParamCount() > 1 {
+				lambdaContext[lambda.ParamName(1)] = key
+			}
+			if lambda.ParamCount() > 2 {
+				lambdaContext[lambda.ParamName(2)] = index
+			}
+			return
 		}
-		if lambda.ParamCount() > 2 {
-			lambdaContext[lambda.ParamName(2)] = index
-		}
-	} else {
 		lambdaContext[lambda.ParamName(0)] = key
 		if lambda.ParamCount() > 1 {
 			lambdaContext[lambda.ParamName(1)] = value
@@ -617,9 +613,7 @@ func evaluatePluckLambda(key string, value Value, index int, isDataWeaveOrder bo
 		if lambda.ParamCount() > 2 {
 			lambdaContext[lambda.ParamName(2)] = index
 		}
-	}
-
-	return evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+	})
 }
 
 // pluckArray extracts nested properties from array elements using dot notation

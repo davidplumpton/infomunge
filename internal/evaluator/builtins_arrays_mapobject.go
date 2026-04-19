@@ -62,7 +62,7 @@ func evalMapObjectInputs(e *ast.CallExpr, context Context, depth int) (Object, *
 }
 
 func mapObjectLambdaContext(context Context, param0, param1 string, key string, value Value, dwOrder bool) Object {
-	lambdaContext := copyContext(context)
+	lambdaContext := make(Context)
 	if dwOrder {
 		lambdaContext[param0], lambdaContext[param1] = value, key
 	} else {
@@ -97,9 +97,11 @@ func applyMapObject(obj Object, lambda *Lambda, context Context, depth int, pos 
 }
 
 func applyAndMerge(value Value, key string, result Object, lambda *Lambda, context Context, param0, param1 string, dwOrder bool, depth int, pos token.Pos) error {
-	lambdaContext := mapObjectLambdaContext(context, param0, param1, key, value, dwOrder)
-
-	mapResult, err := evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+	mapResult, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+		for k, v := range mapObjectLambdaContext(context, param0, param1, key, value, dwOrder) {
+			lambdaContext[k] = v
+		}
+	})
 	if err != nil {
 		return err
 	}

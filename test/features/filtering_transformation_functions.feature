@@ -294,6 +294,29 @@ Feature: Filtering and Transformation Functions
       [1,2,30,40,50]
       """
 
+  Scenario: map lambda keeps captured lexical scope when caller shadows a variable
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      do {
+        var offset = 5
+        var addOffset = (x) -> x + offset
+        ---
+        do {
+          var offset = 100
+          ---
+          [10] map addOffset
+        }
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [15]
+      """
+
   Scenario: filter basic usage (existing test validation)
     Given the following input content:
       """

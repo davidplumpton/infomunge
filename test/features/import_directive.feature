@@ -63,6 +63,22 @@ Feature: Import Directive
       15
       """
 
+  Scenario: Module function ignores caller-shadowed module variable
+    Given the following input content:
+      """
+      %im 0.1
+      import modules::MathUtils
+      var offset = 100
+      output application/json
+      ---
+      MathUtils::addOffset(10)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      15
+      """
+
   Scenario: Module function uses do block separator
     Given the following input content:
       """

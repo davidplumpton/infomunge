@@ -181,15 +181,15 @@ func LazyReduce(input *LazyValue, lambda *Lambda, initial Value, evalCtx Context
 
 // applyLambda applies a lambda to a single argument.
 func applyLambda(lambda *Lambda, arg Value, ctx Context, depth int) (Value, error) {
-	lambdaContext := copyContext(ctx)
-	lambdaContext[lambda.ParamName(0)] = arg
-	return evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+	return evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+		lambdaContext[lambda.ParamName(0)] = arg
+	})
 }
 
 // applyLambdaReduce applies a lambda to accumulator and current value for reduce.
 func applyLambdaReduce(lambda *Lambda, acc Value, val Value, ctx Context, depth int) (Value, error) {
-	lambdaContext := copyContext(ctx)
-	lambdaContext[lambda.ParamName(0)] = acc
-	lambdaContext[lambda.ParamName(1)] = val
-	return evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+	return evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+		lambdaContext[lambda.ParamName(0)] = acc
+		lambdaContext[lambda.ParamName(1)] = val
+	})
 }

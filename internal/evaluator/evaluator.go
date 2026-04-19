@@ -194,6 +194,24 @@ func evalASTWithDepth(expr ast.Expr, context Context, depth int) (Value, error) 
 	return visitor.Visit(expr)
 }
 
+// newLambdaInvocationContext returns the lexical scope captured when the lambda
+// was defined. Caller locals do not implicitly leak into lambda/function bodies;
+// only explicit invocation bindings should be layered on top of this context.
+func newLambdaInvocationContext(lambda *Lambda) Context {
+	if lambda != nil && lambda.Env != nil {
+		return copyContext(lambda.Env)
+	}
+	return make(Context)
+}
+
+func evalLambdaWithBindingsAtDepth(lambda *Lambda, depth int, bind func(Context)) (Value, error) {
+	lambdaContext := newLambdaInvocationContext(lambda)
+	if bind != nil {
+		bind(lambdaContext)
+	}
+	return evalASTWithDepth(lambda.BodyAST, lambdaContext, depth)
+}
+
 // copyContext creates a shallow copy of a context map for scope isolation.
 //
 // This function is essential for maintaining proper variable scoping during:

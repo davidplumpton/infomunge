@@ -84,13 +84,12 @@ func callBuiltinTakeWhile(e *ast.CallExpr, context Context, depth int) (Value, e
 
 	result := make(Array, 0, len(array))
 	for i, elem := range array {
-		lambdaContext := copyContext(context)
-		lambdaContext[lambda.ParamName(0)] = elem
-		if lambda.ParamCount() > 1 {
-			lambdaContext[lambda.ParamName(1)] = i
-		}
-
-		condVal, err := evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+		condVal, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+			lambdaContext[lambda.ParamName(0)] = elem
+			if lambda.ParamCount() > 1 {
+				lambdaContext[lambda.ParamName(1)] = i
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -117,13 +116,12 @@ func callBuiltinDropWhile(e *ast.CallExpr, context Context, depth int) (Value, e
 	result := make(Array, 0, len(array))
 	skip := true
 	for i, elem := range array {
-		lambdaContext := copyContext(context)
-		lambdaContext[lambda.ParamName(0)] = elem
-		if lambda.ParamCount() > 1 {
-			lambdaContext[lambda.ParamName(1)] = i
-		}
-
-		condVal, err := evalASTWithDepth(lambda.BodyAST, lambdaContext, depth+1)
+		condVal, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+			lambdaContext[lambda.ParamName(0)] = elem
+			if lambda.ParamCount() > 1 {
+				lambdaContext[lambda.ParamName(1)] = i
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
