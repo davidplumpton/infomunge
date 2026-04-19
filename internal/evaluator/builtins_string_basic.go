@@ -126,6 +126,10 @@ func callBuiltinSubstring(args []Value, e *ast.CallExpr) (Value, error) {
 	return string(runes[start:]), nil
 }
 
+func runeIndexFromByteOffset(str string, byteOffset int) int {
+	return utf8.RuneCountInString(str[:byteOffset])
+}
+
 // callBuiltinCharAt implements the charAt(string, index) function.
 func callBuiltinCharAt(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 2, "charAt requires exactly 2 arguments: string, index", e); err != nil {
@@ -142,11 +146,12 @@ func callBuiltinCharAt(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	if idx < 0 || idx >= len(str) {
+	runes := []rune(str)
+	if idx < 0 || idx >= len(runes) {
 		return nil, newPosError(fmt.Sprintf("charAt index %d out of range", idx), e.Pos())
 	}
 
-	return string(str[idx]), nil
+	return string(runes[idx]), nil
 }
 
 // callBuiltinCharCodeAt implements the charCodeAt(string, index) function.
@@ -206,7 +211,11 @@ func callBuiltinIndexOf(args []Value, e *ast.CallExpr) (Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		return strings.Index(source, needle), nil
+		byteIdx := strings.Index(source, needle)
+		if byteIdx < 0 {
+			return -1, nil
+		}
+		return runeIndexFromByteOffset(source, byteIdx), nil
 	case Array:
 		target := args[1]
 		for i, item := range source {
@@ -233,7 +242,11 @@ func callBuiltinLastIndexOf(args []Value, e *ast.CallExpr) (Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		return strings.LastIndex(source, needle), nil
+		byteIdx := strings.LastIndex(source, needle)
+		if byteIdx < 0 {
+			return -1, nil
+		}
+		return runeIndexFromByteOffset(source, byteIdx), nil
 	case Array:
 		target := args[1]
 		for i := len(source) - 1; i >= 0; i-- {

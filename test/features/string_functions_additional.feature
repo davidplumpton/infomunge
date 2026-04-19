@@ -399,6 +399,31 @@ Feature: Additional String Functions
     When I run the application and it fails
     Then the output should contain "charAt index -1 out of range"
 
+  Scenario: charAt uses Unicode code point indices
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [charAt("é", 0), charAt("😀x", 0), charAt("éx", 1)]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["é","😀","x"]
+      """
+
+  Scenario: charAt Unicode out of range fails after last rune
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      charAt("é", 1)
+      """
+    When I run the application and it fails
+    Then the output should contain "charAt index 1 out of range"
+
   # indexOf tests
   Scenario: indexOf string basic usage
     Given the following input content:
@@ -440,6 +465,20 @@ Feature: Additional String Functions
     Then the output should be:
       """
       0
+      """
+
+  Scenario: indexOf string reports Unicode rune positions
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [indexOf("éx", "x"), indexOf("😀x😀", "x"), indexOf("😀x😀", "😀")]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,1,0]
       """
 
   Scenario: indexOf array basic usage
@@ -527,6 +566,20 @@ Feature: Additional String Functions
       -1
       """
 
+  Scenario: lastIndexOf string reports Unicode rune positions
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [lastIndexOf("aéé", "é"), lastIndexOf("😀x😀", "😀")]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [2,2]
+      """
+
   Scenario: lastIndexOf array basic usage
     Given the following input content:
       """
@@ -553,6 +606,20 @@ Feature: Additional String Functions
     Then the output should be:
       """
       -1
+      """
+
+  Scenario: Unicode indexing builtins stay consistent together
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [substring("éx", 0, 1), indexOf("éx", "x"), charAt("éx", 1), lastIndexOf("aéé", "é")]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["é",1,"x",2]
       """
 
   # substring tests
