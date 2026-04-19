@@ -15,7 +15,7 @@ Notes:
 ## Add a New Builtin Function
 
 1. Implement in `internal/evaluator/builtins_*.go`.
-2. Register in the builtin map in `internal/evaluator/builtins.go`.
+2. Register in the builtin registry in `internal/evaluator/modular_registry.go`.
 3. Add unit tests in `internal/evaluator/*_test.go`.
 
 ## Add a New Format

@@ -35,7 +35,7 @@ Note: The body is passed as a lambda closure to maintain variable scope.
 
 ### 3. Evaluator Implementation
 
-**Evaluator** (`internal/evaluator/evaluator.go` and `internal/evaluator/builtins.go`) will implement `__while` as a special builtin that:
+**Evaluator** (`internal/evaluator/evaluator.go`, `internal/evaluator/builtins_control_flow.go`, and `internal/evaluator/modular_registry.go`) implements `__while` as a special builtin that:
 
 1. Evaluates the condition
 2. If true, executes the body (which updates variables in context)
