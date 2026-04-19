@@ -109,3 +109,5 @@
 [53] **Agent Mistakes Log** - 2026-04-02: Added a cucumber scenario that used the quoted `a file named ... with content "..."` step for multiline script/module fixtures, so literal `\n` sequences were written and the parser failed with `script must have a header with '---' separator`. Why: reused the single-line fixture step without checking whether it unescapes newline sequences. Prevention: use a docstring-backed file fixture step for multiline files and prefer it for scripts/modules that require real line breaks [22].
 
 [54] **Agent Mistakes Log** - 2026-04-19: Ran `rg` with `--` before later `-g` flags while searching for `exprToString`, so ripgrep treated `-g` and `*.go` as paths and returned noisy errors. Why: inserted the end-of-options marker too early when guarding a pattern search. Prevention: keep all ripgrep flags before `--`, and only then pass the search pattern and paths [22].
+
+[55] **User Preferences Log** - 2026-04-19: User asked for a fresh-eyes audit that starts from `README.md`, `AGENTS.md`, and `MIND_MAP.md` context and turns substantiated quality findings into concrete beads tickets.
