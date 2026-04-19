@@ -1,14 +1,16 @@
 package input
 
 import (
-	"io"
 	"os"
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
+	"infomunge/internal/readlimit"
 	"infomunge/pkg/formats"
 )
+
+const MaxStdinBytes = 10 * 1024 * 1024
 
 // Source represents a data source with its content and MIME type
 type Source struct {
@@ -39,9 +41,12 @@ func (p *Parser) parseStdin(format string) (*Source, error) {
 		return nil, unifiederrors.ValidationErrorf("unknown format: %s", format)
 	}
 
-	content, err := io.ReadAll(os.Stdin)
+	content, tooLarge, err := readlimit.ReadAll(os.Stdin, MaxStdinBytes)
 	if err != nil {
 		return nil, unifiederrors.WrapIOf(err, "reading stdin")
+	}
+	if tooLarge {
+		return nil, unifiederrors.ValidationErrorf("stdin input exceeds maximum size of %d bytes", MaxStdinBytes)
 	}
 
 	return &Source{

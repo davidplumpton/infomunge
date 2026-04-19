@@ -141,6 +141,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	// Steps for docstring_input.feature
 	ctx.Step(`^the following input content:$`, tc.theFollowingInputContent)
 	ctx.Step(`^the following stdin content:$`, tc.theFollowingStdinContent)
+	ctx.Step(`^the stdin content is "([^"]*)" repeated (\d+) times$`, tc.theStdinContentIsRepeatedTimes)
 	ctx.Step(`^a script with (\d+) repeated lines$`, tc.aScriptWithRepeatedLines)
 	ctx.Step(`^I run the application with this content$`, tc.iRunTheApplicationWithThisContent)
 	ctx.Step(`^I run the application with this content using --lazy and it fails$`, tc.iRunTheApplicationWithThisContentUsingLazyAndItFails)
@@ -299,6 +300,14 @@ func (tc *testContext) theFollowingInputContent(content *godog.DocString) error 
 
 func (tc *testContext) theFollowingStdinContent(content *godog.DocString) error {
 	tc.stdinContent = content.Content
+	return nil
+}
+
+func (tc *testContext) theStdinContentIsRepeatedTimes(fragment string, count int) error {
+	if count < 0 {
+		return fmt.Errorf("repeat count must be non-negative, got %d", count)
+	}
+	tc.stdinContent = strings.Repeat(fragment, count)
 	return nil
 }
 

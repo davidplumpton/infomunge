@@ -1,6 +1,9 @@
 package formats
 
 import (
+	"archive/zip"
+	"bytes"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -98,4 +101,54 @@ func TestFormatWithOptions_XLSXStructured_ValidatesShape(t *testing.T) {
 			t.Fatalf("unexpected error message: %v", err)
 		}
 	})
+}
+
+func TestReadWithOptions_XLSXStructured_RejectsOversizedZipEntry(t *testing.T) {
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+
+	entry, err := writer.Create("xl/sharedStrings.xml")
+	if err != nil {
+		t.Fatalf("create zip entry: %v", err)
+	}
+	if _, err := entry.Write([]byte(strings.Repeat("a", MaxXLSXZipEntryBytes+1))); err != nil {
+		t.Fatalf("write zip entry: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close zip writer: %v", err)
+	}
+
+	_, err = ReadWithOptions(archive.String(), "application/xlsx", Object{"structured": true})
+	if err == nil {
+		t.Fatal("expected oversized xlsx entry to fail")
+	}
+	if !strings.Contains(err.Error(), "exceeds maximum size") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestReadWithOptions_XLSXStructured_RejectsTooManyZipEntries(t *testing.T) {
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+
+	for i := 0; i <= MaxXLSXZipEntries; i++ {
+		entry, err := writer.Create(fmt.Sprintf("xl/extra/file%d.xml", i))
+		if err != nil {
+			t.Fatalf("create zip entry %d: %v", i, err)
+		}
+		if _, err := entry.Write([]byte("x")); err != nil {
+			t.Fatalf("write zip entry %d: %v", i, err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close zip writer: %v", err)
+	}
+
+	_, err := ReadWithOptions(archive.String(), "application/xlsx", Object{"structured": true})
+	if err == nil {
+		t.Fatal("expected xlsx archive with too many entries to fail")
+	}
+	if !strings.Contains(err.Error(), "too many files") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
 }

@@ -592,6 +592,39 @@ func TestRead_Multipart_Invalid(t *testing.T) {
 	}
 }
 
+func TestRead_Multipart_Limits(t *testing.T) {
+	t.Run("part bytes limit", func(t *testing.T) {
+		content := strings.Join([]string{
+			"--boundary123",
+			`Content-Disposition: form-data; name="payload"`,
+			"",
+			strings.Repeat("a", MaxMultipartPartBytes+1),
+			"--boundary123--",
+			"",
+		}, "\r\n")
+
+		_, err := Read(content, "multipart/form-data")
+		if err == nil || !strings.Contains(err.Error(), "multipart part") {
+			t.Fatalf("expected multipart part limit error, got: %v", err)
+		}
+	})
+
+	t.Run("part count limit", func(t *testing.T) {
+		var b strings.Builder
+		for i := 0; i <= MaxMultipartParts; i++ {
+			b.WriteString("--boundary123\r\n")
+			b.WriteString(`Content-Disposition: form-data; name="item"` + "\r\n\r\n")
+			b.WriteString("x\r\n")
+		}
+		b.WriteString("--boundary123--\r\n")
+
+		_, err := Read(b.String(), "multipart/form-data")
+		if err == nil || !strings.Contains(err.Error(), "too many parts") {
+			t.Fatalf("expected multipart part count limit error, got: %v", err)
+		}
+	})
+}
+
 func TestRead_XML(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -20,3 +20,17 @@ Feature: Stdin-backed CLI inputs
       extra=:json
       """
     Then the output should contain "multiple stdin-backed inputs are not supported"
+
+  Scenario: CLI rejects oversized stdin-backed input content
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    And the stdin content is "a" repeated 10485761 times
+    When I run the application with this content and stdin-backed inputs and it fails:
+      """
+      """
+    Then the output should contain "stdin input exceeds maximum size"

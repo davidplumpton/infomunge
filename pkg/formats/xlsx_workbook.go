@@ -6,7 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	unifiederrors "infomunge/internal/errors"
-	"io"
+	"infomunge/internal/readlimit"
 	"path"
 	"strconv"
 	"strings"
@@ -17,6 +17,9 @@ const (
 	xlsxWorkbookPath     = "xl/workbook.xml"
 	xlsxWorkbookRelsPath = "xl/_rels/workbook.xml.rels"
 	xlsxSheetPrefix      = "xl/worksheets/sheet"
+	MaxXLSXZipEntries    = 512
+	MaxXLSXZipEntryBytes = 2 * 1024 * 1024
+	MaxXLSXZipTotalBytes = 10 * 1024 * 1024
 )
 
 // Workbook-level model types.
@@ -67,16 +70,28 @@ type xlsxSharedStringItemXML struct {
 
 // readZipFiles reads all entries from a zip.Reader into an in-memory map.
 func readZipFiles(reader *zip.Reader) (map[string][]byte, error) {
+	if len(reader.File) > MaxXLSXZipEntries {
+		return nil, unifiederrors.ValidationErrorf("xlsx archive contains too many files (max %d)", MaxXLSXZipEntries)
+	}
+
 	files := make(map[string][]byte, len(reader.File))
+	totalBytes := int64(0)
 	for _, file := range reader.File {
 		h, err := file.Open()
 		if err != nil {
 			return nil, unifiederrors.ValidationErrorf("unable to read xlsx file %s: %v", file.Name, err)
 		}
-		data, err := io.ReadAll(h)
+		data, tooLarge, err := readlimit.ReadAll(h, MaxXLSXZipEntryBytes)
 		_ = h.Close()
 		if err != nil {
 			return nil, unifiederrors.ValidationErrorf("unable to read xlsx file %s: %v", file.Name, err)
+		}
+		if tooLarge {
+			return nil, unifiederrors.ValidationErrorf("xlsx file %s exceeds maximum size of %d bytes", file.Name, MaxXLSXZipEntryBytes)
+		}
+		totalBytes += int64(len(data))
+		if totalBytes > MaxXLSXZipTotalBytes {
+			return nil, unifiederrors.ValidationErrorf("xlsx archive decompressed size exceeds maximum of %d bytes", MaxXLSXZipTotalBytes)
 		}
 		files[file.Name] = data
 	}

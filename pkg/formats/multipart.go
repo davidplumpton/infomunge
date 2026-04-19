@@ -10,9 +10,16 @@ import (
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/readlimit"
 )
 
 const multipartBoundary = "infomunge-boundary"
+
+const (
+	MaxMultipartBytes     = 10 * 1024 * 1024
+	MaxMultipartPartBytes = 2 * 1024 * 1024
+	MaxMultipartParts     = 256
+)
 
 func init() {
 	RegisterReader("multipart/form-data", readMultipart)
@@ -22,6 +29,10 @@ func init() {
 }
 
 func readMultipart(content string) (interface{}, error) {
+	if len(content) > MaxMultipartBytes {
+		return nil, unifiederrors.ValidationErrorf("multipart input exceeds maximum size of %d bytes", MaxMultipartBytes)
+	}
+
 	boundary, err := detectMultipartBoundary(content)
 	if err != nil {
 		return nil, err
@@ -29,6 +40,7 @@ func readMultipart(content string) (interface{}, error) {
 
 	reader := multipart.NewReader(strings.NewReader(content), boundary)
 	result := make(Object)
+	partCount := 0
 
 	for {
 		part, err := reader.NextPart()
@@ -39,14 +51,22 @@ func readMultipart(content string) (interface{}, error) {
 			return nil, unifiederrors.WrapValidationf(err, "multipart parse error: %v", err)
 		}
 
+		partCount++
+		if partCount > MaxMultipartParts {
+			return nil, unifiederrors.ValidationErrorf("multipart input contains too many parts (max %d)", MaxMultipartParts)
+		}
+
+		body, tooLarge, err := readlimit.ReadAll(part, MaxMultipartPartBytes)
+		if err != nil {
+			return nil, unifiederrors.WrapValidationf(err, "multipart read error: %v", err)
+		}
+		if tooLarge {
+			return nil, unifiederrors.ValidationErrorf("multipart part %q exceeds maximum size of %d bytes", part.FormName(), MaxMultipartPartBytes)
+		}
+
 		name := part.FormName()
 		if name == "" {
 			continue
-		}
-
-		body, err := io.ReadAll(part)
-		if err != nil {
-			return nil, unifiederrors.WrapValidationf(err, "multipart read error: %v", err)
 		}
 
 		value := multipartPartValue(part, string(body))
