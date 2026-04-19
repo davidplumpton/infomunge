@@ -1,10 +1,12 @@
 package evaluator
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"go/ast"
 	goparser "go/parser"
+	"go/printer"
 	"go/token"
 	"strconv"
 	"strings"
@@ -336,33 +338,11 @@ func indexOfAtDepthZero(s string, ch byte) int {
 
 // exprToString converts an AST expression back to a string representation.
 func exprToString(expr ast.Expr) string {
-	switch e := expr.(type) {
-	case *ast.BasicLit:
-		return e.Value
-	case *ast.Ident:
-		return e.Name
-	case *ast.BinaryExpr:
-		left := exprToString(e.X)
-		right := exprToString(e.Y)
-		return fmt.Sprintf("%s %s %s", left, e.Op, right)
-	case *ast.ParenExpr:
-		return fmt.Sprintf("(%s)", exprToString(e.X))
-	case *ast.CallExpr:
-		fun := exprToString(e.Fun)
-		var args []string
-		for _, arg := range e.Args {
-			args = append(args, exprToString(arg))
-		}
-		return fmt.Sprintf("%s(%s)", fun, strings.Join(args, ", "))
-	case *ast.IndexExpr:
-		x := exprToString(e.X)
-		index := exprToString(e.Index)
-		return fmt.Sprintf("%s[%s]", x, index)
-	case *ast.CompositeLit:
-		return fmt.Sprintf("{...}")
-	default:
-		return fmt.Sprintf("%v", expr)
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, token.NewFileSet(), expr); err == nil {
+		return buf.String()
 	}
+	return fmt.Sprintf("%T", expr)
 }
 
 // callBuiltinModCall implements __modcall("Module", "func", args...) for module function calls.

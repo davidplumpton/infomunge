@@ -253,6 +253,48 @@ func TestEvaluate_StringConcatWithLambdaIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestCoerceToString_ArrayContainingLambdaIsDeterministic(t *testing.T) {
+	value := Array{
+		&Lambda{
+			Params: []ParamDef{{Name: "x"}},
+			Body:   "x + 1",
+		},
+		2,
+	}
+
+	first := coerceToString(value)
+	second := coerceToString(value)
+
+	if first != second {
+		t.Fatalf("expected deterministic stringification, got %q and %q", first, second)
+	}
+	if first != "[(lambda: [x] => x + 1) 2]" {
+		t.Fatalf("expected nested lambda stringification to be stable, got %q", first)
+	}
+}
+
+func TestEvaluate_LambdaStringRepresentationHandlesUnaryBody(t *testing.T) {
+	ctx := make(Context)
+	expr := `__lambda("left, y", -6)`
+	mapping := make([]int, len(expr))
+	for i := range mapping {
+		mapping[i] = i
+	}
+
+	result, err := Evaluate(expr, ctx, mapping, 0, expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lambda, ok := result.(*Lambda)
+	if !ok {
+		t.Fatalf("expected lambda result, got %#v (%T)", result, result)
+	}
+	if lambda.String() != "(lambda: [left, y] => -6)" {
+		t.Fatalf("expected stable unary lambda body, got %q", lambda.String())
+	}
+}
+
 func TestEvaluate_ComparisonErrors(t *testing.T) {
 	ctx := Object{
 		"str": "hello",

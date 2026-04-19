@@ -28,6 +28,19 @@ type Lambda struct {
 	Env     Context    // Optional: module or closure environment for lexical scoping
 }
 
+func (l *Lambda) repr() string {
+	if l == nil {
+		return "<function>"
+	}
+	paramList := strings.Join(l.ParamNames(), ", ")
+	return fmt.Sprintf("(lambda: [%s] => %s)", paramList, l.Body)
+}
+
+// String implements fmt.Stringer so nested lambda values render deterministically.
+func (l *Lambda) String() string {
+	return l.repr()
+}
+
 // ParamNames returns the names of all parameters in order.
 func (l *Lambda) ParamNames() []string {
 	names := make([]string, len(l.Params))
@@ -74,9 +87,7 @@ func (l *Lambda) HasDefaults() bool {
 // MarshalJSON implements json.Marshaler for Lambda.
 func (l *Lambda) MarshalJSON() ([]byte, error) {
 	// Represent lambda as a string in JSON output for display purposes
-	paramList := strings.Join(l.ParamNames(), ", ")
-	repr := fmt.Sprintf("(lambda: [%s] => %s)", paramList, l.Body)
-	return []byte(fmt.Sprintf("\"%s\"", repr)), nil
+	return []byte(fmt.Sprintf("\"%s\"", l.repr())), nil
 }
 
 // ErrorContext holds information needed for error reporting and location mapping
