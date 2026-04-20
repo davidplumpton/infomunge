@@ -181,6 +181,13 @@ Feature: Lazy Evaluation
       """
     Then running the script should fail with error containing "__lazyFilter second argument must be a lambda"
 
+  Scenario: Lazy filter rejects non-boolean predicate result
+    Given the script:
+      """
+      __lazyFilter(__toStream([1,2,3]), (x) -> x)
+      """
+    Then running the script should fail with error containing "filter lambda must return a boolean"
+
   Scenario: Lazy reduce requires lambda
     Given the script:
       """

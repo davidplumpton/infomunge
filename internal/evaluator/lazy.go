@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"context"
+	"fmt"
 	unifiederrors "infomunge/internal/errors"
 )
 
@@ -125,7 +126,13 @@ func LazyFilter(input *LazyValue, lambda *Lambda, evalCtx Context) *LazyValue {
 					break
 				}
 				pred, ok := predVal.(bool)
-				if !ok || !pred {
+				if !ok {
+					sendErrOnce(errCh, fmt.Errorf("filter lambda must return a boolean, got %T", predVal))
+					for range inputStream {
+					}
+					break
+				}
+				if !pred {
 					continue
 				}
 				select {
