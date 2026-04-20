@@ -76,7 +76,7 @@ func (app *App) Run(args []string) error {
 func (app *App) parseFlags(args []string) (*Config, error) {
 	var inputs inputFlags
 
-	fs := flag.NewFlagSet("infomunge", flag.ExitOnError)
+	fs := flag.NewFlagSet("infomunge", flag.ContinueOnError)
 
 	scriptFile := fs.String("f", "", "script file to execute")
 	stdinFormat := fs.String("s", "", "read stdin as format (e.g., json), shorthand for -i payload=:format for stdin")

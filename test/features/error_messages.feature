@@ -8,6 +8,11 @@ Feature: Error Messages
     Then the stderr should contain "Error: IOError: error reading script file: missing.im"
     And the output should not contain "open missing.im"
 
+  Scenario: Unknown CLI flag exits through normal error handling
+    When I run the application with arguments "--bogus" and it fails
+    Then the exit status should be 1
+    And the stderr should contain "flag provided but not defined: -bogus"
+
   Scenario: Division by zero with simple expression
     Given the following input content:
       """

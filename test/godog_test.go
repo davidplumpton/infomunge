@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -31,6 +32,7 @@ type testContext struct {
 	lastOutput      string
 	lastStdout      string
 	lastStderr      string
+	lastExitCode    int
 	inputContent    string
 	stdinContent    string
 	payloadContent  string
@@ -136,6 +138,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a file named "([^"]*)" with content:$`, tc.aFileNamedWithDocstringContent)
 	ctx.Step(`^I run the application with "([^"]*)"$`, tc.iRunTheApplicationWith)
 	ctx.Step(`^I run the application with "([^"]*)" and it fails$`, tc.iRunTheApplicationWithAndItFails)
+	ctx.Step(`^I run the application with arguments "([^"]*)" and it fails$`, tc.iRunTheApplicationWithArgumentsAndItFails)
 	ctx.Step(`^I run "go test \./\.\.\." from the repo root$`, tc.iRunGoTestAllFromRepoRoot)
 	ctx.Step(`^the output should contain "((?:[^"\\]|\\.)*)"$`, tc.theOutputShouldContain)
 
@@ -196,6 +199,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the output should have UTC offset minutes (-?\d+)$`, tc.theOutputShouldHaveUTCOffsetMinutes)
 	ctx.Step(`^the stdout should be valid JSON equal to:$`, tc.theStdoutShouldBeValidJSONEqualTo)
 	ctx.Step(`^the stderr should contain "((?:[^"\\]|\\.)*)"$`, tc.theStderrShouldContain)
+	ctx.Step(`^the exit status should be (\d+)$`, tc.theExitStatusShouldBe)
 
 	// Steps for namespace support
 	ctx.Step(`^the output should contain:$`, tc.theOutputShouldContainDocstring)
@@ -263,6 +267,14 @@ func (tc *testContext) iRunTheApplicationWithAndItFails(arg string) error {
 		return err
 	}
 	_ = tc.runCLI("-f", arg)
+	return nil
+}
+
+func (tc *testContext) iRunTheApplicationWithArgumentsAndItFails(argsLine string) error {
+	if err := tc.ensureWorkspace(); err != nil {
+		return err
+	}
+	_ = tc.runCLI(strings.Fields(argsLine)...)
 	return nil
 }
 
@@ -468,6 +480,15 @@ func (tc *testContext) runCLI(args ...string) error {
 	tc.lastStdout = stdout.String()
 	tc.lastStderr = stderr.String()
 	tc.lastOutput = tc.lastStdout + tc.lastStderr
+	tc.lastExitCode = 0
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			tc.lastExitCode = exitErr.ExitCode()
+		} else {
+			tc.lastExitCode = -1
+		}
+	}
 	return err
 }
 
@@ -490,6 +511,15 @@ func (tc *testContext) runCLIWithStdin(stdinContent string, args ...string) erro
 	tc.lastStdout = stdout.String()
 	tc.lastStderr = stderr.String()
 	tc.lastOutput = tc.lastStdout + tc.lastStderr
+	tc.lastExitCode = 0
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			tc.lastExitCode = exitErr.ExitCode()
+		} else {
+			tc.lastExitCode = -1
+		}
+	}
 	return err
 }
 
@@ -1077,6 +1107,13 @@ func (tc *testContext) theStderrShouldContain(expected string) error {
 
 	if !strings.Contains(tc.lastStderr, expected) {
 		return fmt.Errorf("expected stderr to contain %q, but got %q", expected, tc.lastStderr)
+	}
+	return nil
+}
+
+func (tc *testContext) theExitStatusShouldBe(expected int) error {
+	if tc.lastExitCode != expected {
+		return fmt.Errorf("expected exit status %d, but got %d (stdout: %s, stderr: %s)", expected, tc.lastExitCode, tc.lastStdout, tc.lastStderr)
 	}
 	return nil
 }
