@@ -3,6 +3,11 @@ Feature: Error Messages
   As a developer
   I want to see clear and accurate error messages
 
+  Scenario: Missing script file reports a clear read error
+    When I run the application with "missing.im" and it fails
+    Then the stderr should contain "Error: IOError: error reading script file: missing.im"
+    And the output should not contain "open missing.im"
+
   Scenario: Division by zero with simple expression
     Given the following input content:
       """

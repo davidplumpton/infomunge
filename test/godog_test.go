@@ -135,6 +135,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a file named "([^"]*)" with content "([^"]*)"$`, tc.aFileNamedWithContent)
 	ctx.Step(`^a file named "([^"]*)" with content:$`, tc.aFileNamedWithDocstringContent)
 	ctx.Step(`^I run the application with "([^"]*)"$`, tc.iRunTheApplicationWith)
+	ctx.Step(`^I run the application with "([^"]*)" and it fails$`, tc.iRunTheApplicationWithAndItFails)
 	ctx.Step(`^I run "go test \./\.\.\." from the repo root$`, tc.iRunGoTestAllFromRepoRoot)
 	ctx.Step(`^the output should contain "((?:[^"\\]|\\.)*)"$`, tc.theOutputShouldContain)
 
@@ -254,6 +255,14 @@ func (tc *testContext) iRunTheApplicationWith(arg string) error {
 	if err != nil {
 		return fmt.Errorf("app failed: %v, output: %s", err, tc.lastOutput)
 	}
+	return nil
+}
+
+func (tc *testContext) iRunTheApplicationWithAndItFails(arg string) error {
+	if err := tc.ensureWorkspace(); err != nil {
+		return err
+	}
+	_ = tc.runCLI("-f", arg)
 	return nil
 }
 

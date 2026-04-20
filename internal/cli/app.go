@@ -138,7 +138,7 @@ func (app *App) execute(config *Config, context evaluator.Context) error {
 	if config.ScriptFile != "" {
 		content, err := os.ReadFile(config.ScriptFile)
 		if err != nil {
-			return unifiederrors.WrapIOf(err, "error reading script file: %v", err)
+			return unifiederrors.WrapIOf(err, "error reading script file: %s", config.ScriptFile)
 		}
 		absPath, err := filepath.Abs(config.ScriptFile)
 		if err != nil {
