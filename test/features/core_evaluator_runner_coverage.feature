@@ -144,20 +144,6 @@ Feature: Core evaluator runner coverage
       [1,2,3]
       """
 
-  Scenario: Array prepend with >> operator
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      10 >> [20, 30]
-      """
-    When I run the script
-    Then the output should be:
-      """
-      [10,20,30]
-      """
-
   Scenario: << with non-array fails
     Given the following script:
       """

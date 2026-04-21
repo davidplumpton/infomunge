@@ -183,17 +183,6 @@ Feature: Regex Functions
     When I run the application with this content
     Then the output should contain "aaaa"
 
-  Scenario: scan with capture groups
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      scan("test1 foo2 bar3", "([a-z]+)([0-9])")
-      """
-    When I run the application with this content
-    Then the output should be valid JSON with array length of 3
-
   Scenario: match with non-string input
     Given the following input content:
       """

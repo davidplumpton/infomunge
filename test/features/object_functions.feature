@@ -548,20 +548,7 @@ Feature: Object Functions
     And the output should contain "\"TITLE\":\"Dune\""
     And the output should contain "\"AUTHOR\":\"Frank Herbert\""
 
-  # filterObject tests
-  Scenario: filterObject basic usage
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      filterObject({"a": 1, "b": 2, "c": 3}, (k, v) -> v > 1)
-      """
-    When I run the application with this content
-    Then the output should contain "\"b\":2"
-    And the output should contain "\"c\":3"
-    And the output should not contain "\"a\":1"
-
+  # filterObject tests (basic usage in filtering_transformation_functions.feature)
   Scenario: filterObject by key name
     Given the following input content:
       """
@@ -665,17 +652,6 @@ Feature: Object Functions
       """
     When I run the application and it fails
     Then the output should contain "filterObject expects a lambda function"
-
-  Scenario: filterObject on non-object fails
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      filterObject("not an object", (k, v) -> true)
-      """
-    When I run the application and it fails
-    Then the output should contain "filterObject expects an object"
 
   # Combination scenarios
   Scenario: entriesOf result can be filtered

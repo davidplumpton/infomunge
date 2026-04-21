@@ -28,7 +28,7 @@ Feature: Update Operator (~)
     When I run the application with this content
     Then the output should be valid JSON with 2 keys
 
-  Scenario: Update with variable
+  Scenario: Merge with variable using ~ operator
     Given the following input content:
       """
       %im 0.1

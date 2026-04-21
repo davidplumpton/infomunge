@@ -250,7 +250,7 @@ Feature: Date/Time Functions
       false
       """
 
-  Scenario: isLeapYear with leap year 2000
+  Scenario: isLeapYear with leap year 2000 using Feb 29 date
     Given the following script:
       """
       %im 0.1

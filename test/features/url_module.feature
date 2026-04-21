@@ -63,7 +63,7 @@ Feature: URL Module
       "a/b c?d=e"
       """
 
-  Scenario: Import module and call with namespace
+  Scenario: Import Url module and call with namespace
     Given the following input content:
       """
       %im 0.1

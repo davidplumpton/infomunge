@@ -63,7 +63,7 @@ Feature: Numbers Module
       255
       """
 
-  Scenario: Import module and call with namespace
+  Scenario: Import Numbers module and call with namespace
     Given the following input content:
       """
       %im 0.1

@@ -16,27 +16,6 @@ Feature: Runtime builtins runner coverage
     When I run the script
     Then the output should be true
 
-  Scenario: uuid returns different values on successive calls
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      uuid() != uuid()
-      """
-    When I run the script
-    Then the output should be true
-
-  Scenario: uuid takes no arguments
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      uuid("bad")
-      """
-    Then running the script should fail with error containing "uuid takes no arguments"
-
   # --- evaluateCompatibilityFlag ---
 
   Scenario: evaluateCompatibilityFlag returns true for allowUndefinedProperties
@@ -105,16 +84,6 @@ Feature: Runtime builtins runner coverage
     When I run the script
     Then the output should be null
 
-  Scenario: evaluateCompatibilityFlag requires exactly one argument
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      evaluateCompatibilityFlag()
-      """
-    Then running the script should fail with error containing "evaluateCompatibilityFlag requires exactly 1 argument"
-
   Scenario: evaluateCompatibilityFlag expects string argument
     Given the following script:
       """
@@ -125,62 +94,7 @@ Feature: Runtime builtins runner coverage
       """
     Then running the script should fail with error containing "evaluateCompatibilityFlag expects flagName to be a string"
 
-  # --- envVar ---
-
-  Scenario: envVar returns value for existing variable
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      envVar("PATH") != null
-      """
-    When I run the script
-    Then the output should be true
-
-  Scenario: envVar returns null for non-existent variable
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      envVar("INFOMUNGE_NONEXISTENT_VAR_12345")
-      """
-    When I run the script
-    Then the output should be null
-
-  Scenario: envVar requires exactly one argument
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      envVar()
-      """
-    Then running the script should fail with error containing "envVar requires exactly 1 argument"
-
-  Scenario: envVar expects string argument
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      envVar(123)
-      """
-    Then running the script should fail with error containing "envVar expects a string argument"
-
-  # --- envVars ---
-
-  Scenario: envVars returns an object
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      typeOf(envVars())
-      """
-    When I run the script
-    Then the output should be "Object"
+  # --- envVar/envVars (unique in-process scenarios) ---
 
   Scenario: envVars contains PATH key
     Given the following script:
@@ -192,16 +106,6 @@ Feature: Runtime builtins runner coverage
       """
     When I run the script
     Then the output should be true
-
-  Scenario: envVars takes no arguments
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      envVars("unexpected")
-      """
-    Then running the script should fail with error containing "envVars takes no arguments"
 
   Scenario: envVar and envVars are consistent
     Given the following script:
@@ -240,16 +144,6 @@ Feature: Runtime builtins runner coverage
       """
     When I run the script
     Then the output should be "hello"
-
-  Scenario: log requires exactly one argument
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      log()
-      """
-    Then running the script should fail with error containing "log requires exactly 1 argument"
 
   # --- logDebug ---
 
@@ -371,27 +265,7 @@ Feature: Runtime builtins runner coverage
       500
       """
 
-  Scenario: logWith requires exactly two arguments
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      logWith(1)
-      """
-    Then running the script should fail with error containing "logWith requires exactly 2 arguments"
-
-  Scenario: logWith prefix must be string
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      logWith("value", 123)
-      """
-    Then running the script should fail with error containing "logWith expects a string"
-
-  # --- fail (in-process) ---
+  # --- fail (unique in-process scenarios) ---
 
   Scenario: fail with custom message
     Given the following script:
@@ -413,27 +287,7 @@ Feature: Runtime builtins runner coverage
       """
     Then running the script should fail with error containing "Error"
 
-  Scenario: fail expects string argument
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      fail(123)
-      """
-    Then running the script should fail with error containing "fail expects a string argument"
-
-  Scenario: fail accepts at most one argument
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      fail("a", "b")
-      """
-    Then running the script should fail with error containing "fail accepts at most 1 argument"
-
-  # --- try (in-process) ---
+  # --- try (unique in-process scenarios) ---
 
   Scenario: try catches fail and returns success false
     Given the following script:
@@ -482,28 +336,6 @@ Feature: Runtime builtins runner coverage
     When I run the script
     Then the output should be "Custom error"
 
-  Scenario: try returns error kind for user exceptions
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      try(() -> fail("test")).error.kind
-      """
-    When I run the script
-    Then the output should be "UserException"
-
-  Scenario: try catches runtime errors
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      try(() -> (1 / 0)).success
-      """
-    When I run the script
-    Then the output should be false
-
   Scenario: try with named zero-arg function
     Given the following script:
       """
@@ -517,42 +349,7 @@ Feature: Runtime builtins runner coverage
     When I run the script
     Then the output should be true
 
-  Scenario: try requires exactly one argument
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      try()
-      """
-    Then running the script should fail with error containing "try requires exactly 1 argument"
-
-  # --- orElse (in-process) ---
-
-  Scenario: orElse returns result when try succeeds
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      orElse(try(() -> 42), "fallback")
-      """
-    When I run the script
-    Then the output should be:
-      """
-      42
-      """
-
-  Scenario: orElse returns fallback when try fails
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      orElse(try(() -> fail("error")), "fallback")
-      """
-    When I run the script
-    Then the output should be "fallback"
+  # --- orElse (unique in-process scenarios) ---
 
   Scenario: orElse with fallback lambda
     Given the following script:
@@ -566,83 +363,7 @@ Feature: Runtime builtins runner coverage
     When I run the script
     Then the output should be "computed default"
 
-  Scenario: orElse requires exactly two arguments
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      orElse(try(() -> 1))
-      """
-    Then running the script should fail with error containing "orElse requires exactly 2 arguments"
-
-  Scenario: orElse requires TryResult as first argument
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      orElse("not a try result", "fallback")
-      """
-    Then running the script should fail with error containing "orElse: first argument must be a TryResult object"
-
-  # --- orElseTry (in-process) ---
-
-  Scenario: orElseTry returns original TryResult when try succeeds
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      orElseTry(try(() -> 42), () -> 99).result
-      """
-    When I run the script
-    Then the output should be:
-      """
-      42
-      """
-
-  Scenario: orElseTry evaluates fallback when try fails
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      orElseTry(try(() -> fail("error")), () -> 99).result
-      """
-    When I run the script
-    Then the output should be:
-      """
-      99
-      """
-
-  Scenario: orElseTry captures fallback failure
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      orElseTry(try(() -> fail("first")), () -> fail("second")).success
-      """
-    When I run the script
-    Then the output should be false
-
-  Scenario: orElseTry chain with first success
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      fun first() = 1
-      fun second() = 2
-      fun third() = 3
-      ---
-      orElse(orElseTry(orElseTry(try(first), second), third), 0)
-      """
-    When I run the script
-    Then the output should be:
-      """
-      1
-      """
+  # --- orElseTry (unique in-process scenarios) ---
 
   Scenario: orElseTry chain falls through to second
     Given the following script:
@@ -660,16 +381,6 @@ Feature: Runtime builtins runner coverage
       """
       2
       """
-
-  Scenario: orElseTry requires exactly two arguments
-    Given the following script:
-      """
-      %im 0.1
-      output application/json
-      ---
-      orElseTry(try(() -> 1))
-      """
-    Then running the script should fail with error containing "orElseTry requires exactly 2 arguments"
 
   Scenario: orElseTry requires TryResult as first argument
     Given the following script:

@@ -156,20 +156,6 @@ Feature: Array Functions
     And the output should contain "Bob"
     And the output should contain "null"
 
-  Scenario: pluck on empty array
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      [] pluck "name"
-      """
-    When I run the application with this content
-    Then the output should be:
-      """
-      []
-      """
-
   Scenario: pluck on non-array fails
     Given the following input content:
       """

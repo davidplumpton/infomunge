@@ -62,7 +62,7 @@ Feature: Objects Module
     And the output should contain "\"b\":20"
     And the output should contain "\"c\":3"
 
-  Scenario: Import module and call with namespace
+  Scenario: Import Objects module and call with namespace
     Given the following input content:
       """
       %im 0.1

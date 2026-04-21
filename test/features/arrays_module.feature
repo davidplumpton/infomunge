@@ -18,7 +18,7 @@ Feature: Arrays Module
       2
       """
 
-  Scenario: Import module and call with namespace
+  Scenario: Import Arrays module and call with namespace
     Given the following input content:
       """
       %im 0.1

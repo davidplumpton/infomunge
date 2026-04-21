@@ -483,21 +483,7 @@ Feature: Math Functions
     When I run the application and it fails
     Then the output should contain "max function requires non-empty array"
 
-  # sum tests
-  Scenario: sum basic usage
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      sum([1, 2, 3, 4, 5])
-      """
-    When I run the application with this content
-    Then the output should be:
-      """
-      15
-      """
-
+  # sum tests (basic usage in aggregation_functions.feature)
   Scenario: sum of empty array
     Given the following input content:
       """
@@ -526,49 +512,7 @@ Feature: Math Functions
       10
       """
 
-  Scenario: sum with floats
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      sum([1.5, 2.5, 3.0])
-      """
-    When I run the application with this content
-    Then the output should be:
-      """
-      7
-      """
-
-  # avg tests
-  Scenario: avg basic usage
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      avg([2, 4, 6, 8, 10])
-      """
-    When I run the application with this content
-    Then the output should be:
-      """
-      6
-      """
-
-  Scenario: avg with floats
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      avg([1, 2, 3])
-      """
-    When I run the application with this content
-    Then the output should be:
-      """
-      2
-      """
-
+  # avg tests (basic usage in aggregation_functions.feature)
   Scenario: avg of empty array fails
     Given the following input content:
       """
@@ -580,21 +524,7 @@ Feature: Math Functions
     When I run the application and it fails
     Then the output should contain "avg: cannot calculate average of empty array"
 
-  # mod tests
-  Scenario: mod basic usage
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      mod(10, 3)
-      """
-    When I run the application with this content
-    Then the output should be:
-      """
-      1
-      """
-
+  # mod tests (basic usage in utility_functions.feature)
   Scenario: mod with no remainder
     Given the following input content:
       """
@@ -607,20 +537,6 @@ Feature: Math Functions
     Then the output should be:
       """
       0
-      """
-
-  Scenario: mod with negative dividend
-    Given the following input content:
-      """
-      %im 0.1
-      output application/json
-      ---
-      mod(-10, 3)
-      """
-    When I run the application with this content
-    Then the output should be:
-      """
-      -1
       """
 
   Scenario: mod division by zero fails
