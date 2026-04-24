@@ -39,7 +39,7 @@ Important: use jj for version control. Never use git commands. Always commit wit
 - Commit between finishing one beads issue and starting another
 - Use jj commit with a description, don't use jj new with a description
 - Use a 5 minute timeout when running cucumber tests
-- Do not install new software
+- Do not install new software, ask if you think you need a new ability
 - Use golang only
 - Always verify new features or changes by adding a cucumber test
 - Stay within the infomunge directory, put temp files in tmp
