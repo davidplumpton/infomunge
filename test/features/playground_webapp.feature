@@ -81,6 +81,22 @@ Feature: Playground webapp
     Then the response status should be 200
     And the output should contain "\"name\""
 
+  Scenario: Run endpoint applies XML namespaces and output options
+    Given the server is running
+    And the following script:
+      """
+      %im 0.1
+      output application/xml writeDeclaration=false, writeDeclaredNamespaces="all"
+      ns ns0 http://www.abc.com
+      ---
+      {ns0#order: {ns0#id: "A-1"}}
+      """
+    When I run the server script without specifying output
+    Then the response status should be 200
+    And the output should contain "<ns0:order"
+    And the output should contain "xmlns:ns0=\"http://www.abc.com\""
+    And the output should not contain "<?xml"
+
   Scenario: Run endpoint returns timeout when request context is canceled
     Given the server is running
     And the following script:

@@ -5,20 +5,14 @@ import (
 	"fmt"
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
+	"infomunge/internal/output"
 	"infomunge/internal/preprocessor"
 	"infomunge/internal/sourcemap"
 	"infomunge/internal/stringutils"
-	"infomunge/pkg/formats"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-)
-
-// Context keys for eval context metadata shared between runner and handlers.
-const (
-	ContextKeyNamespaces    = "__namespaces__"
-	ContextKeyOutputOptions = "__output_options__"
 )
 
 // RunnerOptions holds configuration for execution
@@ -208,7 +202,7 @@ func handleOutputDecl(trimmedLine string, outputMimeType *string, context evalua
 		return err
 	}
 	if len(parsed) > 0 {
-		context[ContextKeyOutputOptions] = parsed
+		output.SetOptions(context, parsed)
 	}
 	return nil
 }
@@ -439,88 +433,14 @@ func formatOutputWithContext(result evaluator.Value, hasHeader bool, mimeType st
 		return nil
 	}
 
-	var output string
+	var formatted string
 	var err error
 
-	// If XML output and namespaces are declared in context, use them
-	if mimeType == "application/xml" {
-		var nsMap map[string]string
-		if context != nil {
-			if declared, ok := context[ContextKeyNamespaces].(map[string]string); ok {
-				nsMap = declared
-			}
-		}
-		xmlOpts := formats.XMLOutputOptions{
-			DeclaredNamespaces: nsMap,
-			NamespaceVars:      ExtractNamespaceVars(context),
-			WriteDeclaration:   true,
-		}
-		if context != nil {
-			if rawOpts, ok := context[ContextKeyOutputOptions].(map[string]string); ok {
-				if err := ApplyXMLOutputOptions(&xmlOpts, rawOpts); err != nil {
-					return err
-				}
-			}
-		}
-		output, err = formats.FormatXMLWithOptions(result, xmlOpts)
-	} else {
-		output, err = formats.Format(result, mimeType)
-	}
-
+	formatted, err = output.FormatResult(result, mimeType, context)
 	if err != nil {
 		return err
 	}
 
-	fmt.Print(output)
+	fmt.Print(formatted)
 	return nil
-}
-
-// ExtractNamespaceVars finds all Namespace values in the eval context.
-func ExtractNamespaceVars(context evaluator.Context) map[string]formats.Namespace {
-	if context == nil {
-		return nil
-	}
-	vars := make(map[string]formats.Namespace)
-	for k, v := range context {
-		if ns, ok := v.(formats.Namespace); ok {
-			vars[k] = ns
-		}
-	}
-	if len(vars) == 0 {
-		return nil
-	}
-	return vars
-}
-
-// ApplyXMLOutputOptions applies raw string options to XMLOutputOptions.
-func ApplyXMLOutputOptions(opts *formats.XMLOutputOptions, raw map[string]string) error {
-	for key, value := range raw {
-		switch strings.ToLower(strings.TrimSpace(key)) {
-		case "writedeclaration":
-			parsed, err := parseBoolOption(value)
-			if err != nil {
-				return unifiederrors.ParseErrorf("output option writeDeclaration: %v", err)
-			}
-			opts.WriteDeclaration = parsed
-		case "writedeclarednamespaces":
-			opts.WriteDeclaredNamespaces = value
-		case "writenilonnull":
-			parsed, err := parseBoolOption(value)
-			if err != nil {
-				return unifiederrors.ParseErrorf("output option writeNilOnNull: %v", err)
-			}
-			opts.WriteNilOnNull = parsed
-		case "skipnullon":
-			opts.SkipNullOn = value
-		}
-	}
-	return nil
-}
-
-func parseBoolOption(value string) (bool, error) {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return false, fmt.Errorf("empty value")
-	}
-	return strconv.ParseBool(trimmed)
 }

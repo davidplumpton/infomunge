@@ -6,6 +6,7 @@ import (
 
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
+	"infomunge/internal/output"
 )
 
 type headerDirectiveKind string
@@ -150,7 +151,7 @@ func applyHeaderDirectives(directives []headerDirective, goCtx context.Context, 
 	}
 
 	if len(namespaces) > 0 {
-		context[ContextKeyNamespaces] = namespaces
+		output.SetDeclaredNamespaces(context, namespaces)
 	}
 
 	return context, outputMimeType, nil

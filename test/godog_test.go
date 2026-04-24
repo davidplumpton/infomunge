@@ -24,6 +24,7 @@ import (
 	"github.com/cucumber/godog"
 	"infomunge/internal/cli"
 	"infomunge/internal/evaluator"
+	resultoutput "infomunge/internal/output"
 	"infomunge/internal/runner"
 	"infomunge/pkg/formats"
 )
@@ -594,9 +595,7 @@ func (tc *testContext) iRunTheScript() error {
 	return tc.runScriptWithTimeout(tc.scriptContent, ctx)
 }
 
-// iRunTheScriptThroughRunnerOutputPath calls RunFromStringWithContext which
-// exercises the runner's formatOutputWithContext path (including applyXMLOutputOptions
-// and parseBoolOption) by capturing stdout.
+// iRunTheScriptThroughRunnerOutputPath calls RunFromStringWithContext and captures stdout.
 func (tc *testContext) iRunTheScriptThroughRunnerOutputPath() error {
 	ctx := make(evaluator.Context)
 	if tc.payloadMime != "" {
@@ -967,84 +966,17 @@ func (tc *testContext) runScriptWithTimeout(scriptContent string, additionalCont
 	// Wait for result with timeout
 	select {
 	case res := <-resultChan:
-		var output string
-		var err error
-
-		// If XML output, apply DataWeave-compatible options.
-		if res.mimeType == "application/xml" {
-			var nsMap map[string]string
-			if res.context != nil {
-				if declared, ok := res.context["__namespaces__"].(map[string]string); ok {
-					nsMap = declared
-				}
-			}
-			xmlOpts := formats.XMLOutputOptions{
-				DeclaredNamespaces: nsMap,
-				NamespaceVars:      extractNamespaceVars(res.context),
-				WriteDeclaration:   true,
-			}
-			if res.context != nil {
-				if rawOpts, ok := res.context["__output_options__"].(map[string]string); ok {
-					if err := applyXMLOutputOptions(&xmlOpts, rawOpts); err != nil {
-						return fmt.Errorf("failed to apply xml output options: %v", err)
-					}
-				}
-			}
-			output, err = formats.FormatXMLWithOptions(res.result, xmlOpts)
-		} else {
-			output, err = formats.Format(res.result, res.mimeType)
-		}
-
+		formatted, err := resultoutput.FormatResult(res.result, res.mimeType, res.context)
 		if err != nil {
 			return fmt.Errorf("failed to format output: %v", err)
 		}
-		tc.lastOutput = output
+		tc.lastOutput = formatted
 		return nil
 	case err := <-errChan:
 		return err
 	case <-time.After(tc.timeout):
 		return fmt.Errorf("script execution timed out after %v (possible infinite loop)", tc.timeout)
 	}
-}
-
-func extractNamespaceVars(context evaluator.Context) map[string]formats.Namespace {
-	if context == nil {
-		return nil
-	}
-	vars := make(map[string]formats.Namespace)
-	for k, v := range context {
-		if ns, ok := v.(formats.Namespace); ok {
-			vars[k] = ns
-		}
-	}
-	if len(vars) == 0 {
-		return nil
-	}
-	return vars
-}
-
-func applyXMLOutputOptions(opts *formats.XMLOutputOptions, raw map[string]string) error {
-	for key, value := range raw {
-		switch strings.ToLower(strings.TrimSpace(key)) {
-		case "writedeclaration":
-			parsed, err := strconv.ParseBool(strings.TrimSpace(value))
-			if err != nil {
-				return fmt.Errorf("output option writeDeclaration: %v", err)
-			}
-			opts.WriteDeclaration = parsed
-		case "writedeclarednamespaces":
-			opts.WriteDeclaredNamespaces = value
-		case "writenilonnull":
-			parsed, err := strconv.ParseBool(strings.TrimSpace(value))
-			if err != nil {
-				return fmt.Errorf("output option writeNilOnNull: %v", err)
-			}
-			opts.WriteNilOnNull = parsed
-		case "skipnullon":
-			opts.SkipNullOn = value
-		}
-	}
-	return nil
 }
 
 func (tc *testContext) theOutputShouldBeTrue() error {
