@@ -51,8 +51,9 @@ Thumbs.db
 *.db-wal
 *.db-shm
 
-.beads/
-# Keep JSONL exports (source of truth for git)
+# Keep JSONL exports (source of truth for git) while ignoring local DB state.
+.beads/*
+!.beads/
 !.beads/*.jsonl
 
 # Ignore nix result
