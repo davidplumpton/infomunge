@@ -124,6 +124,39 @@ Feature: Import Directive
       35
       """
 
+  Scenario: Multiline declarations behave the same in script headers and modules
+    Given a file named "modules/SharedDecls.im" with content:
+      """
+      %im 0.1
+      var moduleConfig =
+        {
+          base: 10,
+          extra: 5
+        }
+      fun moduleScore(x) =
+        (x * moduleConfig.base) + moduleConfig.extra
+      """
+    And the following input content:
+      """
+      %im 0.1
+      import modules::SharedDecls
+      var scriptConfig =
+        {
+          base: 10,
+          extra: 5
+        }
+      fun scriptScore(x) =
+        (x * scriptConfig.base) + scriptConfig.extra
+      output application/json
+      ---
+      {script: scriptScore(3), module: SharedDecls::moduleScore(3)}
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"module":35,"script":35}
+      """
+
   Scenario: Import module variable with star
     Given the following input content:
       """

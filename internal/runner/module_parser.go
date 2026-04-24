@@ -3,7 +3,6 @@ package runner
 import (
 	"strings"
 
-	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
 )
 
@@ -14,34 +13,19 @@ func parseModuleContent(content string, loader *ModuleLoader) (Namespace, error)
 	ns := make(Namespace)
 	// For evaluation within the module, we need a raw map
 	rawNs := make(evaluator.Context)
-	lines := strings.Split(content, "\n")
-	offset := 0
+	directives, err := parseModuleDirectives(content)
+	if err != nil {
+		return nil, err
+	}
 
-	for i := 0; i < len(lines); {
-		line := lines[i]
-		trimmedLine := strings.TrimSpace(line)
-		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "//") {
-			offset += len(line) + 1
-			i++
-			continue
-		}
+	for _, directive := range directives {
+		switch directive.kind {
+		case headerDirectiveVersion:
+			// Version declarations are accepted for DataWeave compatibility but do not affect modules.
 
-		if trimmedLine == "---" {
-			lineOffset := offset + leadingWhitespaceOffset(line)
-			return nil, attachLineContext(unifiederrors.ParseError("modules cannot contain a body section (---)"), content, lineOffset, line)
-		}
-
-		switch {
-		case strings.HasPrefix(trimmedLine, "%dw "), strings.HasPrefix(trimmedLine, "%im "):
-			// Version declarations - ignore in modules
-			offset += len(line) + 1
-			i++
-			continue
-
-		case strings.HasPrefix(trimmedLine, "import "):
-			if err := handleImport(trimmedLine, rawNs, loader); err != nil {
-				lineOffset := offset + leadingWhitespaceOffset(line)
-				return nil, attachLineContext(err, content, lineOffset, line)
+		case headerDirectiveImport:
+			if err := handleImport(directive.trimmed, rawNs, loader); err != nil {
+				return nil, withHeaderLineContext(err, content, directive.offset, directive.line)
 			}
 			// Copy imported entries to typed namespace
 			for k, v := range rawNs {
@@ -50,50 +34,34 @@ func parseModuleContent(content string, loader *ModuleLoader) (Namespace, error)
 				}
 			}
 
-		case strings.HasPrefix(trimmedLine, "var "):
-			val, varName, consumed, err := parseVarDeclFromLines(lines, i, offset, rawNs, content)
+		case headerDirectiveVar:
+			val, varName, consumed, err := parseVarDeclFromLines(directive.lines, 0, directive.offset, rawNs, content)
 			if err != nil {
-				lineOffset := offset + leadingWhitespaceOffset(line)
-				return nil, attachLineContext(err, content, lineOffset, line)
+				return nil, withHeaderLineContext(err, content, directive.offset, directive.line)
 			}
-			if varName != "" {
+			if consumed > 0 && varName != "" {
 				ns[varName] = NewVarEntry(val)
 				rawNs[varName] = val
 			}
-			for j := 0; j < consumed; j++ {
-				offset += len(lines[i+j]) + 1
-			}
-			i += consumed
-			continue
 
-		case strings.HasPrefix(trimmedLine, "fun "):
-			fn, fnName, consumed, err := parseFunDeclFromLinesWithSource(lines, i, rawNs, content, offset)
+		case headerDirectiveFun:
+			fn, fnName, consumed, err := parseFunDeclFromLinesWithSource(directive.lines, 0, rawNs, content, directive.offset)
 			if err != nil {
-				lineOffset := offset + leadingWhitespaceOffset(line)
-				return nil, attachLineContext(err, content, lineOffset, line)
+				return nil, withHeaderLineContext(err, content, directive.offset, directive.line)
 			}
-			if fnName != "" {
+			if consumed > 0 && fnName != "" {
 				ns[fnName] = NewFuncEntry(fn)
 				rawNs[fnName] = fn
 			}
-			for j := 0; j < consumed; j++ {
-				offset += len(lines[i+j]) + 1
-			}
-			i += consumed
-			continue
 
-		case strings.HasPrefix(trimmedLine, "type "):
-			if td, typeName, err := parseTypeDecl(trimmedLine); err != nil {
-				lineOffset := offset + leadingWhitespaceOffset(line)
-				return nil, attachLineContext(err, content, lineOffset, line)
+		case headerDirectiveType:
+			if td, typeName, err := parseTypeDecl(directive.trimmed); err != nil {
+				return nil, withHeaderLineContext(err, content, directive.offset, directive.line)
 			} else if typeName != "" {
 				ns[typeName] = NewTypeDefEntry(td)
 				rawNs[typeName] = td
 			}
 		}
-
-		offset += len(line) + 1
-		i++
 	}
 
 	return ns, nil

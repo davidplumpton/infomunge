@@ -719,6 +719,18 @@ output application/json badoption`,
 	}
 }
 
+func TestParseModuleContentRejectsBodySection(t *testing.T) {
+	_, err := parseModuleContent("%im 0.1\nvar x = 1\n---\nx", NewModuleLoader("."))
+	if err == nil {
+		t.Fatal("parseModuleContent() expected error for module body separator, got nil")
+	}
+	for _, want := range []string{"modules cannot contain a body section", "line: ---"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("parseModuleContent() error = %v, want substring %q", err, want)
+		}
+	}
+}
+
 func TestSplitPropertyPairs(t *testing.T) {
 	tests := []struct {
 		name  string

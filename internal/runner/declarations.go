@@ -95,8 +95,24 @@ func parseVarDeclSource(lines []string, start int) (*parsedVarDecl, error) {
 	}
 	varName := fields[0]
 
-	var declLines []string
-	declLines = append(declLines, firstLine)
+	declLines := []string{firstLine}
+	declRaw := firstLine
+	eqIdx := strings.Index(declRaw, "=")
+	if eqIdx < 0 {
+		return nil, unifiederrors.ParseErrorf("invalid variable declaration: missing '=' in %q", trimmedFirst)
+	}
+	exprStr := strings.TrimSpace(declRaw[eqIdx+1:])
+	if exprStr != "" {
+		strippedExpr := preprocessor.StripSingleLineComment(exprStr)
+		if strings.TrimSpace(strippedExpr) != "" && isDelimiterBalanced(strippedExpr) {
+			return &parsedVarDecl{
+				varName:  varName,
+				exprStr:  exprStr,
+				consumed: 1,
+			}, nil
+		}
+	}
+
 	i := start + 1
 	for i < len(lines) {
 		line := lines[i]
@@ -106,19 +122,16 @@ func parseVarDeclSource(lines []string, start int) (*parsedVarDecl, error) {
 			i++
 			continue
 		}
-		if isDirectiveLine(trimmed) {
+		if isDirectiveLine(trimmed) || (trimmed == "---" && parsedVarLinesAreComplete(declLines)) {
 			break
 		}
 		declLines = append(declLines, line)
 		i++
 	}
 
-	declRaw := strings.Join(declLines, "\n")
-	eqIdx := strings.Index(declRaw, "=")
-	if eqIdx < 0 {
-		return nil, unifiederrors.ParseErrorf("invalid variable declaration: missing '=' in %q", trimmedFirst)
-	}
-	exprStr := strings.TrimSpace(declRaw[eqIdx+1:])
+	declRaw = strings.Join(declLines, "\n")
+	eqIdx = strings.Index(declRaw, "=")
+	exprStr = strings.TrimSpace(declRaw[eqIdx+1:])
 	if exprStr == "" {
 		return nil, unifiederrors.ParseErrorf("invalid variable declaration: missing expression for %q", varName)
 	}
@@ -131,6 +144,16 @@ func parseVarDeclSource(lines []string, start int) (*parsedVarDecl, error) {
 		exprStr:  exprStr,
 		consumed: len(declLines),
 	}, nil
+}
+
+func parsedVarLinesAreComplete(lines []string) bool {
+	declRaw := strings.Join(lines, "\n")
+	eqIdx := strings.Index(declRaw, "=")
+	if eqIdx < 0 {
+		return false
+	}
+	exprStr := strings.TrimSpace(declRaw[eqIdx+1:])
+	return exprStr != "" && isDelimiterBalanced(exprStr)
 }
 
 func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset int, evalCtx evaluator.Context, goCtx context.Context, fullRaw string) (evaluator.Value, string, int, error) {
