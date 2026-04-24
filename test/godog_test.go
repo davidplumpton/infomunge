@@ -34,6 +34,7 @@ type testContext struct {
 	lastStdout      string
 	lastStderr      string
 	lastExitCode    int
+	lastRunnerMime  string
 	inputContent    string
 	stdinContent    string
 	payloadContent  string
@@ -168,6 +169,8 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the following multipart input:$`, tc.theFollowingMultipartInput)
 	ctx.Step(`^the following script:$`, tc.theFollowingScript)
 	ctx.Step(`^I run the script$`, tc.iRunTheScript)
+	ctx.Step(`^I execute the script through the structured runner API$`, tc.iExecuteTheScriptThroughStructuredRunnerAPI)
+	ctx.Step(`^the runner output MIME type should be "([^"]*)"$`, tc.theRunnerOutputMIMETypeShouldBe)
 	ctx.Step(`^I run the script through the runner output path$`, tc.iRunTheScriptThroughRunnerOutputPath)
 	ctx.Step(`^running the script through the runner output path should fail with error containing "([^"]*)"$`, tc.runningTheScriptThroughRunnerOutputPathShouldFailWithErrorContaining)
 	ctx.Step(`^I run the script with a canceled evaluation context$`, tc.iRunTheScriptWithCanceledEvaluationContext)
@@ -593,6 +596,37 @@ func (tc *testContext) iRunTheScript() error {
 
 	// Run the script with timeout protection
 	return tc.runScriptWithTimeout(tc.scriptContent, ctx)
+}
+
+func (tc *testContext) iExecuteTheScriptThroughStructuredRunnerAPI() error {
+	ctx := make(evaluator.Context)
+	if tc.payloadMime != "" {
+		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
+		if err != nil {
+			return fmt.Errorf("failed to parse payload: %v", err)
+		}
+		ctx["payload"] = payload
+	}
+
+	result, err := runner.ExecuteStringWithContextAndOptions(tc.scriptContent, ctx, runner.RunnerOptions{})
+	if err != nil {
+		return err
+	}
+	tc.lastRunnerMime = result.OutputMimeType
+
+	formatted, err := runner.FormatExecutionResult(result)
+	if err != nil {
+		return err
+	}
+	tc.lastOutput = formatted
+	return nil
+}
+
+func (tc *testContext) theRunnerOutputMIMETypeShouldBe(expected string) error {
+	if tc.lastRunnerMime != expected {
+		return fmt.Errorf("expected runner output MIME type %q, got %q", expected, tc.lastRunnerMime)
+	}
+	return nil
 }
 
 // iRunTheScriptThroughRunnerOutputPath calls RunFromStringWithContext and captures stdout.

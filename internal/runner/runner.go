@@ -7,7 +7,6 @@ import (
 	"infomunge/internal/evaluator"
 	"infomunge/internal/output"
 	"infomunge/internal/preprocessor"
-	"infomunge/internal/sourcemap"
 	"infomunge/internal/stringutils"
 	"os"
 	"path/filepath"
@@ -84,22 +83,49 @@ func runFromStringWithConfig(goCtx context.Context, raw string, additionalContex
 		return unifiederrors.ValidationError(lazyFlagUnsupportedMessage)
 	}
 
+	if err := RequireScriptHeader(raw); err != nil {
+		return err
+	}
+
+	result, err := ExecuteStringWithGoContextAndOptions(goCtx, raw, additionalContext, opts)
+	if err != nil {
+		return err
+	}
+
+	return PrintExecutionResult(result)
+}
+
+// RequireScriptHeader validates that an output-oriented script includes a header separator.
+func RequireScriptHeader(raw string) error {
 	_, _, bodyOffset := preprocessor.ExtractHeaderAndBody(raw)
 	if bodyOffset == 0 {
 		return unifiederrors.ParseError("script must have a header with '---' separator")
 	}
+	return nil
+}
 
-	result, hasHeader, outputMimeType, context, err := evaluateWithContext(goCtx, raw, additionalContext, opts)
+// PrintExecutionResult formats and writes an execution result to stdout.
+// New callers should prefer ExecuteString* plus FormatExecutionResult so output
+// destinations stay owned by the adapter layer.
+func PrintExecutionResult(result ExecutionResult) error {
+	formatted, err := FormatExecutionResult(result)
 	if err != nil {
 		return err
 	}
+	fmt.Print(formatted)
+	return nil
+}
 
-	result, err = ResolveResult(result)
+// FormatExecutionResult resolves and serializes an execution result without printing it.
+func FormatExecutionResult(result ExecutionResult) (string, error) {
+	resolved, err := result.Resolved()
 	if err != nil {
-		return err
+		return "", err
 	}
-
-	return formatOutputWithContext(result, hasHeader, outputMimeType, context)
+	if !resolved.HasHeader {
+		return fmt.Sprint(resolved.Value), nil
+	}
+	return output.FormatResult(resolved.Value, resolved.OutputMimeType, resolved.Context)
 }
 
 // RunString executes an infomunge script from a string with optional additional context.
@@ -110,15 +136,11 @@ func RunString(script string, additionalContext evaluator.Context) (evaluator.Va
 
 // RunStringWithGoContext executes an infomunge script from a string with optional additional context and Go context.
 func RunStringWithGoContext(goCtx context.Context, script string, additionalContext evaluator.Context) (evaluator.Value, error) {
-	baseDir, err := os.Getwd()
-	if err != nil {
-		baseDir = "."
-	}
-	result, _, _, err := evaluate(goCtx, script, additionalContext, RunnerOptions{BaseDir: baseDir})
+	result, err := ExecuteStringWithGoContext(goCtx, script, additionalContext)
 	if err != nil {
 		return nil, err
 	}
-	return ResolveResult(result)
+	return ResolveResult(result.Value)
 }
 
 // RunStringWithContextAndOptionsWithOutput executes a script and returns result plus output metadata.
@@ -128,58 +150,20 @@ func RunStringWithContextAndOptionsWithOutput(script string, additionalContext e
 
 // RunStringWithGoContextAndOptionsWithOutput executes a script and returns result plus output metadata.
 func RunStringWithGoContextAndOptionsWithOutput(goCtx context.Context, script string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, evaluator.Context, error) {
-	if opts.BaseDir == "" {
-		baseDir, err := os.Getwd()
-		if err != nil {
-			opts.BaseDir = "."
-		} else {
-			opts.BaseDir = baseDir
-		}
-	}
-	return evaluateWithContext(goCtx, script, additionalContext, opts)
+	result, err := ExecuteStringWithGoContextAndOptions(goCtx, script, additionalContext, opts)
+	return result.Value, result.HasHeader, result.OutputMimeType, result.Context, err
 }
 
 // evaluate is the core evaluation logic shared by all runner functions.
 func evaluate(goCtx context.Context, raw string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, error) {
-	result, hasHeader, outputMimeType, _, err := evaluateWithContext(goCtx, raw, additionalContext, opts)
-	return result, hasHeader, outputMimeType, err
+	result, err := executeWithConfig(goCtx, raw, additionalContext, opts)
+	return result.Value, result.HasHeader, result.OutputMimeType, err
 }
 
 // evaluateWithContext is the core evaluation logic that also returns the parsed context.
 func evaluateWithContext(goCtx context.Context, raw string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, evaluator.Context, error) {
-	if opts.Lazy {
-		return nil, false, "", nil, unifiederrors.ValidationError(lazyFlagUnsupportedMessage)
-	}
-
-	header, body, bodyOffset := preprocessor.ExtractHeaderAndBody(raw)
-	hasHeader := bodyOffset != 0
-
-	loader := NewModuleLoader(opts.BaseDir)
-	context, outputMimeType, err := parseHeaderWithGoContext(header, hasHeader, goCtx, raw, loader)
-	if err != nil {
-		return nil, hasHeader, outputMimeType, nil, err
-	}
-
-	// Inject additional context (e.g., payload from -i flags)
-	for k, v := range additionalContext {
-		context[k] = v
-	}
-
-	prepOpts := preprocessor.Options{}
-	if strings.ContainsAny(body, "\n\r") {
-		prepOpts.AllowMultilineIfElse = true
-	}
-	parseableExpr, mapping, err := preprocessor.PrepareForParsing(body, prepOpts)
-	if err != nil {
-		return nil, hasHeader, outputMimeType, nil, err
-	}
-	bodyMap := sourcemap.Identity(raw).SliceSource(bodyOffset, bodyOffset+len(body)).Compose(parseableExpr, mapping)
-	result, err := evaluator.EvaluateWithGoContextAndSourceMap(parseableExpr, context, goCtx, bodyMap)
-	if err != nil {
-		return nil, hasHeader, outputMimeType, nil, err
-	}
-
-	return result, hasHeader, outputMimeType, context, nil
+	result, err := executeWithConfig(goCtx, raw, additionalContext, opts)
+	return result.Value, result.HasHeader, result.OutputMimeType, result.Context, err
 }
 
 // handleOutputDecl processes output directive and captures output options.

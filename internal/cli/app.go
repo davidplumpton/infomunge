@@ -146,14 +146,30 @@ func (app *App) execute(config *Config, context evaluator.Context) error {
 		} else {
 			opts.BaseDir = filepath.Dir(absPath)
 		}
-		return runner.RunFromStringWithContextAndOptions(string(content), context, opts)
+		return app.writeExecutionResult(string(content), context, opts)
 	}
 
 	if config.Script != "" {
-		return runner.RunFromStringWithContextAndOptions(config.Script, context, opts)
+		return app.writeExecutionResult(config.Script, context, opts)
 	}
 
 	return unifiederrors.ValidationError("no script provided")
+}
+
+func (app *App) writeExecutionResult(script string, context evaluator.Context, opts runner.RunnerOptions) error {
+	if err := runner.RequireScriptHeader(script); err != nil {
+		return err
+	}
+	result, err := runner.ExecuteStringWithContextAndOptions(script, context, opts)
+	if err != nil {
+		return err
+	}
+	formatted, err := runner.FormatExecutionResult(result)
+	if err != nil {
+		return err
+	}
+	fmt.Print(formatted)
+	return nil
 }
 
 // inputFlags collects multiple -i flag values
