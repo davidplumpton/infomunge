@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"errors"
 	"infomunge/internal/evaluator"
 	"os"
 	"path/filepath"
@@ -99,6 +100,44 @@ func TestRunStringWithGoContextAndOptionsWithOutput_LazyFlagUnsupported(t *testi
 	if !containsString(err.Error(), "--lazy is currently unsupported") {
 		t.Fatalf("expected unsupported lazy flag error, got: %v", err)
 	}
+}
+
+func TestRunStringWithOptions_DisablesURLIOInModuleDeclarations(t *testing.T) {
+	tmpDir := t.TempDir()
+	modulesDir := filepath.Join(tmpDir, "modules")
+	if err := os.Mkdir(modulesDir, 0755); err != nil {
+		t.Fatalf("failed to create modules dir: %v", err)
+	}
+	module := `%im 0.1
+var remote = readUrl("http://example.com/data.json", "application/json")`
+	if err := os.WriteFile(filepath.Join(modulesDir, "Remote.im"), []byte(module), 0644); err != nil {
+		t.Fatalf("failed to write module: %v", err)
+	}
+
+	script := `%im 0.1
+import modules::Remote
+output application/json
+---
+Remote::remote`
+	_, _, _, _, err := RunStringWithGoContextAndOptionsWithOutput(
+		t.Context(),
+		script,
+		nil,
+		RunnerOptions{BaseDir: tmpDir, DisableURLReadService: true},
+	)
+	if err == nil || !errorChainContains(err, "URL IO capability is disabled") {
+		t.Fatalf("expected disabled URL IO error, got %v", err)
+	}
+}
+
+func errorChainContains(err error, expected string) bool {
+	for err != nil {
+		if strings.Contains(err.Error(), expected) {
+			return true
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
 }
 
 func TestParseVarDecl(t *testing.T) {

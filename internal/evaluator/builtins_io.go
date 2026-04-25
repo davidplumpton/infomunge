@@ -3,88 +3,31 @@ package evaluator
 import (
 	"fmt"
 	"go/ast"
-	"io"
-	"net"
-	"net/http"
 	"net/url"
-	"strings"
-	"time"
-
-	"infomunge/pkg/formats"
 )
 
-const (
-	// readUrlTimeout is the maximum time allowed for a readUrl HTTP request.
-	readUrlTimeout = 30 * time.Second
-	// maxResponseBytes is the maximum response body size readUrl will consume (10 MB).
-	maxResponseBytes = 10 * 1024 * 1024
-)
-
-// readUrlClient is a shared HTTP client with timeout for readUrl calls.
-var readUrlClient = &http.Client{
-	Timeout: readUrlTimeout,
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 10 {
-			return fmt.Errorf("too many redirects")
-		}
-		// Validate each redirect target against SSRF rules
-		if err := validateURL(req.URL); err != nil {
-			return err
-		}
-		return nil
-	},
-}
-
-// validateURL checks that a URL is safe to fetch (not an internal/private address).
-func validateURL(u *url.URL) error {
-	scheme := strings.ToLower(u.Scheme)
-	if scheme != "http" && scheme != "https" {
-		return fmt.Errorf("readUrl: unsupported scheme %q (only http and https are allowed)", u.Scheme)
-	}
-
-	hostname := u.Hostname()
-	if hostname == "" {
-		return fmt.Errorf("readUrl: empty hostname")
-	}
-
-	// Block well-known metadata hostnames
-	if hostname == "metadata.google.internal" {
-		return fmt.Errorf("readUrl: access to %q is blocked", hostname)
-	}
-
-	ip := net.ParseIP(hostname)
-	if ip == nil {
-		// It's a hostname — resolve it to check for private IPs
-		addrs, err := net.LookupHost(hostname)
+func evalBuiltinArgs(argExprs []ast.Expr, evalCtx Context, depth int) ([]Value, error) {
+	args := make(Array, 0, len(argExprs))
+	for _, argExpr := range argExprs {
+		arg, err := evalASTWithDepth(argExpr, evalCtx, depth+1)
 		if err != nil {
-			// Let the HTTP client handle DNS errors naturally
-			return nil
+			return nil, err
 		}
-		for _, addr := range addrs {
-			if resolved := net.ParseIP(addr); resolved != nil && isPrivateIP(resolved) {
-				return fmt.Errorf("readUrl: hostname %q resolves to private address %s", hostname, addr)
-			}
-		}
-		return nil
+		args = append(args, arg)
 	}
-
-	if isPrivateIP(ip) {
-		return fmt.Errorf("readUrl: access to private/internal address %s is blocked", ip)
-	}
-	return nil
-}
-
-// isPrivateIP returns true for loopback, private, link-local, and metadata addresses.
-func isPrivateIP(ip net.IP) bool {
-	return ip.IsLoopback() ||
-		ip.IsPrivate() ||
-		ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() ||
-		ip.IsUnspecified()
+	return args, nil
 }
 
 // callBuiltinRead implements the read(content, mimeType[, options]) function.
-func callBuiltinRead(args []Value, e *ast.CallExpr) (Value, error) {
+func callBuiltinRead(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
+	args, err := evalBuiltinArgs(e.Args, evalCtx, depth)
+	if err != nil {
+		return nil, err
+	}
+	return callBuiltinReadWithArgs(args, e, evalCtx)
+}
+
+func callBuiltinReadWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) (Value, error) {
 	if len(args) < 2 {
 		return nil, newPosError("read function requires at least 2 arguments: content and mimeType", e.Pos())
 	}
@@ -97,8 +40,13 @@ func callBuiltinRead(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError("read function arguments must be strings", e.Pos())
 	}
 
+	formatService, err := requireFormatService(evalCtx)
+	if err != nil {
+		return nil, newPosError(err.Error(), e.Pos())
+	}
+
 	if len(args) == 2 {
-		res, err := formats.Read(content, mimeType)
+		res, err := formatService.Read(content, mimeType)
 		if err != nil {
 			return nil, newPosError(err.Error(), e.Pos())
 		}
@@ -110,7 +58,7 @@ func callBuiltinRead(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("read expects options to be an object, got %T", args[2]), e.Pos())
 	}
 
-	res, err := formats.ReadWithOptions(content, mimeType, options)
+	res, err := formatService.ReadWithOptions(content, mimeType, options)
 	if err != nil {
 		return nil, newPosError(err.Error(), e.Pos())
 	}
@@ -119,13 +67,9 @@ func callBuiltinRead(args []Value, e *ast.CallExpr) (Value, error) {
 
 // callBuiltinReadUrl implements the readUrl(url, mimeType) function.
 func callBuiltinReadUrl(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
-	args := make(Array, 0, len(e.Args))
-	for _, argExpr := range e.Args {
-		arg, err := evalASTWithDepth(argExpr, evalCtx, depth+1)
-		if err != nil {
-			return nil, err
-		}
-		args = append(args, arg)
+	args, err := evalBuiltinArgs(e.Args, evalCtx, depth)
+	if err != nil {
+		return nil, err
 	}
 	return callBuiltinReadUrlWithArgs(args, e, evalCtx)
 }
@@ -150,44 +94,33 @@ func callBuiltinReadUrlWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) 
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("readUrl: invalid URL: %v", err), e.Pos())
 	}
-	if err := validateURL(parsed); err != nil {
+	if parsed.Scheme == "" && parsed.Host == "" {
+		return nil, newPosError("readUrl: invalid URL: missing scheme or host", e.Pos())
+	}
+
+	urlReader, err := requireURLReadService(evalCtx)
+	if err != nil {
 		return nil, newPosError(err.Error(), e.Pos())
 	}
 
-	goCtx := GetGoContext(evalCtx)
-	req, err := http.NewRequestWithContext(goCtx, http.MethodGet, rawURL, nil)
+	result, err := urlReader.ReadURL(GetGoContext(evalCtx), rawURL, mimeType)
 	if err != nil {
-		return nil, newPosError(fmt.Sprintf("readUrl: failed to create request: %v", err), e.Pos())
-	}
-
-	// Fetch the URL with timeout-aware client
-	resp, err := readUrlClient.Do(req)
-	if err != nil {
-		return nil, newPosError(fmt.Sprintf("readUrl: failed to fetch URL: %v", err), e.Pos())
-	}
-	defer resp.Body.Close()
-
-	// Read the response body with size limit
-	limited := io.LimitReader(resp.Body, maxResponseBytes+1)
-	body, err := io.ReadAll(limited)
-	if err != nil {
-		return nil, newPosError(fmt.Sprintf("readUrl: failed to read response: %v", err), e.Pos())
-	}
-	if int64(len(body)) > maxResponseBytes {
-		return nil, newPosError(fmt.Sprintf("readUrl: response exceeds maximum size of %d bytes", maxResponseBytes), e.Pos())
-	}
-
-	// Parse the content
-	result, err := formats.Read(string(body), mimeType)
-	if err != nil {
-		return nil, newPosError(fmt.Sprintf("readUrl: failed to parse content: %v", err), e.Pos())
+		return nil, newPosError(err.Error(), e.Pos())
 	}
 
 	return result, nil
 }
 
 // callBuiltinWrite implements the write(value, mimeType[, options]) function.
-func callBuiltinWrite(args []Value, e *ast.CallExpr) (Value, error) {
+func callBuiltinWrite(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
+	args, err := evalBuiltinArgs(e.Args, evalCtx, depth)
+	if err != nil {
+		return nil, err
+	}
+	return callBuiltinWriteWithArgs(args, e, evalCtx)
+}
+
+func callBuiltinWriteWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) (Value, error) {
 	if len(args) < 2 {
 		return nil, newPosError("write requires exactly 2 arguments: value and mimeType", e.Pos())
 	}
@@ -200,8 +133,13 @@ func callBuiltinWrite(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("write expects mimeType to be a string, got %T", args[1]), e.Pos())
 	}
 
+	formatService, err := requireFormatService(evalCtx)
+	if err != nil {
+		return nil, newPosError(err.Error(), e.Pos())
+	}
+
 	if len(args) == 2 {
-		result, err := formats.Format(args[0], mimeType)
+		result, err := formatService.Write(args[0], mimeType)
 		if err != nil {
 			return nil, newPosError(fmt.Sprintf("write error: %v", err), e.Pos())
 		}
@@ -213,7 +151,7 @@ func callBuiltinWrite(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("write expects options to be an object, got %T", args[2]), e.Pos())
 	}
 
-	result, err := formats.FormatWithOptions(args[0], mimeType, options)
+	result, err := formatService.WriteWithOptions(args[0], mimeType, options)
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("write error: %v", err), e.Pos())
 	}

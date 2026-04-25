@@ -7,6 +7,7 @@ import (
 	"infomunge/internal/evaluator"
 	"infomunge/internal/output"
 	"infomunge/internal/preprocessor"
+	"infomunge/internal/runtimeio"
 	"infomunge/internal/stringutils"
 	"os"
 	"path/filepath"
@@ -16,11 +17,40 @@ import (
 
 // RunnerOptions holds configuration for execution
 type RunnerOptions struct {
-	BaseDir string
-	Lazy    bool
+	BaseDir               string
+	Lazy                  bool
+	FormatService         evaluator.FormatService
+	URLReadService        evaluator.URLReadService
+	DisableURLReadService bool
 }
 
 const lazyFlagUnsupportedMessage = "--lazy is currently unsupported; use lazy_eval/force_eval and __toStream/__lazyMap/__lazyFilter/__lazyReduce builtins directly"
+
+func installEvaluationCapabilities(context evaluator.Context, opts RunnerOptions) evaluator.Context {
+	if context == nil {
+		context = make(evaluator.Context)
+	}
+
+	formatService, ok := evaluator.GetFormatService(context)
+	if opts.FormatService != nil {
+		formatService = opts.FormatService
+		context = evaluator.WithFormatService(context, formatService)
+	} else if !ok {
+		formatService = runtimeio.FormatService{}
+		context = evaluator.WithFormatService(context, formatService)
+	}
+
+	if opts.DisableURLReadService {
+		return evaluator.WithURLReadDisabled(context)
+	}
+	if opts.URLReadService != nil {
+		return evaluator.WithURLReadService(context, opts.URLReadService)
+	}
+	if _, ok := evaluator.GetURLReadService(context); !ok {
+		context = evaluator.WithURLReadService(context, runtimeio.NewURLReadService(formatService))
+	}
+	return context
+}
 
 // Run executes the infomunge process on the given file.
 func Run(filePath string) error {

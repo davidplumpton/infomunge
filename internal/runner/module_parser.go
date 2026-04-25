@@ -8,11 +8,19 @@ import (
 
 // parseModuleContent parses a module file (header-only, no ---) and returns its namespace.
 func parseModuleContent(content string, loader *ModuleLoader) (Namespace, error) {
+	opts := RunnerOptions{}
+	if loader != nil {
+		opts = loader.Options
+	}
+	return parseModuleContentWithOptions(content, loader, opts)
+}
+
+func parseModuleContentWithOptions(content string, loader *ModuleLoader, opts RunnerOptions) (Namespace, error) {
 	content = strings.TrimSpace(content)
 
 	ns := make(Namespace)
 	// For evaluation within the module, we need a raw map
-	rawNs := make(evaluator.Context)
+	rawNs := installEvaluationCapabilities(make(evaluator.Context), opts)
 	directives, err := parseModuleDirectives(content)
 	if err != nil {
 		return nil, err

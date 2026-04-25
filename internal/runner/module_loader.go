@@ -17,6 +17,7 @@ type ModuleLoader struct {
 	SearchPaths []string           // Directories to search for modules
 	cache       map[string]*Module // path -> loaded module
 	loading     map[string]bool    // Currently loading (for cycle detection)
+	Options     RunnerOptions      // Evaluation capabilities for module declarations
 }
 
 // NewModuleLoader creates a new ModuleLoader with the given base directory.

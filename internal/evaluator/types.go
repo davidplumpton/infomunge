@@ -10,7 +10,6 @@ import (
 	"time"
 
 	unifiederrors "infomunge/internal/errors"
-	"infomunge/pkg/formats"
 )
 
 // TypeDef represents a custom type definition declared with the 'type' keyword.
@@ -50,7 +49,7 @@ func getTypeName(v Value) string {
 		return "Regex"
 	case *TypeDef:
 		return "Type"
-	case formats.Namespace:
+	case Namespace:
 		return "Namespace"
 	default:
 		return "Unknown"
@@ -225,7 +224,7 @@ func matchesTypeExactly(value Value, typeName string, context Context) bool {
 		_, ok := value.(bool)
 		return ok
 	case "Namespace":
-		_, ok := value.(formats.Namespace)
+		_, ok := value.(Namespace)
 		return ok
 	case "Null":
 		return value == nil
@@ -255,7 +254,7 @@ func matchesTypeExactly(value Value, typeName string, context Context) bool {
 
 func coerceToNamespace(value Value, pos token.Pos) (Value, error) {
 	switch v := value.(type) {
-	case formats.Namespace:
+	case Namespace:
 		return v, nil
 	case Object:
 		uriVal, ok := v["uri"]
@@ -274,7 +273,7 @@ func coerceToNamespace(value Value, pos token.Pos) (Value, error) {
 			}
 			prefix = prefixStr
 		}
-		return formats.Namespace{Prefix: prefix, URI: uri}, nil
+		return Namespace{Prefix: prefix, URI: uri}, nil
 	default:
 		return nil, newCoercionTypeError(value, "Namespace", pos)
 	}

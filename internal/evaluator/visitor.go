@@ -274,7 +274,7 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 			if err != nil {
 				return nil, err
 			}
-			return callUserDefinedFunctionWithVisitor(lambda, args, e, visitor.depth)
+			return callUserDefinedFunctionWithVisitor(lambda, args, e, visitor.context, visitor.depth)
 		}
 	}
 
@@ -282,14 +282,14 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 }
 
 // callUserDefinedFunctionWithVisitor calls a user-defined function using lexical scope.
-func callUserDefinedFunctionWithVisitor(lambda *Lambda, args []Value, e *ast.CallExpr, depth int) (Value, error) {
+func callUserDefinedFunctionWithVisitor(lambda *Lambda, args []Value, e *ast.CallExpr, callerContext Context, depth int) (Value, error) {
 	if len(args) != lambda.ParamCount() {
 		return nil, newPosError(fmt.Sprintf("function expects %d arguments, got %d", lambda.ParamCount(), len(args)), e.Pos())
 	}
 
-	return evalLambdaWithBindingsAtDepth(lambda, depth+1, func(fnContext Context) {
-		for i, param := range lambda.Params {
-			fnContext[param.Name] = args[i]
-		}
-	})
+	fnContext := newLambdaInvocationContextWithCaller(lambda, callerContext)
+	for i, param := range lambda.Params {
+		fnContext[param.Name] = args[i]
+	}
+	return evalASTWithDepth(lambda.BodyAST, fnContext, depth+1)
 }

@@ -204,6 +204,12 @@ func newLambdaInvocationContext(lambda *Lambda) Context {
 	return make(Context)
 }
 
+func newLambdaInvocationContextWithCaller(lambda *Lambda, caller Context) Context {
+	lambdaContext := newLambdaInvocationContext(lambda)
+	copyEvaluationCapabilities(lambdaContext, caller)
+	return lambdaContext
+}
+
 func evalLambdaWithBindingsAtDepth(lambda *Lambda, depth int, bind func(Context)) (Value, error) {
 	lambdaContext := newLambdaInvocationContext(lambda)
 	if bind != nil {

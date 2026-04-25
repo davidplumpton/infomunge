@@ -12,6 +12,7 @@ type ModuleLoader struct {
 	BaseDir string             // Base directory for module resolution
 	cache   map[string]*Module // module spec -> loaded module
 	loading map[string]bool    // currently loading modules
+	Options RunnerOptions      // Evaluation capabilities for module declarations
 }
 
 // NewModuleLoader creates a module loader for JS builds with standard module support.

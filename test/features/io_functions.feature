@@ -802,6 +802,17 @@ Feature: I/O Functions
     When I run the script with an expired evaluation deadline
     Then the output should contain "context deadline exceeded"
 
+  Scenario: readUrl reports disabled URL IO capability
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      readUrl("http://example.com/data.json", "application/json")
+      """
+    When I run the script with URL IO disabled
+    Then the output should contain "URL IO capability is disabled"
+
   Scenario: readUrl requires two arguments
     Given the following script:
       """

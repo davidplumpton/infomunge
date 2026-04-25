@@ -3,13 +3,13 @@ package evaluator
 import (
 	"context"
 	"fmt"
-	"infomunge/pkg/formats"
+	"infomunge/pkg/values"
 	"sync"
 )
 
 // Value is a generic value type that represents any value that can be evaluated in expressions.
 // It can be a nil, bool, string, number (int or float64), array, object, lambda function, TypeDef, or ControlFlowSignal.
-type Value = interface{}
+type Value = values.Value
 
 // Context is a type alias for the evaluation context (namespace mapping).
 type Context = map[string]Value
@@ -45,15 +45,18 @@ func withGoContext(evalCtx Context, goCtx context.Context) Context {
 }
 
 // Object represents a structured data object (map with string keys).
-type Object = map[string]Value
+type Object = values.Object
 
 // Array represents a sequence of values.
-type Array = []Value
+type Array = values.Array
 
 // XMLMultiValue represents an array of values that were originally
 // duplicate keys in an XML object. This helps mapObject distinguish
 // between a natural array and repeated elements.
-type XMLMultiValue = formats.XMLMultiValue
+type XMLMultiValue = values.XMLMultiValue
+
+// Namespace represents an XML namespace with an optional prefix.
+type Namespace = values.Namespace
 
 // ValueKind represents the discriminated type of a Value.
 // This provides a type-safe way to check what kind of value we have.
@@ -186,7 +189,7 @@ func KindOf(v Value) ValueKind {
 		return KindLambda
 	case *TypeDef:
 		return KindTypeDef
-	case formats.Namespace:
+	case Namespace:
 		return KindNamespace
 	case *ControlFlowSignal:
 		return KindControlFlow

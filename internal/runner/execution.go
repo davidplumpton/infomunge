@@ -72,7 +72,8 @@ func executeWithConfig(goCtx context.Context, raw string, additionalContext eval
 	hasHeader := bodyOffset != 0
 
 	loader := NewModuleLoader(opts.BaseDir)
-	evalContext, outputMimeType, err := parseHeaderWithGoContext(header, hasHeader, goCtx, raw, loader)
+	loader.Options = opts
+	evalContext, outputMimeType, err := parseHeaderWithGoContextAndOptions(header, hasHeader, goCtx, raw, loader, opts)
 	if err != nil {
 		return ExecutionResult{HasHeader: hasHeader, OutputMimeType: outputMimeType}, err
 	}
@@ -80,6 +81,7 @@ func executeWithConfig(goCtx context.Context, raw string, additionalContext eval
 	for k, v := range additionalContext {
 		evalContext[k] = v
 	}
+	evalContext = installEvaluationCapabilities(evalContext, opts)
 
 	prepOpts := preprocessor.Options{}
 	if strings.ContainsAny(body, "\n\r") {

@@ -175,6 +175,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^running the script through the runner output path should fail with error containing "([^"]*)"$`, tc.runningTheScriptThroughRunnerOutputPathShouldFailWithErrorContaining)
 	ctx.Step(`^I run the script with a canceled evaluation context$`, tc.iRunTheScriptWithCanceledEvaluationContext)
 	ctx.Step(`^I run the script with an expired evaluation deadline$`, tc.iRunTheScriptWithExpiredEvaluationDeadline)
+	ctx.Step(`^I run the script with URL IO disabled$`, tc.iRunTheScriptWithURLIODisabled)
 	ctx.Step(`^running the script should fail with error containing "([^"]*)"$`, tc.runningTheScriptShouldFailWithErrorContaining)
 
 	// Additional step for JSON input with script from input content
@@ -731,6 +732,31 @@ func (tc *testContext) iRunTheScriptWithExpiredEvaluationDeadline() error {
 	defer cancel()
 
 	_, err := runner.RunStringWithGoContext(goCtx, tc.scriptContent, ctx)
+	if err == nil {
+		return fmt.Errorf("expected script to fail, but it succeeded")
+	}
+
+	tc.lastOutput = err.Error()
+	return nil
+}
+
+func (tc *testContext) iRunTheScriptWithURLIODisabled() error {
+	ctx := make(evaluator.Context)
+
+	if tc.payloadMime != "" {
+		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
+		if err != nil {
+			return fmt.Errorf("failed to parse payload: %v", err)
+		}
+		ctx["payload"] = payload
+	}
+
+	_, _, _, _, err := runner.RunStringWithGoContextAndOptionsWithOutput(
+		context.Background(),
+		tc.scriptContent,
+		ctx,
+		runner.RunnerOptions{DisableURLReadService: true},
+	)
 	if err == nil {
 		return fmt.Errorf("expected script to fail, but it succeeded")
 	}

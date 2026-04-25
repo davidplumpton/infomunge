@@ -67,11 +67,15 @@ func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLo
 }
 
 func parseHeaderWithGoContext(header string, hasHeader bool, goCtx context.Context, fullRaw string, loader *ModuleLoader) (evaluator.Context, string, error) {
+	return parseHeaderWithGoContextAndOptions(header, hasHeader, goCtx, fullRaw, loader, RunnerOptions{})
+}
+
+func parseHeaderWithGoContextAndOptions(header string, hasHeader bool, goCtx context.Context, fullRaw string, loader *ModuleLoader, opts RunnerOptions) (evaluator.Context, string, error) {
 	directives, err := parseHeaderDirectives(header, hasHeader, fullRaw)
 	if err != nil {
 		return nil, "", err
 	}
-	return applyHeaderDirectives(directives, goCtx, fullRaw, loader)
+	return applyHeaderDirectivesWithOptions(directives, goCtx, fullRaw, loader, opts)
 }
 
 func parseHeaderDirectives(header string, hasHeader bool, fullRaw string) ([]headerDirective, error) {
@@ -191,7 +195,11 @@ func validateOutputDirective(trimmedLine string) error {
 }
 
 func applyHeaderDirectives(directives []headerDirective, goCtx context.Context, fullRaw string, loader *ModuleLoader) (evaluator.Context, string, error) {
-	context := make(evaluator.Context)
+	return applyHeaderDirectivesWithOptions(directives, goCtx, fullRaw, loader, RunnerOptions{})
+}
+
+func applyHeaderDirectivesWithOptions(directives []headerDirective, goCtx context.Context, fullRaw string, loader *ModuleLoader, opts RunnerOptions) (evaluator.Context, string, error) {
+	context := installEvaluationCapabilities(make(evaluator.Context), opts)
 	namespaces := make(map[string]string)
 	outputMimeType := "application/json"
 
