@@ -1,266 +1,225 @@
 package preprocessor
 
-import (
-	unifiederrors "infomunge/internal/errors"
-)
-
-// transformHandler defines the signature for transformation functions
+// transformHandler defines the signature for transformation functions.
 type transformHandler func(string) string
 
 type mappedTransformHandler func(string) (string, []int)
 
-// PipelineStage represents a group of related transformations
+// PipelineStage represents a group of related transformations.
 type PipelineStage interface {
 	Name() string
 	Execute(input string, mapping []int) (string, []int, error)
 }
 
-// basicStage is a simple pipeline stage implementation
-type basicStage struct {
-	name     string
-	handlers []mappedTransformHandler
-}
-
-func (bs *basicStage) Name() string {
-	return bs.name
-}
-
-func (bs *basicStage) Execute(input string, mapping []int) (string, []int, error) {
-	result := input
-	resultMapping := mapping
-	for _, handler := range bs.handlers {
-		var local []int
-		result, local = handler(result)
-		resultMapping = composeMappings(resultMapping, local)
-	}
-	return result, resultMapping, nil
-}
-
-// errorAwareHandler is a transformation function that can return errors
+// errorAwareHandler is a transformation function that can return errors.
 type errorAwareHandler func(string) (string, error)
 
 type mappedErrorAwareHandler func(string) (string, []int, error)
 
-// errorAwareStage is a pipeline stage that supports error-returning handlers
-type errorAwareStage struct {
-	name    string
-	handler mappedErrorAwareHandler
-}
-
-func (es *errorAwareStage) Name() string {
-	return es.name
-}
-
-func (es *errorAwareStage) Execute(input string, mapping []int) (string, []int, error) {
-	result, local, err := es.handler(input)
-	if err != nil {
-		return result, mapping, err
-	}
-	return result, composeMappings(mapping, local), nil
-}
-
-func inferMappedTransform(fn transformHandler) mappedTransformHandler {
-	return func(input string) (string, []int) {
-		result := fn(input)
-		return result, inferStageMapping(input, result)
+func inferredTransform(name string, phase TransformPhase, order int, loop TransformLoopMode, fn transformHandler) TransformContract {
+	return TransformContract{
+		Name:          name,
+		Phase:         phase,
+		Order:         order,
+		Associativity: TransformAssociativityNone,
+		Mapping:       TransformMappingInferred,
+		Loop:          loop,
+		Handler: func(input string) (string, []int, error) {
+			result := fn(input)
+			return result, inferStageMapping(input, result), nil
+		},
 	}
 }
 
-func exactMappedTransform(fn mappedTransformHandler) mappedTransformHandler {
-	return fn
-}
-
-func inferMappedErrorTransform(fn errorAwareHandler) mappedErrorAwareHandler {
-	return func(input string) (string, []int, error) {
-		result, err := fn(input)
-		if err != nil {
-			return result, nil, err
-		}
-		return result, inferStageMapping(input, result), nil
+func exactTransform(name string, phase TransformPhase, order int, loop TransformLoopMode, fn mappedTransformHandler) TransformContract {
+	return TransformContract{
+		Name:          name,
+		Phase:         phase,
+		Order:         order,
+		Associativity: TransformAssociativityNone,
+		Mapping:       TransformMappingExact,
+		Loop:          loop,
+		Handler: func(input string) (string, []int, error) {
+			result, mapping := fn(input)
+			return result, mapping, nil
+		},
 	}
 }
 
-// Create stages for different transformation groups
+func inferredErrorTransform(name string, phase TransformPhase, order int, loop TransformLoopMode, fn errorAwareHandler) TransformContract {
+	return TransformContract{
+		Name:          name,
+		Phase:         phase,
+		Order:         order,
+		Associativity: TransformAssociativityNone,
+		Mapping:       TransformMappingInferred,
+		Loop:          loop,
+		Handler: func(input string) (string, []int, error) {
+			result, err := fn(input)
+			if err != nil {
+				return result, nil, err
+			}
+			return result, inferStageMapping(input, result), nil
+		},
+	}
+}
+
+func configuredBinaryOperatorTransform(name string, phase TransformPhase, order int, key string, precedence int, associativity TransformAssociativity) TransformContract {
+	return TransformContract{
+		Name:          name,
+		Phase:         phase,
+		Order:         order,
+		Precedence:    precedence,
+		Associativity: associativity,
+		Mapping:       TransformMappingExact,
+		Loop:          TransformLoopFixpoint,
+		Handler: func(input string) (string, []int, error) {
+			return replaceConfiguredBinaryOperatorWithMapping(input, key)
+		},
+	}
+}
 
 // CreateRegexLiteralStage creates pipeline for regex literal transformations.
 // This must run before other stages that might misinterpret slashes.
 func CreateRegexLiteralStage() PipelineStage {
-	return &basicStage{
-		name: "Regex Literal Processing",
-		handlers: []mappedTransformHandler{
-			exactMappedTransform(replaceRegexLiteralsWithMapping),
-		},
-	}
+	return createRegexLiteralStage(nil)
 }
 
-// CreateStringProcessingStage creates pipeline for string-related transformations
+func createRegexLiteralStage(trace TransformTraceFunc) PipelineStage {
+	return newContractStage("Regex Literal Processing", TransformPhaseRegex, trace, []TransformContract{
+		exactTransform("replaceRegexLiteralsWithMapping", TransformPhaseRegex, 10, TransformLoopOnce, replaceRegexLiteralsWithMapping),
+	})
+}
+
+// CreateStringProcessingStage creates pipeline for string-related transformations.
 func CreateStringProcessingStage() PipelineStage {
-	return &basicStage{
-		name: "String Processing",
-		handlers: []mappedTransformHandler{
-			inferMappedTransform(replaceStringInterpolation),
-			inferMappedTransform(replaceArrayRangeIndexing),
-		},
-	}
+	return createStringProcessingStage(nil)
 }
 
-// CreateOperatorProcessingStage creates pipeline for operator transformations
+func createStringProcessingStage(trace TransformTraceFunc) PipelineStage {
+	return newContractStage("String Processing", TransformPhaseString, trace, []TransformContract{
+		inferredTransform("replaceStringInterpolation", TransformPhaseString, 10, TransformLoopOnce, replaceStringInterpolation),
+		inferredTransform("replaceArrayRangeIndexing", TransformPhaseString, 20, TransformLoopOnce, replaceArrayRangeIndexing),
+	})
+}
+
+// CreateOperatorProcessingStage creates pipeline for low-precedence operator transformations.
 func CreateOperatorProcessingStage() PipelineStage {
-	return &errorAwareStage{
-		name: "Operator Processing",
-		handler: func(s string) (string, []int, error) {
-			// Apply looping operators first
-			transforms := []struct {
-				name string
-				fn   mappedErrorAwareHandler
-			}{
-				{"replaceDefaultOperator", replaceDefaultOperatorErr},
-				{"replaceOnNullOperator", replaceOnNullOperatorErr},
-				{"replaceThenOperator", replaceThenOperatorErr},
-				{"replaceToOperator", replaceToOperatorErr},
-			}
-			result := s
-			resultMapping := identityMapping(len(s))
-			for _, t := range transforms {
-				prevResult := ""
-				iterCount := 0
-				for result != prevResult {
-					if iterCount > MaxTransformIterations {
-						return result, resultMapping, unifiederrors.ParseErrorf("infinite loop detected in %s", t.name)
-					}
-					prevResult = result
-					nextResult, local, err := t.fn(result)
-					if err != nil {
-						return result, resultMapping, err
-					}
-					result = nextResult
-					resultMapping = composeMappings(resultMapping, local)
-					iterCount++
-				}
-			}
-			return result, resultMapping, nil
-		},
+	return createOperatorProcessingStage(nil)
+}
+
+func createOperatorProcessingStage(trace TransformTraceFunc) PipelineStage {
+	return newContractStage("Operator Processing", TransformPhaseOperator, trace, operatorProcessingContracts())
+}
+
+func operatorProcessingContracts() []TransformContract {
+	return []TransformContract{
+		configuredBinaryOperatorTransform("replaceDefaultOperator", TransformPhaseOperator, 10, binaryOpDefault, TransformPrecedenceDefault, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceOnNullOperator", TransformPhaseOperator, 20, binaryOpOnNull, TransformPrecedenceNullChain, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceThenOperator", TransformPhaseOperator, 30, binaryOpThen, TransformPrecedenceNullChain, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceToOperator", TransformPhaseOperator, 40, binaryOpTo, TransformPrecedenceRange, TransformAssociativityLeft),
 	}
 }
 
-// CreateFunctionalProcessingStage creates pipeline for functional transformations
+// CreateFunctionalProcessingStage creates pipeline for functional transformations.
 func CreateFunctionalProcessingStage() PipelineStage {
-	return &errorAwareStage{
-		name: "Functional Processing",
-		handler: func(s string) (string, []int, error) {
-			wrap := func(fn transformHandler) mappedErrorAwareHandler {
-				return func(input string) (string, []int, error) {
-					result := fn(input)
-					return result, inferStageMapping(input, result), nil
-				}
-			}
+	return createFunctionalProcessingStage(nil)
+}
 
-			// Apply looping functional transformations
-			transforms := []struct {
-				name string
-				fn   mappedErrorAwareHandler
-			}{
-				{"replaceImplicitLambdas", wrap(replaceImplicitLambdas)},
-				{"replaceModuleCall", wrap(replaceModuleCall)},
-				{"replaceCaseStatements", wrap(replaceCaseStatements)},
-				{"replaceArrowFunctions", wrap(replaceArrowFunctions)},
-				{"replaceFilterOperator", wrap(replaceFilterOperator)},
-				{"replaceMapOperator", wrap(replaceMapOperator)},
-				{"replaceReduceOperator", wrap(replaceReduceOperator)},
-				{"replaceGroupByOperator", wrap(replaceGroupByOperator)},
-				{"replacePluckOperator", wrap(replacePluckOperator)},
-				{"replaceFlatMapOperator", wrap(replaceFlatMapOperator)},
-				{"replaceMaxByOperator", wrap(replaceMaxByOperator)},
-				{"replaceMinByOperator", wrap(replaceMinByOperator)},
-				{"replaceOrderByOperator", wrap(replaceOrderByOperator)},
-				{"replaceSortOperator", wrap(replaceSortOperator)},
-				{"replaceDistinctByOperator", wrap(replaceDistinctByOperator)},
-				{"replaceFilterObjectOperator", wrap(replaceFilterObjectOperator)},
-				{"replaceMapObjectOperator", wrap(replaceMapObjectOperator)},
-				{"replaceUpdateOperator", inferMappedErrorTransform(replaceUpdateOperatorErr)},
-				{"replaceAsOperator", wrap(replaceAsOperator)},
-				{"replaceIsOperator", wrap(replaceIsOperator)},
-				{"replaceFindOperator", inferMappedErrorTransform(replaceFindOperatorErr)},
-				{"replaceContainsOperator", inferMappedErrorTransform(replaceContainsOperatorErr)},
-				{"replaceSplitByOperator", inferMappedErrorTransform(replaceSplitByOperatorErr)},
-				{"replaceJoinByOperator", inferMappedErrorTransform(replaceJoinByOperatorErr)},
-				{"replaceConcatenateOperator", inferMappedErrorTransform(replaceConcatenateOperatorErr)},
-				{"replaceRemoveOperator", inferMappedErrorTransform(replaceRemoveOperatorErr)},
-				{"replaceExponentOperator", wrap(replaceExponentOperator)},
-				{"replaceMatchOperator", inferMappedErrorTransform(replaceMatchOperatorErr)},
-				{"replaceMatchesOperator", inferMappedErrorTransform(replaceMatchesOperatorErr)},
-				{"replaceModOperator", inferMappedErrorTransform(replaceModOperatorErr)},
-				{"replaceRepeatOperator", inferMappedErrorTransform(replaceRepeatOperatorErr)},
-				{"replaceSubstringOperator", wrap(replaceSubstringOperator)},
-				{"replaceContainsMethodCall", wrap(replaceContainsMethodCall)},
-				{"replaceFindMethodCall", wrap(replaceFindMethodCall)},
-				{"replaceMatchMethodCall", wrap(replaceMatchMethodCall)},
-				{"replaceMatchesMethodCall", wrap(replaceMatchesMethodCall)},
-				{"replaceScanMethodCall", wrap(replaceScanMethodCall)},
-				{"replaceSplitByMethodCall", wrap(replaceSplitByMethodCall)},
-				{"replacePipeToFunctionOperator", wrap(replacePipeToFunctionOperator)},
-				{"replaceReplaceOperator", wrap(replaceReplaceOperator)},
-				{"replaceAssignmentExpressions", wrap(replaceAssignmentExpressions)},
-			}
-			result := s
-			resultMapping := identityMapping(len(s))
-			for _, t := range transforms {
-				prevResult := ""
-				iterCount := 0
-				for result != prevResult {
-					if iterCount > MaxTransformIterations {
-						return result, resultMapping, unifiederrors.ParseErrorf("infinite loop detected in %s", t.name)
-					}
-					prevResult = result
-					nextResult, local, err := t.fn(result)
-					if err != nil {
-						return result, resultMapping, err
-					}
-					result = nextResult
-					resultMapping = composeMappings(resultMapping, local)
-					iterCount++
-				}
-			}
-			return result, resultMapping, nil
-		},
+func createFunctionalProcessingStage(trace TransformTraceFunc) PipelineStage {
+	return newContractStage("Functional Processing", TransformPhaseFunctional, trace, functionalProcessingContracts())
+}
+
+func functionalProcessingContracts() []TransformContract {
+	return []TransformContract{
+		inferredTransform("replaceImplicitLambdas", TransformPhaseFunctional, 10, TransformLoopFixpoint, replaceImplicitLambdas),
+		inferredTransform("replaceModuleCall", TransformPhaseFunctional, 20, TransformLoopFixpoint, replaceModuleCall),
+		inferredTransform("replaceCaseStatements", TransformPhaseFunctional, 30, TransformLoopFixpoint, replaceCaseStatements),
+		inferredTransform("replaceArrowFunctions", TransformPhaseFunctional, 40, TransformLoopFixpoint, replaceArrowFunctions),
+		inferredTransform("replaceFilterOperator", TransformPhaseFunctional, 50, TransformLoopFixpoint, replaceFilterOperator),
+		inferredTransform("replaceMapOperator", TransformPhaseFunctional, 60, TransformLoopFixpoint, replaceMapOperator),
+		inferredTransform("replaceReduceOperator", TransformPhaseFunctional, 70, TransformLoopFixpoint, replaceReduceOperator),
+		inferredTransform("replaceGroupByOperator", TransformPhaseFunctional, 80, TransformLoopFixpoint, replaceGroupByOperator),
+		inferredTransform("replacePluckOperator", TransformPhaseFunctional, 90, TransformLoopFixpoint, replacePluckOperator),
+		inferredTransform("replaceFlatMapOperator", TransformPhaseFunctional, 100, TransformLoopFixpoint, replaceFlatMapOperator),
+		inferredTransform("replaceMaxByOperator", TransformPhaseFunctional, 110, TransformLoopFixpoint, replaceMaxByOperator),
+		inferredTransform("replaceMinByOperator", TransformPhaseFunctional, 120, TransformLoopFixpoint, replaceMinByOperator),
+		inferredTransform("replaceOrderByOperator", TransformPhaseFunctional, 130, TransformLoopFixpoint, replaceOrderByOperator),
+		inferredTransform("replaceSortOperator", TransformPhaseFunctional, 140, TransformLoopFixpoint, replaceSortOperator),
+		inferredTransform("replaceDistinctByOperator", TransformPhaseFunctional, 150, TransformLoopFixpoint, replaceDistinctByOperator),
+		inferredTransform("replaceFilterObjectOperator", TransformPhaseFunctional, 160, TransformLoopFixpoint, replaceFilterObjectOperator),
+		inferredTransform("replaceMapObjectOperator", TransformPhaseFunctional, 170, TransformLoopFixpoint, replaceMapObjectOperator),
+		configuredBinaryOperatorTransform("replaceUpdateOperator", TransformPhaseFunctional, 180, binaryOpUpdate, TransformPrecedenceCollection, TransformAssociativityLeft),
+		inferredTransform("replaceAsOperator", TransformPhaseFunctional, 190, TransformLoopFixpoint, replaceAsOperator),
+		inferredTransform("replaceIsOperator", TransformPhaseFunctional, 200, TransformLoopFixpoint, replaceIsOperator),
+		configuredBinaryOperatorTransform("replaceFindOperator", TransformPhaseFunctional, 210, binaryOpFind, TransformPrecedenceCollection, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceContainsOperator", TransformPhaseFunctional, 220, binaryOpContains, TransformPrecedenceComparison, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceSplitByOperator", TransformPhaseFunctional, 230, binaryOpSplitBy, TransformPrecedenceCollection, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceJoinByOperator", TransformPhaseFunctional, 240, binaryOpJoinBy, TransformPrecedenceCollection, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceConcatenateOperator", TransformPhaseFunctional, 250, binaryOpConcatenate, TransformPrecedenceAdditive, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceRemoveOperator", TransformPhaseFunctional, 260, binaryOpRemove, TransformPrecedenceAdditive, TransformAssociativityLeft),
+		inferredTransform("replaceExponentOperator", TransformPhaseFunctional, 270, TransformLoopFixpoint, replaceExponentOperator),
+		configuredBinaryOperatorTransform("replaceMatchOperator", TransformPhaseFunctional, 280, binaryOpMatch, TransformPrecedenceComparison, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceMatchesOperator", TransformPhaseFunctional, 290, binaryOpMatches, TransformPrecedenceComparison, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceModOperator", TransformPhaseFunctional, 300, binaryOpMod, TransformPrecedenceMultiplicative, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceRepeatOperator", TransformPhaseFunctional, 310, binaryOpRepeat, TransformPrecedenceMultiplicative, TransformAssociativityLeft),
+		inferredTransform("replaceSubstringOperator", TransformPhaseFunctional, 320, TransformLoopFixpoint, replaceSubstringOperator),
+		inferredTransform("replaceContainsMethodCall", TransformPhaseFunctional, 330, TransformLoopFixpoint, replaceContainsMethodCall),
+		inferredTransform("replaceFindMethodCall", TransformPhaseFunctional, 340, TransformLoopFixpoint, replaceFindMethodCall),
+		inferredTransform("replaceMatchMethodCall", TransformPhaseFunctional, 350, TransformLoopFixpoint, replaceMatchMethodCall),
+		inferredTransform("replaceMatchesMethodCall", TransformPhaseFunctional, 360, TransformLoopFixpoint, replaceMatchesMethodCall),
+		inferredTransform("replaceScanMethodCall", TransformPhaseFunctional, 370, TransformLoopFixpoint, replaceScanMethodCall),
+		inferredTransform("replaceSplitByMethodCall", TransformPhaseFunctional, 380, TransformLoopFixpoint, replaceSplitByMethodCall),
+		inferredTransform("replacePipeToFunctionOperator", TransformPhaseFunctional, 390, TransformLoopFixpoint, replacePipeToFunctionOperator),
+		inferredTransform("replaceReplaceOperator", TransformPhaseFunctional, 400, TransformLoopFixpoint, replaceReplaceOperator),
+		inferredTransform("replaceAssignmentExpressions", TransformPhaseFunctional, 410, TransformLoopFixpoint, replaceAssignmentExpressions),
 	}
 }
 
-// CreateSelectorProcessingStage creates pipeline for selector transformations (.* and ..)
-// This must run before operator processing so that selectors bind tightly.
+// CreateSelectorProcessingStage creates pipeline for selector transformations (.* and ..).
+// This must run before functional processing so selectors bind tightly.
 func CreateSelectorProcessingStage() PipelineStage {
-	return &basicStage{
-		name: "Selector Processing",
-		handlers: []mappedTransformHandler{
-			inferMappedTransform(replaceFilterSelectors),
-			inferMappedTransform(replaceMetadataSelectors),
-			exactMappedTransform(replaceRecursiveDescentWithMapping),
-		},
-	}
+	return createSelectorProcessingStage(nil)
 }
 
-// CreateSyntaxProcessingStage creates pipeline for syntax transformations
+func createSelectorProcessingStage(trace TransformTraceFunc) PipelineStage {
+	return newContractStage("Selector Processing", TransformPhaseSelector, trace, []TransformContract{
+		inferredTransform("replaceFilterSelectors", TransformPhaseSelector, 10, TransformLoopOnce, replaceFilterSelectors),
+		inferredTransform("replaceMetadataSelectors", TransformPhaseSelector, 20, TransformLoopOnce, replaceMetadataSelectors),
+		exactTransform("replaceRecursiveDescentWithMapping", TransformPhaseSelector, 30, TransformLoopOnce, replaceRecursiveDescentWithMapping),
+	})
+}
+
+// CreateSyntaxProcessingStage creates pipeline for syntax transformations.
 func CreateSyntaxProcessingStage() PipelineStage {
-	return &basicStage{
-		name: "Syntax Processing",
-		handlers: []mappedTransformHandler{
-			exactMappedTransform(replaceDotNotationWithMapping),
-			inferMappedTransform(replaceKeyAttributes),
-			inferMappedTransform(replaceMultiStatementSequences),
-		},
-	}
+	return createSyntaxProcessingStage(nil)
 }
 
-// CreateModularPostProcessingPipeline builds pipeline using stages
+func createSyntaxProcessingStage(trace TransformTraceFunc) PipelineStage {
+	return newContractStage("Syntax Processing", TransformPhaseSyntax, trace, []TransformContract{
+		exactTransform("replaceDotNotationWithMapping", TransformPhaseSyntax, 10, TransformLoopOnce, replaceDotNotationWithMapping),
+		inferredTransform("replaceKeyAttributes", TransformPhaseSyntax, 20, TransformLoopOnce, replaceKeyAttributes),
+		inferredTransform("replaceMultiStatementSequences", TransformPhaseSyntax, 30, TransformLoopOnce, replaceMultiStatementSequences),
+	})
+}
+
+// CreateModularPostProcessingPipeline builds the default post-rewriter pipeline.
 func CreateModularPostProcessingPipeline() *ModularPipeline {
+	return CreateModularPostProcessingPipelineWithOptions(Options{})
+}
+
+// CreateModularPostProcessingPipelineWithOptions builds the post-rewriter pipeline
+// using explicit phases. The phase order is part of the transform contract:
+// string -> low-precedence operator -> selector -> functional -> syntax.
+func CreateModularPostProcessingPipelineWithOptions(opts Options) *ModularPipeline {
 	stages := []PipelineStage{
 		// Note: Regex literal processing is done in PrepareForParsing before the rewriter,
 		// so we don't include it here.
-		CreateStringProcessingStage(),
-		CreateOperatorProcessingStage(),
-		CreateSelectorProcessingStage(), // .* and .. selectors must run before functional processing
-		CreateFunctionalProcessingStage(),
-		CreateSyntaxProcessingStage(),
+		createStringProcessingStage(opts.TraceTransforms),
+		createOperatorProcessingStage(opts.TraceTransforms),
+		createSelectorProcessingStage(opts.TraceTransforms),
+		createFunctionalProcessingStage(opts.TraceTransforms),
+		createSyntaxProcessingStage(opts.TraceTransforms),
 	}
 
 	return NewModularPipeline(stages)

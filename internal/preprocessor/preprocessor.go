@@ -26,6 +26,8 @@ const (
 type Options struct {
 	// AllowMultilineIfElse enables multiline if/else branch parsing.
 	AllowMultilineIfElse bool
+	// TraceTransforms receives one entry per post-processing transform.
+	TraceTransforms TransformTraceFunc
 }
 
 // PrepareForParsing transforms InfoMunge syntax into Go-compatible syntax for the parser.
@@ -295,7 +297,7 @@ func (r *rewriter) RewriteWithDepth(depth int) (string, []int, error) {
 		r.mapping = composed
 	}
 
-	pipeline := CreateModularPostProcessingPipeline()
+	pipeline := CreateModularPostProcessingPipelineWithOptions(r.opts)
 	var pipelineErr error
 	result, r.mapping, pipelineErr = pipeline.Execute(result, r.mapping)
 	if pipelineErr != nil {
