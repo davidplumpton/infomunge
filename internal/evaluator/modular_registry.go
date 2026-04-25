@@ -1,12 +1,56 @@
 package evaluator
 
 import (
+	"fmt"
 	"go/ast"
+	"sort"
 	"sync"
 )
 
 type SpecialBuiltinFunc = func(*ast.CallExpr, Context, int) (Value, error)
 type RegularBuiltinFunc = func([]Value, *ast.CallExpr) (Value, error)
+
+type BuiltinEvaluationMode string
+
+const (
+	BuiltinEvaluationEager   BuiltinEvaluationMode = "eager"
+	BuiltinEvaluationSpecial BuiltinEvaluationMode = "special"
+
+	BuiltinArityVariadic = -1
+)
+
+const (
+	builtinCategoryArrays     = "arrays"
+	builtinCategoryAssertions = "assertions"
+	builtinCategoryCore       = "core"
+	builtinCategoryDates      = "dates"
+	builtinCategoryIO         = "io"
+	builtinCategoryNumbers    = "numbers"
+	builtinCategoryObjects    = "objects"
+	builtinCategoryRuntime    = "runtime"
+	builtinCategoryStrings    = "strings"
+	builtinCategoryURLs       = "urls"
+)
+
+// BuiltinArity describes the accepted argument count for builtin metadata.
+// Max == BuiltinArityVariadic means no upper bound.
+type BuiltinArity struct {
+	Min int
+	Max int
+}
+
+// BuiltinSpec is the domain-owned descriptor used to build builtin dispatch
+// tables and expose builtin metadata for documentation/tests.
+type BuiltinSpec struct {
+	Name     string
+	Category string
+	Module   string
+	Arity    BuiltinArity
+	Mode     BuiltinEvaluationMode
+	Regular  RegularBuiltinFunc
+	Special  SpecialBuiltinFunc
+	Summary  string
+}
 
 // builtinSpecialRegistry maps special builtin function names to their handlers.
 // Special functions need unevaluated arguments and are called via GetBuiltinSpecial.
@@ -16,229 +60,183 @@ var builtinSpecialRegistry map[string]SpecialBuiltinFunc
 // Regular functions receive evaluated arguments and are called via GetBuiltinFunction.
 var builtinFunctionRegistry map[string]RegularBuiltinFunc
 
-// builtinRegistryMu protects both builtin registries for concurrent reads/writes.
+// builtinSpecRegistry keeps metadata for the currently installed builtins.
+var builtinSpecRegistry map[string]BuiltinSpec
+
+// builtinRegistryMu protects builtin registries for concurrent reads/writes.
 var builtinRegistryMu sync.RWMutex
 
 func init() {
-	builtinSpecialRegistry = map[string]SpecialBuiltinFunc{
-		"__ifelse":          callBuiltinIfElse,
-		"__default":         callBuiltinDefault,
-		"__lambda":          callBuiltinLambdaAST,
-		"lazy_eval":         callBuiltinLazyEval,
-		"__while":           callBuiltinWhile,
-		"__assign":          callBuiltinAssign,
-		"__break":           callBuiltinBreak,
-		"__continue":        callBuiltinContinue,
-		"__seq":             callBuiltinSeq,
-		"__do":              callBuiltinDo,
-		"__updateExpr":      callBuiltinUpdateExpr,
-		"__filter":          callBuiltinFilter,
-		"__filter_selector": callBuiltinFilterSelector,
-		"__map":             callBuiltinMap,
-		"__reduce":          callBuiltinReduce,
-		"__groupBy":         callBuiltinGroupBy,
-		"__flatMap":         callBuiltinFlatMap,
-		"__modcall":         callBuiltinModCall,
-		"__coerce":          callBuiltinCoerce,
-		"__case":            callBuiltinCase,
-		"must":              callMust,
-		"maxBy":             callBuiltinMaxBy,
-		"minBy":             callBuiltinMinBy,
-		"orderBy":           callBuiltinOrderBy,
-		"distinctBy":        callBuiltinDistinctBy,
-		"filterObject":      callBuiltinFilterObject,
-		"groupBy":           callBuiltinGroupBy,
-		"flatMap":           callBuiltinFlatMap,
-		"mapObject":         callBuiltinMapObject,
-		"pluck":             callBuiltinPluck,
-		"__pluck":           callBuiltinPluck,
-		"__toStream":        callBuiltinToStream,
-		"__lazyMap":         callBuiltinLazyMap,
-		"__lazyFilter":      callBuiltinLazyFilter,
-		"__lazyReduce":      callBuiltinLazyReduce,
-		"takeWhile":         callBuiltinTakeWhile,
-		"dropWhile":         callBuiltinDropWhile,
-		"some":              callBuiltinSome,
-		"every":             callBuiltinEvery,
-		"onNull":            callBuiltinOnNull,
-		"then":              callBuiltinThen,
-		"try":               callBuiltinTry,
-		"orElse":            callBuiltinOrElse,
-		"orElseTry":         callBuiltinOrElseTry,
-		"read":              callBuiltinRead,
-		"readUrl":           callBuiltinReadUrl,
-		"write":             callBuiltinWrite,
-		"eachItem":          callEachItemMatcher,
-		"haveItem":          callHaveItemMatcher,
-		"anyOf":             callAnyOfMatcher,
-		"notBe":             callNotBeMatcher,
+	special, regular, specs, err := buildBuiltinRegistries(defaultBuiltinSpecs())
+	if err != nil {
+		panic(fmt.Sprintf("invalid builtin registry: %v", err))
+	}
+	builtinSpecialRegistry = special
+	builtinFunctionRegistry = regular
+	builtinSpecRegistry = specs
+}
+
+func defaultBuiltinSpecs() []BuiltinSpec {
+	groups := []func() []BuiltinSpec{
+		coreBuiltinSpecs,
+		controlFlowBuiltinSpecs,
+		collectionBuiltinSpecs,
+		stringBuiltinSpecs,
+		numberBuiltinSpecs,
+		dateBuiltinSpecs,
+		runtimeBuiltinSpecs,
+		ioBuiltinSpecs,
+		urlBuiltinSpecs,
+		assertionBuiltinSpecs,
 	}
 
-	builtinFunctionRegistry = map[string]RegularBuiltinFunc{
-		"__concat":                  callBuiltinConcat,
-		"__remove":                  callBuiltinRemove,
-		"sizeOf":                    callBuiltinSizeOf,
-		"typeOf":                    callBuiltinTypeOf,
-		"__isType":                  callBuiltinIsType,
-		"isEmpty":                   callBuiltinIsEmpty,
-		"flatten":                   callBuiltinFlatten,
-		"unique":                    callBuiltinUnique,
-		"reverse":                   callBuiltinReverse,
-		"sort":                      callBuiltinSort,
-		"join":                      callBuiltinJoin,
-		"keys":                      callBuiltinKeys,
-		"values":                    callBuiltinValues,
-		"merge":                     callBuiltinMerge,
-		"__with_attrs":              callBuiltinWithAttrs,
-		"__update":                  callBuiltinUpdate,
-		"__deep":                    callBuiltinDeep,
-		"__objvalues":               callBuiltinObjectValues,
-		"__multival":                callBuiltinMultival,
-		"__metadata":                callBuiltinMetadata,
-		"trim":                      callBuiltinTrim,
-		"length":                    callBuiltinLength,
-		"repeat":                    callBuiltinRepeat,
-		"split":                     callBuiltinSplit,
-		"substring":                 callBuiltinSubstring,
-		"charAt":                    callBuiltinCharAt,
-		"charCodeAt":                callBuiltinCharCodeAt,
-		"fromCharCode":              callBuiltinFromCharCode,
-		"indexOf":                   callBuiltinIndexOf,
-		"lastIndexOf":               callBuiltinLastIndexOf,
-		"appendIfMissing":           callBuiltinAppendIfMissing,
-		"prependIfMissing":          callBuiltinPrependIfMissing,
-		"toUpper":                   callBuiltinToUpper,
-		"toLower":                   callBuiltinToLower,
-		"toBase64":                  callBuiltinToBase64,
-		"fromBase64":                callBuiltinFromBase64,
-		"hash":                      callBuiltinHash,
-		"toHex":                     callBuiltinToHex,
-		"fromHex":                   callBuiltinFromHex,
-		"upper":                     callBuiltinUpper,
-		"lower":                     callBuiltinLower,
-		"capitalize":                callBuiltinCapitalize,
-		"camelize":                  callBuiltinCamelize,
-		"dasherize":                 callBuiltinDasherize,
-		"underscore":                callBuiltinUnderscore,
-		"pluralize":                 callBuiltinPluralize,
-		"singularize":               callBuiltinSingularize,
-		"ordinalize":                callBuiltinOrdinalize,
-		"leftPad":                   callBuiltinLeftPad,
-		"rightPad":                  callBuiltinRightPad,
-		"startsWith":                callBuiltinStartsWith,
-		"endsWith":                  callBuiltinEndsWith,
-		"contains":                  callBuiltinContains,
-		"replace":                   callBuiltinReplace,
-		"regex":                     callBuiltinRegex,
-		"ceil":                      callBuiltinCeil,
-		"floor":                     callBuiltinFloor,
-		"round":                     callBuiltinRound,
-		"sqrt":                      callBuiltinSqrt,
-		"abs":                       callBuiltinAbs,
-		"max":                       callBuiltinMax,
-		"min":                       callBuiltinMin,
-		"pow":                       callBuiltinPow,
-		"sum":                       callBuiltinSum,
-		"avg":                       callBuiltinAvg,
-		"mod":                       callBuiltinMod,
-		"toRadix":                   callBuiltinToRadix,
-		"fromRadix":                 callBuiltinFromRadix,
-		"toBinary":                  callBuiltinToBinary,
-		"fromBinary":                callBuiltinFromBinary,
-		"random":                    callBuiltinRandom,
-		"randomInt":                 callBuiltinRandomInt,
-		"uuid":                      callBuiltinUUID,
-		"log":                       callBuiltinLog,
-		"logDebug":                  callBuiltinLogDebug,
-		"logInfo":                   callBuiltinLogInfo,
-		"logWarn":                   callBuiltinLogWarn,
-		"logError":                  callBuiltinLogError,
-		"logWith":                   callBuiltinLogWith,
-		"to":                        callBuiltinTo,
-		"zip":                       callBuiltinZip,
-		"unzip":                     callBuiltinUnzip,
-		"range":                     callBuiltinRange,
-		"distinct":                  callBuiltinDistinct,
-		"__range":                   callBuiltinRange,
-		"with":                      callBuiltinWith,
-		"xsiType":                   callBuiltinXsiType,
-		"evaluateCompatibilityFlag": callBuiltinEvaluateCompatibilityFlag,
-		"now":                       callBuiltinNow,
-		"daysBetween":               callBuiltinDaysBetween,
-		"isLeapYear":                callBuiltinIsLeapYear,
-		"today":                     callBuiltinToday,
-		"tomorrow":                  callBuiltinTomorrow,
-		"yesterday":                 callBuiltinYesterday,
-		"date":                      callBuiltinDate,
-		"time":                      callBuiltinTime,
-		"dateTime":                  callBuiltinDateTime,
-		"localDateTime":             callBuiltinLocalDateTime,
-		"localTime":                 callBuiltinLocalTime,
-		"atBeginningOfDay":          callBuiltinAtBeginningOfDay,
-		"atBeginningOfHour":         callBuiltinAtBeginningOfHour,
-		"atBeginningOfMonth":        callBuiltinAtBeginningOfMonth,
-		"atBeginningOfWeek":         callBuiltinAtBeginningOfWeek,
-		"atBeginningOfYear":         callBuiltinAtBeginningOfYear,
-		"dayOfWeek":                 callBuiltinDayOfWeek,
-		"dayOfYear":                 callBuiltinDayOfYear,
-		"find":                      callBuiltinFind,
-		"match":                     callBuiltinMatch,
-		"matches":                   callBuiltinMatches,
-		"scan":                      callBuiltinScan,
-		"parseURI":                  callBuiltinParseURI,
-		"compose":                   callBuiltinCompose,
-		"encodeURI":                 callBuiltinEncodeURI,
-		"decodeURI":                 callBuiltinDecodeURI,
-		"encodeURIComponent":        callBuiltinEncodeURIComponent,
-		"decodeURIComponent":        callBuiltinDecodeURIComponent,
-		"isBlank":                   callBuiltinIsBlank,
-		"isDecimal":                 callBuiltinIsDecimal,
-		"isInteger":                 callBuiltinIsInteger,
-		"isEven":                    callBuiltinIsEven,
-		"isOdd":                     callBuiltinIsOdd,
-		"objectToArray":             callBuiltinObjectToArray,
-		"arrayToObject":             callBuiltinArrayToObject,
-		"joinBy":                    callBuiltinJoinBy,
-		"splitBy":                   callBuiltinSplitBy,
-		"entriesOf":                 callBuiltinEntriesOf,
-		"keysOf":                    callBuiltinKeysOf,
-		"valuesOf":                  callBuiltinValuesOf,
-		"namesOf":                   callBuiltinNamesOf,
-		"beArray":                   callBeArray,
-		"beObject":                  callBeObject,
-		"beString":                  callBeString,
-		"beNumber":                  callBeNumber,
-		"beBoolean":                 callBeBoolean,
-		"beNull":                    callBeNull,
-		"beEmpty":                   callBeEmpty,
-		"beBlank":                   callBeBlank,
-		"equalTo":                   callEqualTo,
-		"beGreaterThan":             callBeGreaterThan,
-		"beLowerThan":               callBeLowerThan,
-		"beOneOf":                   callBeOneOf,
-		"containStr":                callContainStr,
-		"containVal":                callContainVal,
-		"startWith":                 callStartWith,
-		"endWith":                   callEndWith,
-		"haveSize":                  callHaveSize,
-		"haveKey":                   callHaveKey,
-		"haveValue":                 callHaveValue,
-		"notBeNull":                 callNotBeNull,
-		"fail":                      callBuiltinFail,
-		"assert":                    callBuiltinAssert,
-		"assertThat":                callBuiltinAssertThat,
-		"force_eval":                callBuiltinForceEval,
-		"envVar":                    callBuiltinEnvVar,
-		"envVars":                   callBuiltinEnvVars,
-		"slice":                     callBuiltinSlice,
-		"prepend":                   callBuiltinPrepend,
-		"append":                    callBuiltinAppend,
-		"safe":                      callBuiltinSafeAccess,
-		"first":                     callBuiltinFirst,
-		"last":                      callBuiltinLast,
-		"take":                      callBuiltinTake,
-		"drop":                      callBuiltinDrop,
+	var specs []BuiltinSpec
+	for _, group := range groups {
+		specs = append(specs, group()...)
 	}
+	return specs
+}
+
+func exactArity(n int) BuiltinArity {
+	return BuiltinArity{Min: n, Max: n}
+}
+
+func rangeArity(min, max int) BuiltinArity {
+	return BuiltinArity{Min: min, Max: max}
+}
+
+func variadicArity(min int) BuiltinArity {
+	return BuiltinArity{Min: min, Max: BuiltinArityVariadic}
+}
+
+func anyArity() BuiltinArity {
+	return variadicArity(0)
+}
+
+func (a BuiltinArity) valid() bool {
+	if a.Min < 0 {
+		return false
+	}
+	return a.Max == BuiltinArityVariadic || a.Max >= a.Min
+}
+
+func regularBuiltinSpec(name, category string, arity BuiltinArity, fn RegularBuiltinFunc, summary string) BuiltinSpec {
+	return BuiltinSpec{
+		Name:     name,
+		Category: category,
+		Module:   builtinModuleForCategory(category),
+		Arity:    arity,
+		Mode:     BuiltinEvaluationEager,
+		Regular:  fn,
+		Summary:  builtinSummary(name, summary),
+	}
+}
+
+func specialBuiltinSpec(name, category string, arity BuiltinArity, fn SpecialBuiltinFunc, summary string) BuiltinSpec {
+	return BuiltinSpec{
+		Name:     name,
+		Category: category,
+		Module:   builtinModuleForCategory(category),
+		Arity:    arity,
+		Mode:     BuiltinEvaluationSpecial,
+		Special:  fn,
+		Summary:  builtinSummary(name, summary),
+	}
+}
+
+func builtinSummary(name, summary string) string {
+	if summary != "" {
+		return summary
+	}
+	return name
+}
+
+func builtinModuleForCategory(category string) string {
+	switch category {
+	case builtinCategoryArrays:
+		return "dw::core::Arrays"
+	case builtinCategoryDates:
+		return "dw::core::Dates"
+	case builtinCategoryNumbers:
+		return "dw::core::Numbers"
+	case builtinCategoryObjects:
+		return "dw::core::Objects"
+	case builtinCategoryStrings:
+		return "dw::core::Strings"
+	case builtinCategoryURLs:
+		return "dw::core::URL"
+	default:
+		return "internal::" + category
+	}
+}
+
+func buildBuiltinRegistries(specs []BuiltinSpec) (
+	map[string]SpecialBuiltinFunc,
+	map[string]RegularBuiltinFunc,
+	map[string]BuiltinSpec,
+	error,
+) {
+	special := make(map[string]SpecialBuiltinFunc)
+	regular := make(map[string]RegularBuiltinFunc)
+	byName := make(map[string]BuiltinSpec)
+
+	for _, spec := range specs {
+		if err := validateBuiltinSpec(spec); err != nil {
+			return nil, nil, nil, err
+		}
+		if _, exists := byName[spec.Name]; exists {
+			return nil, nil, nil, fmt.Errorf("duplicate builtin %q", spec.Name)
+		}
+
+		switch spec.Mode {
+		case BuiltinEvaluationSpecial:
+			special[spec.Name] = spec.Special
+		case BuiltinEvaluationEager:
+			regular[spec.Name] = spec.Regular
+		}
+		byName[spec.Name] = spec
+	}
+
+	return special, regular, byName, nil
+}
+
+func validateBuiltinSpec(spec BuiltinSpec) error {
+	if spec.Name == "" {
+		return fmt.Errorf("builtin spec has empty name")
+	}
+	if spec.Category == "" {
+		return fmt.Errorf("builtin %q has empty category", spec.Name)
+	}
+	if spec.Module == "" {
+		return fmt.Errorf("builtin %q has empty module", spec.Name)
+	}
+	if !spec.Arity.valid() {
+		return fmt.Errorf("builtin %q has invalid arity", spec.Name)
+	}
+	if spec.Summary == "" {
+		return fmt.Errorf("builtin %q has empty summary", spec.Name)
+	}
+
+	switch spec.Mode {
+	case BuiltinEvaluationSpecial:
+		if spec.Special == nil {
+			return fmt.Errorf("special builtin %q has nil handler", spec.Name)
+		}
+		if spec.Regular != nil {
+			return fmt.Errorf("special builtin %q also has a regular handler", spec.Name)
+		}
+	case BuiltinEvaluationEager:
+		if spec.Regular == nil {
+			return fmt.Errorf("eager builtin %q has nil handler", spec.Name)
+		}
+		if spec.Special != nil {
+			return fmt.Errorf("eager builtin %q also has a special handler", spec.Name)
+		}
+	default:
+		return fmt.Errorf("builtin %q has unknown evaluation mode %q", spec.Name, spec.Mode)
+	}
+
+	return nil
 }
 
 func cloneSpecialRegistry(src map[string]SpecialBuiltinFunc) map[string]SpecialBuiltinFunc {
@@ -257,11 +255,34 @@ func cloneFunctionRegistry(src map[string]RegularBuiltinFunc) map[string]Regular
 	return dst
 }
 
+func cloneSpecRegistry(src map[string]BuiltinSpec) map[string]BuiltinSpec {
+	dst := make(map[string]BuiltinSpec, len(src))
+	for name, spec := range src {
+		dst[name] = spec
+	}
+	return dst
+}
+
+func specRegistryFromMaps(
+	special map[string]SpecialBuiltinFunc,
+	regular map[string]RegularBuiltinFunc,
+) map[string]BuiltinSpec {
+	specs := make(map[string]BuiltinSpec, len(special)+len(regular))
+	for name, fn := range regular {
+		specs[name] = regularBuiltinSpec(name, builtinCategoryRuntime, anyArity(), fn, "runtime registered builtin")
+	}
+	for name, fn := range special {
+		specs[name] = specialBuiltinSpec(name, builtinCategoryRuntime, anyArity(), fn, "runtime registered special builtin")
+	}
+	return specs
+}
+
 // RegisterBuiltinSpecial registers or overrides a special builtin at runtime.
 func RegisterBuiltinSpecial(name string, fn SpecialBuiltinFunc) {
 	builtinRegistryMu.Lock()
 	defer builtinRegistryMu.Unlock()
 	builtinSpecialRegistry[name] = fn
+	builtinSpecRegistry[name] = specialBuiltinSpec(name, builtinCategoryRuntime, anyArity(), fn, "runtime registered special builtin")
 }
 
 // RegisterBuiltinFunction registers or overrides a regular builtin at runtime.
@@ -269,6 +290,9 @@ func RegisterBuiltinFunction(name string, fn RegularBuiltinFunc) {
 	builtinRegistryMu.Lock()
 	defer builtinRegistryMu.Unlock()
 	builtinFunctionRegistry[name] = fn
+	if _, hasSpecial := builtinSpecialRegistry[name]; !hasSpecial {
+		builtinSpecRegistry[name] = regularBuiltinSpec(name, builtinCategoryRuntime, anyArity(), fn, "runtime registered builtin")
+	}
 }
 
 // SetBuiltinRegistriesForTesting swaps builtin registries and returns a restore func.
@@ -280,20 +304,23 @@ func SetBuiltinRegistriesForTesting(
 	builtinRegistryMu.Lock()
 	prevSpecial := cloneSpecialRegistry(builtinSpecialRegistry)
 	prevRegular := cloneFunctionRegistry(builtinFunctionRegistry)
+	prevSpecs := cloneSpecRegistry(builtinSpecRegistry)
 	builtinSpecialRegistry = cloneSpecialRegistry(special)
 	builtinFunctionRegistry = cloneFunctionRegistry(regular)
+	builtinSpecRegistry = specRegistryFromMaps(builtinSpecialRegistry, builtinFunctionRegistry)
 	builtinRegistryMu.Unlock()
 
 	return func() {
 		builtinRegistryMu.Lock()
 		builtinSpecialRegistry = prevSpecial
 		builtinFunctionRegistry = prevRegular
+		builtinSpecRegistry = prevSpecs
 		builtinRegistryMu.Unlock()
 	}
 }
 
-// GetBuiltinSpecial returns a special function handler by name
-// This maintains compatibility with existing visitor code
+// GetBuiltinSpecial returns a special function handler by name.
+// This maintains compatibility with existing visitor code.
 func GetBuiltinSpecial(name string) (SpecialBuiltinFunc, bool) {
 	builtinRegistryMu.RLock()
 	defer builtinRegistryMu.RUnlock()
@@ -301,10 +328,46 @@ func GetBuiltinSpecial(name string) (SpecialBuiltinFunc, bool) {
 	return fn, ok
 }
 
-// GetBuiltinFunction returns a regular function handler by name
+// GetBuiltinFunction returns a regular function handler by name.
 func GetBuiltinFunction(name string) (RegularBuiltinFunc, bool) {
 	builtinRegistryMu.RLock()
 	defer builtinRegistryMu.RUnlock()
 	fn, ok := builtinFunctionRegistry[name]
 	return fn, ok
+}
+
+func GetBuiltinSpec(name string) (BuiltinSpec, bool) {
+	builtinRegistryMu.RLock()
+	defer builtinRegistryMu.RUnlock()
+	spec, ok := builtinSpecRegistry[name]
+	return spec, ok
+}
+
+func ListBuiltinSpecs() []BuiltinSpec {
+	builtinRegistryMu.RLock()
+	defer builtinRegistryMu.RUnlock()
+
+	specs := make([]BuiltinSpec, 0, len(builtinSpecRegistry))
+	for _, spec := range builtinSpecRegistry {
+		specs = append(specs, spec)
+	}
+	sortBuiltinSpecs(specs)
+	return specs
+}
+
+func BuiltinSpecsByCategory() map[string][]BuiltinSpec {
+	grouped := make(map[string][]BuiltinSpec)
+	for _, spec := range ListBuiltinSpecs() {
+		grouped[spec.Category] = append(grouped[spec.Category], spec)
+	}
+	return grouped
+}
+
+func sortBuiltinSpecs(specs []BuiltinSpec) {
+	sort.Slice(specs, func(i, j int) bool {
+		if specs[i].Category != specs[j].Category {
+			return specs[i].Category < specs[j].Category
+		}
+		return specs[i].Name < specs[j].Name
+	})
 }

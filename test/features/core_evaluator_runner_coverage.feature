@@ -3,6 +3,17 @@ Feature: Core evaluator runner coverage
   As a maintainer
   I want fundamental evaluator operations exercised in-process
 
+  Scenario: Descriptor-backed registry dispatches eager and special builtins
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      sizeOf(["a", "b", "c"]) + (if (false) fail("wrong") else 4) + (null default 5)
+      """
+    When I run the script
+    Then the output should be valid JSON with number: 12
+
   # --- Logical OR operator (lor) ---
 
   Scenario: Logical OR with both true
