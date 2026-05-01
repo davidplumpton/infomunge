@@ -19,6 +19,10 @@ func parseVarDecl(line, trimmedLine string, baseOffset int, evalCtx evaluator.Co
 }
 
 func parseVarDeclWithGoContext(line, trimmedLine string, baseOffset int, evalCtx evaluator.Context, goCtx context.Context, fullRaw string) (evaluator.Value, string, error) {
+	return parseVarDeclWithScope(line, trimmedLine, baseOffset, evaluator.NewScope(evalCtx).WithGoContext(goCtx), fullRaw)
+}
+
+func parseVarDeclWithScope(line, trimmedLine string, baseOffset int, scope *evaluator.Scope, fullRaw string) (evaluator.Value, string, error) {
 	parts := strings.SplitN(trimmedLine, "=", 2)
 	if len(parts) != 2 {
 		return nil, "", unifiederrors.ParseErrorf("invalid variable declaration: missing '=' in %q", trimmedLine)
@@ -32,6 +36,9 @@ func parseVarDeclWithGoContext(line, trimmedLine string, baseOffset int, evalCtx
 	varName := declParts[1]
 	if strings.TrimSpace(varName) == "" {
 		return nil, "", unifiederrors.ParseErrorf("invalid variable declaration: missing variable name in %q", trimmedLine)
+	}
+	if evaluator.IsReservedBindingName(varName) {
+		return nil, "", unifiederrors.ParseErrorf("%q is reserved for runtime metadata", varName)
 	}
 	exprStr := strings.TrimSpace(parts[1])
 	if exprStr == "" {
@@ -48,7 +55,7 @@ func parseVarDeclWithGoContext(line, trimmedLine string, baseOffset int, evalCtx
 		return nil, "", unifiederrors.InternalError("internal error: malformed variable declaration")
 	}
 	exprMap := sourceMapForDeclExpr(fullRaw, baseOffset, line, eqIdx+1, false)
-	val, err := evaluator.EvaluateWithGoContextAndSourceMap(parseableVal, evalCtx, goCtx, exprMap.Compose(parseableVal, mapping))
+	val, err := evaluator.EvaluateWithScopeAndContext(parseableVal, scope, &evaluator.ErrorContext{SourceMap: exprMap.Compose(parseableVal, mapping)})
 	if err != nil {
 		return nil, "", err
 	}
@@ -94,6 +101,9 @@ func parseVarDeclSource(lines []string, start int) (*parsedVarDecl, error) {
 		return nil, unifiederrors.ParseErrorf("invalid variable declaration: expected a single variable name in %q", trimmedFirst)
 	}
 	varName := fields[0]
+	if evaluator.IsReservedBindingName(varName) {
+		return nil, unifiederrors.ParseErrorf("%q is reserved for runtime metadata", varName)
+	}
 
 	declLines := []string{firstLine}
 	declRaw := firstLine
@@ -157,6 +167,10 @@ func parsedVarLinesAreComplete(lines []string) bool {
 }
 
 func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset int, evalCtx evaluator.Context, goCtx context.Context, fullRaw string) (evaluator.Value, string, int, error) {
+	return parseVarDeclFromLinesWithScope(lines, start, baseOffset, evaluator.NewScope(evalCtx).WithGoContext(goCtx), fullRaw)
+}
+
+func parseVarDeclFromLinesWithScope(lines []string, start int, baseOffset int, scope *evaluator.Scope, fullRaw string) (evaluator.Value, string, int, error) {
 	spec, err := parseVarDeclSource(lines, start)
 	if err != nil {
 		consumed := 1
@@ -180,7 +194,7 @@ func parseVarDeclFromLinesWithGoContext(lines []string, start int, baseOffset in
 	if strings.ContainsAny(spec.exprStr, "\n\r") {
 		exprMap = collapseGeneratedWhitespaceMap(exprMap)
 	}
-	val, err := evaluator.EvaluateWithGoContextAndSourceMap(parseableVal, evalCtx, goCtx, exprMap.Compose(parseableVal, mapping))
+	val, err := evaluator.EvaluateWithScopeAndContext(parseableVal, scope, &evaluator.ErrorContext{SourceMap: exprMap.Compose(parseableVal, mapping)})
 	if err != nil {
 		return nil, "", spec.consumed, err
 	}
@@ -198,6 +212,9 @@ func parseFunDeclLine(trimmedLine string) (string, []evaluator.ParamDef, string,
 	fnName := strings.TrimSpace(rest[:parenIdx])
 	if fnName == "" {
 		return "", nil, "", unifiederrors.ParseError("invalid function declaration: missing function name")
+	}
+	if evaluator.IsReservedBindingName(fnName) {
+		return "", nil, "", unifiederrors.ParseErrorf("%q is reserved for runtime metadata", fnName)
 	}
 
 	closeParenIdx := strings.Index(rest, ")")
@@ -484,6 +501,9 @@ func parseTypeDecl(trimmedLine string) (*evaluator.TypeDef, string, error) {
 	typeName := strings.TrimSpace(rest[:eqIdx])
 	if typeName == "" {
 		return nil, "", unifiederrors.ParseError("invalid type declaration: missing type name")
+	}
+	if evaluator.IsReservedBindingName(typeName) {
+		return nil, "", unifiederrors.ParseErrorf("%q is reserved for runtime metadata", typeName)
 	}
 
 	rhs := strings.TrimSpace(rest[eqIdx+1:])

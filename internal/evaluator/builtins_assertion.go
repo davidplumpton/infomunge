@@ -190,19 +190,19 @@ func callNotBeNull(args []Value, e *ast.CallExpr) (Value, error) {
 
 // callMust implements the must(value, matcher(s)) function
 // It can take 2 arguments (value, matcher) or (value, array of matchers)
-func callMust(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callMust(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) < 2 || len(e.Args) > 2 {
 		return nil, newPosError("must() requires exactly 2 arguments: value and matcher(s)", e.Pos())
 	}
 
 	// Evaluate the value
-	value, err := evalASTWithDepth(e.Args[0], context, depth)
+	value, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
 
 	// Evaluate the matcher(s)
-	matcherArg, err := evalASTWithDepth(e.Args[1], context, depth)
+	matcherArg, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -238,13 +238,13 @@ func callMust(e *ast.CallExpr, context Context, depth int) (Value, error) {
 }
 
 // callEachItemMatcher implements the eachItem(matcher) function
-func callEachItemMatcher(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callEachItemMatcher(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("eachItem() requires exactly 1 argument (matcher)", e.Pos())
 	}
 
 	// Evaluate the matcher
-	matcherArg, err := evalASTWithDepth(e.Args[0], context, depth)
+	matcherArg, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -258,13 +258,13 @@ func callEachItemMatcher(e *ast.CallExpr, context Context, depth int) (Value, er
 }
 
 // callHaveItemMatcher implements the haveItem(matcher) function
-func callHaveItemMatcher(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callHaveItemMatcher(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("haveItem() requires exactly 1 argument (matcher)", e.Pos())
 	}
 
 	// Evaluate the matcher
-	matcherArg, err := evalASTWithDepth(e.Args[0], context, depth)
+	matcherArg, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -278,13 +278,13 @@ func callHaveItemMatcher(e *ast.CallExpr, context Context, depth int) (Value, er
 }
 
 // callAnyOfMatcher implements the anyOf(matchers) function
-func callAnyOfMatcher(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callAnyOfMatcher(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("anyOf() requires exactly 1 argument (array of matchers)", e.Pos())
 	}
 
 	// Evaluate the matchers array
-	matchersArg, err := evalASTWithDepth(e.Args[0], context, depth)
+	matchersArg, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -307,13 +307,13 @@ func callAnyOfMatcher(e *ast.CallExpr, context Context, depth int) (Value, error
 }
 
 // callNotBeMatcher implements the notBe(matcher) function
-func callNotBeMatcher(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callNotBeMatcher(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("notBe() requires exactly 1 argument (matcher)", e.Pos())
 	}
 
 	// Evaluate the matcher
-	matcherArg, err := evalASTWithDepth(e.Args[0], context, depth)
+	matcherArg, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}

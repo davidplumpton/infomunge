@@ -7,12 +7,12 @@ import (
 )
 
 // callBuiltinToStream implements the __toStream(array) function.
-func callBuiltinToStream(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
+func callBuiltinToStream(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("__toStream expects 1 argument", e.Pos())
 	}
 
-	arrayVal, err := evalASTWithDepth(e.Args[0], evalCtx, depth)
+	arrayVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -35,16 +35,16 @@ func callBuiltinToStream(e *ast.CallExpr, evalCtx Context, depth int) (Value, er
 			}
 		}()
 		return stream, nil
-	}, GetGoContext(evalCtx)), nil
+	}, scope.GoContext()), nil
 }
 
 // callBuiltinLazyMap implements the __lazyMap(lazyStream, lambda) function.
-func callBuiltinLazyMap(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
+func callBuiltinLazyMap(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("__lazyMap expects 2 arguments", e.Pos())
 	}
 
-	lazyVal, err := evalASTWithDepth(e.Args[0], evalCtx, depth)
+	lazyVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func callBuiltinLazyMap(e *ast.CallExpr, evalCtx Context, depth int) (Value, err
 		return nil, newPosError("__lazyMap first argument must be a lazy value", e.Args[0].Pos())
 	}
 
-	lambdaVal, err := evalASTWithDepth(e.Args[1], evalCtx, depth)
+	lambdaVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -64,16 +64,16 @@ func callBuiltinLazyMap(e *ast.CallExpr, evalCtx Context, depth int) (Value, err
 		return nil, newPosError("__lazyMap second argument must be a lambda", e.Args[1].Pos())
 	}
 
-	return LazyMap(lazy, lambda, evalCtx), nil
+	return LazyMapInScope(lazy, lambda, scope), nil
 }
 
 // callBuiltinLazyFilter implements the __lazyFilter(lazyStream, lambda) function.
-func callBuiltinLazyFilter(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
+func callBuiltinLazyFilter(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("__lazyFilter expects 2 arguments", e.Pos())
 	}
 
-	lazyVal, err := evalASTWithDepth(e.Args[0], evalCtx, depth)
+	lazyVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func callBuiltinLazyFilter(e *ast.CallExpr, evalCtx Context, depth int) (Value, 
 		return nil, newPosError("__lazyFilter first argument must be a lazy value", e.Args[0].Pos())
 	}
 
-	lambdaVal, err := evalASTWithDepth(e.Args[1], evalCtx, depth)
+	lambdaVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -93,16 +93,16 @@ func callBuiltinLazyFilter(e *ast.CallExpr, evalCtx Context, depth int) (Value, 
 		return nil, newPosError("__lazyFilter second argument must be a lambda", e.Args[1].Pos())
 	}
 
-	return LazyFilter(lazy, lambda, evalCtx), nil
+	return LazyFilterInScope(lazy, lambda, scope), nil
 }
 
 // callBuiltinLazyReduce implements the __lazyReduce(lazyStream, lambda, initial) function.
-func callBuiltinLazyReduce(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
+func callBuiltinLazyReduce(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 3 {
 		return nil, newPosError("__lazyReduce expects 3 arguments", e.Pos())
 	}
 
-	lazyVal, err := evalASTWithDepth(e.Args[0], evalCtx, depth)
+	lazyVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func callBuiltinLazyReduce(e *ast.CallExpr, evalCtx Context, depth int) (Value, 
 		return nil, newPosError("__lazyReduce first argument must be a lazy value", e.Args[0].Pos())
 	}
 
-	lambdaVal, err := evalASTWithDepth(e.Args[1], evalCtx, depth)
+	lambdaVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -125,10 +125,10 @@ func callBuiltinLazyReduce(e *ast.CallExpr, evalCtx Context, depth int) (Value, 
 		return nil, newPosError(fmt.Sprintf("lazyReduce lambda must have 2 or 3 parameters, got %d", lambda.ParamCount()), e.Args[1].Pos())
 	}
 
-	initial, err := evalASTWithDepth(e.Args[2], evalCtx, depth)
+	initial, err := evalASTInScopeWithDepth(e.Args[2], scope, depth)
 	if err != nil {
 		return nil, err
 	}
 
-	return LazyReduce(lazy, lambda, initial, evalCtx), nil
+	return LazyReduceInScope(lazy, lambda, initial, scope), nil
 }

@@ -14,12 +14,12 @@ type Value = values.Value
 // Context is a type alias for the evaluation context (namespace mapping).
 type Context = map[string]Value
 
-// GoContextKey is the key used to store a Go context.Context in the evaluation context.
-// This allows lazy values and streams to respect timeouts and cancellation.
+// GoContextKey is the legacy key used by old API callers to pass a
+// context.Context into NewScope. Runtime code should use Scope.GoContext.
 const GoContextKey = "__go_ctx__"
 
-// GetGoContext retrieves the Go context.Context from the evaluation context.
-// Returns context.Background() if not present.
+// GetGoContext retrieves a legacy Go context.Context from an evaluation context.
+// New evaluation code should use Scope.GoContext instead.
 func GetGoContext(evalCtx Context) context.Context {
 	if evalCtx == nil {
 		return context.Background()
@@ -39,7 +39,7 @@ func withGoContext(evalCtx Context, goCtx context.Context) Context {
 	}
 	evalCtx[GoContextKey] = goCtx
 	if deadline, ok := goCtx.Deadline(); ok {
-		evalCtx["__deadline"] = deadline
+		evalCtx[deadlineContextKey] = deadline
 	}
 	return evalCtx
 }

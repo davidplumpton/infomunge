@@ -130,7 +130,7 @@ func EvaluateWithGoContext(exprStr string, evalCtx Context, goCtx context.Contex
 
 // EvaluateWithGoContextAndSourceMap parses and evaluates an expression with an explicit source map.
 func EvaluateWithGoContextAndSourceMap(exprStr string, evalCtx Context, goCtx context.Context, sourceMap sourcemap.Map) (Value, error) {
-	contextWithGoCtx := withGoContext(evalCtx, goCtx)
+	scope := NewScope(evalCtx).WithGoContext(goCtx)
 	ctx := &ErrorContext{
 		ExprStr:    exprStr,
 		Mapping:    sourceMap.Positions(),
@@ -138,7 +138,7 @@ func EvaluateWithGoContextAndSourceMap(exprStr string, evalCtx Context, goCtx co
 		FullRaw:    "",
 		SourceMap:  sourceMap,
 	}
-	return EvaluateWithContextAndGoContext(exprStr, contextWithGoCtx, goCtx, ctx)
+	return EvaluateWithScopeAndContext(exprStr, scope, ctx)
 }
 
 // EvaluateWithContext parses and evaluates the expression with error context.
@@ -148,13 +148,18 @@ func EvaluateWithContext(exprStr string, evalCtx Context, errCtx *ErrorContext) 
 
 // EvaluateWithContextAndGoContext parses and evaluates the expression with error and Go contexts.
 func EvaluateWithContextAndGoContext(exprStr string, evalCtx Context, goCtx context.Context, errCtx *ErrorContext) (Value, error) {
-	contextWithGoCtx := withGoContext(evalCtx, goCtx)
+	scope := NewScope(evalCtx).WithGoContext(goCtx)
+	return EvaluateWithScopeAndContext(exprStr, scope, errCtx)
+}
+
+// EvaluateWithScopeAndContext parses and evaluates an expression with an explicit scope.
+func EvaluateWithScopeAndContext(exprStr string, scope *Scope, errCtx *ErrorContext) (Value, error) {
 	expr, err := parser.ParseExpr(exprStr)
 	if err != nil {
 		return nil, errCtx.FormatParseError(err, exprStr)
 	}
 
-	result, err := evalASTWithDepth(expr, contextWithGoCtx, 0)
+	result, err := evalASTInScopeWithDepth(expr, scope, 0)
 	if err != nil {
 		return nil, errCtx.FormatEvalError(err)
 	}
@@ -184,38 +189,42 @@ func (ec *ErrorContext) resolvedSourceMap() sourcemap.Map {
 
 // evalAST evaluates an expression with initial depth of 0 using the visitor pattern.
 func evalAST(expr ast.Expr, context Context) (Value, error) {
-	visitor := NewDefaultVisitor(context, 0)
-	return visitor.Visit(expr)
+	return evalASTInScopeWithDepth(expr, NewScope(context), 0)
 }
 
 // evalASTWithDepth evaluates an expression using the visitor pattern with the given depth.
 func evalASTWithDepth(expr ast.Expr, context Context, depth int) (Value, error) {
-	visitor := NewDefaultVisitor(context, depth)
+	return evalASTInScopeWithDepth(expr, NewScope(context), depth)
+}
+
+func evalASTInScopeWithDepth(expr ast.Expr, scope *Scope, depth int) (Value, error) {
+	visitor := NewDefaultVisitorForScope(scope, depth)
 	return visitor.Visit(expr)
 }
 
-// newLambdaInvocationContext returns the lexical scope captured when the lambda
+// newLambdaInvocationScope returns the lexical scope captured when the lambda
 // was defined. Caller locals do not implicitly leak into lambda/function bodies;
-// only explicit invocation bindings should be layered on top of this context.
-func newLambdaInvocationContext(lambda *Lambda) Context {
+// only explicit invocation bindings should be layered on top of this scope.
+func newLambdaInvocationScope(lambda *Lambda, caller *Scope) *Scope {
 	if lambda != nil && lambda.Env != nil {
-		return copyContext(lambda.Env)
+		runtime := Runtime{}
+		if caller != nil {
+			runtime = caller.Runtime
+		}
+		return NewScopeWithRuntime(copyContext(lambda.Env), runtime)
 	}
-	return make(Context)
+	if caller != nil {
+		return NewScopeWithRuntime(make(Context), caller.Runtime)
+	}
+	return NewScope(nil)
 }
 
-func newLambdaInvocationContextWithCaller(lambda *Lambda, caller Context) Context {
-	lambdaContext := newLambdaInvocationContext(lambda)
-	copyEvaluationCapabilities(lambdaContext, caller)
-	return lambdaContext
-}
-
-func evalLambdaWithBindingsAtDepth(lambda *Lambda, depth int, bind func(Context)) (Value, error) {
-	lambdaContext := newLambdaInvocationContext(lambda)
+func evalLambdaWithBindingsAtDepth(lambda *Lambda, caller *Scope, depth int, bind func(Context)) (Value, error) {
+	lambdaScope := newLambdaInvocationScope(lambda, caller)
 	if bind != nil {
-		bind(lambdaContext)
+		bind(lambdaScope.Vars)
 	}
-	return evalASTWithDepth(lambda.BodyAST, lambdaContext, depth)
+	return evalASTInScopeWithDepth(lambda.BodyAST, lambdaScope, depth)
 }
 
 // copyContext creates a shallow copy of a context map for scope isolation.
@@ -680,15 +689,15 @@ func numericEquals(left, right Value) bool {
 }
 
 // callUserDefinedFunction calls a user-defined function (Lambda) with the provided arguments
-func callUserDefinedFunction(lambda *Lambda, args []Value, e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callUserDefinedFunction(lambda *Lambda, args []Value, e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(args) != lambda.ParamCount() {
 		return nil, newPosError(fmt.Sprintf("function expects %d arguments, got %d", lambda.ParamCount(), len(args)), e.Pos())
 	}
 
-	fnContext := copyContext(context)
+	fnScope := scope.Copy()
 	for i, param := range lambda.Params {
-		fnContext[param.Name] = args[i]
+		fnScope.Vars[param.Name] = args[i]
 	}
 
-	return evalASTWithDepth(lambda.BodyAST, fnContext, depth+1)
+	return evalASTInScopeWithDepth(lambda.BodyAST, fnScope, depth+1)
 }

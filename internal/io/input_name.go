@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/evaluator"
 )
 
 var inputNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -17,6 +18,9 @@ func NormalizeAndValidateInputName(raw string) (string, error) {
 	}
 	if !inputNamePattern.MatchString(name) {
 		return "", unifiederrors.ValidationErrorf("invalid input name %q: must match [A-Za-z_][A-Za-z0-9_]*", name)
+	}
+	if evaluator.IsReservedBindingName(name) {
+		return "", unifiederrors.ValidationErrorf("input name %q is reserved for runtime metadata", name)
 	}
 	return name, nil
 }

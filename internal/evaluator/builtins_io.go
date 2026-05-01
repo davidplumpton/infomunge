@@ -6,10 +6,10 @@ import (
 	"net/url"
 )
 
-func evalBuiltinArgs(argExprs []ast.Expr, evalCtx Context, depth int) ([]Value, error) {
+func evalBuiltinArgs(argExprs []ast.Expr, scope *Scope, depth int) ([]Value, error) {
 	args := make(Array, 0, len(argExprs))
 	for _, argExpr := range argExprs {
-		arg, err := evalASTWithDepth(argExpr, evalCtx, depth+1)
+		arg, err := evalASTInScopeWithDepth(argExpr, scope, depth+1)
 		if err != nil {
 			return nil, err
 		}
@@ -19,15 +19,15 @@ func evalBuiltinArgs(argExprs []ast.Expr, evalCtx Context, depth int) ([]Value, 
 }
 
 // callBuiltinRead implements the read(content, mimeType[, options]) function.
-func callBuiltinRead(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
-	args, err := evalBuiltinArgs(e.Args, evalCtx, depth)
+func callBuiltinRead(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	args, err := evalBuiltinArgs(e.Args, scope, depth)
 	if err != nil {
 		return nil, err
 	}
-	return callBuiltinReadWithArgs(args, e, evalCtx)
+	return callBuiltinReadWithArgs(args, e, scope)
 }
 
-func callBuiltinReadWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) (Value, error) {
+func callBuiltinReadWithArgs(args []Value, e *ast.CallExpr, scope *Scope) (Value, error) {
 	if len(args) < 2 {
 		return nil, newPosError("read function requires at least 2 arguments: content and mimeType", e.Pos())
 	}
@@ -40,7 +40,7 @@ func callBuiltinReadWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) (Va
 		return nil, newPosError("read function arguments must be strings", e.Pos())
 	}
 
-	formatService, err := requireFormatService(evalCtx)
+	formatService, err := requireFormatService(scope)
 	if err != nil {
 		return nil, newPosError(err.Error(), e.Pos())
 	}
@@ -66,15 +66,15 @@ func callBuiltinReadWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) (Va
 }
 
 // callBuiltinReadUrl implements the readUrl(url, mimeType) function.
-func callBuiltinReadUrl(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
-	args, err := evalBuiltinArgs(e.Args, evalCtx, depth)
+func callBuiltinReadUrl(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	args, err := evalBuiltinArgs(e.Args, scope, depth)
 	if err != nil {
 		return nil, err
 	}
-	return callBuiltinReadUrlWithArgs(args, e, evalCtx)
+	return callBuiltinReadUrlWithArgs(args, e, scope)
 }
 
-func callBuiltinReadUrlWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) (Value, error) {
+func callBuiltinReadUrlWithArgs(args []Value, e *ast.CallExpr, scope *Scope) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("readUrl requires exactly 2 arguments: url and mimeType", e.Pos())
 	}
@@ -98,12 +98,12 @@ func callBuiltinReadUrlWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) 
 		return nil, newPosError("readUrl: invalid URL: missing scheme or host", e.Pos())
 	}
 
-	urlReader, err := requireURLReadService(evalCtx)
+	urlReader, err := requireURLReadService(scope)
 	if err != nil {
 		return nil, newPosError(err.Error(), e.Pos())
 	}
 
-	result, err := urlReader.ReadURL(GetGoContext(evalCtx), rawURL, mimeType)
+	result, err := urlReader.ReadURL(scope.GoContext(), rawURL, mimeType)
 	if err != nil {
 		return nil, newPosError(err.Error(), e.Pos())
 	}
@@ -112,15 +112,15 @@ func callBuiltinReadUrlWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) 
 }
 
 // callBuiltinWrite implements the write(value, mimeType[, options]) function.
-func callBuiltinWrite(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
-	args, err := evalBuiltinArgs(e.Args, evalCtx, depth)
+func callBuiltinWrite(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	args, err := evalBuiltinArgs(e.Args, scope, depth)
 	if err != nil {
 		return nil, err
 	}
-	return callBuiltinWriteWithArgs(args, e, evalCtx)
+	return callBuiltinWriteWithArgs(args, e, scope)
 }
 
-func callBuiltinWriteWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) (Value, error) {
+func callBuiltinWriteWithArgs(args []Value, e *ast.CallExpr, scope *Scope) (Value, error) {
 	if len(args) < 2 {
 		return nil, newPosError("write requires exactly 2 arguments: value and mimeType", e.Pos())
 	}
@@ -133,7 +133,7 @@ func callBuiltinWriteWithArgs(args []Value, e *ast.CallExpr, evalCtx Context) (V
 		return nil, newPosError(fmt.Sprintf("write expects mimeType to be a string, got %T", args[1]), e.Pos())
 	}
 
-	formatService, err := requireFormatService(evalCtx)
+	formatService, err := requireFormatService(scope)
 	if err != nil {
 		return nil, newPosError(err.Error(), e.Pos())
 	}

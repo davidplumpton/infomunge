@@ -7,12 +7,12 @@ import (
 )
 
 // callBuiltinIfElse implements the __ifelse(condition, trueValue, falseValue) function.
-func callBuiltinIfElse(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinIfElse(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 3 {
 		return nil, newPosError("if/else requires exactly 3 arguments: condition, trueValue, falseValue", e.Pos())
 	}
 	// Evaluate condition
-	cond, err := evalASTWithDepth(e.Args[0], context, depth)
+	cond, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -23,20 +23,20 @@ func callBuiltinIfElse(e *ast.CallExpr, context Context, depth int) (Value, erro
 	}
 	// Evaluate and return appropriate branch
 	if condBool {
-		return evalASTWithDepth(e.Args[1], context, depth)
+		return evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	}
-	return evalASTWithDepth(e.Args[2], context, depth)
+	return evalASTInScopeWithDepth(e.Args[2], scope, depth)
 }
 
 // callBuiltinWhile implements the __while(condition, body) function.
-func callBuiltinWhile(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("while loop requires exactly 2 arguments: condition, body", e.Pos())
 	}
 
 	var result Value
 	startTime := time.Now()
-	deadline := getDeadline(context, startTime)
+	deadline := getDeadline(scope, startTime)
 
 loop:
 	for i := 0; ; i++ {
@@ -46,7 +46,7 @@ loop:
 		}
 
 		// Evaluate condition
-		condBool, err := evaluateCondition(e, context, depth)
+		condBool, err := evaluateCondition(e, scope, depth)
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +57,7 @@ loop:
 		}
 
 		// Execute body
-		bodyResult, err := evaluateBody(e, context, depth)
+		bodyResult, err := evaluateBody(e, scope, depth)
 		if err != nil {
 			return nil, err
 		}
@@ -83,11 +83,8 @@ loop:
 }
 
 // getDeadline retrieves the loop deadline from context or uses default timeout
-func getDeadline(context Context, startTime time.Time) time.Time {
-	if d, ok := context["__deadline"].(time.Time); ok {
-		return d
-	}
-	return startTime.Add(DefaultLoopTimeout)
+func getDeadline(scope *Scope, startTime time.Time) time.Time {
+	return scope.LoopDeadline(startTime)
 }
 
 // checkTimeout verifies the loop hasn't exceeded the deadline
@@ -100,8 +97,8 @@ func checkTimeout(i int, startTime, deadline time.Time, e *ast.CallExpr) error {
 }
 
 // evaluateCondition evaluates the while condition and converts it to boolean
-func evaluateCondition(e *ast.CallExpr, context Context, depth int) (bool, error) {
-	cond, err := evalASTWithDepth(e.Args[0], context, depth)
+func evaluateCondition(e *ast.CallExpr, scope *Scope, depth int) (bool, error) {
+	cond, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return false, err
 	}
@@ -114,8 +111,8 @@ func evaluateCondition(e *ast.CallExpr, context Context, depth int) (bool, error
 }
 
 // evaluateBody executes the while loop body and returns the result or control flow signal
-func evaluateBody(e *ast.CallExpr, context Context, depth int) (Value, error) {
-	return evalASTWithDepth(e.Args[1], context, depth)
+func evaluateBody(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	return evalASTInScopeWithDepth(e.Args[1], scope, depth)
 }
 
 // processBodyResult handles control flow signals from the loop body
@@ -127,7 +124,7 @@ func processBodyResult(bodyResult Value) (*ControlFlowSignal, bool) {
 }
 
 // callBuiltinBreak implements the __break function.
-func callBuiltinBreak(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinBreak(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 0 {
 		return nil, newPosError("break takes no arguments", e.Pos())
 	}
@@ -135,7 +132,7 @@ func callBuiltinBreak(e *ast.CallExpr, context Context, depth int) (Value, error
 }
 
 // callBuiltinContinue implements the __continue function.
-func callBuiltinContinue(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinContinue(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 0 {
 		return nil, newPosError("continue takes no arguments", e.Pos())
 	}
@@ -143,7 +140,7 @@ func callBuiltinContinue(e *ast.CallExpr, context Context, depth int) (Value, er
 }
 
 // callBuiltinSeq implements the __seq(expr1, expr2, ...) function.
-func callBuiltinSeq(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinSeq(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) < 1 {
 		return nil, newPosError("seq requires at least 1 argument", e.Pos())
 	}
@@ -153,7 +150,7 @@ func callBuiltinSeq(e *ast.CallExpr, context Context, depth int) (Value, error) 
 
 	// Evaluate all arguments in order
 	for _, arg := range e.Args {
-		result, err = evalASTWithDepth(arg, context, depth)
+		result, err = evalASTInScopeWithDepth(arg, scope, depth)
 		if err != nil {
 			return nil, err
 		}

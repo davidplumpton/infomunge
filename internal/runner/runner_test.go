@@ -652,11 +652,10 @@ func TestParseHeader(t *testing.T) {
 			wantMimeType: "application/xml",
 		},
 		{
-			name:           "input directive",
-			header:         "input application/json\noutput application/json",
-			hasHeader:      true,
-			wantMimeType:   "application/json",
-			wantContextKey: "__input_mime__",
+			name:         "input directive",
+			header:       "input application/json\noutput application/json",
+			hasHeader:    true,
+			wantMimeType: "application/json",
 		},
 		{
 			name:      "unknown directive",
@@ -669,7 +668,7 @@ func TestParseHeader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			loader := NewModuleLoader(".")
-			ctx, mimeType, err := parseHeader(tt.header, tt.hasHeader, tt.header, loader)
+			scope, mimeType, _, err := parseHeader(tt.header, tt.hasHeader, tt.header, loader)
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("parseHeader() expected error, got nil")
@@ -684,7 +683,7 @@ func TestParseHeader(t *testing.T) {
 				t.Errorf("parseHeader() mimeType = %q, want %q", mimeType, tt.wantMimeType)
 			}
 			if tt.wantContextKey != "" {
-				if _, ok := ctx[tt.wantContextKey]; !ok {
+				if _, ok := scope.Vars[tt.wantContextKey]; !ok {
 					t.Errorf("parseHeader() context should have key %q", tt.wantContextKey)
 				}
 			}

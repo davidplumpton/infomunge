@@ -13,13 +13,13 @@ import (
 )
 
 // callBuiltinUpdateExpr implements the __updateExpr(value, casesString) function.
-func callBuiltinUpdateExpr(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinUpdateExpr(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("update expression requires exactly 2 arguments: value and cases", e.Pos())
 	}
 
 	// First argument is evaluated (the value to update)
-	value, err := evalASTWithDepth(e.Args[0], context, depth+1)
+	value, err := evalASTInScopeWithDepth(e.Args[0], scope, depth+1)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func callBuiltinUpdateExpr(e *ast.CallExpr, context Context, depth int) (Value, 
 	}
 
 	// Parse and apply the case statements
-	res, err := applyUpdateCases(value, casesStr, context, depth)
+	res, err := applyUpdateCases(value, casesStr, scope, depth)
 	if err != nil {
 		return nil, newPosError(err.Error(), e.Args[1].Pos())
 	}
@@ -44,7 +44,7 @@ func callBuiltinUpdateExpr(e *ast.CallExpr, context Context, depth int) (Value, 
 }
 
 // applyUpdateCases parses and applies update case statements to a value
-func applyUpdateCases(value Value, casesStr string, context Context, depth int) (Value, error) {
+func applyUpdateCases(value Value, casesStr string, scope *Scope, depth int) (Value, error) {
 	// Parse case statements line by line
 	lines := strings.Split(casesStr, "\n")
 	result := deepCopy(value) // Start with a copy of the value
@@ -69,6 +69,9 @@ func applyUpdateCases(value Value, casesStr string, context Context, depth int) 
 		}
 
 		varName := strings.TrimSpace(rest[:atIdx])
+		if IsReservedBindingName(varName) {
+			return nil, unifiederrors.EvalErrorf("%q is reserved for runtime metadata", varName)
+		}
 		afterAt := rest[atIdx+4:]
 
 		// Find " -> " separator
@@ -82,7 +85,7 @@ func applyUpdateCases(value Value, casesStr string, context Context, depth int) 
 
 		// Apply this case
 		var applyErr error
-		result, applyErr = applyUpdateCase(result, varName, selector, expression, context, depth)
+		result, applyErr = applyUpdateCase(result, varName, selector, expression, scope, depth)
 		if applyErr != nil {
 			return nil, applyErr
 		}
@@ -92,7 +95,7 @@ func applyUpdateCases(value Value, casesStr string, context Context, depth int) 
 }
 
 // applyUpdateCase applies a single update case to a value
-func applyUpdateCase(value Value, varName, selector, expression string, context Context, depth int) (Value, error) {
+func applyUpdateCase(value Value, varName, selector, expression string, scope *Scope, depth int) (Value, error) {
 	// Parse the selector path
 	path, err := parseSelectorPath(selector)
 	if err != nil {
@@ -111,8 +114,8 @@ func applyUpdateCase(value Value, varName, selector, expression string, context 
 	}
 
 	// Create local context with the variable binding
-	localContext := copyContext(context)
-	localContext[varName] = currentValue
+	localScope := scope.Copy()
+	localScope.Vars[varName] = currentValue
 
 	// Evaluate the expression in the local context
 	preparedExpr, _, err := preprocessor.PrepareForParsing(expression, preprocessor.Options{})
@@ -124,7 +127,7 @@ func applyUpdateCase(value Value, varName, selector, expression string, context 
 		return nil, unifiederrors.EvalErrorf("parse error in update case expression: %s", err)
 	}
 
-	newValue, err := evalASTWithDepth(parsedExpr, localContext, depth+1)
+	newValue, err := evalASTInScopeWithDepth(parsedExpr, localScope, depth+1)
 	if err != nil {
 		return nil, err
 	}

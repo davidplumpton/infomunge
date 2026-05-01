@@ -57,10 +57,10 @@ func reduceInitialAccumulator(array Array, setup reduceSetup) (Value, int) {
 	return array[0], 1
 }
 
-func runReduce(array Array, lambda *Lambda, context Context, depth int, setup reduceSetup) (Value, error) {
+func runReduce(array Array, lambda *Lambda, scope *Scope, depth int, setup reduceSetup) (Value, error) {
 	accumulator, startIdx := reduceInitialAccumulator(array, setup)
 	for i := startIdx; i < len(array); i++ {
-		result, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+		result, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			lambdaContext[lambda.ParamName(setup.accParamIdx)] = accumulator
 			lambdaContext[lambda.ParamName(setup.elemParamIdx)] = array[i]
 			if lambda.ParamCount() > 2 {
@@ -98,8 +98,8 @@ func runReduce(array Array, lambda *Lambda, context Context, depth int, setup re
 //     starts from second element.
 //
 // Returns an error if the array is empty and no initial value is provided.
-func callBuiltinReduce(e *ast.CallExpr, context Context, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("reduce", e, context, depth, 2, 3)
+func callBuiltinReduce(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	array, lambda, err := evalArrayAndLambda("reduce", e, scope, depth, 2, 3)
 	if err != nil {
 		return nil, err
 	}
@@ -109,5 +109,5 @@ func callBuiltinReduce(e *ast.CallExpr, context Context, depth int) (Value, erro
 		return result, err
 	}
 
-	return runReduce(array, lambda, context, depth, setup)
+	return runReduce(array, lambda, scope, depth, setup)
 }

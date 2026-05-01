@@ -782,11 +782,10 @@ func (tc *testContext) runningTheScriptShouldFailWithErrorContaining(expected st
 		ctx["payload"] = payload
 	}
 
-	// Inject deadline into context for while loop timeout detection
-	ctx["__deadline"] = time.Now().Add(tc.timeout)
-
 	// Run the script with injected context
-	_, err := runner.RunString(tc.scriptContent, ctx)
+	goCtx, cancel := context.WithTimeout(context.Background(), tc.timeout)
+	defer cancel()
+	_, err := runner.RunStringWithGoContext(goCtx, tc.scriptContent, ctx)
 	if err == nil {
 		return fmt.Errorf("expected script to fail, but it succeeded")
 	}
@@ -991,45 +990,33 @@ func (tc *testContext) theOutputShouldBeValidJSONBoolean() error {
 
 // runScriptWithTimeout runs a script with the configured timeout
 func (tc *testContext) runScriptWithTimeout(scriptContent string, additionalContext evaluator.Context) error {
-	type runResult struct {
-		result    evaluator.Value
-		hasHeader bool
-		mimeType  string
-		context   evaluator.Context
-	}
-	resultChan := make(chan runResult, 1)
+	resultChan := make(chan string, 1)
 	errChan := make(chan error, 1)
 
-	// Inject deadline into context for while loop timeout detection
 	if additionalContext == nil {
 		additionalContext = make(evaluator.Context)
 	}
-	additionalContext["__deadline"] = time.Now().Add(tc.timeout)
 
 	// Run script in a goroutine
 	go func() {
 		goCtx, cancel := context.WithTimeout(context.Background(), tc.timeout)
 		defer cancel()
-		result, hasHeader, mimeType, context, err := runner.RunStringWithGoContextAndOptionsWithOutput(goCtx, scriptContent, additionalContext, runner.RunnerOptions{})
+		result, err := runner.ExecuteStringWithGoContextAndOptions(goCtx, scriptContent, additionalContext, runner.RunnerOptions{})
 		if err != nil {
 			errChan <- err
 		} else {
-			resolved, err := runner.ResolveResult(result)
+			formatted, err := formatTestExecutionResult(result)
 			if err != nil {
-				errChan <- err
-			} else {
-				resultChan <- runResult{resolved, hasHeader, mimeType, context}
+				errChan <- fmt.Errorf("failed to format output: %v", err)
+				return
 			}
+			resultChan <- formatted
 		}
 	}()
 
 	// Wait for result with timeout
 	select {
-	case res := <-resultChan:
-		formatted, err := resultoutput.FormatResult(res.result, res.mimeType, res.context)
-		if err != nil {
-			return fmt.Errorf("failed to format output: %v", err)
-		}
+	case formatted := <-resultChan:
 		tc.lastOutput = formatted
 		return nil
 	case err := <-errChan:
@@ -1037,6 +1024,17 @@ func (tc *testContext) runScriptWithTimeout(scriptContent string, additionalCont
 	case <-time.After(tc.timeout):
 		return fmt.Errorf("script execution timed out after %v (possible infinite loop)", tc.timeout)
 	}
+}
+
+func formatTestExecutionResult(result runner.ExecutionResult) (string, error) {
+	if result.HasHeader {
+		return runner.FormatExecutionResult(result)
+	}
+	resolved, err := result.Resolved()
+	if err != nil {
+		return "", err
+	}
+	return resultoutput.FormatResultWithMetadata(resolved.Value, resolved.OutputMimeType, resolved.Context, resolved.OutputMetadata)
 }
 
 func (tc *testContext) theOutputShouldBeTrue() error {

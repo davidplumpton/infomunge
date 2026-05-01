@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-type SpecialBuiltinFunc = func(*ast.CallExpr, Context, int) (Value, error)
+type SpecialBuiltinFunc = func(*ast.CallExpr, *Scope, int) (Value, error)
 type RegularBuiltinFunc = func([]Value, *ast.CallExpr) (Value, error)
 
 type BuiltinEvaluationMode string

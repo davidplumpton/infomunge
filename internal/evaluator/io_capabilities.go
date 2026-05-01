@@ -30,7 +30,13 @@ func (disabledURLReadService) ReadURL(context.Context, string, string) (Value, e
 	return nil, fmt.Errorf("readUrl: URL IO capability is disabled")
 }
 
-// WithFormatService installs a format service into an evaluation context.
+// DisabledURLReadService returns a URLReadService that rejects all URL IO.
+func DisabledURLReadService() URLReadService {
+	return disabledURLReadService{}
+}
+
+// WithFormatService installs a format service into an evaluation context for
+// legacy callers. New evaluator code carries this capability on Scope.Runtime.
 func WithFormatService(ctx Context, service FormatService) Context {
 	if ctx == nil {
 		ctx = make(Context)
@@ -43,7 +49,8 @@ func WithFormatService(ctx Context, service FormatService) Context {
 	return ctx
 }
 
-// WithURLReadService installs a URL read service into an evaluation context.
+// WithURLReadService installs a URL read service into an evaluation context for
+// legacy callers. New evaluator code carries this capability on Scope.Runtime.
 func WithURLReadService(ctx Context, service URLReadService) Context {
 	if ctx == nil {
 		ctx = make(Context)
@@ -61,7 +68,7 @@ func WithURLReadDisabled(ctx Context) Context {
 	return WithURLReadService(ctx, disabledURLReadService{})
 }
 
-// GetFormatService returns the format service installed in an evaluation context.
+// GetFormatService returns a legacy format service installed in an evaluation context.
 func GetFormatService(ctx Context) (FormatService, bool) {
 	if ctx == nil {
 		return nil, false
@@ -70,7 +77,7 @@ func GetFormatService(ctx Context) (FormatService, bool) {
 	return service, ok
 }
 
-// GetURLReadService returns the URL read service installed in an evaluation context.
+// GetURLReadService returns a legacy URL read service installed in an evaluation context.
 func GetURLReadService(ctx Context) (URLReadService, bool) {
 	if ctx == nil {
 		return nil, false
@@ -79,29 +86,48 @@ func GetURLReadService(ctx Context) (URLReadService, bool) {
 	return service, ok
 }
 
-func requireFormatService(ctx Context) (FormatService, error) {
-	service, ok := GetFormatService(ctx)
+func (s *Scope) SetFormatService(service FormatService) {
+	if s == nil {
+		return
+	}
+	s.ensure()
+	s.Runtime.FormatService = service
+}
+
+func (s *Scope) SetURLReadService(service URLReadService) {
+	if s == nil {
+		return
+	}
+	s.ensure()
+	s.Runtime.URLReadService = service
+}
+
+func (s *Scope) FormatService() (FormatService, bool) {
+	if s == nil || s.Runtime.FormatService == nil {
+		return nil, false
+	}
+	return s.Runtime.FormatService, true
+}
+
+func (s *Scope) URLReadService() (URLReadService, bool) {
+	if s == nil || s.Runtime.URLReadService == nil {
+		return nil, false
+	}
+	return s.Runtime.URLReadService, true
+}
+
+func requireFormatService(scope *Scope) (FormatService, error) {
+	service, ok := scope.FormatService()
 	if !ok {
 		return nil, fmt.Errorf("format service is unavailable")
 	}
 	return service, nil
 }
 
-func requireURLReadService(ctx Context) (URLReadService, error) {
-	service, ok := GetURLReadService(ctx)
+func requireURLReadService(scope *Scope) (URLReadService, error) {
+	service, ok := scope.URLReadService()
 	if !ok {
 		return nil, fmt.Errorf("readUrl: URL IO capability is unavailable")
 	}
 	return service, nil
-}
-
-func copyEvaluationCapabilities(dst, src Context) {
-	if dst == nil || src == nil {
-		return
-	}
-	for _, key := range []string{formatServiceContextKey, urlReadServiceContextKey} {
-		if value, ok := src[key]; ok {
-			dst[key] = value
-		}
-	}
 }

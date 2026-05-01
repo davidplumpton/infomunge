@@ -102,6 +102,17 @@ Feature: Runner header declaration paths (in-process coverage)
       3
       """
 
+  Scenario: Reserved runtime metadata names cannot be declared as variables
+    Given the following script:
+      """
+      %im 0.1
+      var __output_metadata__ = "shadow"
+      output application/json
+      ---
+      __output_metadata__
+      """
+    Then running the script should fail with error containing "\"__output_metadata__\" is reserved for runtime metadata"
+
   # --- Function declarations ---
 
   Scenario: Simple function via in-process runner

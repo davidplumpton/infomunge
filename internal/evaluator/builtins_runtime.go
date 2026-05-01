@@ -188,13 +188,13 @@ func callBuiltinLogWith(args []Value, e *ast.CallExpr) (Value, error) {
 }
 
 // callBuiltinTry implements the try(delegate) function.
-func callBuiltinTry(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinTry(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("try requires exactly 1 argument: a delegate function", e.Pos())
 	}
 
 	// Evaluate the delegate expression
-	result, err := evalASTWithDepth(e.Args[0], context, depth)
+	result, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 
 	if err != nil {
 		// Build error object based on error type
@@ -207,7 +207,7 @@ func callBuiltinTry(e *ast.CallExpr, context Context, depth int) (Value, error) 
 
 	// If result is a zero-argument lambda, invoke it
 	if lambda, ok := result.(*Lambda); ok && lambda.ParamCount() == 0 {
-		result, err = callUserDefinedFunction(lambda, Array{}, e, context, depth)
+		result, err = callUserDefinedFunction(lambda, Array{}, e, scope, depth)
 		if err != nil {
 			errorObj := buildErrorObject(err)
 			return Object{
@@ -224,13 +224,13 @@ func callBuiltinTry(e *ast.CallExpr, context Context, depth int) (Value, error) 
 }
 
 // callBuiltinOrElse implements the orElse(previous, orElse) function.
-func callBuiltinOrElse(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinOrElse(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("orElse requires exactly 2 arguments: previous TryResult, orElse value or function", e.Pos())
 	}
 
 	// Evaluate the previous argument (should be a TryResult)
-	prev, err := evalASTWithDepth(e.Args[0], context, depth)
+	prev, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -251,27 +251,27 @@ func callBuiltinOrElse(e *ast.CallExpr, context Context, depth int) (Value, erro
 	}
 
 	// Previous failed, evaluate the orElse argument
-	orElseVal, err := evalASTWithDepth(e.Args[1], context, depth)
+	orElseVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		return nil, err
 	}
 
 	// If orElse is a zero-argument lambda, invoke it
 	if lambda, ok := orElseVal.(*Lambda); ok && lambda.ParamCount() == 0 {
-		return callUserDefinedFunction(lambda, Array{}, e, context, depth)
+		return callUserDefinedFunction(lambda, Array{}, e, scope, depth)
 	}
 
 	return orElseVal, nil
 }
 
 // callBuiltinOrElseTry implements the orElseTry(previous, orElse) function.
-func callBuiltinOrElseTry(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinOrElseTry(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("orElseTry requires exactly 2 arguments: previous TryResult, orElse function", e.Pos())
 	}
 
 	// Evaluate the previous argument (should be a TryResult)
-	prev, err := evalASTWithDepth(e.Args[0], context, depth)
+	prev, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +292,7 @@ func callBuiltinOrElseTry(e *ast.CallExpr, context Context, depth int) (Value, e
 	}
 
 	// Previous failed, evaluate the orElse argument and wrap in TryResult
-	orElseVal, err := evalASTWithDepth(e.Args[1], context, depth)
+	orElseVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		// orElse evaluation itself failed
 		errorObj := buildErrorObject(err)
@@ -304,7 +304,7 @@ func callBuiltinOrElseTry(e *ast.CallExpr, context Context, depth int) (Value, e
 
 	// If orElse is a zero-argument lambda, invoke it
 	if lambda, ok := orElseVal.(*Lambda); ok && lambda.ParamCount() == 0 {
-		result, err := callUserDefinedFunction(lambda, Array{}, e, context, depth)
+		result, err := callUserDefinedFunction(lambda, Array{}, e, scope, depth)
 		if err != nil {
 			errorObj := buildErrorObject(err)
 			return Object{

@@ -55,7 +55,7 @@ func TestRegisterBuiltinFunctions(t *testing.T) {
 	RegisterBuiltinFunction("runtimeFn", func(_ []Value, _ *ast.CallExpr) (Value, error) {
 		return 42, nil
 	})
-	RegisterBuiltinSpecial("runtimeSpecial", func(_ *ast.CallExpr, _ Context, _ int) (Value, error) {
+	RegisterBuiltinSpecial("runtimeSpecial", func(_ *ast.CallExpr, _ *Scope, _ int) (Value, error) {
 		return true, nil
 	})
 
@@ -82,7 +82,7 @@ func TestBuildBuiltinRegistriesRejectsInvalidSpecs(t *testing.T) {
 	validRegular := regularBuiltinSpec("validRegular", builtinCategoryCore, exactArity(0), func(_ []Value, _ *ast.CallExpr) (Value, error) {
 		return "regular", nil
 	}, "valid regular")
-	validSpecial := specialBuiltinSpec("validSpecial", builtinCategoryCore, exactArity(0), func(_ *ast.CallExpr, _ Context, _ int) (Value, error) {
+	validSpecial := specialBuiltinSpec("validSpecial", builtinCategoryCore, exactArity(0), func(_ *ast.CallExpr, _ *Scope, _ int) (Value, error) {
 		return "special", nil
 	}, "valid special")
 
@@ -147,7 +147,7 @@ func TestBuildBuiltinRegistriesDispatchesByEvaluationMode(t *testing.T) {
 			regularCalled = true
 			return "regular", nil
 		}, "regular only"),
-		specialBuiltinSpec("specialOnly", builtinCategoryCore, exactArity(0), func(_ *ast.CallExpr, _ Context, _ int) (Value, error) {
+		specialBuiltinSpec("specialOnly", builtinCategoryCore, exactArity(0), func(_ *ast.CallExpr, _ *Scope, _ int) (Value, error) {
 			specialCalled = true
 			return "special", nil
 		}, "special only"),

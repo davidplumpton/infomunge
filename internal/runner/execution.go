@@ -4,6 +4,7 @@ import (
 	"context"
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
+	"infomunge/internal/output"
 	"infomunge/internal/preprocessor"
 	"infomunge/internal/sourcemap"
 	"os"
@@ -18,6 +19,7 @@ type ExecutionResult struct {
 	HasHeader      bool
 	OutputMimeType string
 	Context        evaluator.Context
+	OutputMetadata output.Metadata
 }
 
 // Resolved returns a copy of the execution result with lazy and stream values
@@ -73,15 +75,18 @@ func executeWithConfig(goCtx context.Context, raw string, additionalContext eval
 
 	loader := NewModuleLoader(opts.BaseDir)
 	loader.Options = opts
-	evalContext, outputMimeType, err := parseHeaderWithGoContextAndOptions(header, hasHeader, goCtx, raw, loader, opts)
+	evalScope, outputMimeType, outputMetadata, err := parseHeaderWithGoContextAndOptions(header, hasHeader, goCtx, raw, loader, opts)
 	if err != nil {
 		return ExecutionResult{HasHeader: hasHeader, OutputMimeType: outputMimeType}, err
 	}
 
 	for k, v := range additionalContext {
-		evalContext[k] = v
+		if evaluator.IsReservedBindingName(k) {
+			return ExecutionResult{HasHeader: hasHeader, OutputMimeType: outputMimeType, Context: evalScope.Vars, OutputMetadata: outputMetadata}, unifiederrors.ValidationErrorf("binding name %q is reserved for runtime metadata", k)
+		}
+		evalScope.Vars[k] = v
 	}
-	evalContext = installEvaluationCapabilities(evalContext, opts)
+	evalScope = installEvaluationCapabilities(evalScope, opts)
 
 	prepOpts := preprocessor.Options{}
 	if strings.ContainsAny(body, "\n\r") {
@@ -89,18 +94,19 @@ func executeWithConfig(goCtx context.Context, raw string, additionalContext eval
 	}
 	parseableExpr, mapping, err := preprocessor.PrepareForParsing(body, prepOpts)
 	if err != nil {
-		return ExecutionResult{HasHeader: hasHeader, OutputMimeType: outputMimeType, Context: evalContext}, err
+		return ExecutionResult{HasHeader: hasHeader, OutputMimeType: outputMimeType, Context: evalScope.Vars, OutputMetadata: outputMetadata}, err
 	}
 	bodyMap := sourcemap.Identity(raw).SliceSource(bodyOffset, bodyOffset+len(body)).Compose(parseableExpr, mapping)
-	value, err := evaluator.EvaluateWithGoContextAndSourceMap(parseableExpr, evalContext, goCtx, bodyMap)
+	value, err := evaluator.EvaluateWithScopeAndContext(parseableExpr, evalScope, &evaluator.ErrorContext{SourceMap: bodyMap})
 	if err != nil {
-		return ExecutionResult{HasHeader: hasHeader, OutputMimeType: outputMimeType, Context: evalContext}, err
+		return ExecutionResult{HasHeader: hasHeader, OutputMimeType: outputMimeType, Context: evalScope.Vars, OutputMetadata: outputMetadata}, err
 	}
 
 	return ExecutionResult{
 		Value:          value,
 		HasHeader:      hasHeader,
 		OutputMimeType: outputMimeType,
-		Context:        evalContext,
+		Context:        evalScope.Vars,
+		OutputMetadata: outputMetadata,
 	}, nil
 }

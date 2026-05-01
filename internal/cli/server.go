@@ -141,7 +141,7 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 		opts := runner.RunnerOptions{
 			Lazy: config.Lazy,
 		}
-		result, _, headerOutputMimeType, evalCtx, err := runner.RunStringWithGoContextAndOptionsWithOutput(r.Context(), payload.Script, evalContext, opts)
+		execution, err := runner.ExecuteStringWithGoContextAndOptions(r.Context(), payload.Script, evalContext, opts)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				writeRequestTimeout(w)
@@ -151,13 +151,14 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 			return
 		}
 
-		outputMimeType, err := handlers.ResolveOutputMimeType(payload.Output, headerOutputMimeType)
+		outputMimeType, err := handlers.ResolveOutputMimeType(payload.Output, execution.OutputMimeType)
 		if err != nil {
 			writeSanitizedBadRequest(w, err)
 			return
 		}
 
-		formatted, err := handlers.FormatRunResult(result, outputMimeType, evalCtx)
+		execution.OutputMimeType = outputMimeType
+		formatted, err := runner.FormatExecutionResult(execution)
 		if err != nil {
 			log.Printf("run endpoint format error: %v", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)

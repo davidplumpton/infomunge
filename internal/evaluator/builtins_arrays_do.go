@@ -13,7 +13,7 @@ import (
 )
 
 // callBuiltinAssign implements the __assign(varName, value) function.
-func callBuiltinAssign(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinAssign(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("assignment requires exactly 2 arguments: variable name and value", e.Pos())
 	}
@@ -28,22 +28,25 @@ func callBuiltinAssign(e *ast.CallExpr, context Context, depth int) (Value, erro
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("invalid variable name: %s", err), e.Args[0].Pos())
 	}
+	if IsReservedBindingName(varName) {
+		return nil, newPosError(fmt.Sprintf("%q is reserved for runtime metadata", varName), e.Args[0].Pos())
+	}
 
 	// Evaluate the value expression
-	value, err := evalASTWithDepth(e.Args[1], context, depth)
+	value, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		return nil, err
 	}
 
 	// Update the context with the new value
-	context[varName] = value
+	scope.Vars[varName] = value
 
 	// Return the assigned value
 	return value, nil
 }
 
 // callBuiltinDo implements the __do(declarations, expression) function.
-func callBuiltinDo(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinDo(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("do block requires exactly 2 arguments: declarations and expression", e.Pos())
 	}
@@ -68,10 +71,10 @@ func callBuiltinDo(e *ast.CallExpr, context Context, depth int) (Value, error) {
 	}
 
 	// Create a new local context by copying the parent context
-	localContext := copyContext(context)
+	localScope := scope.Copy()
 
 	// Parse and evaluate declarations
-	if err := parseDoDeclarations(declsStr, localContext, depth); err != nil {
+	if err := parseDoDeclarations(declsStr, localScope, depth); err != nil {
 		return nil, newPosError(err.Error(), e.Args[0].Pos())
 	}
 
@@ -85,18 +88,21 @@ func callBuiltinDo(e *ast.CallExpr, context Context, depth int) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("parse error in do expression: %s", err), e.Args[1].Pos())
 	}
 
-	return evalASTWithDepth(parsedExpr, localContext, depth+1)
+	return evalASTInScopeWithDepth(parsedExpr, localScope, depth+1)
 }
 
 // parseVarDeclaration parses a var declaration and adds it to the context.
 // Format: var name = expression
-func parseVarDeclaration(line string, context Context, depth int) error {
+func parseVarDeclaration(line string, scope *Scope, depth int) error {
 	rest := strings.TrimPrefix(line, "var ")
 	parts := strings.SplitN(rest, "=", 2)
 	if len(parts) != 2 {
 		return unifiederrors.EvalErrorf("invalid var declaration: %s", line)
 	}
 	varName := strings.TrimSpace(parts[0])
+	if IsReservedBindingName(varName) {
+		return unifiederrors.EvalErrorf("%q is reserved for runtime metadata", varName)
+	}
 	exprStr := strings.TrimSpace(parts[1])
 
 	preparedExpr, _, err := preprocessor.PrepareForParsing(exprStr, preprocessor.Options{})
@@ -107,11 +113,11 @@ func parseVarDeclaration(line string, context Context, depth int) error {
 	if err != nil {
 		return unifiederrors.EvalErrorf("parse error in var declaration '%s': %s", varName, err)
 	}
-	value, err := evalASTWithDepth(parsedExpr, context, depth+1)
+	value, err := evalASTInScopeWithDepth(parsedExpr, scope, depth+1)
 	if err != nil {
 		return err
 	}
-	context[varName] = value
+	scope.Vars[varName] = value
 	return nil
 }
 
@@ -125,6 +131,9 @@ func parseFunDeclaration(line string, context Context) error {
 		return unifiederrors.EvalErrorf("invalid fun declaration (missing parentheses): %s", line)
 	}
 	funName := strings.TrimSpace(rest[:parenIdx])
+	if IsReservedBindingName(funName) {
+		return unifiederrors.EvalErrorf("%q is reserved for runtime metadata", funName)
+	}
 
 	closeParenIdx := strings.Index(rest, ")")
 	if closeParenIdx == -1 {
@@ -173,7 +182,7 @@ func parseFunParams(paramsStr string) []ParamDef {
 }
 
 // parseDoDeclarations parses and evaluates declarations (var, fun) in a do block
-func parseDoDeclarations(declsStr string, context Context, depth int) error {
+func parseDoDeclarations(declsStr string, scope *Scope, depth int) error {
 	for _, line := range strings.Split(declsStr, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
@@ -182,11 +191,11 @@ func parseDoDeclarations(declsStr string, context Context, depth int) error {
 
 		switch {
 		case strings.HasPrefix(trimmed, "var "):
-			if err := parseVarDeclaration(trimmed, context, depth); err != nil {
+			if err := parseVarDeclaration(trimmed, scope, depth); err != nil {
 				return err
 			}
 		case strings.HasPrefix(trimmed, "fun "):
-			if err := parseFunDeclaration(trimmed, context); err != nil {
+			if err := parseFunDeclaration(trimmed, scope.Vars); err != nil {
 				return err
 			}
 		default:

@@ -10,8 +10,6 @@ import (
 	"infomunge/pkg/formats"
 )
 
-const contextKeyMetadata = "__output_metadata__"
-
 // Metadata carries output-formatting directives parsed from the script header.
 type Metadata struct {
 	DeclaredNamespaces map[string]string
@@ -19,25 +17,30 @@ type Metadata struct {
 }
 
 // SetDeclaredNamespaces records namespace declarations used by XML output.
-func SetDeclaredNamespaces(context evaluator.Context, namespaces map[string]string) {
-	if context == nil || len(namespaces) == 0 {
+func SetDeclaredNamespaces(metadata *Metadata, namespaces map[string]string) {
+	if metadata == nil || len(namespaces) == 0 {
 		return
 	}
-	metadataForContext(context).DeclaredNamespaces = copyStringMap(namespaces)
+	metadata.DeclaredNamespaces = copyStringMap(namespaces)
 }
 
 // SetOptions records raw output options parsed from the output directive.
-func SetOptions(context evaluator.Context, options map[string]string) {
-	if context == nil || len(options) == 0 {
+func SetOptions(metadata *Metadata, options map[string]string) {
+	if metadata == nil || len(options) == 0 {
 		return
 	}
-	metadataForContext(context).Options = copyStringMap(options)
+	metadata.Options = copyStringMap(options)
 }
 
-// FormatResult formats an evaluated result using metadata stored in evalCtx.
+// FormatResult formats an evaluated result without header output metadata.
 func FormatResult(result evaluator.Value, mimeType string, evalCtx evaluator.Context) (string, error) {
+	return FormatResultWithMetadata(result, mimeType, evalCtx, Metadata{})
+}
+
+// FormatResultWithMetadata formats an evaluated result using explicit output metadata.
+func FormatResultWithMetadata(result evaluator.Value, mimeType string, evalCtx evaluator.Context, metadata Metadata) (string, error) {
 	if mimeType == "application/xml" {
-		xmlOpts, err := XMLOptionsFromContext(evalCtx)
+		xmlOpts, err := XMLOptions(evalCtx, metadata)
 		if err != nil {
 			return "", err
 		}
@@ -48,7 +51,11 @@ func FormatResult(result evaluator.Value, mimeType string, evalCtx evaluator.Con
 
 // XMLOptionsFromContext builds XML output options from centralized metadata.
 func XMLOptionsFromContext(evalCtx evaluator.Context) (formats.XMLOutputOptions, error) {
-	metadata := metadataFromContext(evalCtx)
+	return XMLOptions(evalCtx, Metadata{})
+}
+
+// XMLOptions builds XML output options from explicit metadata and namespace vars.
+func XMLOptions(evalCtx evaluator.Context, metadata Metadata) (formats.XMLOutputOptions, error) {
 	opts := formats.XMLOutputOptions{
 		DeclaredNamespaces: metadata.DeclaredNamespaces,
 		NamespaceVars:      extractNamespaceVars(evalCtx),
@@ -58,28 +65,6 @@ func XMLOptionsFromContext(evalCtx evaluator.Context) (formats.XMLOutputOptions,
 		return formats.XMLOutputOptions{}, err
 	}
 	return opts, nil
-}
-
-func metadataForContext(context evaluator.Context) *Metadata {
-	if metadata, ok := context[contextKeyMetadata].(*Metadata); ok && metadata != nil {
-		return metadata
-	}
-	metadata := &Metadata{}
-	context[contextKeyMetadata] = metadata
-	return metadata
-}
-
-func metadataFromContext(context evaluator.Context) Metadata {
-	if context == nil {
-		return Metadata{}
-	}
-	if metadata, ok := context[contextKeyMetadata].(*Metadata); ok && metadata != nil {
-		return Metadata{
-			DeclaredNamespaces: copyStringMap(metadata.DeclaredNamespaces),
-			Options:            copyStringMap(metadata.Options),
-		}
-	}
-	return Metadata{}
 }
 
 func extractNamespaceVars(context evaluator.Context) map[string]formats.Namespace {

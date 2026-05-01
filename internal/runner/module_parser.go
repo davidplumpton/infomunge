@@ -19,8 +19,9 @@ func parseModuleContentWithOptions(content string, loader *ModuleLoader, opts Ru
 	content = strings.TrimSpace(content)
 
 	ns := make(Namespace)
-	// For evaluation within the module, we need a raw map
-	rawNs := installEvaluationCapabilities(make(evaluator.Context), opts)
+	// For evaluation within the module, we need a raw map.
+	scope := installEvaluationCapabilities(evaluator.NewScope(nil), opts)
+	rawNs := scope.Vars
 	directives, err := parseModuleDirectives(content)
 	if err != nil {
 		return nil, err
@@ -43,7 +44,7 @@ func parseModuleContentWithOptions(content string, loader *ModuleLoader, opts Ru
 			}
 
 		case headerDirectiveVar:
-			val, varName, consumed, err := parseVarDeclFromLines(directive.lines, 0, directive.offset, rawNs, content)
+			val, varName, consumed, err := parseVarDeclFromLinesWithScope(directive.lines, 0, directive.offset, scope, content)
 			if err != nil {
 				return nil, withHeaderLineContext(err, content, directive.offset, directive.line)
 			}

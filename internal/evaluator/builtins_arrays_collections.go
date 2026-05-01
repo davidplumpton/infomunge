@@ -111,9 +111,9 @@ func callBuiltinSlice(args []Value, e *ast.CallExpr) (Value, error) {
 }
 
 // callBuiltinMapInternal is a helper for internal map operations
-func callBuiltinMapInternal(array Array, lambda *Lambda, context Context, depth int) (Value, error) {
+func callBuiltinMapInternal(array Array, lambda *Lambda, scope *Scope, depth int) (Value, error) {
 	result := make(Array, 0, len(array))
-	err := executeLambdaOnArrayElements(array, lambda, context, depth, func(_ Value, _ int, mappedVal Value) error {
+	err := executeLambdaOnArrayElements(array, lambda, scope, depth, func(_ Value, _ int, mappedVal Value) error {
 		result = append(result, mappedVal)
 		return nil
 	})

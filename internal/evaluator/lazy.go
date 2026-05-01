@@ -56,6 +56,14 @@ func sendErrOnce(errCh chan error, err error) {
 
 // LazyMap applies a lambda function to each element of a lazy stream, returning a new lazy stream.
 func LazyMap(input *LazyValue, lambda *Lambda, evalCtx Context) *LazyValue {
+	return LazyMapInScope(input, lambda, NewScope(evalCtx))
+}
+
+// LazyMapInScope applies a lambda using an explicit evaluation scope.
+func LazyMapInScope(input *LazyValue, lambda *Lambda, scope *Scope) *LazyValue {
+	if scope == nil {
+		scope = NewScope(nil)
+	}
 	return NewLazyValue(func(ctx context.Context) (Value, error) {
 		inputVal, err := input.GetValue()
 		if err != nil {
@@ -73,7 +81,7 @@ func LazyMap(input *LazyValue, lambda *Lambda, evalCtx Context) *LazyValue {
 			defer close(errCh)
 			for val := range inputStream {
 				// Apply lambda to the value
-				result, err := applyLambda(lambda, val, evalCtx, 0)
+				result, err := applyLambda(lambda, val, scope, 0)
 				if err != nil {
 					sendErrOnce(errCh, err)
 					for range inputStream {
@@ -96,11 +104,19 @@ func LazyMap(input *LazyValue, lambda *Lambda, evalCtx Context) *LazyValue {
 			}
 		}()
 		return &StreamWithError{Stream: output, Err: errCh}, nil
-	}, GetGoContext(evalCtx))
+	}, scope.GoContext())
 }
 
 // LazyFilter filters elements of a lazy stream using a predicate lambda, returning a new lazy stream.
 func LazyFilter(input *LazyValue, lambda *Lambda, evalCtx Context) *LazyValue {
+	return LazyFilterInScope(input, lambda, NewScope(evalCtx))
+}
+
+// LazyFilterInScope filters elements using an explicit evaluation scope.
+func LazyFilterInScope(input *LazyValue, lambda *Lambda, scope *Scope) *LazyValue {
+	if scope == nil {
+		scope = NewScope(nil)
+	}
 	return NewLazyValue(func(ctx context.Context) (Value, error) {
 		inputVal, err := input.GetValue()
 		if err != nil {
@@ -118,7 +134,7 @@ func LazyFilter(input *LazyValue, lambda *Lambda, evalCtx Context) *LazyValue {
 			defer close(errCh)
 			for val := range inputStream {
 				// Apply predicate
-				predVal, err := applyLambda(lambda, val, evalCtx, 0)
+				predVal, err := applyLambda(lambda, val, scope, 0)
 				if err != nil {
 					sendErrOnce(errCh, err)
 					for range inputStream {
@@ -151,11 +167,19 @@ func LazyFilter(input *LazyValue, lambda *Lambda, evalCtx Context) *LazyValue {
 			}
 		}()
 		return &StreamWithError{Stream: output, Err: errCh}, nil
-	}, GetGoContext(evalCtx))
+	}, scope.GoContext())
 }
 
 // LazyReduce aggregates a lazy stream using a lambda function and an initial value.
 func LazyReduce(input *LazyValue, lambda *Lambda, initial Value, evalCtx Context) *LazyValue {
+	return LazyReduceInScope(input, lambda, initial, NewScope(evalCtx))
+}
+
+// LazyReduceInScope aggregates a lazy stream using an explicit evaluation scope.
+func LazyReduceInScope(input *LazyValue, lambda *Lambda, initial Value, scope *Scope) *LazyValue {
+	if scope == nil {
+		scope = NewScope(nil)
+	}
 	return NewLazyValue(func(ctx context.Context) (Value, error) {
 		inputVal, err := input.GetValue()
 		if err != nil {
@@ -169,7 +193,7 @@ func LazyReduce(input *LazyValue, lambda *Lambda, initial Value, evalCtx Context
 		acc := initial
 		for val := range inputStream {
 			// Apply lambda(acc, val)
-			result, err := applyLambdaReduce(lambda, acc, val, evalCtx, 0)
+			result, err := applyLambdaReduce(lambda, acc, val, scope, 0)
 			if err != nil {
 				return nil, err
 			}
@@ -183,19 +207,19 @@ func LazyReduce(input *LazyValue, lambda *Lambda, initial Value, evalCtx Context
 			}
 		}
 		return acc, nil
-	}, GetGoContext(evalCtx))
+	}, scope.GoContext())
 }
 
 // applyLambda applies a lambda to a single argument.
-func applyLambda(lambda *Lambda, arg Value, ctx Context, depth int) (Value, error) {
-	return evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+func applyLambda(lambda *Lambda, arg Value, scope *Scope, depth int) (Value, error) {
+	return evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 		lambdaContext[lambda.ParamName(0)] = arg
 	})
 }
 
 // applyLambdaReduce applies a lambda to accumulator and current value for reduce.
-func applyLambdaReduce(lambda *Lambda, acc Value, val Value, ctx Context, depth int) (Value, error) {
-	return evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+func applyLambdaReduce(lambda *Lambda, acc Value, val Value, scope *Scope, depth int) (Value, error) {
+	return evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 		lambdaContext[lambda.ParamName(0)] = acc
 		lambdaContext[lambda.ParamName(1)] = val
 	})

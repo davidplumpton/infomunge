@@ -26,30 +26,31 @@ type RunnerOptions struct {
 
 const lazyFlagUnsupportedMessage = "--lazy is currently unsupported; use lazy_eval/force_eval and __toStream/__lazyMap/__lazyFilter/__lazyReduce builtins directly"
 
-func installEvaluationCapabilities(context evaluator.Context, opts RunnerOptions) evaluator.Context {
-	if context == nil {
-		context = make(evaluator.Context)
+func installEvaluationCapabilities(scope *evaluator.Scope, opts RunnerOptions) *evaluator.Scope {
+	if scope == nil {
+		scope = evaluator.NewScope(nil)
 	}
 
-	formatService, ok := evaluator.GetFormatService(context)
+	formatService, ok := scope.FormatService()
 	if opts.FormatService != nil {
 		formatService = opts.FormatService
-		context = evaluator.WithFormatService(context, formatService)
 	} else if !ok {
 		formatService = runtimeio.FormatService{}
-		context = evaluator.WithFormatService(context, formatService)
 	}
+	scope.SetFormatService(formatService)
 
 	if opts.DisableURLReadService {
-		return evaluator.WithURLReadDisabled(context)
+		scope.SetURLReadService(evaluator.DisabledURLReadService())
+		return scope
 	}
 	if opts.URLReadService != nil {
-		return evaluator.WithURLReadService(context, opts.URLReadService)
+		scope.SetURLReadService(opts.URLReadService)
+		return scope
 	}
-	if _, ok := evaluator.GetURLReadService(context); !ok {
-		context = evaluator.WithURLReadService(context, runtimeio.NewURLReadService(formatService))
+	if _, ok := scope.URLReadService(); !ok {
+		scope.SetURLReadService(runtimeio.NewURLReadService(formatService))
 	}
-	return context
+	return scope
 }
 
 // Run executes the infomunge process on the given file.
@@ -155,7 +156,7 @@ func FormatExecutionResult(result ExecutionResult) (string, error) {
 	if !resolved.HasHeader {
 		return fmt.Sprint(resolved.Value), nil
 	}
-	return output.FormatResult(resolved.Value, resolved.OutputMimeType, resolved.Context)
+	return output.FormatResultWithMetadata(resolved.Value, resolved.OutputMimeType, resolved.Context, resolved.OutputMetadata)
 }
 
 // RunString executes an infomunge script from a string with optional additional context.
@@ -173,12 +174,15 @@ func RunStringWithGoContext(goCtx context.Context, script string, additionalCont
 	return ResolveResult(result.Value)
 }
 
-// RunStringWithContextAndOptionsWithOutput executes a script and returns result plus output metadata.
+// RunStringWithContextAndOptionsWithOutput executes a script and returns the legacy
+// value/header/mime/context tuple. New callers should prefer ExecuteString* so
+// explicit output metadata is preserved.
 func RunStringWithContextAndOptionsWithOutput(script string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, evaluator.Context, error) {
 	return RunStringWithGoContextAndOptionsWithOutput(context.Background(), script, additionalContext, opts)
 }
 
-// RunStringWithGoContextAndOptionsWithOutput executes a script and returns result plus output metadata.
+// RunStringWithGoContextAndOptionsWithOutput executes a script and returns the
+// legacy value/header/mime/context tuple. New callers should prefer ExecuteString*.
 func RunStringWithGoContextAndOptionsWithOutput(goCtx context.Context, script string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, evaluator.Context, error) {
 	result, err := ExecuteStringWithGoContextAndOptions(goCtx, script, additionalContext, opts)
 	return result.Value, result.HasHeader, result.OutputMimeType, result.Context, err
@@ -197,7 +201,7 @@ func evaluateWithContext(goCtx context.Context, raw string, additionalContext ev
 }
 
 // handleOutputDecl processes output directive and captures output options.
-func handleOutputDecl(trimmedLine string, outputMimeType *string, context evaluator.Context) error {
+func handleOutputDecl(trimmedLine string, outputMimeType *string, metadata *output.Metadata) error {
 	rest := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "output "))
 	if rest == "" {
 		*outputMimeType = ""
@@ -216,17 +220,14 @@ func handleOutputDecl(trimmedLine string, outputMimeType *string, context evalua
 		return err
 	}
 	if len(parsed) > 0 {
-		output.SetOptions(context, parsed)
+		output.SetOptions(metadata, parsed)
 	}
 	return nil
 }
 
 // handleInputDecl processes input directive.
-func handleInputDecl(trimmedLine string, context evaluator.Context) {
-	inputMimeType := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "input "))
-	if inputMimeType != "" {
-		context["__input_mime__"] = inputMimeType
-	}
+func handleInputDecl(trimmedLine string) {
+	_ = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "input "))
 }
 
 func splitFirstToken(s string) (string, string) {

@@ -6,12 +6,12 @@ import (
 )
 
 // evalArrayAndLambda is a helper that extracts and validates an array and lambda
-func evalArrayAndLambda(funcName string, e *ast.CallExpr, context Context, depth int, minParams, maxParams int) (Array, *Lambda, error) {
+func evalArrayAndLambda(funcName string, e *ast.CallExpr, scope *Scope, depth int, minParams, maxParams int) (Array, *Lambda, error) {
 	if len(e.Args) != 2 {
 		return nil, nil, newPosError(fmt.Sprintf("%s requires exactly 2 arguments: array, lambda", funcName), e.Pos())
 	}
 
-	arrayVal, err := evalASTWithDepth(e.Args[0], context, depth)
+	arrayVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -34,7 +34,7 @@ func evalArrayAndLambda(funcName string, e *ast.CallExpr, context Context, depth
 		return nil, nil, newPosError(fmt.Sprintf("%s expects an array, got %T", funcName, arrayVal), e.Args[0].Pos())
 	}
 
-	lambdaVal, err := evalASTWithDepth(e.Args[1], context, depth)
+	lambdaVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -52,14 +52,14 @@ func evalArrayAndLambda(funcName string, e *ast.CallExpr, context Context, depth
 }
 
 // callBuiltinFilter implements the __filter(array, lambda) function.
-func callBuiltinFilter(e *ast.CallExpr, context Context, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("filter", e, context, depth, 1, 2)
+func callBuiltinFilter(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	array, lambda, err := evalArrayAndLambda("filter", e, scope, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(Array, 0, len(array))
-	err = executeLambdaOnArrayElements(array, lambda, context, depth, func(elem Value, _ int, condVal Value) error {
+	err = executeLambdaOnArrayElements(array, lambda, scope, depth, func(elem Value, _ int, condVal Value) error {
 		// Convert condition to boolean
 		condBool, ok := condVal.(bool)
 		if !ok {
@@ -76,15 +76,15 @@ func callBuiltinFilter(e *ast.CallExpr, context Context, depth int) (Value, erro
 }
 
 // callBuiltinTakeWhile implements the takeWhile(array, lambda) function.
-func callBuiltinTakeWhile(e *ast.CallExpr, context Context, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("takeWhile", e, context, depth, 1, 2)
+func callBuiltinTakeWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	array, lambda, err := evalArrayAndLambda("takeWhile", e, scope, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(Array, 0, len(array))
 	for i, elem := range array {
-		condVal, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+		condVal, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			lambdaContext[lambda.ParamName(0)] = elem
 			if lambda.ParamCount() > 1 {
 				lambdaContext[lambda.ParamName(1)] = i
@@ -107,8 +107,8 @@ func callBuiltinTakeWhile(e *ast.CallExpr, context Context, depth int) (Value, e
 }
 
 // callBuiltinDropWhile implements the dropWhile(array, lambda) function.
-func callBuiltinDropWhile(e *ast.CallExpr, context Context, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("dropWhile", e, context, depth, 1, 2)
+func callBuiltinDropWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	array, lambda, err := evalArrayAndLambda("dropWhile", e, scope, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func callBuiltinDropWhile(e *ast.CallExpr, context Context, depth int) (Value, e
 	result := make(Array, 0, len(array))
 	skip := true
 	for i, elem := range array {
-		condVal, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+		condVal, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			lambdaContext[lambda.ParamName(0)] = elem
 			if lambda.ParamCount() > 1 {
 				lambdaContext[lambda.ParamName(1)] = i
@@ -140,14 +140,14 @@ func callBuiltinDropWhile(e *ast.CallExpr, context Context, depth int) (Value, e
 }
 
 // callBuiltinMap implements the __map(array, lambda) function.
-func callBuiltinMap(e *ast.CallExpr, context Context, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("map", e, context, depth, 1, 2)
+func callBuiltinMap(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	array, lambda, err := evalArrayAndLambda("map", e, scope, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(Array, 0, len(array))
-	err = executeLambdaOnArrayElements(array, lambda, context, depth, func(_ Value, _ int, mappedVal Value) error {
+	err = executeLambdaOnArrayElements(array, lambda, scope, depth, func(_ Value, _ int, mappedVal Value) error {
 		result = append(result, mappedVal)
 		return nil
 	})
@@ -155,14 +155,14 @@ func callBuiltinMap(e *ast.CallExpr, context Context, depth int) (Value, error) 
 }
 
 // callBuiltinFlatMap implements the __flatMap(array, lambda) function.
-func callBuiltinFlatMap(e *ast.CallExpr, context Context, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("flatMap", e, context, depth, 1, 2)
+func callBuiltinFlatMap(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	array, lambda, err := evalArrayAndLambda("flatMap", e, scope, depth, 1, 2)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(Array, 0)
-	err = executeLambdaOnArrayElements(array, lambda, context, depth, func(_ Value, _ int, mappedVal Value) error {
+	err = executeLambdaOnArrayElements(array, lambda, scope, depth, func(_ Value, _ int, mappedVal Value) error {
 		// If the result is an array, flatten it by one level
 		if mappedArray, ok := mappedVal.(Array); ok {
 			result = append(result, mappedArray...)

@@ -62,18 +62,18 @@ var moduleDirectivePolicy = directiveParsePolicy{
 	disallowContext:    "modules",
 }
 
-func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLoader) (evaluator.Context, string, error) {
+func parseHeader(header string, hasHeader bool, fullRaw string, loader *ModuleLoader) (*evaluator.Scope, string, output.Metadata, error) {
 	return parseHeaderWithGoContext(header, hasHeader, context.Background(), fullRaw, loader)
 }
 
-func parseHeaderWithGoContext(header string, hasHeader bool, goCtx context.Context, fullRaw string, loader *ModuleLoader) (evaluator.Context, string, error) {
+func parseHeaderWithGoContext(header string, hasHeader bool, goCtx context.Context, fullRaw string, loader *ModuleLoader) (*evaluator.Scope, string, output.Metadata, error) {
 	return parseHeaderWithGoContextAndOptions(header, hasHeader, goCtx, fullRaw, loader, RunnerOptions{})
 }
 
-func parseHeaderWithGoContextAndOptions(header string, hasHeader bool, goCtx context.Context, fullRaw string, loader *ModuleLoader, opts RunnerOptions) (evaluator.Context, string, error) {
+func parseHeaderWithGoContextAndOptions(header string, hasHeader bool, goCtx context.Context, fullRaw string, loader *ModuleLoader, opts RunnerOptions) (*evaluator.Scope, string, output.Metadata, error) {
 	directives, err := parseHeaderDirectives(header, hasHeader, fullRaw)
 	if err != nil {
-		return nil, "", err
+		return nil, "", output.Metadata{}, err
 	}
 	return applyHeaderDirectivesWithOptions(directives, goCtx, fullRaw, loader, opts)
 }
@@ -194,60 +194,61 @@ func validateOutputDirective(trimmedLine string) error {
 	return err
 }
 
-func applyHeaderDirectives(directives []headerDirective, goCtx context.Context, fullRaw string, loader *ModuleLoader) (evaluator.Context, string, error) {
+func applyHeaderDirectives(directives []headerDirective, goCtx context.Context, fullRaw string, loader *ModuleLoader) (*evaluator.Scope, string, output.Metadata, error) {
 	return applyHeaderDirectivesWithOptions(directives, goCtx, fullRaw, loader, RunnerOptions{})
 }
 
-func applyHeaderDirectivesWithOptions(directives []headerDirective, goCtx context.Context, fullRaw string, loader *ModuleLoader, opts RunnerOptions) (evaluator.Context, string, error) {
-	context := installEvaluationCapabilities(make(evaluator.Context), opts)
+func applyHeaderDirectivesWithOptions(directives []headerDirective, goCtx context.Context, fullRaw string, loader *ModuleLoader, opts RunnerOptions) (*evaluator.Scope, string, output.Metadata, error) {
+	scope := installEvaluationCapabilities(evaluator.NewScope(nil).WithGoContext(goCtx), opts)
 	namespaces := make(map[string]string)
+	outputMetadata := output.Metadata{}
 	outputMimeType := "application/json"
 
 	for _, directive := range directives {
-		if err := applyHeaderDirective(directive, context, namespaces, &outputMimeType, goCtx, fullRaw, loader); err != nil {
-			return nil, "", err
+		if err := applyHeaderDirective(directive, scope, namespaces, &outputMimeType, &outputMetadata, fullRaw, loader); err != nil {
+			return nil, "", output.Metadata{}, err
 		}
 	}
 
 	if len(namespaces) > 0 {
-		output.SetDeclaredNamespaces(context, namespaces)
+		output.SetDeclaredNamespaces(&outputMetadata, namespaces)
 	}
 
-	return context, outputMimeType, nil
+	return scope, outputMimeType, outputMetadata, nil
 }
 
-func applyHeaderDirective(directive headerDirective, context evaluator.Context, namespaces map[string]string, outputMimeType *string, goCtx context.Context, fullRaw string, loader *ModuleLoader) error {
+func applyHeaderDirective(directive headerDirective, scope *evaluator.Scope, namespaces map[string]string, outputMimeType *string, outputMetadata *output.Metadata, fullRaw string, loader *ModuleLoader) error {
 	var err error
 
 	switch directive.kind {
 	case headerDirectiveVersion:
 		return nil
 	case headerDirectiveOutput:
-		err = handleOutputDecl(directive.trimmed, outputMimeType, context)
+		err = handleOutputDecl(directive.trimmed, outputMimeType, outputMetadata)
 	case headerDirectiveInput:
-		handleInputDecl(directive.trimmed, context)
+		handleInputDecl(directive.trimmed)
 	case headerDirectiveNamespace:
 		err = handleNamespaceDecl(directive.trimmed, namespaces)
 	case headerDirectiveImport:
-		err = handleImport(directive.trimmed, context, loader)
+		err = handleImport(directive.trimmed, scope.Vars, loader)
 	case headerDirectiveVar:
 		var val evaluator.Value
 		var varName string
 		var consumed int
-		val, varName, consumed, err = parseVarDeclFromLinesWithGoContext(directive.lines, 0, directive.offset, context, goCtx, fullRaw)
+		val, varName, consumed, err = parseVarDeclFromLinesWithScope(directive.lines, 0, directive.offset, scope, fullRaw)
 		if err == nil && consumed > 0 && varName != "" {
-			context[varName] = val
+			scope.Vars[varName] = val
 		}
 	case headerDirectiveFun:
 		var fnName string
 		var fn evaluator.Value
 		var consumed int
-		fn, fnName, consumed, err = parseFunDeclFromLinesWithSource(directive.lines, 0, context, fullRaw, directive.offset)
+		fn, fnName, consumed, err = parseFunDeclFromLinesWithSource(directive.lines, 0, scope.Vars, fullRaw, directive.offset)
 		if err == nil && consumed > 0 && fnName != "" {
-			context[fnName] = fn
+			scope.Vars[fnName] = fn
 		}
 	case headerDirectiveType:
-		err = handleTypeDecl(directive.trimmed, context)
+		err = handleTypeDecl(directive.trimmed, scope.Vars)
 	}
 
 	if err != nil {

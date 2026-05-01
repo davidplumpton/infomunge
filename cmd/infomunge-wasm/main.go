@@ -40,17 +40,18 @@ func runPayload(payload string) js.Value {
 	opts := runner.RunnerOptions{
 		BaseDir: ".",
 	}
-	result, _, headerOutputMimeType, evalCtx, err := runner.RunStringWithGoContextAndOptionsWithOutput(context.Background(), request.Script, evalContext, opts)
+	execution, err := runner.ExecuteStringWithGoContextAndOptions(context.Background(), request.Script, evalContext, opts)
 	if err != nil {
 		return errorResponse(err)
 	}
 
-	outputMimeType, err := handlers.ResolveOutputMimeType(request.Output, headerOutputMimeType)
+	outputMimeType, err := handlers.ResolveOutputMimeType(request.Output, execution.OutputMimeType)
 	if err != nil {
 		return errorResponse(err)
 	}
 
-	formatted, err := handlers.FormatRunResult(result, outputMimeType, evalCtx)
+	execution.OutputMimeType = outputMimeType
+	formatted, err := runner.FormatExecutionResult(execution)
 	if err != nil {
 		return errorResponse(err)
 	}

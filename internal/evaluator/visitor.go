@@ -37,15 +37,24 @@ type ASTVisitor interface {
 // DefaultVisitor provides a concrete implementation of ASTVisitor.
 // It uses recursion depth tracking to prevent stack overflow attacks.
 type DefaultVisitor struct {
-	context Context
-	depth   int
+	scope *Scope
+	depth int
 }
 
 // NewDefaultVisitor creates a new DefaultVisitor with the given context and depth.
 func NewDefaultVisitor(context Context, depth int) *DefaultVisitor {
+	return NewDefaultVisitorForScope(NewScope(context), depth)
+}
+
+// NewDefaultVisitorForScope creates a visitor with explicit runtime scope.
+func NewDefaultVisitorForScope(scope *Scope, depth int) *DefaultVisitor {
+	if scope == nil {
+		scope = NewScope(nil)
+	}
+	scope.ensure()
 	return &DefaultVisitor{
-		context: context,
-		depth:   depth,
+		scope: scope,
+		depth: depth,
 	}
 }
 
@@ -84,13 +93,13 @@ func (v *DefaultVisitor) VisitBasicLit(expr *ast.BasicLit) (Value, error) {
 
 // VisitIdent evaluates an identifier (variable reference).
 func (v *DefaultVisitor) VisitIdent(expr *ast.Ident) (Value, error) {
-	return evalIdent(expr, v.context)
+	return evalIdent(expr, v.scope.Vars)
 }
 
 // VisitBinaryExpr evaluates a binary expression by evaluating both operands
 // and applying the operator.
 func (v *DefaultVisitor) VisitBinaryExpr(expr *ast.BinaryExpr) (Value, error) {
-	childVisitor := NewDefaultVisitor(v.context, v.depth+1)
+	childVisitor := NewDefaultVisitorForScope(v.scope, v.depth+1)
 
 	left, err := childVisitor.Visit(expr.X)
 	if err != nil {
@@ -107,7 +116,7 @@ func (v *DefaultVisitor) VisitBinaryExpr(expr *ast.BinaryExpr) (Value, error) {
 
 // VisitUnaryExpr evaluates a unary expression (e.g., -x, !x).
 func (v *DefaultVisitor) VisitUnaryExpr(expr *ast.UnaryExpr) (Value, error) {
-	childVisitor := NewDefaultVisitor(v.context, v.depth+1)
+	childVisitor := NewDefaultVisitorForScope(v.scope, v.depth+1)
 
 	val, err := childVisitor.Visit(expr.X)
 	if err != nil {
@@ -119,7 +128,7 @@ func (v *DefaultVisitor) VisitUnaryExpr(expr *ast.UnaryExpr) (Value, error) {
 
 // VisitCompositeLit evaluates a composite literal (map or array).
 func (v *DefaultVisitor) VisitCompositeLit(expr *ast.CompositeLit) (Value, error) {
-	childVisitor := NewDefaultVisitor(v.context, v.depth+1)
+	childVisitor := NewDefaultVisitorForScope(v.scope, v.depth+1)
 
 	switch expr.Type.(type) {
 	case *ast.MapType:
@@ -206,13 +215,13 @@ func (v *DefaultVisitor) VisitCompositeLit(expr *ast.CompositeLit) (Value, error
 
 // VisitParenExpr evaluates a parenthesized expression by visiting its inner expression.
 func (v *DefaultVisitor) VisitParenExpr(expr *ast.ParenExpr) (Value, error) {
-	childVisitor := NewDefaultVisitor(v.context, v.depth+1)
+	childVisitor := NewDefaultVisitorForScope(v.scope, v.depth+1)
 	return childVisitor.Visit(expr.X)
 }
 
 // VisitIndexExpr evaluates an index expression (a[b]).
 func (v *DefaultVisitor) VisitIndexExpr(expr *ast.IndexExpr) (Value, error) {
-	childVisitor := NewDefaultVisitor(v.context, v.depth+1)
+	childVisitor := NewDefaultVisitorForScope(v.scope, v.depth+1)
 
 	obj, err := childVisitor.Visit(expr.X)
 	if err != nil {
@@ -229,7 +238,7 @@ func (v *DefaultVisitor) VisitIndexExpr(expr *ast.IndexExpr) (Value, error) {
 // VisitCallExpr evaluates a function call expression.
 func (v *DefaultVisitor) VisitCallExpr(expr *ast.CallExpr) (Value, error) {
 	// Increase depth for the function call
-	childVisitor := NewDefaultVisitor(v.context, v.depth+1)
+	childVisitor := NewDefaultVisitorForScope(v.scope, v.depth+1)
 	return evalCallExprWithVisitor(expr, childVisitor)
 }
 
@@ -242,7 +251,7 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 
 	// Handle special functions that need unevaluated arguments
 	if handler, ok := GetBuiltinSpecial(fun.Name); ok {
-		return handler(e, visitor.context, visitor.depth)
+		return handler(e, visitor.scope, visitor.depth)
 	}
 
 	// Helper to evaluate arguments using the visitor
@@ -268,13 +277,13 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 	}
 
 	// Check if it's a user-defined function in the context
-	if userFn, exists := visitor.context[fun.Name]; exists {
+	if userFn, exists := visitor.scope.Vars[fun.Name]; exists {
 		if lambda, ok := userFn.(*Lambda); ok {
 			args, err := evalArgs()
 			if err != nil {
 				return nil, err
 			}
-			return callUserDefinedFunctionWithVisitor(lambda, args, e, visitor.context, visitor.depth)
+			return callUserDefinedFunctionWithVisitor(lambda, args, e, visitor.scope, visitor.depth)
 		}
 	}
 
@@ -282,14 +291,14 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 }
 
 // callUserDefinedFunctionWithVisitor calls a user-defined function using lexical scope.
-func callUserDefinedFunctionWithVisitor(lambda *Lambda, args []Value, e *ast.CallExpr, callerContext Context, depth int) (Value, error) {
+func callUserDefinedFunctionWithVisitor(lambda *Lambda, args []Value, e *ast.CallExpr, caller *Scope, depth int) (Value, error) {
 	if len(args) != lambda.ParamCount() {
 		return nil, newPosError(fmt.Sprintf("function expects %d arguments, got %d", lambda.ParamCount(), len(args)), e.Pos())
 	}
 
-	fnContext := newLambdaInvocationContextWithCaller(lambda, callerContext)
+	fnScope := newLambdaInvocationScope(lambda, caller)
 	for i, param := range lambda.Params {
-		fnContext[param.Name] = args[i]
+		fnScope.Vars[param.Name] = args[i]
 	}
-	return evalASTWithDepth(lambda.BodyAST, fnContext, depth+1)
+	return evalASTInScopeWithDepth(lambda.BodyAST, fnScope, depth+1)
 }

@@ -32,12 +32,12 @@ func extractMapObjectResult(mapResult Value, pos token.Pos) (Object, bool, error
 	}
 }
 
-func evalMapObjectInputs(e *ast.CallExpr, context Context, depth int) (Object, *Lambda, error) {
+func evalMapObjectInputs(e *ast.CallExpr, scope *Scope, depth int) (Object, *Lambda, error) {
 	if len(e.Args) != 2 {
 		return nil, nil, newPosError("mapObject requires exactly 2 arguments: object, lambda", e.Pos())
 	}
 
-	objVal, err := evalASTWithDepth(e.Args[0], context, depth)
+	objVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -46,7 +46,7 @@ func evalMapObjectInputs(e *ast.CallExpr, context Context, depth int) (Object, *
 		return nil, nil, newPosError(fmt.Sprintf("mapObject expects an object, got %T", objVal), e.Args[0].Pos())
 	}
 
-	lambdaVal, err := evalASTWithDepth(e.Args[1], context, depth)
+	lambdaVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -61,7 +61,7 @@ func evalMapObjectInputs(e *ast.CallExpr, context Context, depth int) (Object, *
 	return obj, lambda, nil
 }
 
-func mapObjectLambdaContext(context Context, param0, param1 string, key string, value Value, dwOrder bool) Object {
+func mapObjectLambdaContext(param0, param1 string, key string, value Value, dwOrder bool) Object {
 	lambdaContext := make(Context)
 	if dwOrder {
 		lambdaContext[param0], lambdaContext[param1] = value, key
@@ -71,7 +71,7 @@ func mapObjectLambdaContext(context Context, param0, param1 string, key string, 
 	return lambdaContext
 }
 
-func applyMapObject(obj Object, lambda *Lambda, context Context, depth int, pos token.Pos) (Object, error) {
+func applyMapObject(obj Object, lambda *Lambda, scope *Scope, depth int, pos token.Pos) (Object, error) {
 	param0, param1 := lambda.ParamName(0), lambda.ParamName(1)
 	dwOrder := !shouldUseLegacyObjectLambdaOrder(lambda)
 	keys := sortedKeys(obj)
@@ -82,12 +82,12 @@ func applyMapObject(obj Object, lambda *Lambda, context Context, depth int, pos 
 
 		if multi, ok := value.(XMLMultiValue); ok {
 			for _, v := range multi {
-				if err := applyAndMerge(v, key, result, lambda, context, param0, param1, dwOrder, depth, pos); err != nil {
+				if err := applyAndMerge(v, key, result, lambda, scope, param0, param1, dwOrder, depth, pos); err != nil {
 					return nil, err
 				}
 			}
 		} else {
-			if err := applyAndMerge(value, key, result, lambda, context, param0, param1, dwOrder, depth, pos); err != nil {
+			if err := applyAndMerge(value, key, result, lambda, scope, param0, param1, dwOrder, depth, pos); err != nil {
 				return nil, err
 			}
 		}
@@ -96,9 +96,9 @@ func applyMapObject(obj Object, lambda *Lambda, context Context, depth int, pos 
 	return result, nil
 }
 
-func applyAndMerge(value Value, key string, result Object, lambda *Lambda, context Context, param0, param1 string, dwOrder bool, depth int, pos token.Pos) error {
-	mapResult, err := evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
-		for k, v := range mapObjectLambdaContext(context, param0, param1, key, value, dwOrder) {
+func applyAndMerge(value Value, key string, result Object, lambda *Lambda, scope *Scope, param0, param1 string, dwOrder bool, depth int, pos token.Pos) error {
+	mapResult, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+		for k, v := range mapObjectLambdaContext(param0, param1, key, value, dwOrder) {
 			lambdaContext[k] = v
 		}
 	})
@@ -149,13 +149,13 @@ func applyAndMerge(value Value, key string, result Object, lambda *Lambda, conte
 //
 //	{"a": 1, "b": 2} mapObject (value, key) -> {(upper(key)): value * 2}
 //	// Returns: {"A": 2, "B": 4}
-func callBuiltinMapObject(e *ast.CallExpr, context Context, depth int) (Value, error) {
-	obj, lambda, err := evalMapObjectInputs(e, context, depth)
+func callBuiltinMapObject(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	obj, lambda, err := evalMapObjectInputs(e, scope, depth)
 	if err != nil {
 		return nil, err
 	}
 
-	return applyMapObject(obj, lambda, context, depth, e.Args[1].Pos())
+	return applyMapObject(obj, lambda, scope, depth, e.Args[1].Pos())
 }
 
 // sortedKeys returns the keys of the map in sorted order.

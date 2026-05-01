@@ -16,14 +16,14 @@ import (
 )
 
 // callBuiltinLazyEval implements the lazy_eval(expr) function.
-func callBuiltinLazyEval(e *ast.CallExpr, evalCtx Context, depth int) (Value, error) {
+func callBuiltinLazyEval(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 1 {
 		return nil, newPosError("lazy_eval requires exactly 1 argument: expression", e.Pos())
 	}
 
 	return NewLazyValue(func(ctx context.Context) (Value, error) {
-		return evalASTWithDepth(e.Args[0], evalCtx, depth)
-	}, GetGoContext(evalCtx)), nil
+		return evalASTInScopeWithDepth(e.Args[0], scope, depth)
+	}, scope.GoContext()), nil
 }
 
 // callBuiltinForceEval implements the force_eval(lazyValue) function.
@@ -41,12 +41,12 @@ func callBuiltinForceEval(values []Value, e *ast.CallExpr) (Value, error) {
 }
 
 // callBuiltinDefault implements the __default(value, defaultValue) function.
-func callBuiltinDefault(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinDefault(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("default operator requires exactly 2 arguments: value, defaultValue", e.Pos())
 	}
 	// Evaluate the left side (the value)
-	left, err := evalASTWithDepth(e.Args[0], context, depth)
+	left, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -54,17 +54,17 @@ func callBuiltinDefault(e *ast.CallExpr, context Context, depth int) (Value, err
 	if left != nil {
 		return left, nil
 	}
-	return evalASTWithDepth(e.Args[1], context, depth)
+	return evalASTInScopeWithDepth(e.Args[1], scope, depth)
 }
 
 // callBuiltinLambdaAST implements the __lambda(paramNames, body) function.
-func callBuiltinLambdaAST(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinLambdaAST(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("lambda expression requires exactly 2 arguments: paramNames, body", e.Pos())
 	}
 
 	// Evaluate the first argument (parameter names) - should be a string literal
-	paramNamesVal, err := evalASTWithDepth(e.Args[0], context, depth)
+	paramNamesVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func callBuiltinLambdaAST(e *ast.CallExpr, context Context, depth int) (Value, e
 		Params:  params,
 		Body:    bodyStr,
 		BodyAST: bodyExpr, // Store the AST for later evaluation
-		Env:     context,
+		Env:     scope.Vars,
 	}, nil
 }
 
@@ -347,16 +347,16 @@ func exprToString(expr ast.Expr) string {
 }
 
 // callBuiltinModCall implements __modcall("Module", "func", args...) for module function calls.
-func callBuiltinModCall(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinModCall(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) < 2 {
 		return nil, newPosError("__modcall requires at least 2 arguments: module name and function name", e.Pos())
 	}
 
-	modNameVal, err := evalASTWithDepth(e.Args[0], context, depth+1)
+	modNameVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth+1)
 	if err != nil {
 		return nil, err
 	}
-	funcNameVal, err := evalASTWithDepth(e.Args[1], context, depth+1)
+	funcNameVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth+1)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +367,7 @@ func callBuiltinModCall(e *ast.CallExpr, context Context, depth int) (Value, err
 		return nil, newPosError("__modcall requires string module and function names", e.Pos())
 	}
 
-	modVal, ok := context[modName]
+	modVal, ok := scope.Vars[modName]
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("module %q not found", modName), e.Pos())
 	}
@@ -389,19 +389,19 @@ func callBuiltinModCall(e *ast.CallExpr, context Context, depth int) (Value, err
 
 	args := make([]Value, 0, len(e.Args)-2)
 	for _, argExpr := range e.Args[2:] {
-		v, err := evalASTWithDepth(argExpr, context, depth+1)
+		v, err := evalASTInScopeWithDepth(argExpr, scope, depth+1)
 		if err != nil {
 			return nil, err
 		}
 		args = append(args, v)
 	}
 
-	return callUserLambda(l, args, depth+1)
+	return callUserLambda(l, args, scope, depth+1)
 }
 
 // callUserLambda invokes a user-defined Lambda with the given arguments.
-func callUserLambda(l *Lambda, args []Value, depth int) (Value, error) {
-	return evalLambdaWithBindingsAtDepth(l, depth, func(base Context) {
+func callUserLambda(l *Lambda, args []Value, caller *Scope, depth int) (Value, error) {
+	return evalLambdaWithBindingsAtDepth(l, caller, depth, func(base Context) {
 		for i, param := range l.Params {
 			if i < len(args) {
 				base[param.Name] = args[i]
@@ -410,12 +410,12 @@ func callUserLambda(l *Lambda, args []Value, depth int) (Value, error) {
 	})
 }
 
-func callBuiltinCoerce(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinCoerce(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) < 2 || len(e.Args) > 3 {
 		return nil, newPosError("as operator requires 2 or 3 arguments: value, type[, config]", e.Pos())
 	}
 
-	value, err := evalASTWithDepth(e.Args[0], context, depth)
+	value, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +437,7 @@ func callBuiltinCoerce(e *ast.CallExpr, context Context, depth int) (Value, erro
 		typeName = unquoted
 
 	default:
-		v, err := evalASTWithDepth(e.Args[1], context, depth)
+		v, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 		if err != nil {
 			return nil, err
 		}
@@ -450,7 +450,7 @@ func callBuiltinCoerce(e *ast.CallExpr, context Context, depth int) (Value, erro
 
 	var properties Object
 	if len(e.Args) == 3 {
-		propsVal, err := evalASTWithDepth(e.Args[2], context, depth)
+		propsVal, err := evalASTInScopeWithDepth(e.Args[2], scope, depth)
 		if err != nil {
 			return nil, err
 		}
@@ -467,15 +467,15 @@ func callBuiltinCoerce(e *ast.CallExpr, context Context, depth int) (Value, erro
 		}
 	}
 
-	return coerceToTypeWithVisited(value, typeName, context, e.Args[1].Pos(), nil, properties)
+	return coerceToTypeWithVisited(value, typeName, scope.Vars, e.Args[1].Pos(), nil, properties)
 }
 
-func callBuiltinCase(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinCase(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("__case requires exactly 2 arguments: value, cases", e.Pos())
 	}
 
-	val, err := evalASTWithDepth(e.Args[0], context, depth)
+	val, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -527,14 +527,14 @@ func callBuiltinCase(e *ast.CallExpr, context Context, depth int) (Value, error)
 		}
 
 		// Check if pattern matches
-		matchContext := copyContext(context)
-		matched, matchFound, err := matchPattern(val, patternStr, matchContext, e.Pos())
+		matchContext := copyContext(scope.Vars)
+		matched, matchFound, err := matchPattern(val, patternStr, matchContext, scope, e.Pos())
 		if err != nil {
 			return nil, err
 		}
 
 		if matchFound {
-			return evalASTWithDepth(resultAST, matched, depth+1)
+			return evalASTInScopeWithDepth(resultAST, NewScopeWithRuntime(matched, scope.Runtime), depth+1)
 		}
 	}
 
@@ -588,12 +588,12 @@ func matchTypePattern(val Value, pattern string, context Context) (Context, bool
 }
 
 // evaluateIfCondition evaluates the guard condition in a pattern match.
-func evaluateIfCondition(condStr string, matchContext Context, pos token.Pos) (bool, error) {
+func evaluateIfCondition(condStr string, matchContext Context, caller *Scope, pos token.Pos) (bool, error) {
 	condAST, err := goparser.ParseExpr(condStr)
 	if err != nil {
 		return false, newPosError(fmt.Sprintf("invalid case condition: %v", err), pos)
 	}
-	condVal, err := evalASTWithDepth(condAST, matchContext, 0)
+	condVal, err := evalASTInScopeWithDepth(condAST, NewScopeWithRuntime(matchContext, caller.Runtime), 0)
 	if err != nil {
 		return false, err
 	}
@@ -604,7 +604,7 @@ func evaluateIfCondition(condStr string, matchContext Context, pos token.Pos) (b
 	return condBool, nil
 }
 
-func matchPattern(val Value, patternStr string, context Context, pos token.Pos) (Context, bool, error) {
+func matchPattern(val Value, patternStr string, context Context, caller *Scope, pos token.Pos) (Context, bool, error) {
 	if patternStr == "else" {
 		return context, true, nil
 	}
@@ -644,7 +644,7 @@ func matchPattern(val Value, patternStr string, context Context, pos token.Pos) 
 
 	// Evaluate 'if' condition if present
 	if len(ifParts) > 1 {
-		condOk, err := evaluateIfCondition(strings.TrimSpace(ifParts[1]), matchContext, pos)
+		condOk, err := evaluateIfCondition(strings.TrimSpace(ifParts[1]), matchContext, caller, pos)
 		if err != nil {
 			return nil, false, err
 		}
@@ -681,13 +681,13 @@ func isSimpleIdentifier(s string) bool {
 	return true
 }
 
-func callBuiltinOnNull(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinOnNull(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("onNull requires exactly 2 arguments: value, lambda", e.Pos())
 	}
 
 	// Evaluate the value argument
-	value, err := evalASTWithDepth(e.Args[0], context, depth)
+	value, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -698,7 +698,7 @@ func callBuiltinOnNull(e *ast.CallExpr, context Context, depth int) (Value, erro
 	}
 
 	// Evaluate the lambda argument to get the lambda function
-	lambdaVal, err := evalASTWithDepth(e.Args[1], context, depth)
+	lambdaVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -714,16 +714,16 @@ func callBuiltinOnNull(e *ast.CallExpr, context Context, depth int) (Value, erro
 	}
 
 	// Execute the lambda with a clean context
-	return evalLambdaWithBindingsAtDepth(lambda, depth+1, nil)
+	return evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, nil)
 }
 
-func callBuiltinThen(e *ast.CallExpr, context Context, depth int) (Value, error) {
+func callBuiltinThen(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) != 2 {
 		return nil, newPosError("then requires exactly 2 arguments: value, lambda", e.Pos())
 	}
 
 	// Evaluate the value argument
-	value, err := evalASTWithDepth(e.Args[0], context, depth)
+	value, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -734,7 +734,7 @@ func callBuiltinThen(e *ast.CallExpr, context Context, depth int) (Value, error)
 	}
 
 	// Evaluate the lambda argument to get the lambda function
-	lambdaVal, err := evalASTWithDepth(e.Args[1], context, depth)
+	lambdaVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		return nil, err
 	}
@@ -750,7 +750,7 @@ func callBuiltinThen(e *ast.CallExpr, context Context, depth int) (Value, error)
 	}
 
 	// Execute the lambda with the value as parameter
-	return evalLambdaWithBindingsAtDepth(lambda, depth+1, func(lambdaContext Context) {
+	return evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 		lambdaContext[lambda.ParamName(0)] = value
 	})
 }
