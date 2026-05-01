@@ -24,11 +24,12 @@ const (
 
 // Runtime carries non-user execution capabilities for evaluation.
 type Runtime struct {
-	GoContext      context.Context
-	Deadline       time.Time
-	HasDeadline    bool
-	FormatService  FormatService
-	URLReadService URLReadService
+	GoContext          context.Context
+	Deadline           time.Time
+	HasDeadline        bool
+	FormatService      FormatService
+	URLReadService     URLReadService
+	ExpressionCompiler ExpressionCompiler
 }
 
 // Scope separates user/module variables from runtime capabilities.
@@ -118,6 +119,26 @@ func (s *Scope) GoContext() context.Context {
 		return context.Background()
 	}
 	return s.Runtime.GoContext
+}
+
+// SetExpressionCompiler sets the compiler used by nested runtime constructs
+// such as do blocks and update cases.
+func (s *Scope) SetExpressionCompiler(compiler ExpressionCompiler) *Scope {
+	if s == nil {
+		s = NewScope(nil)
+	}
+	s.ensure()
+	s.Runtime.ExpressionCompiler = compiler
+	return s
+}
+
+// ExpressionCompiler returns the configured compiler or a parser-only fallback
+// for direct evaluator tests that pass already rewritten expressions.
+func (s *Scope) ExpressionCompiler() ExpressionCompiler {
+	if s == nil || s.Runtime.ExpressionCompiler == nil {
+		return parseExpressionCompiler{}
+	}
+	return s.Runtime.ExpressionCompiler
 }
 
 // LoopDeadline returns the active evaluation deadline or the default loop timeout.

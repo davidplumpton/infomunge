@@ -3,13 +3,11 @@ package evaluator
 import (
 	"fmt"
 	"go/ast"
-	goparser "go/parser"
 	"go/token"
 	"strconv"
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
-	"infomunge/internal/preprocessor"
 )
 
 // callBuiltinUpdateExpr implements the __updateExpr(value, casesString) function.
@@ -117,14 +115,9 @@ func applyUpdateCase(value Value, varName, selector, expression string, scope *S
 	localScope := scope.Copy()
 	localScope.Vars[varName] = currentValue
 
-	// Evaluate the expression in the local context
-	preparedExpr, _, err := preprocessor.PrepareForParsing(expression, preprocessor.Options{})
+	parsedExpr, err := compileExpressionInScope(scope, expression)
 	if err != nil {
-		return nil, unifiederrors.EvalErrorf("preprocessing error in update case expression: %s", err)
-	}
-	parsedExpr, err := goparser.ParseExpr(preparedExpr)
-	if err != nil {
-		return nil, unifiederrors.EvalErrorf("parse error in update case expression: %s", err)
+		return nil, unifiederrors.EvalErrorf("compile error in update case expression: %s", err)
 	}
 
 	newValue, err := evalASTInScopeWithDepth(parsedExpr, localScope, depth+1)

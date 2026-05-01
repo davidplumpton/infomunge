@@ -3,13 +3,11 @@ package evaluator
 import (
 	"fmt"
 	"go/ast"
-	goparser "go/parser"
 	"go/token"
 	"strconv"
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
-	"infomunge/internal/preprocessor"
 )
 
 // callBuiltinAssign implements the __assign(varName, value) function.
@@ -78,14 +76,9 @@ func callBuiltinDo(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 		return nil, newPosError(err.Error(), e.Args[0].Pos())
 	}
 
-	// Preprocess and evaluate the expression in the local context
-	preparedExpr, _, err := preprocessor.PrepareForParsing(exprStr, preprocessor.Options{})
+	parsedExpr, err := compileExpressionInScope(scope, exprStr)
 	if err != nil {
-		return nil, newPosError(fmt.Sprintf("preprocessing error in do expression: %s", err), e.Args[1].Pos())
-	}
-	parsedExpr, err := goparser.ParseExpr(preparedExpr)
-	if err != nil {
-		return nil, newPosError(fmt.Sprintf("parse error in do expression: %s", err), e.Args[1].Pos())
+		return nil, newPosError(fmt.Sprintf("compile error in do expression: %s", err), e.Args[1].Pos())
 	}
 
 	return evalASTInScopeWithDepth(parsedExpr, localScope, depth+1)
@@ -105,13 +98,9 @@ func parseVarDeclaration(line string, scope *Scope, depth int) error {
 	}
 	exprStr := strings.TrimSpace(parts[1])
 
-	preparedExpr, _, err := preprocessor.PrepareForParsing(exprStr, preprocessor.Options{})
+	parsedExpr, err := compileExpressionInScope(scope, exprStr)
 	if err != nil {
-		return unifiederrors.EvalErrorf("preprocessing error in var declaration '%s': %s", varName, err)
-	}
-	parsedExpr, err := goparser.ParseExpr(preparedExpr)
-	if err != nil {
-		return unifiederrors.EvalErrorf("parse error in var declaration '%s': %s", varName, err)
+		return unifiederrors.EvalErrorf("compile error in var declaration '%s': %s", varName, err)
 	}
 	value, err := evalASTInScopeWithDepth(parsedExpr, scope, depth+1)
 	if err != nil {
@@ -123,7 +112,7 @@ func parseVarDeclaration(line string, scope *Scope, depth int) error {
 
 // parseFunDeclaration parses a fun declaration and adds it to the context.
 // Format: fun name(params) = body
-func parseFunDeclaration(line string, context Context) error {
+func parseFunDeclaration(line string, scope *Scope) error {
 	rest := strings.TrimPrefix(line, "fun ")
 
 	parenIdx := strings.Index(rest, "(")
@@ -148,20 +137,16 @@ func parseFunDeclaration(line string, context Context) error {
 	}
 	bodyStr := strings.TrimSpace(rest[closeParenIdx+eqIdx+1:])
 
-	preparedBody, _, err := preprocessor.PrepareForParsing(bodyStr, preprocessor.Options{})
+	parsedBody, err := compileExpressionInScope(scope, bodyStr)
 	if err != nil {
-		return unifiederrors.EvalErrorf("preprocessing error in fun declaration '%s': %s", funName, err)
-	}
-	parsedBody, err := goparser.ParseExpr(preparedBody)
-	if err != nil {
-		return unifiederrors.EvalErrorf("parse error in fun declaration '%s': %s", funName, err)
+		return unifiederrors.EvalErrorf("compile error in fun declaration '%s': %s", funName, err)
 	}
 
-	context[funName] = &Lambda{
+	scope.Vars[funName] = &Lambda{
 		Params:  params,
 		Body:    bodyStr,
 		BodyAST: parsedBody,
-		Env:     context,
+		Env:     scope.Vars,
 	}
 	return nil
 }
@@ -195,7 +180,7 @@ func parseDoDeclarations(declsStr string, scope *Scope, depth int) error {
 				return err
 			}
 		case strings.HasPrefix(trimmed, "fun "):
-			if err := parseFunDeclaration(trimmed, scope.Vars); err != nil {
+			if err := parseFunDeclaration(trimmed, scope); err != nil {
 				return err
 			}
 		default:

@@ -193,3 +193,21 @@ Feature: Update Expression
       """
       {"a":2}
       """
+
+  Scenario: Update case inside do block uses the shared nested expression compiler
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      do {
+        var base = {a: 1}
+        ---
+        base update {case x at .a -> if (x == 1) x + 1 else 0}
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"a":2}
+      """

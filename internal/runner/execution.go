@@ -8,7 +8,6 @@ import (
 	"infomunge/internal/preprocessor"
 	"infomunge/internal/sourcemap"
 	"os"
-	"strings"
 )
 
 // ExecutionResult is the structured result of evaluating a script.
@@ -73,12 +72,9 @@ func executeWithConfig(goCtx context.Context, raw string, additionalContext eval
 		evalScope.Vars[k] = v
 	}
 	evalScope = installEvaluationCapabilities(evalScope, opts)
+	evalScope.SetExpressionCompiler(expressionCompiler{})
 
-	prepOpts := preprocessor.Options{}
-	if strings.ContainsAny(body, "\n\r") {
-		prepOpts.AllowMultilineIfElse = true
-	}
-	parseableExpr, mapping, err := preprocessor.PrepareForParsing(body, prepOpts)
+	parseableExpr, mapping, err := prepareExpressionForParsing(body)
 	if err != nil {
 		return ExecutionResult{HasHeader: hasHeader, OutputMimeType: outputMimeType, Context: evalScope.Vars, OutputMetadata: outputMetadata}, err
 	}

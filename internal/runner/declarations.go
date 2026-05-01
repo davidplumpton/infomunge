@@ -45,7 +45,7 @@ func parseVarDeclWithScope(line, trimmedLine string, baseOffset int, scope *eval
 		return nil, "", unifiederrors.ParseErrorf("invalid variable declaration: missing expression for %q", varName)
 	}
 
-	parseableVal, mapping, err := preprocessor.PrepareForParsing(exprStr, preprocessor.Options{})
+	parseableVal, mapping, err := prepareExpressionForParsing(exprStr)
 	if err != nil {
 		return nil, "", unifiederrors.WrapParsef(err, "preprocessing error in variable declaration: %v", err)
 	}
@@ -118,7 +118,7 @@ func parseVarDeclFromLinesWithScope(lines []string, start int, baseOffset int, s
 		return nil, "", 0, nil
 	}
 
-	parseableVal, mapping, err := preprocessor.PrepareForParsing(spec.exprStr, preprocessor.Options{})
+	parseableVal, mapping, err := prepareExpressionForParsing(spec.exprStr)
 	if err != nil {
 		return nil, "", spec.consumed, unifiederrors.WrapParsef(err, "preprocessing error in variable declaration: %v", err)
 	}
@@ -148,7 +148,7 @@ func evaluateVarDeclaration(decl *VarDeclaration, source DeclarationSource, scop
 		return nil, unifiederrors.ParseErrorf("invalid variable declaration: missing expression for %q", decl.Name)
 	}
 
-	parseableVal, mapping, err := preprocessor.PrepareForParsing(decl.Expression, preprocessor.Options{})
+	parseableVal, mapping, err := prepareExpressionForParsing(decl.Expression)
 	if err != nil {
 		return nil, unifiederrors.WrapParsef(err, "preprocessing error in variable declaration: %v", err)
 	}
@@ -181,11 +181,7 @@ func buildFunLambda(params []evaluator.ParamDef, bodyStr string, env evaluator.C
 		return nil, unifiederrors.ParseError("invalid function declaration: empty body")
 	}
 
-	prepOpts := preprocessor.Options{}
-	if strings.ContainsAny(bodyStr, "\n\r") {
-		prepOpts.AllowMultilineIfElse = true
-	}
-	parseableBody, mapping, err := preprocessor.PrepareForParsing(bodyStr, prepOpts)
+	parseableBody, mapping, err := prepareExpressionForParsing(bodyStr)
 	if err != nil {
 		return nil, unifiederrors.WrapParse(err, "preprocessing error in function body")
 	}
