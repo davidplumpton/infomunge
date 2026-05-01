@@ -9,27 +9,6 @@ import (
 	"infomunge/internal/output"
 )
 
-type headerDirectiveKind string
-
-const (
-	headerDirectiveVersion   headerDirectiveKind = "version"
-	headerDirectiveOutput    headerDirectiveKind = "output"
-	headerDirectiveInput     headerDirectiveKind = "input"
-	headerDirectiveNamespace headerDirectiveKind = "namespace"
-	headerDirectiveImport    headerDirectiveKind = "import"
-	headerDirectiveVar       headerDirectiveKind = "var"
-	headerDirectiveFun       headerDirectiveKind = "fun"
-	headerDirectiveType      headerDirectiveKind = "type"
-)
-
-type headerDirective struct {
-	kind    headerDirectiveKind
-	line    string
-	lines   []string
-	trimmed string
-	offset  int
-}
-
 type directiveParsePolicy struct {
 	allowedKinds       map[headerDirectiveKind]bool
 	bodySeparatorError string
@@ -71,36 +50,36 @@ func parseHeaderWithGoContext(header string, hasHeader bool, goCtx context.Conte
 }
 
 func parseHeaderWithGoContextAndOptions(header string, hasHeader bool, goCtx context.Context, fullRaw string, loader *ModuleLoader, opts RunnerOptions) (*evaluator.Scope, string, output.Metadata, error) {
-	directives, err := parseHeaderDirectives(header, hasHeader, fullRaw)
+	declarations, err := parseHeaderDirectives(header, hasHeader, fullRaw)
 	if err != nil {
 		return nil, "", output.Metadata{}, err
 	}
-	return applyHeaderDirectivesWithOptions(directives, goCtx, fullRaw, loader, opts)
+	return applyHeaderDirectivesWithOptions(declarations, goCtx, fullRaw, loader, opts)
 }
 
-func parseHeaderDirectives(header string, hasHeader bool, fullRaw string) ([]headerDirective, error) {
+func parseHeaderDirectives(header string, hasHeader bool, fullRaw string) ([]Declaration, error) {
 	if !hasHeader {
 		return nil, nil
 	}
 	return parseDirectives(header, fullRaw, scriptHeaderDirectivePolicy)
 }
 
-func parseModuleDirectives(content string) ([]headerDirective, error) {
+func parseModuleDirectives(content string) ([]Declaration, error) {
 	return parseDirectives(content, content, moduleDirectivePolicy)
 }
 
-func parseDirectives(source string, fullRaw string, policy directiveParsePolicy) ([]headerDirective, error) {
+func parseDirectives(source string, fullRaw string, policy directiveParsePolicy) ([]Declaration, error) {
 	lines := normalizeHeaderLines(source)
-	directives := make([]headerDirective, 0, len(lines))
+	declarations := make([]Declaration, 0, len(lines))
 	headerOffset := 0
 
 	for i := 0; i < len(lines); {
-		directive, consumed, err := parseDirective(lines, i, headerOffset, fullRaw, policy)
+		declaration, consumed, err := parseDirective(lines, i, headerOffset, fullRaw, policy)
 		if err != nil {
 			return nil, err
 		}
-		if directive != nil {
-			directives = append(directives, *directive)
+		if declaration != nil {
+			declarations = append(declarations, *declaration)
 		}
 		for j := 0; j < consumed; j++ {
 			headerOffset += len(lines[i+j]) + 1
@@ -108,14 +87,14 @@ func parseDirectives(source string, fullRaw string, policy directiveParsePolicy)
 		i += consumed
 	}
 
-	return directives, nil
+	return declarations, nil
 }
 
-func parseHeaderDirective(lines []string, index int, headerOffset int, fullRaw string) (*headerDirective, int, error) {
+func parseHeaderDirective(lines []string, index int, headerOffset int, fullRaw string) (*Declaration, int, error) {
 	return parseDirective(lines, index, headerOffset, fullRaw, scriptHeaderDirectivePolicy)
 }
 
-func parseDirective(lines []string, index int, headerOffset int, fullRaw string, policy directiveParsePolicy) (*headerDirective, int, error) {
+func parseDirective(lines []string, index int, headerOffset int, fullRaw string, policy directiveParsePolicy) (*Declaration, int, error) {
 	line := lines[index]
 	trimmed := strings.TrimSpace(line)
 	if trimmed == "" || strings.HasPrefix(trimmed, "//") {
@@ -126,18 +105,19 @@ func parseDirective(lines []string, index int, headerOffset int, fullRaw string,
 		return nil, 0, withHeaderLineContext(unifiederrors.ParseError(policy.bodySeparatorError), fullRaw, headerOffset, line)
 	}
 
-	newDirective := func(kind headerDirectiveKind, consumed int) (*headerDirective, int, error) {
+	newDeclaration := func(kind headerDirectiveKind, consumed int, fill func(*Declaration)) (*Declaration, int, error) {
 		if !policy.allowedKinds[kind] {
 			err := unifiederrors.ParseErrorf("%s directive is not allowed in %s", kind, policy.disallowContext)
 			return nil, 0, withHeaderLineContext(err, fullRaw, headerOffset, line)
 		}
-		return &headerDirective{
-			kind:    kind,
-			line:    line,
-			lines:   append([]string(nil), lines[index:index+consumed]...),
-			trimmed: trimmed,
-			offset:  headerOffset,
-		}, consumed, nil
+		declaration := &Declaration{
+			Kind:   kind,
+			Source: newDeclarationSource(lines, index, consumed, headerOffset),
+		}
+		if fill != nil {
+			fill(declaration)
+		}
+		return declaration, consumed, nil
 	}
 
 	switch {
@@ -145,35 +125,57 @@ func parseDirective(lines []string, index int, headerOffset int, fullRaw string,
 		if err := validateOutputDirective(trimmed); err != nil {
 			return nil, 0, withHeaderLineContext(err, fullRaw, headerOffset, line)
 		}
-		return newDirective(headerDirectiveOutput, 1)
+		outputDecl := parseOutputDeclaration(trimmed)
+		return newDeclaration(headerDirectiveOutput, 1, func(declaration *Declaration) {
+			declaration.Output = &outputDecl
+		})
 	case strings.HasPrefix(trimmed, "input "):
-		return newDirective(headerDirectiveInput, 1)
+		inputDecl := InputDeclaration{Text: strings.TrimSpace(strings.TrimPrefix(trimmed, "input "))}
+		return newDeclaration(headerDirectiveInput, 1, func(declaration *Declaration) {
+			declaration.Input = &inputDecl
+		})
 	case strings.HasPrefix(trimmed, "%dw "), strings.HasPrefix(trimmed, "%im "):
-		return newDirective(headerDirectiveVersion, 1)
+		versionDecl := VersionDeclaration{Text: trimmed}
+		return newDeclaration(headerDirectiveVersion, 1, func(declaration *Declaration) {
+			declaration.Version = &versionDecl
+		})
 	case strings.HasPrefix(trimmed, "ns "):
-		if _, _, err := parseNamespaceDecl(trimmed); err != nil {
+		namespaceDecl, err := parseNamespaceDeclaration(trimmed)
+		if err != nil {
 			return nil, 0, withHeaderLineContext(err, fullRaw, headerOffset, line)
 		}
-		return newDirective(headerDirectiveNamespace, 1)
+		return newDeclaration(headerDirectiveNamespace, 1, func(declaration *Declaration) {
+			declaration.Namespace = namespaceDecl
+		})
 	case strings.HasPrefix(trimmed, "import "):
-		return newDirective(headerDirectiveImport, 1)
+		importDecl := parseImportDeclaration(trimmed)
+		return newDeclaration(headerDirectiveImport, 1, func(declaration *Declaration) {
+			declaration.Import = &importDecl
+		})
 	case strings.HasPrefix(trimmed, "var "):
-		spec, err := parseVarDeclSource(lines, index)
+		varDecl, consumed, err := parseVarDeclarationFromLines(lines, index)
 		if err != nil {
 			return nil, 0, withHeaderLineContext(err, fullRaw, headerOffset, line)
 		}
-		return newDirective(headerDirectiveVar, spec.consumed)
+		return newDeclaration(headerDirectiveVar, consumed, func(declaration *Declaration) {
+			declaration.Var = varDecl
+		})
 	case strings.HasPrefix(trimmed, "fun "):
-		spec, err := parseFunDeclSource(lines, index)
+		functionDecl, consumed, err := parseFunctionDeclarationFromLines(lines, index)
 		if err != nil {
 			return nil, 0, withHeaderLineContext(err, fullRaw, headerOffset, line)
 		}
-		return newDirective(headerDirectiveFun, spec.consumed)
+		return newDeclaration(headerDirectiveFun, consumed, func(declaration *Declaration) {
+			declaration.Function = functionDecl
+		})
 	case strings.HasPrefix(trimmed, "type "):
-		if _, _, err := parseTypeDecl(trimmed); err != nil {
+		typeDecl, err := parseTypeDeclaration(trimmed)
+		if err != nil {
 			return nil, 0, withHeaderLineContext(err, fullRaw, headerOffset, line)
 		}
-		return newDirective(headerDirectiveType, 1)
+		return newDeclaration(headerDirectiveType, 1, func(declaration *Declaration) {
+			declaration.Type = typeDecl
+		})
 	default:
 		return nil, 0, withHeaderLineContext(unifiederrors.ParseErrorf("unrecognized header directive: %s", trimmed), fullRaw, headerOffset, line)
 	}
@@ -194,18 +196,18 @@ func validateOutputDirective(trimmedLine string) error {
 	return err
 }
 
-func applyHeaderDirectives(directives []headerDirective, goCtx context.Context, fullRaw string, loader *ModuleLoader) (*evaluator.Scope, string, output.Metadata, error) {
-	return applyHeaderDirectivesWithOptions(directives, goCtx, fullRaw, loader, RunnerOptions{})
+func applyHeaderDirectives(declarations []Declaration, goCtx context.Context, fullRaw string, loader *ModuleLoader) (*evaluator.Scope, string, output.Metadata, error) {
+	return applyHeaderDirectivesWithOptions(declarations, goCtx, fullRaw, loader, RunnerOptions{})
 }
 
-func applyHeaderDirectivesWithOptions(directives []headerDirective, goCtx context.Context, fullRaw string, loader *ModuleLoader, opts RunnerOptions) (*evaluator.Scope, string, output.Metadata, error) {
+func applyHeaderDirectivesWithOptions(declarations []Declaration, goCtx context.Context, fullRaw string, loader *ModuleLoader, opts RunnerOptions) (*evaluator.Scope, string, output.Metadata, error) {
 	scope := installEvaluationCapabilities(evaluator.NewScope(nil).WithGoContext(goCtx), opts)
 	namespaces := make(map[string]string)
 	outputMetadata := output.Metadata{}
 	outputMimeType := "application/json"
 
-	for _, directive := range directives {
-		if err := applyHeaderDirective(directive, scope, namespaces, &outputMimeType, &outputMetadata, fullRaw, loader); err != nil {
+	for _, declaration := range declarations {
+		if err := applyHeaderDirective(declaration, scope, namespaces, &outputMimeType, &outputMetadata, fullRaw, loader); err != nil {
 			return nil, "", output.Metadata{}, err
 		}
 	}
@@ -217,42 +219,38 @@ func applyHeaderDirectivesWithOptions(directives []headerDirective, goCtx contex
 	return scope, outputMimeType, outputMetadata, nil
 }
 
-func applyHeaderDirective(directive headerDirective, scope *evaluator.Scope, namespaces map[string]string, outputMimeType *string, outputMetadata *output.Metadata, fullRaw string, loader *ModuleLoader) error {
+func applyHeaderDirective(declaration Declaration, scope *evaluator.Scope, namespaces map[string]string, outputMimeType *string, outputMetadata *output.Metadata, fullRaw string, loader *ModuleLoader) error {
 	var err error
 
-	switch directive.kind {
+	switch declaration.Kind {
 	case headerDirectiveVersion:
 		return nil
 	case headerDirectiveOutput:
-		err = handleOutputDecl(directive.trimmed, outputMimeType, outputMetadata)
+		err = applyOutputDeclaration(declaration.Output, outputMimeType, outputMetadata)
 	case headerDirectiveInput:
-		handleInputDecl(directive.trimmed)
+		applyInputDeclaration(declaration.Input)
 	case headerDirectiveNamespace:
-		err = handleNamespaceDecl(directive.trimmed, namespaces)
+		err = applyNamespaceDeclaration(declaration.Namespace, namespaces)
 	case headerDirectiveImport:
-		err = handleImport(directive.trimmed, scope.Vars, loader)
+		err = applyImportDeclaration(declaration.Import, scope.Vars, loader)
 	case headerDirectiveVar:
 		var val evaluator.Value
-		var varName string
-		var consumed int
-		val, varName, consumed, err = parseVarDeclFromLinesWithScope(directive.lines, 0, directive.offset, scope, fullRaw)
-		if err == nil && consumed > 0 && varName != "" {
-			scope.Vars[varName] = val
+		val, err = evaluateVarDeclaration(declaration.Var, declaration.Source, scope, fullRaw)
+		if err == nil && declaration.Var != nil && declaration.Var.Name != "" {
+			scope.Vars[declaration.Var.Name] = val
 		}
 	case headerDirectiveFun:
-		var fnName string
 		var fn evaluator.Value
-		var consumed int
-		fn, fnName, consumed, err = parseFunDeclFromLinesWithSource(directive.lines, 0, scope.Vars, fullRaw, directive.offset)
-		if err == nil && consumed > 0 && fnName != "" {
-			scope.Vars[fnName] = fn
+		fn, err = buildFunctionDeclaration(declaration.Function, declaration.Source, scope.Vars, fullRaw)
+		if err == nil && declaration.Function != nil && declaration.Function.Name != "" {
+			scope.Vars[declaration.Function.Name] = fn
 		}
 	case headerDirectiveType:
-		err = handleTypeDecl(directive.trimmed, scope.Vars)
+		err = applyTypeDeclaration(declaration.Type, scope.Vars)
 	}
 
 	if err != nil {
-		return withHeaderLineContext(err, fullRaw, directive.offset, directive.line)
+		return withHeaderLineContext(err, fullRaw, declaration.Source.Offset, declaration.Source.Line)
 	}
 	return nil
 }

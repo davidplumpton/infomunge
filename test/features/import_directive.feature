@@ -157,6 +157,31 @@ Feature: Import Directive
       {"module":35,"script":35}
       """
 
+  Scenario: Shared declaration parsing binds script and module declarations
+    Given a file named "modules/SharedDeclarationIR.im" with content:
+      """
+      %im 0.1
+      type Label = String
+      var modulePrefix = "module"
+      fun moduleLabel(label) = modulePrefix ++ ":" ++ (label as Label)
+      """
+    And the following input content:
+      """
+      %im 0.1
+      import modules::SharedDeclarationIR
+      type Label = String
+      var scriptPrefix = "script"
+      fun scriptLabel(label) = scriptPrefix ++ ":" ++ (label as Label)
+      output application/json
+      ---
+      {script: scriptLabel("ok"), module: SharedDeclarationIR::moduleLabel("ok")}
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"module":"module:ok","script":"script:ok"}
+      """
+
   Scenario: Import module variable with star
     Given the following input content:
       """

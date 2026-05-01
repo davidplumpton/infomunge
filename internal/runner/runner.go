@@ -179,20 +179,26 @@ func RunStringWithGoContext(goCtx context.Context, script string, additionalCont
 
 // handleOutputDecl processes output directive and captures output options.
 func handleOutputDecl(trimmedLine string, outputMimeType *string, metadata *output.Metadata) error {
-	rest := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "output "))
-	if rest == "" {
+	decl := parseOutputDeclaration(trimmedLine)
+	return applyOutputDeclaration(&decl, outputMimeType, metadata)
+}
+
+func applyOutputDeclaration(decl *OutputDeclaration, outputMimeType *string, metadata *output.Metadata) error {
+	if decl == nil {
+		return unifiederrors.InternalError("internal error: missing output declaration")
+	}
+	if decl.MimeType == "" {
 		*outputMimeType = ""
 		return nil
 	}
 
-	mimeType, options := splitFirstToken(rest)
-	*outputMimeType = mimeType
+	*outputMimeType = decl.MimeType
 
-	if options == "" {
+	if decl.Options == "" {
 		return nil
 	}
 
-	parsed, err := parseOutputOptions(options)
+	parsed, err := parseOutputOptions(decl.Options)
 	if err != nil {
 		return err
 	}
@@ -204,7 +210,12 @@ func handleOutputDecl(trimmedLine string, outputMimeType *string, metadata *outp
 
 // handleInputDecl processes input directive.
 func handleInputDecl(trimmedLine string) {
-	_ = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "input "))
+	decl := InputDeclaration{Text: strings.TrimSpace(strings.TrimPrefix(trimmedLine, "input "))}
+	applyInputDeclaration(&decl)
+}
+
+func applyInputDeclaration(decl *InputDeclaration) {
+	_ = decl
 }
 
 func splitFirstToken(s string) (string, string) {
@@ -290,24 +301,28 @@ func unquoteOptionValue(value string) (string, bool) {
 
 // handleNamespaceDecl processes namespace declaration
 func handleNamespaceDecl(trimmedLine string, namespaces map[string]string) error {
-	prefix, uri, err := parseNamespaceDecl(trimmedLine)
+	decl, err := parseNamespaceDeclaration(trimmedLine)
 	if err != nil {
 		return err
 	}
-	namespaces[prefix] = uri
+	return applyNamespaceDeclaration(decl, namespaces)
+}
+
+func applyNamespaceDeclaration(decl *NamespaceDeclaration, namespaces map[string]string) error {
+	if decl == nil {
+		return unifiederrors.InternalError("internal error: missing namespace declaration")
+	}
+	namespaces[decl.Prefix] = decl.URI
 	return nil
 }
 
 // handleTypeDecl processes type declaration
 func handleTypeDecl(trimmedLine string, context evaluator.Context) error {
-	typeDef, typeName, err := parseTypeDecl(trimmedLine)
+	decl, err := parseTypeDeclaration(trimmedLine)
 	if err != nil {
 		return err
 	}
-	if typeName != "" {
-		context[typeName] = typeDef
-	}
-	return nil
+	return applyTypeDeclaration(decl, context)
 }
 
 var directiveKeywords = []string{"output ", "input ", "%dw ", "%im ", "ns ", "import ", "var ", "fun ", "type "}

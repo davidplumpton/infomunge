@@ -77,82 +77,17 @@ type parsedVarDecl struct {
 }
 
 func parseVarDeclSource(lines []string, start int) (*parsedVarDecl, error) {
-	if start >= len(lines) {
-		return nil, nil
+	decl, consumed, err := parseVarDeclarationFromLines(lines, start)
+	if err != nil || decl == nil {
+		return nil, err
 	}
-
-	firstLine := lines[start]
-	trimmedFirst := strings.TrimSpace(firstLine)
-	if !strings.HasPrefix(trimmedFirst, "var ") {
-		return nil, nil
+	if evaluator.IsReservedBindingName(decl.Name) {
+		return nil, unifiederrors.ParseErrorf("%q is reserved for runtime metadata", decl.Name)
 	}
-
-	rest := strings.TrimSpace(strings.TrimPrefix(trimmedFirst, "var "))
-	if rest == "" {
-		return nil, unifiederrors.ParseErrorf("invalid variable declaration: missing variable name in %q", trimmedFirst)
-	}
-
-	namePart := rest
-	if eqIdx := strings.Index(rest, "="); eqIdx >= 0 {
-		namePart = strings.TrimSpace(rest[:eqIdx])
-	}
-	fields := strings.Fields(namePart)
-	if len(fields) != 1 {
-		return nil, unifiederrors.ParseErrorf("invalid variable declaration: expected a single variable name in %q", trimmedFirst)
-	}
-	varName := fields[0]
-	if evaluator.IsReservedBindingName(varName) {
-		return nil, unifiederrors.ParseErrorf("%q is reserved for runtime metadata", varName)
-	}
-
-	declLines := []string{firstLine}
-	declRaw := firstLine
-	eqIdx := strings.Index(declRaw, "=")
-	if eqIdx < 0 {
-		return nil, unifiederrors.ParseErrorf("invalid variable declaration: missing '=' in %q", trimmedFirst)
-	}
-	exprStr := strings.TrimSpace(declRaw[eqIdx+1:])
-	if exprStr != "" {
-		strippedExpr := preprocessor.StripSingleLineComment(exprStr)
-		if strings.TrimSpace(strippedExpr) != "" && isDelimiterBalanced(strippedExpr) {
-			return &parsedVarDecl{
-				varName:  varName,
-				exprStr:  exprStr,
-				consumed: 1,
-			}, nil
-		}
-	}
-
-	i := start + 1
-	for i < len(lines) {
-		line := lines[i]
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			declLines = append(declLines, line)
-			i++
-			continue
-		}
-		if isDirectiveLine(trimmed) || (trimmed == "---" && parsedVarLinesAreComplete(declLines)) {
-			break
-		}
-		declLines = append(declLines, line)
-		i++
-	}
-
-	declRaw = strings.Join(declLines, "\n")
-	eqIdx = strings.Index(declRaw, "=")
-	exprStr = strings.TrimSpace(declRaw[eqIdx+1:])
-	if exprStr == "" {
-		return nil, unifiederrors.ParseErrorf("invalid variable declaration: missing expression for %q", varName)
-	}
-	if strings.ContainsAny(exprStr, "\n\r") {
-		exprStr = collapseWhitespaceOutsideStrings(exprStr)
-	}
-
 	return &parsedVarDecl{
-		varName:  varName,
-		exprStr:  exprStr,
-		consumed: len(declLines),
+		varName:  decl.Name,
+		exprStr:  decl.Expression,
+		consumed: consumed,
 	}, nil
 }
 
@@ -202,52 +137,43 @@ func parseVarDeclFromLinesWithScope(lines []string, start int, baseOffset int, s
 	return val, spec.varName, spec.consumed, nil
 }
 
-func parseFunDeclLine(trimmedLine string) (string, []evaluator.ParamDef, string, error) {
-	rest := strings.TrimPrefix(trimmedLine, "fun ")
-
-	parenIdx := strings.Index(rest, "(")
-	if parenIdx < 0 {
-		return "", nil, "", unifiederrors.ParseError("invalid function declaration: missing parameter list")
+func evaluateVarDeclaration(decl *VarDeclaration, source DeclarationSource, scope *evaluator.Scope, fullRaw string) (evaluator.Value, error) {
+	if decl == nil {
+		return nil, unifiederrors.InternalError("internal error: missing variable declaration")
 	}
-	fnName := strings.TrimSpace(rest[:parenIdx])
-	if fnName == "" {
-		return "", nil, "", unifiederrors.ParseError("invalid function declaration: missing function name")
+	if evaluator.IsReservedBindingName(decl.Name) {
+		return nil, unifiederrors.ParseErrorf("%q is reserved for runtime metadata", decl.Name)
+	}
+	if strings.TrimSpace(decl.Expression) == "" {
+		return nil, unifiederrors.ParseErrorf("invalid variable declaration: missing expression for %q", decl.Name)
+	}
+
+	parseableVal, mapping, err := preprocessor.PrepareForParsing(decl.Expression, preprocessor.Options{})
+	if err != nil {
+		return nil, unifiederrors.WrapParsef(err, "preprocessing error in variable declaration: %v", err)
+	}
+
+	declRaw := strings.Join(source.Lines, "\n")
+	eqIdx := strings.Index(declRaw, "=")
+	if eqIdx < 0 {
+		return nil, unifiederrors.InternalError("internal error: malformed variable declaration")
+	}
+	exprMap := sourceMapForDeclExpr(fullRaw, source.Offset, declRaw, eqIdx+1, true)
+	if strings.ContainsAny(decl.Expression, "\n\r") {
+		exprMap = collapseGeneratedWhitespaceMap(exprMap)
+	}
+	return evaluator.EvaluateWithScopeAndContext(parseableVal, scope, &evaluator.ErrorContext{SourceMap: exprMap.Compose(parseableVal, mapping)})
+}
+
+func parseFunDeclLine(trimmedLine string) (string, []evaluator.ParamDef, string, error) {
+	fnName, params, bodyStr, err := parseFunctionDeclarationLine(trimmedLine)
+	if err != nil {
+		return "", nil, "", err
 	}
 	if evaluator.IsReservedBindingName(fnName) {
 		return "", nil, "", unifiederrors.ParseErrorf("%q is reserved for runtime metadata", fnName)
 	}
-
-	closeParenIdx := strings.Index(rest, ")")
-	if closeParenIdx < 0 || closeParenIdx < parenIdx {
-		return "", nil, "", unifiederrors.ParseError("invalid function declaration: missing closing parenthesis")
-	}
-
-	paramStr := rest[parenIdx+1 : closeParenIdx]
-	var params []evaluator.ParamDef
-	if strings.TrimSpace(paramStr) != "" {
-		for _, p := range strings.Split(paramStr, ",") {
-			trimmed := strings.TrimSpace(p)
-			if colonIdx := strings.Index(trimmed, ":"); colonIdx >= 0 {
-				trimmed = strings.TrimSpace(trimmed[:colonIdx])
-			}
-			if trimmed == "" {
-				continue
-			}
-			params = append(params, evaluator.ParamDef{
-				Name:         trimmed,
-				ExpectedKind: evaluator.KindUnknown,
-			})
-		}
-	}
-
-	afterParams := strings.TrimSpace(rest[closeParenIdx+1:])
-	eqIdx := strings.Index(afterParams, "=")
-	if eqIdx < 0 {
-		return "", nil, "", unifiederrors.ParseError("invalid function declaration: missing '=' after parameters")
-	}
-
-	bodyStr := strings.TrimSpace(afterParams[eqIdx+1:])
-	return fnName, params, bodyStr, nil
+	return fnName, paramDeclarationsToParamDefs(params), bodyStr, nil
 }
 
 func buildFunLambda(params []evaluator.ParamDef, bodyStr string, env evaluator.Context, bodyMap *sourcemap.Map) (*evaluator.Lambda, error) {
@@ -314,6 +240,35 @@ func parseFunDeclFromLinesWithSource(lines []string, start int, env evaluator.Co
 		return nil, "", 0, err
 	}
 	return fn, spec.fnName, spec.consumed, nil
+}
+
+func paramDeclarationsToParamDefs(params []ParamDeclaration) []evaluator.ParamDef {
+	defs := make([]evaluator.ParamDef, 0, len(params))
+	for _, param := range params {
+		defs = append(defs, evaluator.ParamDef{
+			Name:         param.Name,
+			ExpectedKind: evaluator.KindUnknown,
+		})
+	}
+	return defs
+}
+
+func buildFunctionDeclaration(decl *FunctionDeclaration, source DeclarationSource, env evaluator.Context, fullRaw string) (*evaluator.Lambda, error) {
+	if decl == nil {
+		return nil, unifiederrors.InternalError("internal error: missing function declaration")
+	}
+	if evaluator.IsReservedBindingName(decl.Name) {
+		return nil, unifiederrors.ParseErrorf("%q is reserved for runtime metadata", decl.Name)
+	}
+
+	var bodyMap *sourcemap.Map
+	if fullRaw != "" {
+		declRaw := strings.Join(source.Lines, "\n")
+		m := sourceMapForDeclExpr(fullRaw, source.Offset, declRaw, strings.Index(declRaw, "=")+1, false)
+		bodyMap = &m
+	}
+
+	return buildFunLambda(paramDeclarationsToParamDefs(decl.Params), decl.Body, env, bodyMap)
 }
 
 type parsedFunDecl struct {
@@ -491,56 +446,40 @@ func parseFunDecl(trimmedLine string, env evaluator.Context) (*evaluator.Lambda,
 // parseTypeDecl parses a type declaration line like "type Currency = String { format: "##.00" }"
 // and returns a TypeDef with properties.
 func parseTypeDecl(trimmedLine string) (*evaluator.TypeDef, string, error) {
-	rest := strings.TrimPrefix(trimmedLine, "type ")
-
-	eqIdx := strings.Index(rest, "=")
-	if eqIdx < 0 {
-		return nil, "", unifiederrors.ParseError("invalid type declaration: missing '='")
+	decl, err := parseTypeDeclaration(trimmedLine)
+	if err != nil {
+		return nil, "", err
 	}
-
-	typeName := strings.TrimSpace(rest[:eqIdx])
-	if typeName == "" {
-		return nil, "", unifiederrors.ParseError("invalid type declaration: missing type name")
+	typeDef, err := bindTypeDeclaration(decl)
+	if err != nil {
+		return nil, "", err
 	}
-	if evaluator.IsReservedBindingName(typeName) {
-		return nil, "", unifiederrors.ParseErrorf("%q is reserved for runtime metadata", typeName)
+	return typeDef, decl.Name, nil
+}
+
+func bindTypeDeclaration(decl *TypeDeclaration) (*evaluator.TypeDef, error) {
+	if decl == nil {
+		return nil, unifiederrors.InternalError("internal error: missing type declaration")
 	}
-
-	rhs := strings.TrimSpace(rest[eqIdx+1:])
-	if rhs == "" {
-		return nil, "", unifiederrors.ParseError("invalid type declaration: missing base type")
+	if evaluator.IsReservedBindingName(decl.Name) {
+		return nil, unifiederrors.ParseErrorf("%q is reserved for runtime metadata", decl.Name)
 	}
-
-	var baseType string
-	var properties evaluator.Object
-
-	braceIdx := strings.Index(rhs, "{")
-	if braceIdx < 0 {
-		baseType = rhs
-	} else {
-		baseType = strings.TrimSpace(rhs[:braceIdx])
-		propsStr := rhs[braceIdx:]
-
-		if !strings.HasSuffix(strings.TrimSpace(propsStr), "}") {
-			return nil, "", unifiederrors.ParseError("invalid type declaration: unclosed properties block")
-		}
-
-		var err error
-		properties, err = parseTypeProperties(propsStr)
-		if err != nil {
-			return nil, "", unifiederrors.WrapParse(err, "invalid type declaration")
-		}
-	}
-
-	if baseType == "" {
-		return nil, "", unifiederrors.ParseError("invalid type declaration: missing base type")
-	}
-
 	return &evaluator.TypeDef{
-		Name:       typeName,
-		BaseType:   baseType,
-		Properties: properties,
-	}, typeName, nil
+		Name:       decl.Name,
+		BaseType:   decl.BaseType,
+		Properties: evaluator.Object(decl.Properties),
+	}, nil
+}
+
+func applyTypeDeclaration(decl *TypeDeclaration, context evaluator.Context) error {
+	typeDef, err := bindTypeDeclaration(decl)
+	if err != nil {
+		return err
+	}
+	if decl.Name != "" {
+		context[decl.Name] = typeDef
+	}
+	return nil
 }
 
 // parseTypeProperties parses a properties block like "{ format: \"##.00\", locale: \"en_US\" }".
@@ -653,14 +592,20 @@ func parseNamespaceDecl(trimmedLine string) (string, string, error) {
 
 // handleImport processes an import directive and adds symbols to the context.
 func handleImport(line string, context evaluator.Context, loader *ModuleLoader) error {
+	decl := parseImportDeclaration(line)
+	return applyImportDeclaration(&decl, context, loader)
+}
+
+func applyImportDeclaration(decl *ImportDeclaration, context evaluator.Context, loader *ModuleLoader) error {
 	if loader == nil {
 		return unifiederrors.ParseError("imports are not available in this context")
 	}
+	if decl == nil {
+		return unifiederrors.InternalError("internal error: missing import declaration")
+	}
 
-	rest := strings.TrimSpace(strings.TrimPrefix(line, "import "))
-
-	if !strings.Contains(rest, " from ") {
-		m, err := loader.Load(rest)
+	if decl.NamespaceOnly {
+		m, err := loader.Load(decl.ModuleSpec)
 		if err != nil {
 			return err
 		}
@@ -669,11 +614,7 @@ func handleImport(line string, context evaluator.Context, loader *ModuleLoader) 
 		return nil
 	}
 
-	parts := strings.SplitN(rest, " from ", 2)
-	namesPart := strings.TrimSpace(parts[0])
-	moduleSpec := strings.TrimSpace(parts[1])
-
-	m, err := loader.Load(moduleSpec)
+	m, err := loader.Load(decl.ModuleSpec)
 	if err != nil {
 		return err
 	}
@@ -681,30 +622,26 @@ func handleImport(line string, context evaluator.Context, loader *ModuleLoader) 
 	// Convert typed Namespace to raw map for evaluation context
 	context[m.Name] = m.Namespace.ToContext()
 
-	if namesPart == "*" {
+	if decl.Star {
 		for k, entry := range m.Namespace {
 			if strings.HasPrefix(k, "_") {
 				continue
 			}
 			if _, exists := context[k]; exists && k != m.Name {
-				return unifiederrors.ParseErrorf("import * from %s: name %q already defined", moduleSpec, k)
+				return unifiederrors.ParseErrorf("import * from %s: name %q already defined", decl.ModuleSpec, k)
 			}
 			context[k] = entry.Value
 		}
 		return nil
 	}
 
-	for _, name := range strings.Split(namesPart, ",") {
-		n := strings.TrimSpace(name)
-		if n == "" {
-			continue
-		}
+	for _, n := range decl.Names {
 		entry, ok := m.Namespace[n]
 		if !ok {
-			return unifiederrors.ParseErrorf("import %s from %s: symbol %q not found", namesPart, moduleSpec, n)
+			return unifiederrors.ParseErrorf("import %s from %s: symbol %q not found", decl.NamesPart, decl.ModuleSpec, n)
 		}
 		if _, exists := context[n]; exists {
-			return unifiederrors.ParseErrorf("import %s from %s: name %q already defined", namesPart, moduleSpec, n)
+			return unifiederrors.ParseErrorf("import %s from %s: name %q already defined", decl.NamesPart, decl.ModuleSpec, n)
 		}
 		context[n] = entry.Value
 	}

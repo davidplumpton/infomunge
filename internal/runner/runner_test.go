@@ -749,11 +749,92 @@ output application/json badoption`,
 				t.Fatalf("parseHeaderDirectives() directive count = %d, want %d", len(directives), len(tt.wantKinds))
 			}
 			for i, kind := range tt.wantKinds {
-				if directives[i].kind != kind {
-					t.Fatalf("parseHeaderDirectives()[%d].kind = %q, want %q", i, directives[i].kind, kind)
+				if directives[i].Kind != kind {
+					t.Fatalf("parseHeaderDirectives()[%d].Kind = %q, want %q", i, directives[i].Kind, kind)
 				}
 			}
 		})
+	}
+}
+
+func TestParseHeaderDirectivesBuildsDeclarationIRWithoutEvaluation(t *testing.T) {
+	header := `%im 0.1
+var broken = missing + 1
+fun invalid(x) = x +
+type Label = String { format: "plain" }
+output application/json`
+
+	declarations, err := parseHeaderDirectives(header, true, header)
+	if err != nil {
+		t.Fatalf("parseHeaderDirectives() unexpected error: %v", err)
+	}
+	if len(declarations) != 5 {
+		t.Fatalf("parseHeaderDirectives() declaration count = %d, want 5", len(declarations))
+	}
+
+	varDecl := declarations[1]
+	if varDecl.Kind != DeclarationVar || varDecl.Var == nil {
+		t.Fatalf("declarations[1] = %#v, want var declaration", varDecl)
+	}
+	if varDecl.Var.Name != "broken" || varDecl.Var.Expression != "missing + 1" {
+		t.Fatalf("var declaration = %#v, want name broken and unevaluated expression", varDecl.Var)
+	}
+	if varDecl.Source.Span.Start != varDecl.Source.Offset || varDecl.Source.Span.End <= varDecl.Source.Span.Start {
+		t.Fatalf("var declaration source span = %#v, offset %d", varDecl.Source.Span, varDecl.Source.Offset)
+	}
+
+	funDecl := declarations[2]
+	if funDecl.Kind != DeclarationFun || funDecl.Function == nil {
+		t.Fatalf("declarations[2] = %#v, want function declaration", funDecl)
+	}
+	if funDecl.Function.Name != "invalid" || funDecl.Function.Body != "x +" {
+		t.Fatalf("function declaration = %#v, want invalid body preserved without AST parsing", funDecl.Function)
+	}
+
+	typeDecl := declarations[3]
+	if typeDecl.Kind != DeclarationType || typeDecl.Type == nil {
+		t.Fatalf("declarations[3] = %#v, want type declaration", typeDecl)
+	}
+	if typeDecl.Type.Name != "Label" || typeDecl.Type.BaseType != "String" {
+		t.Fatalf("type declaration = %#v, want Label = String", typeDecl.Type)
+	}
+}
+
+func TestScriptHeadersAndModulesShareDeclarationIR(t *testing.T) {
+	source := `%im 0.1
+import double from modules::MathUtils
+var base = 5
+fun scale(x) = double(x) + base
+type Label = String`
+
+	headerDeclarations, err := parseHeaderDirectives(source, true, source)
+	if err != nil {
+		t.Fatalf("parseHeaderDirectives() unexpected error: %v", err)
+	}
+	moduleDeclarations, err := parseModuleDirectives(source)
+	if err != nil {
+		t.Fatalf("parseModuleDirectives() unexpected error: %v", err)
+	}
+	if len(headerDeclarations) != len(moduleDeclarations) {
+		t.Fatalf("declaration count mismatch: header=%d module=%d", len(headerDeclarations), len(moduleDeclarations))
+	}
+
+	for i := range headerDeclarations {
+		if headerDeclarations[i].Kind != moduleDeclarations[i].Kind {
+			t.Fatalf("declaration %d kind mismatch: header=%q module=%q", i, headerDeclarations[i].Kind, moduleDeclarations[i].Kind)
+		}
+	}
+	if headerDeclarations[1].Import.ModuleSpec != moduleDeclarations[1].Import.ModuleSpec {
+		t.Fatalf("import module mismatch: header=%#v module=%#v", headerDeclarations[1].Import, moduleDeclarations[1].Import)
+	}
+	if headerDeclarations[2].Var.Name != moduleDeclarations[2].Var.Name {
+		t.Fatalf("var mismatch: header=%#v module=%#v", headerDeclarations[2].Var, moduleDeclarations[2].Var)
+	}
+	if headerDeclarations[3].Function.Name != moduleDeclarations[3].Function.Name {
+		t.Fatalf("function mismatch: header=%#v module=%#v", headerDeclarations[3].Function, moduleDeclarations[3].Function)
+	}
+	if headerDeclarations[4].Type.Name != moduleDeclarations[4].Type.Name {
+		t.Fatalf("type mismatch: header=%#v module=%#v", headerDeclarations[4].Type, moduleDeclarations[4].Type)
 	}
 }
 

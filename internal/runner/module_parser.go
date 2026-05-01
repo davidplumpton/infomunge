@@ -22,19 +22,19 @@ func parseModuleContentWithOptions(content string, loader *ModuleLoader, opts Ru
 	// For evaluation within the module, we need a raw map.
 	scope := installEvaluationCapabilities(evaluator.NewScope(nil), opts)
 	rawNs := scope.Vars
-	directives, err := parseModuleDirectives(content)
+	declarations, err := parseModuleDirectives(content)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, directive := range directives {
-		switch directive.kind {
+	for _, declaration := range declarations {
+		switch declaration.Kind {
 		case headerDirectiveVersion:
 			// Version declarations are accepted for DataWeave compatibility but do not affect modules.
 
 		case headerDirectiveImport:
-			if err := handleImport(directive.trimmed, rawNs, loader); err != nil {
-				return nil, withHeaderLineContext(err, content, directive.offset, directive.line)
+			if err := applyImportDeclaration(declaration.Import, rawNs, loader); err != nil {
+				return nil, withHeaderLineContext(err, content, declaration.Source.Offset, declaration.Source.Line)
 			}
 			// Copy imported entries to typed namespace
 			for k, v := range rawNs {
@@ -44,31 +44,31 @@ func parseModuleContentWithOptions(content string, loader *ModuleLoader, opts Ru
 			}
 
 		case headerDirectiveVar:
-			val, varName, consumed, err := parseVarDeclFromLinesWithScope(directive.lines, 0, directive.offset, scope, content)
+			val, err := evaluateVarDeclaration(declaration.Var, declaration.Source, scope, content)
 			if err != nil {
-				return nil, withHeaderLineContext(err, content, directive.offset, directive.line)
+				return nil, withHeaderLineContext(err, content, declaration.Source.Offset, declaration.Source.Line)
 			}
-			if consumed > 0 && varName != "" {
-				ns[varName] = NewVarEntry(val)
-				rawNs[varName] = val
+			if declaration.Var != nil && declaration.Var.Name != "" {
+				ns[declaration.Var.Name] = NewVarEntry(val)
+				rawNs[declaration.Var.Name] = val
 			}
 
 		case headerDirectiveFun:
-			fn, fnName, consumed, err := parseFunDeclFromLinesWithSource(directive.lines, 0, rawNs, content, directive.offset)
+			fn, err := buildFunctionDeclaration(declaration.Function, declaration.Source, rawNs, content)
 			if err != nil {
-				return nil, withHeaderLineContext(err, content, directive.offset, directive.line)
+				return nil, withHeaderLineContext(err, content, declaration.Source.Offset, declaration.Source.Line)
 			}
-			if consumed > 0 && fnName != "" {
-				ns[fnName] = NewFuncEntry(fn)
-				rawNs[fnName] = fn
+			if declaration.Function != nil && declaration.Function.Name != "" {
+				ns[declaration.Function.Name] = NewFuncEntry(fn)
+				rawNs[declaration.Function.Name] = fn
 			}
 
 		case headerDirectiveType:
-			if td, typeName, err := parseTypeDecl(directive.trimmed); err != nil {
-				return nil, withHeaderLineContext(err, content, directive.offset, directive.line)
-			} else if typeName != "" {
-				ns[typeName] = NewTypeDefEntry(td)
-				rawNs[typeName] = td
+			if td, err := bindTypeDeclaration(declaration.Type); err != nil {
+				return nil, withHeaderLineContext(err, content, declaration.Source.Offset, declaration.Source.Line)
+			} else if declaration.Type != nil && declaration.Type.Name != "" {
+				ns[declaration.Type.Name] = NewTypeDefEntry(td)
+				rawNs[declaration.Type.Name] = td
 			}
 		}
 	}
