@@ -7,4 +7,7 @@ func init() {
 	RegisterWriter("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", formatBinary)
 	RegisterExtension(".xlsx", "application/xlsx")
 	RegisterExtension(".excel", "application/xlsx")
+	RegisterOptionsAlias("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/xlsx")
+	RegisterReadOptionsHandler("application/xlsx", readXLSXWithOptions)
+	RegisterWriteOptionsHandler("application/xlsx", formatXLSXWithOptions)
 }

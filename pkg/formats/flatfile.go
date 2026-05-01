@@ -28,6 +28,8 @@ func init() {
 	RegisterWriter("application/flatfile", formatFlatfile)
 	RegisterExtension(".flatfile", "application/flatfile")
 	RegisterExtension(".ffd", "application/flatfile")
+	RegisterReadOptionsHandler("application/flatfile", readFlatfileWithOptions)
+	RegisterWriteOptionsHandler("application/flatfile", formatFlatfileWithOptions)
 }
 
 func readFlatfile(content string) (interface{}, error) {

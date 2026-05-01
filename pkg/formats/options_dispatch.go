@@ -1,40 +1,32 @@
 package formats
 
-type readOptionsHandler func(content string, options Object) (interface{}, error)
-type writeOptionsHandler func(result interface{}, options Object) (string, error)
+import formatcore "infomunge/pkg/formats/core"
 
-var optionMimeAliases = map[string]string{
-	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "application/xlsx",
-	"application/x-protobuf": "application/protobuf",
+// ReadOptionsHandler parses content using format-specific options.
+type ReadOptionsHandler = formatcore.ReadOptionsHandler
+
+// WriteOptionsHandler serializes a value using format-specific options.
+type WriteOptionsHandler = formatcore.WriteOptionsHandler
+
+// RegisterOptionsAlias maps an alternate MIME type to another option-handler MIME type.
+func RegisterOptionsAlias(alias, canonical string) {
+	registry.RegisterOptionsAlias(alias, canonical)
 }
 
-var readOptionsHandlers = map[string]readOptionsHandler{
-	"application/flatfile": readFlatfileWithOptions,
-	"application/java":     readJavaWithOptions,
-	"application/xlsx":     readXLSXWithOptions,
-	"application/protobuf": readProtobufWithOptions,
+// RegisterReadOptionsHandler registers a read options handler for a MIME type.
+func RegisterReadOptionsHandler(mimeType string, handler ReadOptionsHandler) {
+	registry.RegisterReadOptionsHandler(mimeType, handler)
 }
 
-var writeOptionsHandlers = map[string]writeOptionsHandler{
-	"application/flatfile": formatFlatfileWithOptions,
-	"application/java":     formatJavaWithOptions,
-	"application/xlsx":     formatXLSXWithOptions,
-	"application/protobuf": formatProtobufWithOptions,
+// RegisterWriteOptionsHandler registers a write options handler for a MIME type.
+func RegisterWriteOptionsHandler(mimeType string, handler WriteOptionsHandler) {
+	registry.RegisterWriteOptionsHandler(mimeType, handler)
 }
 
-func canonicalOptionsMimeType(mimeType string) string {
-	if canonical, ok := optionMimeAliases[mimeType]; ok {
-		return canonical
-	}
-	return mimeType
+func getReadOptionsHandler(mimeType string) (ReadOptionsHandler, bool) {
+	return registry.GetReadOptionsHandler(mimeType)
 }
 
-func getReadOptionsHandler(mimeType string) (readOptionsHandler, bool) {
-	h, ok := readOptionsHandlers[canonicalOptionsMimeType(mimeType)]
-	return h, ok
-}
-
-func getWriteOptionsHandler(mimeType string) (writeOptionsHandler, bool) {
-	h, ok := writeOptionsHandlers[canonicalOptionsMimeType(mimeType)]
-	return h, ok
+func getWriteOptionsHandler(mimeType string) (WriteOptionsHandler, bool) {
+	return registry.GetWriteOptionsHandler(mimeType)
 }

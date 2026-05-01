@@ -324,6 +324,20 @@ Feature: I/O Functions
       {"Employees":[{"active":true,"age":30,"name":"Alice"},{"active":false,"age":41,"name":"Bob"}],"Sales":[{"amount":12.5,"region":"west"}]}
       """
 
+  Scenario: read and write structured xlsx workbook through standard mime alias
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read(write({Sheet1: [{name: "Alice", active: true}]}, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", {structured: true}), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", {structured: true})
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"Sheet1":[{"active":true,"name":"Alice"}]}
+      """
+
   Scenario: read with invalid JSON fails
     Given the following script:
       """

@@ -2,75 +2,19 @@ package formats
 
 import (
 	"fmt"
+	formatcore "infomunge/pkg/formats/core"
 	"sync"
 	"testing"
 )
 
-func cloneReaders(src map[string]Reader) map[string]Reader {
-	dst := make(map[string]Reader, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
-}
-
-func cloneWriters(src map[string]Writer) map[string]Writer {
-	dst := make(map[string]Writer, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
-}
-
-func cloneObjectReaders(src map[string]ObjectReader) map[string]ObjectReader {
-	dst := make(map[string]ObjectReader, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
-}
-
-func cloneArrayReaders(src map[string]ArrayReader) map[string]ArrayReader {
-	dst := make(map[string]ArrayReader, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
-}
-
-func cloneExtensions(src map[string]string) map[string]string {
-	dst := make(map[string]string, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
-}
-
 func withIsolatedRegistry(t *testing.T) {
 	t.Helper()
 
-	registryMu.Lock()
-	origReaders := cloneReaders(readers)
-	origWriters := cloneWriters(writers)
-	origObjectReaders := cloneObjectReaders(objectReaders)
-	origArrayReaders := cloneArrayReaders(arrayReaders)
-	origExtensions := cloneExtensions(extensions)
-
-	readers = make(map[string]Reader)
-	writers = make(map[string]Writer)
-	objectReaders = make(map[string]ObjectReader)
-	arrayReaders = make(map[string]ArrayReader)
-	extensions = make(map[string]string)
-	registryMu.Unlock()
+	origRegistry := registry
+	registry = formatcore.NewRegistry()
 
 	t.Cleanup(func() {
-		registryMu.Lock()
-		readers = origReaders
-		writers = origWriters
-		objectReaders = origObjectReaders
-		arrayReaders = origArrayReaders
-		extensions = origExtensions
-		registryMu.Unlock()
+		registry = origRegistry
 	})
 }
 
@@ -139,6 +83,34 @@ func TestRegistryConcurrentRegisterAndLookup(t *testing.T) {
 	}
 	if got := DetectMimeType("sample.x0"); got != "application/x-test-0" {
 		t.Fatalf("expected extension lookup after concurrent registration, got %q", got)
+	}
+}
+
+func TestRegisterOptionsHandlers_RuntimeRegistration(t *testing.T) {
+	withIsolatedRegistry(t)
+
+	RegisterReadOptionsHandler("application/x-test", func(content string, options Object) (interface{}, error) {
+		return Object{"content": content, "mode": options["mode"]}, nil
+	})
+	RegisterWriteOptionsHandler("application/x-test", func(result interface{}, options Object) (string, error) {
+		return fmt.Sprintf("%v:%v", result, options["mode"]), nil
+	})
+	RegisterOptionsAlias("application/vnd.test", "application/x-test")
+
+	value, err := ReadWithOptions("payload", "application/vnd.test", Object{"mode": "alias"})
+	if err != nil {
+		t.Fatalf("expected aliased read options handler, got error: %v", err)
+	}
+	if got := value.(Object)["mode"]; got != "alias" {
+		t.Fatalf("expected read option through alias, got %v", got)
+	}
+
+	formatted, err := FormatWithOptions("payload", "application/vnd.test", Object{"mode": "alias"})
+	if err != nil {
+		t.Fatalf("expected aliased write options handler, got error: %v", err)
+	}
+	if formatted != "payload:alias" {
+		t.Fatalf("expected aliased write output, got %q", formatted)
 	}
 }
 

@@ -17,6 +17,8 @@ func init() {
 	RegisterWriter("application/java", formatJava)
 	RegisterExtension(".java", "application/java")
 	RegisterExtension(".ser", "application/java")
+	RegisterReadOptionsHandler("application/java", readJavaWithOptions)
+	RegisterWriteOptionsHandler("application/java", formatJavaWithOptions)
 }
 
 func readJava(content string) (interface{}, error) {
