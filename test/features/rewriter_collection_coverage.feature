@@ -469,6 +469,20 @@ Feature: Preprocessor rewriter and collection transformer coverage
       {}
       """
 
+  Scenario: One-line object field uses inline if value
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      foo: if (false) 1 else 2
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"foo":2}
+      """
+
   # --- if/else false branch terminated by delimiter (findExpressionEnd) ---
 
   Scenario: If/else false branch inside parentheses

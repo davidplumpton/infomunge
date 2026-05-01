@@ -204,6 +204,66 @@ func TestPrepareForParsing_MappingRangeValidity(t *testing.T) {
 	}
 }
 
+func TestPrepareForParsing_InlineIfObjectValuesTerminateAtObjectBoundary(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		contains     string
+		keySourcePos int
+	}{
+		{
+			name:         "explicit object false branch before closing brace",
+			input:        `{foo: if (false) 1 else 2}`,
+			contains:     `__ifelse(false, 1, 2)`,
+			keySourcePos: 1,
+		},
+		{
+			name:         "implicit top level object false branch before wrapper close",
+			input:        `foo: if (false) 1 else 2`,
+			contains:     `__ifelse(false, 1, 2)`,
+			keySourcePos: 0,
+		},
+		{
+			name:         "true branch before comma",
+			input:        `{foo: if (true) 1, bar: 2}`,
+			contains:     `__ifelse(true, 1, nil)`,
+			keySourcePos: 1,
+		},
+		{
+			name:         "true branch before closing brace",
+			input:        `{foo: if (true) 1}`,
+			contains:     `__ifelse(true, 1, nil)`,
+			keySourcePos: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, mapping, err := PrepareForParsing(tt.input, Options{})
+			if err != nil {
+				t.Fatalf("PrepareForParsing returned error: %v", err)
+			}
+			if !strings.Contains(result, tt.contains) {
+				t.Fatalf("expected result to contain %q, got %q", tt.contains, result)
+			}
+			if len(result) != len(mapping) {
+				t.Fatalf("mapping length %d != result length %d", len(mapping), len(result))
+			}
+
+			keyPos := strings.Index(result, `"foo"`)
+			if keyPos == -1 {
+				t.Fatalf("result missing rewritten key: %q", result)
+			}
+			for i := 0; i < len("foo"); i++ {
+				if mapping[keyPos+1+i] != tt.keySourcePos+i {
+					t.Fatalf("expected key mapping[%d] to be %d, got %d",
+						keyPos+1+i, tt.keySourcePos+i, mapping[keyPos+1+i])
+				}
+			}
+		})
+	}
+}
+
 func TestPrepareForParsing_ExactMappingAcrossPostProcessingTransforms(t *testing.T) {
 	input := `payload.user default items..name`
 
@@ -1003,6 +1063,22 @@ func TestScanBranchEnd(t *testing.T) {
 			0,
 			8,
 			true,
+			true,
+		},
+		{
+			"expression before comma",
+			`value, next`,
+			0,
+			5,
+			false,
+			true,
+		},
+		{
+			"expression before closing object",
+			`value}`,
+			0,
+			5,
+			false,
 			true,
 		},
 	}

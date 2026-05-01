@@ -265,7 +265,9 @@ func (r *rewriter) handleUnquotedKey(char byte) bool {
 				return false
 			}
 			r.append('"', r.pos)
-			r.appendString(word, r.pos)
+			for i := 0; i < len(word); i++ {
+				r.append(word[i], r.pos+i)
+			}
 			r.append('"', r.pos)
 			r.pos = k - 1
 			return true

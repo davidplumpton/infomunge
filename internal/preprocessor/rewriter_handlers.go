@@ -258,12 +258,7 @@ func (r *rewriter) findBranches(condEndPos int) (BranchPositions, bool) {
 	}
 
 	falseBranchStart := skipSpace(r.input, scan.ElsePos+len("else"), true)
-	var falseBranchEnd int
-	if r.opts.AllowMultilineIfElse {
-		falseBranchEnd = findExpressionEnd(r.input, falseBranchStart, true)
-	} else {
-		falseBranchEnd = findLineEnd(r.input, falseBranchStart)
-	}
+	falseBranchEnd := findExpressionEnd(r.input, falseBranchStart, r.opts.AllowMultilineIfElse)
 	return BranchPositions{
 		TrueStart:  trueStartPos,
 		TrueEnd:    scan.BranchEnd,
@@ -671,16 +666,21 @@ func findMatchingDelimited(input string, start int, opener byte, closer byte, al
 // scanBranchEnd finds the end of a branch expression starting at start.
 //
 // It tracks nesting across (), {}, [] and ignores content inside string literals.
-// Returns the end position, the else position (or -1), and the position of
-// an unmatched closer if the scan fails.
+// Returns the end position and the else position (or -1). Top-level commas
+// and closing delimiters terminate the branch; they belong to the containing
+// object, array, call, or grouped expression, not to the branch body.
 func scanBranchEnd(input string, start int, allowMultiline bool) BranchScanResult {
 	pos := start
 	state := ScanState{}
 	for pos < len(input) {
 		ch := input[pos]
 		if !state.InString() {
-			if isBranchCloser(ch) && state.Depth() == 0 {
-				return BranchScanResult{ErrPos: pos}
+			if state.Depth() == 0 && isBranchTerminator(ch) {
+				branchEnd := pos
+				for branchEnd > start && isWhitespace(input[branchEnd-1]) {
+					branchEnd--
+				}
+				return BranchScanResult{BranchEnd: branchEnd, ElsePos: -1, ErrPos: -1, OK: true}
 			} else if state.Depth() == 0 && isElseKeywordAt(input, pos) {
 				// branchEnd should be before any whitespace leading to else
 				branchEnd := pos
@@ -770,12 +770,6 @@ func isBranchCloser(ch byte) bool {
 	return ch == ')' || ch == '}' || ch == ']'
 }
 
-// findLineEnd returns the position of the next newline or the end of input.
-func findLineEnd(input string, start int) int {
-	for pos := start; pos < len(input); pos++ {
-		if input[pos] == '\n' {
-			return pos
-		}
-	}
-	return len(input)
+func isBranchTerminator(ch byte) bool {
+	return ch == ',' || isBranchCloser(ch)
 }
