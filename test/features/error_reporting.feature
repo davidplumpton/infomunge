@@ -176,6 +176,17 @@ Feature: Error Reporting
     When I run the application and it fails
     Then the error should contain "3:9:"
 
+  Scenario: Parse error after full preprocessing path reports exact column
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      foo: /a+/ default (1 + )
+      """
+    When I run the application and it fails
+    Then the error should contain "4:24:"
+
   Scenario: Parse error in multiline header variable reports exact line
     Given the following input content:
       """

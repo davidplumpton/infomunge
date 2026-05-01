@@ -557,7 +557,7 @@ func (r *rewriter) rewriteBranchWithMapping(raw string, basePos int) (string, []
 	})
 	branchMapping := inferStageMapping(trimmed, branch)
 	branchRewriter := newRewriter(branch, r.opts)
-	rewritten, rewrittenMapping, err := branchRewriter.Rewrite()
+	rewritten, rewrittenMapping, err := branchRewriter.RewriteCoreWithDepth(0)
 	if err != nil {
 		r.err = err
 		return "", nil, false

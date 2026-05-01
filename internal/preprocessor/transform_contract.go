@@ -7,21 +7,26 @@ import (
 )
 
 // Transform lifecycle:
-//  1. PrepareForParsing performs source-preserving normalization that must happen
-//     before the byte rewriter, such as comment stripping and regex literal
-//     replacement.
-//  2. The recursive byte rewriter handles syntax whose structure depends on
+//  1. Comment processing preserves byte positions while removing line comments.
+//  2. Regex literal processing runs before syntax that could misread slashes.
+//  3. Wrapper processing normalizes implicit and top-level object literals.
+//  4. The recursive byte rewriter handles syntax whose structure depends on
 //     braces, strings, and branch bodies.
-//  3. The modular post-processing pipeline runs ordered transform contracts.
+//  5. The modular post-processing pipeline runs ordered transform contracts for
+//     strings, operators, selectors, functional syntax, and final syntax cleanup.
 //
 // Ordering rule: phases run in the order declared by
-// CreateModularPostProcessingPipelineWithOptions. Within a phase, lower Order
-// values run first. A contract must state whether it runs once or to a fixpoint
-// and whether its source mapping is exact or inferred.
+// CreateFullPreprocessingPipelineWithOptions. The post-rewriter subset is
+// declared by CreateModularPostProcessingPipelineWithOptions. Within a phase,
+// lower Order values run first. A contract must state whether it runs once or to
+// a fixpoint and whether its source mapping is exact or inferred.
 type TransformPhase string
 
 const (
+	TransformPhaseComment    TransformPhase = "comment"
 	TransformPhaseRegex      TransformPhase = "regex"
+	TransformPhaseWrapper    TransformPhase = "wrapper"
+	TransformPhaseRewrite    TransformPhase = "rewrite"
 	TransformPhaseString     TransformPhase = "string"
 	TransformPhaseOperator   TransformPhase = "operator"
 	TransformPhaseSelector   TransformPhase = "selector"

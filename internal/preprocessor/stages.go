@@ -46,6 +46,18 @@ func exactTransform(name string, phase TransformPhase, order int, loop Transform
 	}
 }
 
+func exactErrorTransform(name string, phase TransformPhase, order int, loop TransformLoopMode, fn mappedErrorAwareHandler) TransformContract {
+	return TransformContract{
+		Name:          name,
+		Phase:         phase,
+		Order:         order,
+		Associativity: TransformAssociativityNone,
+		Mapping:       TransformMappingExact,
+		Loop:          loop,
+		Handler:       fn,
+	}
+}
+
 func inferredErrorTransform(name string, phase TransformPhase, order int, loop TransformLoopMode, fn errorAwareHandler) TransformContract {
 	return TransformContract{
 		Name:          name,
@@ -79,6 +91,22 @@ func configuredBinaryOperatorTransform(name string, phase TransformPhase, order 
 	}
 }
 
+// CreateCommentProcessingStage creates pipeline for source-preserving comment stripping.
+func CreateCommentProcessingStage() PipelineStage {
+	return createCommentProcessingStage(nil)
+}
+
+func createCommentProcessingStage(trace TransformTraceFunc) PipelineStage {
+	return newContractStage("Comment Processing", TransformPhaseComment, trace, []TransformContract{
+		exactTransform("stripLineComments", TransformPhaseComment, 10, TransformLoopOnce, stripLineCommentsWithMapping),
+	})
+}
+
+func stripLineCommentsWithMapping(input string) (string, []int) {
+	result := StripLineComments(input)
+	return result, identityMapping(len(result))
+}
+
 // CreateRegexLiteralStage creates pipeline for regex literal transformations.
 // This must run before other stages that might misinterpret slashes.
 func CreateRegexLiteralStage() PipelineStage {
@@ -88,6 +116,55 @@ func CreateRegexLiteralStage() PipelineStage {
 func createRegexLiteralStage(trace TransformTraceFunc) PipelineStage {
 	return newContractStage("Regex Literal Processing", TransformPhaseRegex, trace, []TransformContract{
 		exactTransform("replaceRegexLiteralsWithMapping", TransformPhaseRegex, 10, TransformLoopOnce, replaceRegexLiteralsWithMapping),
+	})
+}
+
+// CreateWrapperProcessingStage creates pipeline for object-literal wrapper transformations.
+func CreateWrapperProcessingStage() PipelineStage {
+	return createWrapperProcessingStage(nil)
+}
+
+func createWrapperProcessingStage(trace TransformTraceFunc) PipelineStage {
+	return newContractStage("Wrapper Processing", TransformPhaseWrapper, trace, []TransformContract{
+		inferredTransform("wrapImplicitObjectLiteralBodies", TransformPhaseWrapper, 10, TransformLoopOnce, wrapImplicitObjectLiteralBodies),
+		exactTransform("wrapTopLevelObjectLiteral", TransformPhaseWrapper, 20, TransformLoopOnce, wrapTopLevelObjectLiteralWithMapping),
+	})
+}
+
+func wrapTopLevelObjectLiteralWithMapping(input string) (string, []int) {
+	result, wrapped := wrapTopLevelObjectLiteral(input)
+	if !wrapped {
+		return result, identityMapping(len(result))
+	}
+
+	wrapperPositions := make([]int, len(result))
+	for i := range wrapperPositions {
+		switch {
+		case i == 0:
+			wrapperPositions[i] = 0
+		case i == len(result)-1:
+			if len(input) == 0 {
+				wrapperPositions[i] = 0
+			} else {
+				wrapperPositions[i] = len(input) - 1
+			}
+		default:
+			wrapperPositions[i] = i - 1
+		}
+	}
+	return result, wrapperPositions
+}
+
+// CreateCoreRewriterStage creates pipeline for the recursive byte-walking rewriter.
+func CreateCoreRewriterStage(opts Options) PipelineStage {
+	return createCoreRewriterStage(opts)
+}
+
+func createCoreRewriterStage(opts Options) PipelineStage {
+	return newContractStage("Core Rewriter", TransformPhaseRewrite, opts.TraceTransforms, []TransformContract{
+		exactErrorTransform("rewriteCoreSyntax", TransformPhaseRewrite, 10, TransformLoopOnce, func(input string) (string, []int, error) {
+			return newRewriter(input, opts).RewriteCoreWithDepth(0)
+		}),
 	})
 }
 
@@ -203,18 +280,42 @@ func createSyntaxProcessingStage(trace TransformTraceFunc) PipelineStage {
 	})
 }
 
+// CreateFullPreprocessingPipeline builds the full PrepareForParsing transform pipeline.
+func CreateFullPreprocessingPipeline() *ModularPipeline {
+	return CreateFullPreprocessingPipelineWithOptions(Options{})
+}
+
+// CreateFullPreprocessingPipelineWithOptions builds the complete preprocessing
+// pipeline using explicit phases. The phase order is part of the transform
+// contract: comment -> regex -> wrapper -> rewrite -> string -> low-precedence
+// operator -> selector -> functional -> syntax.
+func CreateFullPreprocessingPipelineWithOptions(opts Options) *ModularPipeline {
+	stages := []PipelineStage{
+		createCommentProcessingStage(opts.TraceTransforms),
+		createRegexLiteralStage(opts.TraceTransforms),
+		createWrapperProcessingStage(opts.TraceTransforms),
+		createCoreRewriterStage(opts),
+		createStringProcessingStage(opts.TraceTransforms),
+		createOperatorProcessingStage(opts.TraceTransforms),
+		createSelectorProcessingStage(opts.TraceTransforms),
+		createFunctionalProcessingStage(opts.TraceTransforms),
+		createSyntaxProcessingStage(opts.TraceTransforms),
+	}
+
+	return NewModularPipeline(stages)
+}
+
 // CreateModularPostProcessingPipeline builds the default post-rewriter pipeline.
 func CreateModularPostProcessingPipeline() *ModularPipeline {
 	return CreateModularPostProcessingPipelineWithOptions(Options{})
 }
 
-// CreateModularPostProcessingPipelineWithOptions builds the post-rewriter pipeline
-// using explicit phases. The phase order is part of the transform contract:
-// string -> low-precedence operator -> selector -> functional -> syntax.
+// CreateModularPostProcessingPipelineWithOptions builds the post-rewriter
+// subset of the preprocessing pipeline using explicit phases. The phase order
+// is part of the transform contract: string -> low-precedence operator ->
+// selector -> functional -> syntax.
 func CreateModularPostProcessingPipelineWithOptions(opts Options) *ModularPipeline {
 	stages := []PipelineStage{
-		// Note: Regex literal processing is done in PrepareForParsing before the rewriter,
-		// so we don't include it here.
 		createStringProcessingStage(opts.TraceTransforms),
 		createOperatorProcessingStage(opts.TraceTransforms),
 		createSelectorProcessingStage(opts.TraceTransforms),

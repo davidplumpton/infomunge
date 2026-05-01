@@ -2,10 +2,9 @@ package preprocessor
 
 import (
 	"fmt"
+	"strings"
 
 	unifiederrors "infomunge/internal/errors"
-	"infomunge/internal/sourcemap"
-	"strings"
 )
 
 // MaxRecursionDepth limits how deeply nested if-else expressions can be.
@@ -26,55 +25,16 @@ const (
 type Options struct {
 	// AllowMultilineIfElse enables multiline if/else branch parsing.
 	AllowMultilineIfElse bool
-	// TraceTransforms receives one entry per post-processing transform.
+	// TraceTransforms receives one entry per transform contract in the full
+	// preprocessing path.
 	TraceTransforms TransformTraceFunc
 }
 
 // PrepareForParsing transforms InfoMunge syntax into Go-compatible syntax for the parser.
 // Returns an error if the expression exceeds recursion depth limits.
 func PrepareForParsing(body string, opts Options) (string, []int, error) {
-	// Strip // line comments before any other processing, since the Go
-	// expression parser does not support them.
-	body = StripLineComments(body)
-
-	// Process regex literals first, before any other transformations,
-	// to prevent /[a-z]+/ from being interpreted as an array literal.
-	// Track exact source positions through each early transform.
-	body, regexMapping := replaceRegexLiteralsWithMapping(body)
-
-	prevBody := body
-	body = wrapImplicitObjectLiteralBodies(body)
-	wrapMapping := inferStageMapping(prevBody, body)
-
-	input, wrapped := wrapTopLevelObjectLiteral(body)
-	inputMap := sourcemap.Identity(body)
-	if wrapped {
-		wrapperPositions := make([]int, len(input))
-		for i := range wrapperPositions {
-			switch {
-			case i == 0:
-				wrapperPositions[i] = 0
-			case i == len(input)-1:
-				if len(body) == 0 {
-					wrapperPositions[i] = 0
-				} else {
-					wrapperPositions[i] = len(body) - 1
-				}
-			default:
-				wrapperPositions[i] = i - 1
-			}
-		}
-		inputMap = sourcemap.New(body, input, wrapperPositions)
-	}
-	rewriter := newRewriter(input, opts)
-	result, mapping, err := rewriter.RewriteWithDepth(0)
-
-	// Compose full chain: result → rewriter input → post-wrap → post-regex → original
-	composed := inputMap.Compose(result, mapping).Positions()
-	composed = composeMappings(wrapMapping, composed)
-	composed = composeMappings(regexMapping, composed)
-
-	return result, composed, err
+	pipeline := CreateFullPreprocessingPipelineWithOptions(opts)
+	return pipeline.Execute(body, identityMapping(len(body)))
 }
 
 // Internal implementation of the rewriter
@@ -153,8 +113,28 @@ func (r *rewriter) Rewrite() (string, []int, error) {
 	return r.RewriteWithDepth(0)
 }
 
-// RewriteWithDepth is the internal rewrite function that tracks recursion depth.
+// RewriteWithDepth rewrites core syntax and then runs the post-processing
+// contracts. PrepareForParsing uses the full preprocessing pipeline instead so
+// the same post-processing contracts are traced in global order.
 func (r *rewriter) RewriteWithDepth(depth int) (string, []int, error) {
+	result, mapping, err := r.RewriteCoreWithDepth(depth)
+	if err != nil {
+		return result, mapping, err
+	}
+
+	pipeline := CreateModularPostProcessingPipelineWithOptions(r.opts)
+	result, mapping, err = pipeline.Execute(result, mapping)
+	if err != nil {
+		return result, mapping, err
+	}
+	r.result = []byte(result)
+	r.mapping = mapping
+	return result, mapping, nil
+}
+
+// RewriteCoreWithDepth is the internal byte-walking rewrite function that
+// tracks recursion depth without running the modular post-processing pipeline.
+func (r *rewriter) RewriteCoreWithDepth(depth int) (string, []int, error) {
 	if depth > MaxRecursionDepth {
 		r.err = unifiederrors.ParseErrorf("expression exceeds maximum recursion depth of %d", MaxRecursionDepth)
 		return string(r.result), r.mapping, r.err
@@ -280,7 +260,7 @@ func (r *rewriter) RewriteWithDepth(depth int) (string, []int, error) {
 		newRewriter := newRewriter(result, r.opts)
 		var secondPassMapping []int
 		var err error
-		result, secondPassMapping, err = newRewriter.RewriteWithDepth(depth + 1)
+		result, secondPassMapping, err = newRewriter.RewriteCoreWithDepth(depth + 1)
 		if err != nil {
 			r.mapping = secondPassMapping
 			return result, r.mapping, err
@@ -295,13 +275,6 @@ func (r *rewriter) RewriteWithDepth(depth int) (string, []int, error) {
 			}
 		}
 		r.mapping = composed
-	}
-
-	pipeline := CreateModularPostProcessingPipelineWithOptions(r.opts)
-	var pipelineErr error
-	result, r.mapping, pipelineErr = pipeline.Execute(result, r.mapping)
-	if pipelineErr != nil {
-		return result, r.mapping, pipelineErr
 	}
 
 	if r.err != nil {
