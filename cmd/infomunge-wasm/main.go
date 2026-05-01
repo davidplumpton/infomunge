@@ -40,7 +40,7 @@ func runPayload(payload string) js.Value {
 	opts := runner.RunnerOptions{
 		BaseDir: ".",
 	}
-	execution, err := runner.ExecuteStringWithGoContextAndOptions(context.Background(), request.Script, evalContext, opts)
+	execution, err := runner.ExecuteString(context.Background(), request.Script, evalContext, opts)
 	if err != nil {
 		return errorResponse(err)
 	}

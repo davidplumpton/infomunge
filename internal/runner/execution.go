@@ -33,27 +33,13 @@ func (r ExecutionResult) Resolved() (ExecutionResult, error) {
 	return r, nil
 }
 
-// ExecuteString evaluates a script without formatting or printing the result.
-func ExecuteString(script string, additionalContext evaluator.Context) (ExecutionResult, error) {
-	return ExecuteStringWithGoContext(context.Background(), script, additionalContext)
-}
-
-// ExecuteStringWithGoContext evaluates a script with a Go context.
-func ExecuteStringWithGoContext(goCtx context.Context, script string, additionalContext evaluator.Context) (ExecutionResult, error) {
-	baseDir, err := os.Getwd()
-	if err != nil {
-		baseDir = "."
+// ExecuteString evaluates a script and returns the structured result without
+// formatting or printing it. Adapter layers own formatting and output side
+// effects.
+func ExecuteString(goCtx context.Context, script string, additionalContext evaluator.Context, opts RunnerOptions) (ExecutionResult, error) {
+	if goCtx == nil {
+		goCtx = context.Background()
 	}
-	return ExecuteStringWithGoContextAndOptions(goCtx, script, additionalContext, RunnerOptions{BaseDir: baseDir})
-}
-
-// ExecuteStringWithContextAndOptions evaluates a script with runner options.
-func ExecuteStringWithContextAndOptions(script string, additionalContext evaluator.Context, opts RunnerOptions) (ExecutionResult, error) {
-	return ExecuteStringWithGoContextAndOptions(context.Background(), script, additionalContext, opts)
-}
-
-// ExecuteStringWithGoContextAndOptions evaluates a script with runner options and a Go context.
-func ExecuteStringWithGoContextAndOptions(goCtx context.Context, script string, additionalContext evaluator.Context, opts RunnerOptions) (ExecutionResult, error) {
 	if opts.BaseDir == "" {
 		baseDir, err := os.Getwd()
 		if err != nil {

@@ -609,7 +609,7 @@ func (tc *testContext) iExecuteTheScriptThroughStructuredRunnerAPI() error {
 		ctx["payload"] = payload
 	}
 
-	result, err := runner.ExecuteStringWithContextAndOptions(tc.scriptContent, ctx, runner.RunnerOptions{})
+	result, err := runner.ExecuteString(context.Background(), tc.scriptContent, ctx, runner.RunnerOptions{})
 	if err != nil {
 		return err
 	}
@@ -751,7 +751,7 @@ func (tc *testContext) iRunTheScriptWithURLIODisabled() error {
 		ctx["payload"] = payload
 	}
 
-	_, _, _, _, err := runner.RunStringWithGoContextAndOptionsWithOutput(
+	_, err := runner.ExecuteString(
 		context.Background(),
 		tc.scriptContent,
 		ctx,
@@ -1001,7 +1001,7 @@ func (tc *testContext) runScriptWithTimeout(scriptContent string, additionalCont
 	go func() {
 		goCtx, cancel := context.WithTimeout(context.Background(), tc.timeout)
 		defer cancel()
-		result, err := runner.ExecuteStringWithGoContextAndOptions(goCtx, scriptContent, additionalContext, runner.RunnerOptions{})
+		result, err := runner.ExecuteString(goCtx, scriptContent, additionalContext, runner.RunnerOptions{})
 		if err != nil {
 			errChan <- err
 		} else {

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	unifiederrors "infomunge/internal/errors"
@@ -156,11 +157,11 @@ func (app *App) execute(config *Config, context evaluator.Context) error {
 	return unifiederrors.ValidationError("no script provided")
 }
 
-func (app *App) writeExecutionResult(script string, context evaluator.Context, opts runner.RunnerOptions) error {
+func (app *App) writeExecutionResult(script string, evalContext evaluator.Context, opts runner.RunnerOptions) error {
 	if err := runner.RequireScriptHeader(script); err != nil {
 		return err
 	}
-	result, err := runner.ExecuteStringWithContextAndOptions(script, context, opts)
+	result, err := runner.ExecuteString(context.Background(), script, evalContext, opts)
 	if err != nil {
 		return err
 	}

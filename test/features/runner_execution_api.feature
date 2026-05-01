@@ -22,6 +22,18 @@ Feature: Runner execution API
       """
     And the runner output MIME type should be "application/json"
 
+  Scenario: Structured runner API leaves no-header formatting to the adapter
+    Given the following script:
+      """
+      1 + 2
+      """
+    When I execute the script through the structured runner API
+    Then the output should be:
+      """
+      3
+      """
+    And the runner output MIME type should be "application/json"
+
   Scenario: CLI output adapter prints formatted execution result
     Given the following input content:
       """

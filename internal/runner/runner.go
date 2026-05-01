@@ -118,7 +118,7 @@ func runFromStringWithConfig(goCtx context.Context, raw string, additionalContex
 		return err
 	}
 
-	result, err := ExecuteStringWithGoContextAndOptions(goCtx, raw, additionalContext, opts)
+	result, err := ExecuteString(goCtx, raw, additionalContext, opts)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func RequireScriptHeader(raw string) error {
 }
 
 // PrintExecutionResult formats and writes an execution result to stdout.
-// New callers should prefer ExecuteString* plus FormatExecutionResult so output
+// New callers should prefer ExecuteString plus FormatExecutionResult so output
 // destinations stay owned by the adapter layer.
 func PrintExecutionResult(result ExecutionResult) error {
 	formatted, err := FormatExecutionResult(result)
@@ -159,45 +159,22 @@ func FormatExecutionResult(result ExecutionResult) (string, error) {
 	return output.FormatResultWithMetadata(resolved.Value, resolved.OutputMimeType, resolved.Context, resolved.OutputMetadata)
 }
 
-// RunString executes an infomunge script from a string with optional additional context.
-// The additionalContext map allows injecting variables (like "payload") into the evaluation context.
+// RunString executes an infomunge script from a string with optional additional context
+// and returns only the resolved value. Use ExecuteString when callers need header
+// metadata or formatting policy.
 func RunString(script string, additionalContext evaluator.Context) (evaluator.Value, error) {
 	return RunStringWithGoContext(context.Background(), script, additionalContext)
 }
 
-// RunStringWithGoContext executes an infomunge script from a string with optional additional context and Go context.
+// RunStringWithGoContext executes an infomunge script with optional additional
+// context and Go context, returning only the resolved value. Use ExecuteString
+// when callers need header metadata or formatting policy.
 func RunStringWithGoContext(goCtx context.Context, script string, additionalContext evaluator.Context) (evaluator.Value, error) {
-	result, err := ExecuteStringWithGoContext(goCtx, script, additionalContext)
+	result, err := ExecuteString(goCtx, script, additionalContext, RunnerOptions{})
 	if err != nil {
 		return nil, err
 	}
 	return ResolveResult(result.Value)
-}
-
-// RunStringWithContextAndOptionsWithOutput executes a script and returns the legacy
-// value/header/mime/context tuple. New callers should prefer ExecuteString* so
-// explicit output metadata is preserved.
-func RunStringWithContextAndOptionsWithOutput(script string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, evaluator.Context, error) {
-	return RunStringWithGoContextAndOptionsWithOutput(context.Background(), script, additionalContext, opts)
-}
-
-// RunStringWithGoContextAndOptionsWithOutput executes a script and returns the
-// legacy value/header/mime/context tuple. New callers should prefer ExecuteString*.
-func RunStringWithGoContextAndOptionsWithOutput(goCtx context.Context, script string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, evaluator.Context, error) {
-	result, err := ExecuteStringWithGoContextAndOptions(goCtx, script, additionalContext, opts)
-	return result.Value, result.HasHeader, result.OutputMimeType, result.Context, err
-}
-
-// evaluate is the core evaluation logic shared by all runner functions.
-func evaluate(goCtx context.Context, raw string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, error) {
-	result, err := executeWithConfig(goCtx, raw, additionalContext, opts)
-	return result.Value, result.HasHeader, result.OutputMimeType, err
-}
-
-// evaluateWithContext is the core evaluation logic that also returns the parsed context.
-func evaluateWithContext(goCtx context.Context, raw string, additionalContext evaluator.Context, opts RunnerOptions) (evaluator.Value, bool, string, evaluator.Context, error) {
-	result, err := executeWithConfig(goCtx, raw, additionalContext, opts)
-	return result.Value, result.HasHeader, result.OutputMimeType, result.Context, err
 }
 
 // handleOutputDecl processes output directive and captures output options.
@@ -390,10 +367,6 @@ func normalizeHeaderLines(header string) []string {
 	return strings.Split(normalizeHeader(header), "\n")
 }
 
-func formatOutput(result evaluator.Value, hasHeader bool, mimeType string) error {
-	return formatOutputWithContext(result, hasHeader, mimeType, nil)
-}
-
 func ResolveResult(result evaluator.Value) (evaluator.Value, error) {
 	switch r := result.(type) {
 	case *evaluator.LazyValue:
@@ -420,42 +393,4 @@ func ResolveResult(result evaluator.Value) (evaluator.Value, error) {
 	default:
 		return result, nil
 	}
-}
-
-// formatOutputWithContext formats output with optional context (for namespaces, etc).
-func formatOutputWithContext(result evaluator.Value, hasHeader bool, mimeType string, context evaluator.Context) error {
-	// Check if result is a stream (lazy evaluation result)
-	switch r := result.(type) {
-	case *evaluator.StreamWithError:
-		var values evaluator.Array
-		for val := range r.Stream {
-			values = append(values, val)
-		}
-		if err := r.WaitError(); err != nil {
-			return err
-		}
-		result = values
-	case chan evaluator.Value:
-		var values evaluator.Array
-		for val := range r {
-			values = append(values, val)
-		}
-		result = values
-	}
-
-	if !hasHeader {
-		fmt.Print(result)
-		return nil
-	}
-
-	var formatted string
-	var err error
-
-	formatted, err = output.FormatResult(result, mimeType, context)
-	if err != nil {
-		return err
-	}
-
-	fmt.Print(formatted)
-	return nil
 }

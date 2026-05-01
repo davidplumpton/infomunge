@@ -91,9 +91,9 @@ func TestRunString(t *testing.T) {
 	}
 }
 
-func TestRunStringWithGoContextAndOptionsWithOutput_LazyFlagUnsupported(t *testing.T) {
+func TestExecuteString_LazyFlagUnsupported(t *testing.T) {
 	script := "%im 0.1\noutput application/json\n---\n1 + 1"
-	_, _, _, _, err := RunStringWithGoContextAndOptionsWithOutput(t.Context(), script, nil, RunnerOptions{Lazy: true})
+	_, err := ExecuteString(t.Context(), script, nil, RunnerOptions{Lazy: true})
 	if err == nil {
 		t.Fatalf("expected error when Lazy option is enabled")
 	}
@@ -119,7 +119,7 @@ import modules::Remote
 output application/json
 ---
 Remote::remote`
-	_, _, _, _, err := RunStringWithGoContextAndOptionsWithOutput(
+	_, err := ExecuteString(
 		t.Context(),
 		script,
 		nil,

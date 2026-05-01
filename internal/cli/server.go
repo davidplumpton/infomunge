@@ -141,7 +141,7 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 		opts := runner.RunnerOptions{
 			Lazy: config.Lazy,
 		}
-		execution, err := runner.ExecuteStringWithGoContextAndOptions(r.Context(), payload.Script, evalContext, opts)
+		execution, err := runner.ExecuteString(r.Context(), payload.Script, evalContext, opts)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				writeRequestTimeout(w)
