@@ -1,0 +1,179 @@
+package preprocessor
+
+import (
+	unifiederrors "infomunge/internal/errors"
+	"infomunge/internal/stringutils"
+)
+
+const (
+	binaryOpDefault     = "default"
+	binaryOpOnNull      = "onNull"
+	binaryOpThen        = "then"
+	binaryOpUpdate      = "update"
+	binaryOpFind        = "find"
+	binaryOpConcatenate = "concatenate"
+	binaryOpRemove      = "remove"
+	binaryOpSplitBy     = "splitBy"
+	binaryOpJoinBy      = "joinBy"
+	binaryOpTo          = "to"
+	binaryOpMatch       = "match"
+	binaryOpContains    = "contains"
+	binaryOpMatches     = "matches"
+	binaryOpRepeat      = "repeat"
+	binaryOpMod         = "mod"
+)
+
+var binaryOperatorConfigs = map[string]stringutils.BinaryOperatorConfig{
+	binaryOpDefault: {
+		Operator:     " default ",
+		FuncName:     "__default",
+		RightStopOps: []string{" and "},
+	},
+	binaryOpOnNull: {
+		Operator: " onNull ",
+		FuncName: "onNull",
+	},
+	binaryOpThen: {
+		Operator: " then ",
+		FuncName: "then",
+	},
+	binaryOpUpdate: {
+		Operator:     " ~ ",
+		FuncName:     "__update",
+		ExtraStops:   []rune{'~'},
+		RightStopOps: []string{" ~ "},
+	},
+	binaryOpFind: {
+		Operator: " find ",
+		FuncName: "find",
+	},
+	binaryOpConcatenate: {
+		Operator:     " ++ ",
+		FuncName:     "__concat",
+		ExtraStops:   []rune{'+'},
+		RightStopOps: []string{" ++ "},
+	},
+	binaryOpRemove: {
+		Operator:     " -- ",
+		FuncName:     "__remove",
+		ExtraStops:   []rune{'-'},
+		RightStopOps: []string{" -- "},
+	},
+	binaryOpSplitBy: {
+		Operator:     " splitBy ",
+		FuncName:     "splitBy",
+		RightStopOps: []string{" splitBy "},
+	},
+	binaryOpJoinBy: {
+		Operator:     " joinBy ",
+		FuncName:     "joinBy",
+		RightStopOps: []string{" joinBy "},
+	},
+	binaryOpTo: {
+		Operator:        " to ",
+		FuncName:        "to",
+		RightStopOps:    []string{" to "},
+		UseMinimalStops: true, // Allow negative numbers like -2 to 5.
+	},
+	binaryOpMatch: {
+		Operator:     " match ",
+		FuncName:     "match",
+		RightStopOps: []string{" match "},
+	},
+	binaryOpContains: {
+		Operator:     " contains ",
+		FuncName:     "contains",
+		RightStopOps: []string{" && ", " || ", " and ", " or ", " contains "},
+	},
+	binaryOpMatches: {
+		Operator:     " matches ",
+		FuncName:     "matches",
+		RightStopOps: []string{" matches "},
+	},
+	binaryOpRepeat: {
+		Operator:     " repeat ",
+		FuncName:     "repeat",
+		RightStopOps: []string{" repeat "},
+	},
+	binaryOpMod: {
+		Operator:     " mod ",
+		FuncName:     "mod",
+		RightStopOps: []string{"==", "!=", "<", ">", "<=", ">=", " matches "},
+	},
+}
+
+func replaceConfiguredBinaryOperator(s string, key string) (string, error) {
+	if _, ok := binaryOperatorConfigs[key]; !ok {
+		return s, unifiederrors.ParseErrorf("missing binary operator config: %s", key)
+	}
+	result, _, err := replaceConfiguredBinaryOperatorWithMapping(s, key)
+	return result, err
+}
+
+func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, []int, error) {
+	config, ok := binaryOperatorConfigs[key]
+	if !ok {
+		return s, identityMapping(len(s)), unifiederrors.ParseErrorf("missing binary operator config: %s", key)
+	}
+
+	buf := newMappedBuffer(len(s) + len(config.FuncName) + 4)
+	inString := false
+	i := 0
+	opLen := len(config.Operator)
+	stopBytes := defaultStopBytes(config.ExtraStops)
+	if config.UseMinimalStops {
+		stopBytes = minimalStopBytes()
+	}
+
+	for i < len(s) {
+		if s[i] == '"' && !stringutils.IsEscapedAt(s, i) {
+			inString = !inString
+			buf.AppendOriginal(s, i, i+1)
+			i++
+			continue
+		}
+
+		if !inString && i+opLen <= len(s) && s[i:i+opLen] == config.Operator {
+			leftStart := findLeftOperandStartBytesWithStops(buf.bytes, stopBytes)
+			if leftStart >= buf.Len() {
+				buf.AppendOriginal(s, i, i+opLen)
+				i += opLen
+				continue
+			}
+
+			leftTrimStart, _ := trimSpaceBounds(buf.String(), leftStart, buf.Len())
+			if leftTrimStart >= buf.Len() {
+				buf.AppendOriginal(s, i, i+opLen)
+				i += opLen
+				continue
+			}
+
+			leftBytes, leftMapping := buf.Slice(leftTrimStart)
+			buf.Truncate(leftStart)
+
+			rightStart := i + opLen
+			rightTrimStart, rightTrimEnd, rightEnd, ok := scanRightOperandBounds(s, rightStart, rightOperandScanConfig{
+				StopOps: config.RightStopOps,
+			})
+			if !ok {
+				buf.AppendBytes(leftBytes, leftMapping)
+				buf.AppendOriginal(s, i, i+opLen)
+				i += opLen
+				continue
+			}
+
+			buf.AppendLiteral(config.FuncName+"(", i)
+			buf.AppendBytes(leftBytes, leftMapping)
+			buf.AppendLiteral(", ", i)
+			buf.AppendOriginal(s, rightTrimStart, rightTrimEnd)
+			buf.AppendLiteral(")", rightTrimEnd-1)
+			i = rightEnd
+			continue
+		}
+
+		buf.AppendOriginal(s, i, i+1)
+		i++
+	}
+
+	return buf.String(), buf.mapping, nil
+}

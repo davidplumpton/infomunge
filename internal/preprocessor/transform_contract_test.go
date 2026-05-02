@@ -48,6 +48,22 @@ func TestOperatorProcessingContractsUseExplicitBinaryOperatorPath(t *testing.T) 
 	}
 }
 
+func TestFunctionalContractsUseExactTypedOperatorMappings(t *testing.T) {
+	contracts := functionalProcessingContracts()
+	for _, name := range []string{"replaceAsOperator", "replaceIsOperator"} {
+		contract, ok := findTransformContract(contracts, name)
+		if !ok {
+			t.Fatalf("missing contract %q", name)
+		}
+		if contract.Mapping != TransformMappingExact {
+			t.Fatalf("%s mapping = %q, want %q", name, contract.Mapping, TransformMappingExact)
+		}
+		if contract.Loop != TransformLoopFixpoint {
+			t.Fatalf("%s loop = %q, want %q", name, contract.Loop, TransformLoopFixpoint)
+		}
+	}
+}
+
 func TestPrepareForParsing_TraceTransforms(t *testing.T) {
 	var trace []TransformTraceEntry
 	result, _, err := PrepareForParsing(`payload.name default "missing"`, Options{
@@ -157,6 +173,28 @@ func TestConfiguredBinaryOperatorSourceMapErrorLocation(t *testing.T) {
 	}
 }
 
+func TestTypedOperatorSourceMapErrorLocation(t *testing.T) {
+	input := `1 as Number {format: 1 + }`
+	result, mapping, err := PrepareForParsing(input, Options{})
+	if err != nil {
+		t.Fatalf("PrepareForParsing returned error: %v", err)
+	}
+
+	if !strings.Contains(result, `__coerce(1, "Number", map[string]interface{}{`) {
+		t.Fatalf("result did not use mapped as-operator rewrite: %q", result)
+	}
+
+	_, parseErr := parser.ParseExpr(result)
+	if parseErr == nil {
+		t.Fatalf("expected transformed expression to fail parsing: %q", result)
+	}
+
+	formatted := sourcemap.New(input, result, mapping).FormatParseError(parseErr)
+	if !strings.Contains(formatted.Error(), "1:26:") {
+		t.Fatalf("expected source-mapped error at 1:26, got %q from %q", formatted.Error(), result)
+	}
+}
+
 func TestFullPreprocessSourceMapComposesRegexWrapperRewriterAndPostTransforms(t *testing.T) {
 	input := `foo: /a+/ default (1 + )`
 	result, mapping, err := PrepareForParsing(input, Options{})
@@ -194,6 +232,15 @@ func changedTraceEntry(trace []TransformTraceEntry, transform string) (Transform
 		}
 	}
 	return TransformTraceEntry{}, false
+}
+
+func findTransformContract(contracts []TransformContract, name string) (TransformContract, bool) {
+	for _, contract := range contracts {
+		if contract.Name == name {
+			return contract, true
+		}
+	}
+	return TransformContract{}, false
 }
 
 func traceIndex(trace []TransformTraceEntry, transform string) int {

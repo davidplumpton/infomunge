@@ -18,6 +18,16 @@ type rightOperandScanConfig struct {
 	StopPredicate func(input string, pos int, operandStart int) bool
 }
 
+type typedOperatorRightSpan struct {
+	TypeExpr    string
+	TypeStart   int
+	TypeEnd     int
+	ConfigArg   string
+	ConfigStart int
+	ConfigEnd   int
+	Next        int
+}
+
 // These lower-precedence infix operators define the left boundary for typed
 // operators so `as`/`is` only rewrite the immediate operand to their left.
 var typedOperatorLeftBoundaryOps = []string{
@@ -53,6 +63,26 @@ func findLeftOperandBoundsRunes(result []rune, cfg leftOperandScanConfig) (int, 
 
 func findTypedOperatorLeftOperandStart(result []rune) int {
 	leftStart := stringutils.FindLeftOperandStart(result, []rune{':', '&', '|'})
+	if leftStart >= len(result) {
+		return leftStart
+	}
+
+	leftOp := string(result[leftStart:])
+	lastBoundary := -1
+	for _, op := range typedOperatorLeftBoundaryOps {
+		pos := strings.LastIndex(leftOp, op)
+		if pos > lastBoundary {
+			lastBoundary = pos + len(op)
+		}
+	}
+	if lastBoundary > 0 {
+		return leftStart + lastBoundary
+	}
+	return leftStart
+}
+
+func findTypedOperatorLeftOperandStartBytes(result []byte) int {
+	leftStart := findLeftOperandStartBytesWithStops(result, defaultStopBytes([]rune{':', '&', '|'}))
 	if leftStart >= len(result) {
 		return leftStart
 	}
@@ -109,6 +139,14 @@ func scanRightOperandBounds(input string, start int, cfg rightOperandScanConfig)
 }
 
 func scanTypedOperatorRight(input string, start int, allowConfig bool) (string, string, int, bool) {
+	span, ok := scanTypedOperatorRightSpan(input, start, allowConfig)
+	if !ok {
+		return "", "", start, false
+	}
+	return span.TypeExpr, span.ConfigArg, span.Next, true
+}
+
+func scanTypedOperatorRightSpan(input string, start int, allowConfig bool) (typedOperatorRightSpan, bool) {
 	end := start
 	for end < len(input) && IsTypeExprChar(input[end]) {
 		if allowConfig && end+4 <= len(input) && input[end:end+4] == "map[" {
@@ -119,36 +157,53 @@ func scanTypedOperatorRight(input string, start int, allowConfig bool) (string, 
 
 	typeStart, typeEnd := trimSpaceBounds(input, start, end)
 	if typeStart >= typeEnd {
-		return "", "", start, false
+		return typedOperatorRightSpan{}, false
 	}
 
 	typeExpr := input[typeStart:typeEnd]
 	next := end
 	configArg := ""
+	configStart := -1
+	configEnd := -1
 	if !allowConfig {
-		return typeExpr, configArg, next, true
+		return typedOperatorRightSpan{
+			TypeExpr:  typeExpr,
+			TypeStart: typeStart,
+			TypeEnd:   typeEnd,
+			Next:      next,
+		}, true
 	}
 
-	configStart := next
-	for configStart < len(input) && unicode.IsSpace(rune(input[configStart])) {
-		configStart++
+	configCandidateStart := next
+	for configCandidateStart < len(input) && unicode.IsSpace(rune(input[configCandidateStart])) {
+		configCandidateStart++
 	}
 
 	prefixes := []string{GoObjectPrefix, GoObjectPrefixSpace}
 	for _, prefix := range prefixes {
-		if configStart+len(prefix) > len(input) || input[configStart:configStart+len(prefix)] != prefix {
+		if configCandidateStart+len(prefix) > len(input) || input[configCandidateStart:configCandidateStart+len(prefix)] != prefix {
 			continue
 		}
-		bracePos := configStart + len(prefix) - 1
+		bracePos := configCandidateStart + len(prefix) - 1
 		scanner := stringutils.NewExpressionScanner(input)
 		closePos := scanner.FindMatchingCloseBracket(bracePos)
 		if closePos == -1 {
 			break
 		}
-		configArg = input[configStart : closePos+1]
+		configStart = configCandidateStart
+		configEnd = closePos + 1
+		configArg = input[configStart:configEnd]
 		next = closePos + 1
 		break
 	}
 
-	return typeExpr, configArg, next, true
+	return typedOperatorRightSpan{
+		TypeExpr:    typeExpr,
+		TypeStart:   typeStart,
+		TypeEnd:     typeEnd,
+		ConfigArg:   configArg,
+		ConfigStart: configStart,
+		ConfigEnd:   configEnd,
+		Next:        next,
+	}, true
 }
