@@ -6,6 +6,7 @@ import (
 
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/preprocessor"
+	"infomunge/internal/stringutils"
 	"infomunge/pkg/values"
 )
 
@@ -22,23 +23,6 @@ const (
 	DeclarationFun       DeclarationKind = "fun"
 	DeclarationType      DeclarationKind = "type"
 )
-
-// Keep existing internal test names readable while the implementation moves to
-// the shared Declaration IR.
-type headerDirectiveKind = DeclarationKind
-
-const (
-	headerDirectiveVersion   = DeclarationVersion
-	headerDirectiveOutput    = DeclarationOutput
-	headerDirectiveInput     = DeclarationInput
-	headerDirectiveNamespace = DeclarationNamespace
-	headerDirectiveImport    = DeclarationImport
-	headerDirectiveVar       = DeclarationVar
-	headerDirectiveFun       = DeclarationFun
-	headerDirectiveType      = DeclarationType
-)
-
-type headerDirective = Declaration
 
 // SourceSpan records the byte range for a declaration in the raw source used by
 // runner diagnostics.
@@ -141,11 +125,16 @@ func parseOutputDeclaration(trimmedLine string) OutputDeclaration {
 }
 
 func parseNamespaceDeclaration(trimmedLine string) (*NamespaceDeclaration, error) {
-	prefix, uri, err := parseNamespaceDecl(trimmedLine)
-	if err != nil {
-		return nil, err
+	rest := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "ns "))
+	parts := strings.Fields(rest)
+	switch len(parts) {
+	case 1:
+		return &NamespaceDeclaration{URI: parts[0]}, nil
+	case 2:
+		return &NamespaceDeclaration{Prefix: parts[0], URI: parts[1]}, nil
+	default:
+		return nil, unifiederrors.ParseError("invalid namespace declaration: expected 'ns [prefix] uri'")
 	}
-	return &NamespaceDeclaration{Prefix: prefix, URI: uri}, nil
 }
 
 func parseImportDeclaration(trimmedLine string) ImportDeclaration {
@@ -246,6 +235,16 @@ func parseVarDeclarationFromLines(lines []string, start int) (*VarDeclaration, i
 		Name:       varName,
 		Expression: exprStr,
 	}, len(declLines), nil
+}
+
+func parsedVarLinesAreComplete(lines []string) bool {
+	declRaw := strings.Join(lines, "\n")
+	eqIdx := strings.Index(declRaw, "=")
+	if eqIdx < 0 {
+		return false
+	}
+	exprStr := strings.TrimSpace(declRaw[eqIdx+1:])
+	return exprStr != "" && isDelimiterBalanced(exprStr)
 }
 
 func parseFunctionDeclarationLine(trimmedLine string) (string, []ParamDeclaration, string, error) {
@@ -436,6 +435,29 @@ func parseTypeDeclarationProperties(propsStr string) (values.Object, error) {
 	}
 
 	return properties, nil
+}
+
+// splitPropertyPairs splits a comma-separated list of property pairs, respecting quoted strings.
+func splitPropertyPairs(s string) []string {
+	var pairs []string
+	var current strings.Builder
+	var sc stringutils.ScanState
+
+	for _, ch := range s {
+		sc.AdvanceRune(ch)
+		if !sc.InString() && ch == ',' {
+			pairs = append(pairs, current.String())
+			current.Reset()
+			continue
+		}
+		current.WriteRune(ch)
+	}
+
+	if current.Len() > 0 {
+		pairs = append(pairs, current.String())
+	}
+
+	return pairs
 }
 
 func parseTypeDeclarationPropertyValue(s string) (values.Value, error) {

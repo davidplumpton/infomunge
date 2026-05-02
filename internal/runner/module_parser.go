@@ -29,10 +29,10 @@ func parseModuleContentWithOptions(content string, loader *ModuleLoader, opts Ru
 
 	for _, declaration := range declarations {
 		switch declaration.Kind {
-		case headerDirectiveVersion:
+		case DeclarationVersion:
 			// Version declarations are accepted for DataWeave compatibility but do not affect modules.
 
-		case headerDirectiveImport:
+		case DeclarationImport:
 			if err := applyImportDeclaration(declaration.Import, rawNs, loader); err != nil {
 				return nil, withHeaderLineContext(err, content, declaration.Source.Offset, declaration.Source.Line)
 			}
@@ -43,7 +43,7 @@ func parseModuleContentWithOptions(content string, loader *ModuleLoader, opts Ru
 				}
 			}
 
-		case headerDirectiveVar:
+		case DeclarationVar:
 			val, err := evaluateVarDeclaration(declaration.Var, declaration.Source, scope, content)
 			if err != nil {
 				return nil, withHeaderLineContext(err, content, declaration.Source.Offset, declaration.Source.Line)
@@ -53,7 +53,7 @@ func parseModuleContentWithOptions(content string, loader *ModuleLoader, opts Ru
 				rawNs[declaration.Var.Name] = val
 			}
 
-		case headerDirectiveFun:
+		case DeclarationFun:
 			fn, err := buildFunctionDeclaration(declaration.Function, declaration.Source, rawNs, content)
 			if err != nil {
 				return nil, withHeaderLineContext(err, content, declaration.Source.Offset, declaration.Source.Line)
@@ -63,7 +63,7 @@ func parseModuleContentWithOptions(content string, loader *ModuleLoader, opts Ru
 				rawNs[declaration.Function.Name] = fn
 			}
 
-		case headerDirectiveType:
+		case DeclarationType:
 			if td, err := bindTypeDeclaration(declaration.Type); err != nil {
 				return nil, withHeaderLineContext(err, content, declaration.Source.Offset, declaration.Source.Line)
 			} else if declaration.Type != nil && declaration.Type.Name != "" {

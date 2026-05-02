@@ -182,6 +182,28 @@ Feature: Import Directive
       {"module":"module:ok","script":"script:ok"}
       """
 
+  Scenario: Shared declaration parsing preserves type property literals
+    Given a file named "modules/SharedTypeProperties.im" with content:
+      """
+      %im 0.1
+      type Amount = String { format: "##.00" }
+      fun moduleAmount(value) = value as Amount
+      """
+    And the following input content:
+      """
+      %im 0.1
+      import modules::SharedTypeProperties
+      type Amount = String { format: "##.00" }
+      output application/json
+      ---
+      {script: 7.5 as Amount, module: SharedTypeProperties::moduleAmount(7.5)}
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"module":"7.50","script":"7.50"}
+      """
+
   Scenario: Import module variable with star
     Given the following input content:
       """

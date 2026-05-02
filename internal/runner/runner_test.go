@@ -3,6 +3,7 @@ package runner
 import (
 	"errors"
 	"infomunge/internal/evaluator"
+	"infomunge/internal/output"
 	"os"
 	"path/filepath"
 	"strings"
@@ -140,11 +141,29 @@ func errorChainContains(err error, expected string) bool {
 	return false
 }
 
-func TestParseVarDecl(t *testing.T) {
+func applySingleHeaderDirectiveForTest(t *testing.T, line string, vars evaluator.Context) (*evaluator.Scope, error) {
+	t.Helper()
+
+	declarations, err := parseHeaderDirectives(line, true, line)
+	if err != nil {
+		return nil, err
+	}
+	if len(declarations) != 1 {
+		t.Fatalf("parseHeaderDirectives() declaration count = %d, want 1", len(declarations))
+	}
+
+	scope := installEvaluationCapabilities(evaluator.NewScope(vars), RunnerOptions{})
+	namespaces := make(map[string]string)
+	mimeType := "application/json"
+	metadata := output.Metadata{}
+	err = applyHeaderDirective(declarations[0], scope, namespaces, &mimeType, &metadata, line, NewModuleLoader("."))
+	return scope, err
+}
+
+func TestApplyHeaderDirectiveEvaluatesVarDeclaration(t *testing.T) {
 	tests := []struct {
 		name     string
 		line     string
-		trimmed  string
 		context  evaluator.Context
 		wantVal  evaluator.Value
 		wantName string
@@ -154,7 +173,6 @@ func TestParseVarDecl(t *testing.T) {
 		{
 			name:     "simple integer",
 			line:     "var x = 42",
-			trimmed:  "var x = 42",
 			context:  make(evaluator.Context),
 			wantVal:  42,
 			wantName: "x",
@@ -162,7 +180,6 @@ func TestParseVarDecl(t *testing.T) {
 		{
 			name:     "string value",
 			line:     "var name = \"hello\"",
-			trimmed:  "var name = \"hello\"",
 			context:  make(evaluator.Context),
 			wantVal:  "hello",
 			wantName: "name",
@@ -170,7 +187,6 @@ func TestParseVarDecl(t *testing.T) {
 		{
 			name:     "expression value",
 			line:     "var result = 10 + 5",
-			trimmed:  "var result = 10 + 5",
 			context:  make(evaluator.Context),
 			wantVal:  15,
 			wantName: "result",
@@ -178,7 +194,6 @@ func TestParseVarDecl(t *testing.T) {
 		{
 			name:     "using context",
 			line:     "var doubled = x * 2",
-			trimmed:  "var doubled = x * 2",
 			context:  evaluator.Object{"x": 5},
 			wantVal:  10,
 			wantName: "doubled",
@@ -186,7 +201,6 @@ func TestParseVarDecl(t *testing.T) {
 		{
 			name:     "array value",
 			line:     "var arr = [1, 2, 3]",
-			trimmed:  "var arr = [1, 2, 3]",
 			context:  make(evaluator.Context),
 			wantVal:  evaluator.Array{1, 2, 3},
 			wantName: "arr",
@@ -194,7 +208,6 @@ func TestParseVarDecl(t *testing.T) {
 		{
 			name:     "missing equals sign",
 			line:     "var x",
-			trimmed:  "var x",
 			context:  make(evaluator.Context),
 			wantErr:  true,
 			errMatch: "missing '='",
@@ -203,31 +216,32 @@ func TestParseVarDecl(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			val, name, err := parseVarDecl(tt.line, tt.trimmed, 0, tt.context, tt.line)
+			scope, err := applySingleHeaderDirectiveForTest(t, tt.line, tt.context)
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("parseVarDecl() expected error, got nil")
+					t.Errorf("applyHeaderDirective() expected error, got nil")
 				}
 				if tt.errMatch != "" && !containsString(err.Error(), tt.errMatch) {
-					t.Errorf("parseVarDecl() error = %v, want error containing %q", err, tt.errMatch)
+					t.Errorf("applyHeaderDirective() error = %v, want error containing %q", err, tt.errMatch)
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("parseVarDecl() unexpected error: %v", err)
+				t.Errorf("applyHeaderDirective() unexpected error: %v", err)
 				return
 			}
-			if name != tt.wantName {
-				t.Errorf("parseVarDecl() name = %q, want %q", name, tt.wantName)
+			val, ok := scope.Vars[tt.wantName]
+			if !ok {
+				t.Fatalf("applyHeaderDirective() did not bind %q", tt.wantName)
 			}
 			if tt.wantName != "" && !deepEqual(val, tt.wantVal) {
-				t.Errorf("parseVarDecl() val = %v, want %v", val, tt.wantVal)
+				t.Errorf("applyHeaderDirective() val = %v, want %v", val, tt.wantVal)
 			}
 		})
 	}
 }
 
-func TestParseFunDecl(t *testing.T) {
+func TestApplyHeaderDirectiveBuildsFunctionDeclaration(t *testing.T) {
 	tests := []struct {
 		name     string
 		line     string
@@ -283,26 +297,27 @@ func TestParseFunDecl(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lambda, name, err := parseFunDecl(tt.line, nil)
+			scope, err := applySingleHeaderDirectiveForTest(t, tt.line, nil)
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("parseFunDecl() expected error, got nil")
+					t.Errorf("applyHeaderDirective() expected error, got nil")
 					return
 				}
 				if tt.errMatch != "" && !containsString(err.Error(), tt.errMatch) {
-					t.Errorf("parseFunDecl() error = %v, want error containing %q", err, tt.errMatch)
+					t.Errorf("applyHeaderDirective() error = %v, want error containing %q", err, tt.errMatch)
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("parseFunDecl() unexpected error: %v", err)
+				t.Errorf("applyHeaderDirective() unexpected error: %v", err)
 				return
 			}
-			if name != tt.wantName {
-				t.Errorf("parseFunDecl() name = %q, want %q", name, tt.wantName)
+			lambda, ok := scope.Vars[tt.wantName]
+			if !ok {
+				t.Fatalf("applyHeaderDirective() did not bind %q", tt.wantName)
 			}
-			if lambda == nil {
-				t.Errorf("parseFunDecl() lambda = nil, want non-nil")
+			if _, ok := lambda.(*evaluator.Lambda); !ok {
+				t.Errorf("applyHeaderDirective() binding = %T, want *evaluator.Lambda", lambda)
 			}
 		})
 	}
@@ -329,7 +344,7 @@ func TestModuleLoaderLoadArraysModule(t *testing.T) {
 	}
 }
 
-func TestParseFunDeclFromLines_DoBlockSeparator(t *testing.T) {
+func TestParseFunctionDeclarationFromLines_DoBlockSeparator(t *testing.T) {
 	lines := []string{
 		"fun addOne(x) = do {",
 		"  var y = x + 1",
@@ -338,22 +353,38 @@ func TestParseFunDeclFromLines_DoBlockSeparator(t *testing.T) {
 		"}",
 		"output application/json",
 	}
-	fn, name, consumed, err := parseFunDeclFromLines(lines, 0, nil)
+	header := strings.Join(lines, "\n")
+	declarations, err := parseHeaderDirectives(header, true, header)
 	if err != nil {
-		t.Fatalf("parseFunDeclFromLines() unexpected error: %v", err)
+		t.Fatalf("parseHeaderDirectives() unexpected error: %v", err)
 	}
-	if name != "addOne" {
-		t.Fatalf("parseFunDeclFromLines() name = %q, want %q", name, "addOne")
+	if len(declarations) != 2 {
+		t.Fatalf("parseHeaderDirectives() declaration count = %d, want 2", len(declarations))
 	}
-	if consumed != 5 {
-		t.Fatalf("parseFunDeclFromLines() consumed = %d, want %d", consumed, 5)
+	function := declarations[0].Function
+	if function == nil {
+		t.Fatalf("parseHeaderDirectives()[0].Function = nil, want declaration")
 	}
-	if fn == nil {
-		t.Fatal("parseFunDeclFromLines() fn = nil, want non-nil")
+	if function.Name != "addOne" {
+		t.Fatalf("function name = %q, want %q", function.Name, "addOne")
+	}
+	if len(declarations[0].Source.Lines) != 5 {
+		t.Fatalf("function source line count = %d, want 5", len(declarations[0].Source.Lines))
+	}
+	wantBody := "do {\n  var y = x + 1\n  ---\n  y\n}"
+	if function.Body != wantBody {
+		t.Fatalf("function body = %q, want %q", function.Body, wantBody)
+	}
+	scope, err := applySingleHeaderDirectiveForTest(t, strings.Join(lines[:5], "\n"), nil)
+	if err != nil {
+		t.Fatalf("applyHeaderDirective() unexpected error: %v", err)
+	}
+	if _, ok := scope.Vars["addOne"].(*evaluator.Lambda); !ok {
+		t.Fatalf("applyHeaderDirective() did not bind addOne as function")
 	}
 }
 
-func TestParseTypeDecl(t *testing.T) {
+func TestParseTypeDeclarationIR(t *testing.T) {
 	tests := []struct {
 		name      string
 		line      string
@@ -398,32 +429,39 @@ func TestParseTypeDecl(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			typeDef, name, err := parseTypeDecl(tt.line)
+			decl, err := parseTypeDeclaration(tt.line)
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("parseTypeDecl() expected error, got nil")
+					t.Errorf("parseTypeDeclaration() expected error, got nil")
 					return
 				}
 				if tt.errMatch != "" && !containsString(err.Error(), tt.errMatch) {
-					t.Errorf("parseTypeDecl() error = %v, want error containing %q", err, tt.errMatch)
+					t.Errorf("parseTypeDeclaration() error = %v, want error containing %q", err, tt.errMatch)
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("parseTypeDecl() unexpected error: %v", err)
+				t.Errorf("parseTypeDeclaration() unexpected error: %v", err)
 				return
 			}
-			if name != tt.wantName {
-				t.Errorf("parseTypeDecl() name = %q, want %q", name, tt.wantName)
+			typeDef, err := bindTypeDeclaration(decl)
+			if err != nil {
+				t.Fatalf("bindTypeDeclaration() unexpected error: %v", err)
+			}
+			if decl.Name != tt.wantName {
+				t.Errorf("parseTypeDeclaration() name = %q, want %q", decl.Name, tt.wantName)
 			}
 			if typeDef.BaseType != tt.wantBase {
-				t.Errorf("parseTypeDecl() baseType = %q, want %q", typeDef.BaseType, tt.wantBase)
+				t.Errorf("bindTypeDeclaration() baseType = %q, want %q", typeDef.BaseType, tt.wantBase)
+			}
+			if tt.wantProps != nil && !deepEqual(typeDef.Properties, tt.wantProps) {
+				t.Errorf("bindTypeDeclaration() properties = %v, want %v", typeDef.Properties, tt.wantProps)
 			}
 		})
 	}
 }
 
-func TestParseNamespaceDecl(t *testing.T) {
+func TestParseNamespaceDeclaration(t *testing.T) {
 	tests := []struct {
 		name       string
 		line       string
@@ -452,22 +490,22 @@ func TestParseNamespaceDecl(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			prefix, uri, err := parseNamespaceDecl(tt.line)
+			decl, err := parseNamespaceDeclaration(tt.line)
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("parseNamespaceDecl() expected error, got nil")
+					t.Errorf("parseNamespaceDeclaration() expected error, got nil")
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("parseNamespaceDecl() unexpected error: %v", err)
+				t.Errorf("parseNamespaceDeclaration() unexpected error: %v", err)
 				return
 			}
-			if prefix != tt.wantPrefix {
-				t.Errorf("parseNamespaceDecl() prefix = %q, want %q", prefix, tt.wantPrefix)
+			if decl.Prefix != tt.wantPrefix {
+				t.Errorf("parseNamespaceDeclaration() prefix = %q, want %q", decl.Prefix, tt.wantPrefix)
 			}
-			if uri != tt.wantURI {
-				t.Errorf("parseNamespaceDecl() uri = %q, want %q", uri, tt.wantURI)
+			if decl.URI != tt.wantURI {
+				t.Errorf("parseNamespaceDeclaration() uri = %q, want %q", decl.URI, tt.wantURI)
 			}
 		})
 	}
@@ -696,7 +734,7 @@ func TestParseHeaderDirectives(t *testing.T) {
 		name      string
 		header    string
 		hasHeader bool
-		wantKinds []headerDirectiveKind
+		wantKinds []DeclarationKind
 		wantErr   string
 	}{
 		{
@@ -706,11 +744,11 @@ func TestParseHeaderDirectives(t *testing.T) {
 var broken = (
 fun wrap(x) = x
 output application/json`,
-			wantKinds: []headerDirectiveKind{
-				headerDirectiveVersion,
-				headerDirectiveVar,
-				headerDirectiveFun,
-				headerDirectiveOutput,
+			wantKinds: []DeclarationKind{
+				DeclarationVersion,
+				DeclarationVar,
+				DeclarationFun,
+				DeclarationOutput,
 			},
 		},
 		{
@@ -894,7 +932,7 @@ func TestSplitPropertyPairs(t *testing.T) {
 	}
 }
 
-func TestParsePropertyValue(t *testing.T) {
+func TestParseTypeDeclarationPropertyValue(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -912,19 +950,19 @@ func TestParsePropertyValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parsePropertyValue(tt.input)
+			got, err := parseTypeDeclarationPropertyValue(tt.input)
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("parsePropertyValue() expected error, got nil")
+					t.Errorf("parseTypeDeclarationPropertyValue() expected error, got nil")
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("parsePropertyValue() unexpected error: %v", err)
+				t.Errorf("parseTypeDeclarationPropertyValue() unexpected error: %v", err)
 				return
 			}
 			if !deepEqual(got, tt.want) {
-				t.Errorf("parsePropertyValue() = %v, want %v", got, tt.want)
+				t.Errorf("parseTypeDeclarationPropertyValue() = %v, want %v", got, tt.want)
 			}
 		})
 	}

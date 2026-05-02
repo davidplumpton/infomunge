@@ -177,12 +177,6 @@ func RunStringWithGoContext(goCtx context.Context, script string, additionalCont
 	return ResolveResult(result.Value)
 }
 
-// handleOutputDecl processes output directive and captures output options.
-func handleOutputDecl(trimmedLine string, outputMimeType *string, metadata *output.Metadata) error {
-	decl := parseOutputDeclaration(trimmedLine)
-	return applyOutputDeclaration(&decl, outputMimeType, metadata)
-}
-
 func applyOutputDeclaration(decl *OutputDeclaration, outputMimeType *string, metadata *output.Metadata) error {
 	if decl == nil {
 		return unifiederrors.InternalError("internal error: missing output declaration")
@@ -206,12 +200,6 @@ func applyOutputDeclaration(decl *OutputDeclaration, outputMimeType *string, met
 		output.SetOptions(metadata, parsed)
 	}
 	return nil
-}
-
-// handleInputDecl processes input directive.
-func handleInputDecl(trimmedLine string) {
-	decl := InputDeclaration{Text: strings.TrimSpace(strings.TrimPrefix(trimmedLine, "input "))}
-	applyInputDeclaration(&decl)
 }
 
 func applyInputDeclaration(decl *InputDeclaration) {
@@ -299,30 +287,12 @@ func unquoteOptionValue(value string) (string, bool) {
 	return value, false
 }
 
-// handleNamespaceDecl processes namespace declaration
-func handleNamespaceDecl(trimmedLine string, namespaces map[string]string) error {
-	decl, err := parseNamespaceDeclaration(trimmedLine)
-	if err != nil {
-		return err
-	}
-	return applyNamespaceDeclaration(decl, namespaces)
-}
-
 func applyNamespaceDeclaration(decl *NamespaceDeclaration, namespaces map[string]string) error {
 	if decl == nil {
 		return unifiederrors.InternalError("internal error: missing namespace declaration")
 	}
 	namespaces[decl.Prefix] = decl.URI
 	return nil
-}
-
-// handleTypeDecl processes type declaration
-func handleTypeDecl(trimmedLine string, context evaluator.Context) error {
-	decl, err := parseTypeDeclaration(trimmedLine)
-	if err != nil {
-		return err
-	}
-	return applyTypeDeclaration(decl, context)
 }
 
 var directiveKeywords = []string{"output ", "input ", "%dw ", "%im ", "ns ", "import ", "var ", "fun ", "type "}

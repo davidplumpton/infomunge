@@ -2,7 +2,7 @@ Feature: Runner header declaration paths (in-process coverage)
   In order to verify runner header parsing and declaration handling logic
   As a developer
   I want to exercise parseHeader, directive dispatch, variable declarations, function declarations,
-  handleTypeDecl, handleNamespaceDecl, handleImport, and related helpers in-process
+  type declarations, namespace declarations, imports, and shared declaration IR application in-process
 
   # --- Variable declarations ---
 
