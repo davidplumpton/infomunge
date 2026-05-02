@@ -60,9 +60,9 @@ func Run(filePath string) error {
 
 // RunWithConfig executes the infomunge process on the given file with options.
 func RunWithConfig(filePath string, opts RunnerOptions) error {
-	content, err := os.ReadFile(filePath)
+	content, err := ReadScriptFile(filePath)
 	if err != nil {
-		return unifiederrors.WrapIO(err, "error reading file")
+		return err
 	}
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
@@ -73,7 +73,7 @@ func RunWithConfig(filePath string, opts RunnerOptions) error {
 		opts.BaseDir = filepath.Dir(absPath)
 	}
 
-	return runFromStringWithConfig(context.Background(), string(content), nil, opts)
+	return runFromStringWithConfig(context.Background(), content, nil, opts)
 }
 
 // RunFromString executes an infomunge script from a string and prints formatted output.

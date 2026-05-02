@@ -139,6 +139,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	// Steps for read_file.feature
 	ctx.Step(`^a file named "([^"]*)" with content "([^"]*)"$`, tc.aFileNamedWithContent)
 	ctx.Step(`^a file named "([^"]*)" with content:$`, tc.aFileNamedWithDocstringContent)
+	ctx.Step(`^a file named "([^"]*)" with "([^"]*)" repeated (\d+) times$`, tc.aFileNamedWithRepeatedContent)
 	ctx.Step(`^I run the application with "([^"]*)"$`, tc.iRunTheApplicationWith)
 	ctx.Step(`^I run the application with "([^"]*)" and it fails$`, tc.iRunTheApplicationWithAndItFails)
 	ctx.Step(`^I run the application with arguments "([^"]*)" and it fails$`, tc.iRunTheApplicationWithArgumentsAndItFails)
@@ -256,6 +257,13 @@ func (tc *testContext) aFileNamedWithContent(fileName, content string) error {
 
 func (tc *testContext) aFileNamedWithDocstringContent(fileName string, content *godog.DocString) error {
 	return tc.aFileNamedWithContent(fileName, content.Content)
+}
+
+func (tc *testContext) aFileNamedWithRepeatedContent(fileName, fragment string, count int) error {
+	if count < 0 {
+		return fmt.Errorf("repeat count must be non-negative, got %d", count)
+	}
+	return tc.aFileNamedWithContent(fileName, strings.Repeat(fragment, count))
 }
 
 func (tc *testContext) iRunTheApplicationWith(arg string) error {

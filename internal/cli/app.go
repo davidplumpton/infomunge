@@ -137,9 +137,9 @@ func (app *App) execute(config *Config, context evaluator.Context) error {
 	}
 
 	if config.ScriptFile != "" {
-		content, err := os.ReadFile(config.ScriptFile)
+		content, err := runner.ReadScriptFile(config.ScriptFile)
 		if err != nil {
-			return unifiederrors.WrapIOf(err, "error reading script file: %s", config.ScriptFile)
+			return err
 		}
 		absPath, err := filepath.Abs(config.ScriptFile)
 		if err != nil {
@@ -147,7 +147,7 @@ func (app *App) execute(config *Config, context evaluator.Context) error {
 		} else {
 			opts.BaseDir = filepath.Dir(absPath)
 		}
-		return app.writeExecutionResult(string(content), context, opts)
+		return app.writeExecutionResult(content, context, opts)
 	}
 
 	if config.Script != "" {

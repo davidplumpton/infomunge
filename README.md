@@ -72,6 +72,12 @@ Notes:
 - If `format` is omitted, inputs are treated as `text/plain`.
 - `output` can be a format like `json` or a MIME type like `application/json`.
 
+### Size Limits
+
+- CLI script files and imported module files are limited to 1 MiB each.
+- File-backed CLI inputs and stdin-backed CLI inputs are limited to 10 MiB each.
+- Server `/run` request bodies are limited to 1 MiB; `readUrl` responses are limited to 10 MiB.
+
 ### Standalone Playground (WASM)
 
 Build standalone browser assets:

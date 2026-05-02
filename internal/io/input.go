@@ -10,7 +10,10 @@ import (
 	"infomunge/pkg/formats"
 )
 
-const MaxStdinBytes = 10 * 1024 * 1024
+const (
+	MaxStdinBytes     = 10 * 1024 * 1024
+	MaxFileInputBytes = 10 * 1024 * 1024
+)
 
 // Source represents a data source with its content and MIME type
 type Source struct {
@@ -62,9 +65,12 @@ func (p *Parser) parseFile(filePath string) (*Source, error) {
 		return nil, unifiederrors.ValidationErrorf("unsupported file extension: %s", filePath)
 	}
 
-	content, err := os.ReadFile(filePath)
+	content, tooLarge, err := readlimit.ReadFile(filePath, MaxFileInputBytes)
 	if err != nil {
 		return nil, unifiederrors.WrapIOf(err, "reading file %s", filePath)
+	}
+	if tooLarge {
+		return nil, unifiederrors.ValidationErrorf("input file %s exceeds maximum size of %d bytes", filePath, MaxFileInputBytes)
 	}
 
 	return &Source{

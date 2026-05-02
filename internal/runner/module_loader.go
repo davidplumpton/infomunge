@@ -87,11 +87,11 @@ func (l *ModuleLoader) Load(moduleSpec string) (*Module, error) {
 			return nil, unifiederrors.WrapParsef(err, "failed to load standard module %s", moduleSpec)
 		}
 	} else {
-		rawContent, readErr := os.ReadFile(path)
+		moduleContent, readErr := readModuleFile(moduleSpec, path)
 		if readErr != nil {
-			return nil, unifiederrors.WrapIOf(readErr, "failed to read module %s", moduleSpec)
+			return nil, readErr
 		}
-		content = string(rawContent)
+		content = moduleContent
 	}
 
 	ns, err := parseModuleContent(content, l)
