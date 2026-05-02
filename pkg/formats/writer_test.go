@@ -51,6 +51,32 @@ func TestFormat_JSON(t *testing.T) {
 	}
 }
 
+func TestFormat_TextPlain(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    interface{}
+		expected string
+	}{
+		{"string", "hello", "hello"},
+		{"int", 42, "42"},
+		{"bool", true, "true"},
+		{"object", Object{"key": "value"}, `{"key":"value"}`},
+		{"array", Array{"a", "b"}, `["a","b"]`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Format(tt.input, "text/plain")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
 func TestFormat_XML(t *testing.T) {
 	tests := []struct {
 		name     string
