@@ -2,6 +2,7 @@ package runtimeio
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -58,7 +59,8 @@ func NewURLReadService(formatService evaluator.FormatService) *URLReadService {
 
 func defaultHTTPClient() *http.Client {
 	return &http.Client{
-		Timeout: ReadURLTimeout,
+		Timeout:   ReadURLTimeout,
+		Transport: safeHTTPTransport(),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return fmt.Errorf("too many redirects")
@@ -116,7 +118,8 @@ func (s *URLReadService) ReadURL(ctx context.Context, rawURL, mimeType string) (
 	return result, nil
 }
 
-// ValidateURL checks that a URL is safe to fetch.
+// ValidateURL checks URL shape and literal hosts before fetching. Hostname
+// resolution and actual remote-address enforcement happen in the HTTP dialer.
 func ValidateURL(u *url.URL) error {
 	scheme := strings.ToLower(u.Scheme)
 	if scheme != "http" && scheme != "https" {
@@ -128,26 +131,157 @@ func ValidateURL(u *url.URL) error {
 		return fmt.Errorf("readUrl: empty hostname")
 	}
 
-	if hostname == "metadata.google.internal" {
+	if isBlockedHostname(hostname) {
 		return fmt.Errorf("readUrl: access to %q is blocked", hostname)
 	}
 
-	ip := net.ParseIP(hostname)
-	if ip == nil {
-		addrs, err := net.LookupHost(hostname)
-		if err != nil {
-			return nil
-		}
-		for _, addr := range addrs {
-			if resolved := net.ParseIP(addr); resolved != nil && IsPrivateIP(resolved) {
-				return fmt.Errorf("readUrl: hostname %q resolves to private address %s", hostname, addr)
-			}
-		}
-		return nil
+	if ip := parseHostIP(hostname); ip != nil && IsPrivateIP(ip) {
+		return fmt.Errorf("readUrl: access to private/internal address %s is blocked", ip)
+	}
+	return nil
+}
+
+type ipResolver interface {
+	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
+}
+
+type dialContextFunc func(context.Context, string, string) (net.Conn, error)
+
+type safeDialer struct {
+	resolver    ipResolver
+	dialContext dialContextFunc
+}
+
+func safeHTTPTransport() *http.Transport {
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		base = &http.Transport{}
+	}
+	transport := base.Clone()
+	transport.Proxy = nil
+	transport.DialContext = newSafeDialer().DialContext
+	return transport
+}
+
+func newSafeDialer() safeDialer {
+	dialer := &net.Dialer{}
+	return safeDialer{
+		resolver:    net.DefaultResolver,
+		dialContext: dialer.DialContext,
+	}
+}
+
+func (d safeDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, fmt.Errorf("readUrl: invalid dial address %q: %w", address, err)
+	}
+	if host == "" {
+		return nil, fmt.Errorf("readUrl: empty hostname")
+	}
+	if isBlockedHostname(host) {
+		return nil, fmt.Errorf("readUrl: access to %q is blocked", host)
 	}
 
+	addrs, err := d.resolve(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	for _, addr := range addrs {
+		if addr.IP == nil {
+			return nil, fmt.Errorf("readUrl: hostname %q resolved to an unverifiable address", host)
+		}
+		if IsPrivateIP(addr.IP) {
+			return nil, fmt.Errorf("readUrl: hostname %q resolves to private address %s", host, addr.IP)
+		}
+	}
+
+	dial := d.dialContext
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
+
+	var lastErr error
+	for _, addr := range addrs {
+		conn, err := dial(ctx, network, net.JoinHostPort(addr.IP.String(), port))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if err := validateRemoteAddress(host, conn.RemoteAddr()); err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
+		return conn, nil
+	}
+	if lastErr != nil {
+		return nil, fmt.Errorf("readUrl: failed to connect to hostname %q: %w", host, lastErr)
+	}
+	return nil, fmt.Errorf("readUrl: hostname %q resolved to no addresses", host)
+}
+
+func (d safeDialer) resolve(ctx context.Context, host string) ([]net.IPAddr, error) {
+	if ip := parseHostIP(host); ip != nil {
+		return []net.IPAddr{{IP: ip}}, nil
+	}
+	resolver := d.resolver
+	if resolver == nil {
+		resolver = net.DefaultResolver
+	}
+	addrs, err := resolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("readUrl: failed to resolve hostname %q: %w", host, err)
+	}
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("readUrl: hostname %q resolved to no addresses", host)
+	}
+	return addrs, nil
+}
+
+func validateRemoteAddress(host string, addr net.Addr) error {
+	ip := remoteIP(addr)
+	if ip == nil {
+		return fmt.Errorf("readUrl: could not verify remote address %q for hostname %q", addr, host)
+	}
 	if IsPrivateIP(ip) {
-		return fmt.Errorf("readUrl: access to private/internal address %s is blocked", ip)
+		return fmt.Errorf("readUrl: connected to private/internal address %s for hostname %q", ip, host)
+	}
+	return nil
+}
+
+func remoteIP(addr net.Addr) net.IP {
+	switch typed := addr.(type) {
+	case *net.TCPAddr:
+		return typed.IP
+	case *net.UDPAddr:
+		return typed.IP
+	case *net.IPAddr:
+		return typed.IP
+	}
+	if addr == nil {
+		return nil
+	}
+	host, _, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		host = addr.String()
+	}
+	return parseHostIP(host)
+}
+
+func isBlockedHostname(hostname string) bool {
+	normalized := strings.TrimSuffix(strings.ToLower(hostname), ".")
+	return normalized == "metadata.google.internal"
+}
+
+func parseHostIP(hostname string) net.IP {
+	if ip := net.ParseIP(hostname); ip != nil {
+		return ip
+	}
+	if zoneIndex := strings.LastIndex(hostname, "%"); zoneIndex > 0 {
+		return net.ParseIP(hostname[:zoneIndex])
 	}
 	return nil
 }

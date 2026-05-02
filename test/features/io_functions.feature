@@ -867,6 +867,16 @@ Feature: I/O Functions
       """
     Then running the script should fail with error containing "private/internal address"
 
+  Scenario: readUrl blocks hostnames that resolve to private addresses
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      readUrl("http://localhost/secret", "text/plain")
+      """
+    Then running the script should fail with error containing "resolves to private address"
+
   Scenario: readUrl blocks link-local metadata addresses
     Given the following script:
       """
@@ -876,6 +886,17 @@ Feature: I/O Functions
       readUrl("http://169.254.169.254/latest/meta-data/", "text/plain")
       """
     Then running the script should fail with error containing "private/internal address"
+
+  Scenario: readUrl blocks redirects to private targets
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      readUrl("http://redirect.example/start", "text/plain")
+      """
+    When I run the script with readUrl redirecting to "http://127.0.0.1/secret"
+    Then the output should contain "private/internal address"
 
   Scenario: readUrl blocks non-HTTP schemes
     Given the following script:

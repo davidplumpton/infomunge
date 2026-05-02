@@ -26,6 +26,7 @@ import (
 	"infomunge/internal/evaluator"
 	resultoutput "infomunge/internal/output"
 	"infomunge/internal/runner"
+	"infomunge/internal/runtimeio"
 	"infomunge/pkg/formats"
 )
 
@@ -176,6 +177,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I run the script with a canceled evaluation context$`, tc.iRunTheScriptWithCanceledEvaluationContext)
 	ctx.Step(`^I run the script with an expired evaluation deadline$`, tc.iRunTheScriptWithExpiredEvaluationDeadline)
 	ctx.Step(`^I run the script with URL IO disabled$`, tc.iRunTheScriptWithURLIODisabled)
+	ctx.Step(`^I run the script with readUrl redirecting to "([^"]*)"$`, tc.iRunTheScriptWithReadURLRedirectingTo)
 	ctx.Step(`^running the script should fail with error containing "([^"]*)"$`, tc.runningTheScriptShouldFailWithErrorContaining)
 
 	// Additional step for JSON input with script from input content
@@ -763,6 +765,64 @@ func (tc *testContext) iRunTheScriptWithURLIODisabled() error {
 
 	tc.lastOutput = err.Error()
 	return nil
+}
+
+func (tc *testContext) iRunTheScriptWithReadURLRedirectingTo(target string) error {
+	ctx := make(evaluator.Context)
+
+	if tc.payloadMime != "" {
+		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
+		if err != nil {
+			return fmt.Errorf("failed to parse payload: %v", err)
+		}
+		ctx["payload"] = payload
+	}
+
+	redirectClient := &http.Client{
+		Transport: redirectRoundTripper{target: target},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			return runtimeio.ValidateURL(req.URL)
+		},
+	}
+	service := &runtimeio.URLReadService{
+		Client:        redirectClient,
+		FormatService: runtimeio.FormatService{},
+	}
+
+	result, err := runner.ExecuteString(
+		context.Background(),
+		tc.scriptContent,
+		ctx,
+		runner.RunnerOptions{URLReadService: service},
+	)
+	if err != nil {
+		tc.lastOutput = err.Error()
+		return nil
+	}
+
+	formatted, err := formatTestExecutionResult(result)
+	if err != nil {
+		return fmt.Errorf("failed to format output: %v", err)
+	}
+	tc.lastOutput = formatted
+	return nil
+}
+
+type redirectRoundTripper struct {
+	target string
+}
+
+func (rt redirectRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusFound,
+		Status:     "302 Found",
+		Header:     http.Header{"Location": []string{rt.target}},
+		Body:       io.NopCloser(strings.NewReader("")),
+		Request:    req,
+	}, nil
 }
 
 func (tc *testContext) runningTheScriptShouldFailWithErrorContaining(expected string) error {
