@@ -211,7 +211,7 @@ func columnName(col int) string {
 	return out
 }
 
-// xmlEscape escapes a string for safe inclusion in XML text content.
+// xmlEscape escapes a string for safe inclusion in XML text or quoted attribute values.
 func xmlEscape(value string) string {
 	var b bytes.Buffer
 	if err := xml.EscapeText(&b, []byte(value)); err != nil {

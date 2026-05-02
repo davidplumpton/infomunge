@@ -223,11 +223,12 @@ func (nsDecls xmlNamespaceDecls) mergeInto(dst map[string]string) {
 func (nsDecls xmlNamespaceDecls) declarationStrings() []string {
 	decls := make([]string, 0, len(nsDecls))
 	for prefix, uri := range nsDecls {
+		escapedURI := xmlEscape(uri)
 		if prefix == "" {
-			decls = append(decls, fmt.Sprintf(`xmlns="%v"`, uri))
+			decls = append(decls, fmt.Sprintf(`xmlns="%s"`, escapedURI))
 			continue
 		}
-		decls = append(decls, fmt.Sprintf(`xmlns:%s="%v"`, prefix, uri))
+		decls = append(decls, fmt.Sprintf(`xmlns:%s="%s"`, prefix, escapedURI))
 	}
 	return decls
 }
@@ -397,7 +398,7 @@ func toXMLWithOptionsRecursive(v interface{}, name string, opts xmlRenderOptions
 		return buildElementContent(name, val, opts, isChild)
 	default:
 		if name == "" {
-			return fmt.Sprintf("%v", v)
+			return xmlEscape(fmt.Sprintf("%v", v))
 		}
 		return buildElementContent(name, v, opts, isChild)
 	}
@@ -434,7 +435,7 @@ func buildElementContent(name string, value interface{}, opts xmlRenderOptions, 
 		return openingTag + buildXMLContentWithOptions(valObj, opts)
 	}
 
-	return openingTag + fmt.Sprintf("%v", value)
+	return openingTag + xmlEscape(fmt.Sprintf("%v", value))
 }
 
 // buildXMLAttributes builds XML namespace declarations and attribute strings.
@@ -593,7 +594,7 @@ func buildXMLContentWithOptions(val Object, opts xmlRenderOptions) string {
 
 	// Add text content if present
 	if text, ok := val[XMLTextKey]; ok && text != nil {
-		sb.WriteString(fmt.Sprintf("%v", text))
+		sb.WriteString(xmlEscape(fmt.Sprintf("%v", text)))
 	}
 
 	return sb.String()
@@ -634,7 +635,7 @@ func formatXMLAttrValue(value interface{}) string {
 	if value == nil {
 		return ""
 	}
-	return fmt.Sprintf("%v", value)
+	return xmlEscape(fmt.Sprintf("%v", value))
 }
 
 // buildXMLOpeningTag builds the opening tag attributes string.
