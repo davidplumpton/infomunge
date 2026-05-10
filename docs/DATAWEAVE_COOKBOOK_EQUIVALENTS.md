@@ -772,7 +772,7 @@ output application/json
 
 **Usage:**
 ```bash
-./infomunge -i payload orders.json -i users users.json "%im 0.1
+./infomunge -i payload=orders.json -i users=users.json "%im 0.1
 input payload application/json
 input users application/json
 output application/json
@@ -882,7 +882,7 @@ output application/json
 | **Multiple Inputs** | `input <name> <format>` | `input <name> <format>` |
 | **Null Literal** | `null` | `null` (preferred), `nil` alias also accepted |
 | **Type System** | Complex type definitions | Basic types with `as` coercion |
-| **Supported Formats** | JSON, XML, CSV, YAML, Properties | JSON, XML, CSV, YAML, Properties |
+| **Supported Formats** | JSON, XML, CSV, YAML, Properties | JSON, XML, CSV, YAML; Properties input only |
 
 ---
 
@@ -892,15 +892,15 @@ To test these examples, use:
 
 ```bash
 # Simple expression
-./infomunge -i payload input.json "%im 0.1
+./infomunge -i payload=input.json "%im 0.1
 input application/json
 output application/json
 ---
 payload.name"
 
 # From file
-./infomunge -i payload input.json -f transformation.im
+./infomunge -i payload=input.json -f transformation.im
 
 # Multiple inputs
-./infomunge -i payload orders.json -i users users.json -f multi_input.im
+./infomunge -i payload=orders.json -i users=users.json -f multi_input.im
 ```

@@ -40,7 +40,7 @@ The `--lazy` flag is currently unsupported and returns a validation error.
 Use lazy builtins directly in scripts instead.
 
 ```bash
-infomunge -i payload data.json "%im 0.1
+infomunge -i payload=data.json "%im 0.1
 output application/json
 ---
 __lazyFilter(__lazyMap(__toStream(payload), (x) -> x.field), (x) -> x > 10)"

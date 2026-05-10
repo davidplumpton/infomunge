@@ -6,7 +6,7 @@
 
 - The project will be structured so the domain logic can be extracted as a library
 - Data can be received and emitted in several formats
-- JSON, XML, CSV, YAML, Java properties
+- JSON, XML, CSV, and YAML support both input and output; Java properties are input-only
 - Multiple inputs are possible, each with a different name
 - Features will be developed incrementally
 
@@ -25,8 +25,8 @@ go build -o infomunge ./cmd/infomunge
 ### Usage
 
 ```bash
-./infomunge -i payload <payload.json> "%im 0.1 output text/csv --- payload"
-./infomunge -i payload <payload.json> -i input2 <inout2.json> -f <infomungefile.im>
+./infomunge -i payload=payload.json "%im 0.1 output text/csv --- payload"
+./infomunge -i payload=payload.json -i input2=input2.json -f infomungefile.im
 ```
 
 Notes:
@@ -62,9 +62,9 @@ Open the playground at `http://localhost:8080/` to use the interactive UI. It of
 POST a script with optional inputs:
 
 ```bash
-curl -X POST http://localhost:8080/run \\
-  -H 'Content-Type: application/json' \\
-  -H 'X-API-Key: your-secret' \\
+curl -X POST http://localhost:8080/run \
+  -H 'Content-Type: application/json' \
+  -H 'X-API-Key: your-secret' \
   -d '{"script":"%im 0.1\\noutput application/json\\n---\\nsizeOf(payload)","output":"json","inputs":[{"name":"payload","format":"json","content":"[1,2,3]"}]}'
 ```
 
@@ -107,7 +107,7 @@ Key entrypoint: `internal/runner/runner.go`.
 - Runner + header parsing: `internal/runner/runner.go`
 - Preprocessor (syntax transforms): `internal/preprocessor/*`
 - Evaluator (AST + builtins + lazy): `internal/evaluator/*`
-- Formats (read/write): `pkg/formats/*`
+- Formats (readers/writers): `pkg/formats/*`
 - Core module scripts: `modules/dw/core/*.im` (for example `Arrays.im`, `Binaries.im`, `Strings.im`, `Objects.im`, `Numbers.im`)
 
 ### Where To Add Things
@@ -154,10 +154,10 @@ Repo-wide package tests should also pass:
 go test ./...
 ```
 
-Scratch helper programs under `tmp/` are isolated in a nested Go module so they do not participate in the repo-root `go test ./...` package walk. Run them from inside `tmp/`, for example:
+Scratch helper programs under `tmp/` are isolated in a nested Go module so they do not participate in the repo-root `go test ./...` package walk. Run helpers from inside `tmp/` by passing the helper file you created:
 
 ```bash
-cd tmp && go run ./inspect.go
+cd tmp && go run ./your-helper.go
 ```
 
 Generate coverage from cucumber tests (runtime-focused packages):
