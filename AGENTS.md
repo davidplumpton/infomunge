@@ -11,7 +11,7 @@ bv --robot-triage     # Find available work
 br show <id>          # View issue details
 br update <id> --status in_progress  # Claim work
 br close <id>         # Complete work
-br sync               # Sync with git
+br sync --flush-only  # Export beads DB to .beads/issues.jsonl for jj to commit
 ```
 
 ## Landing the Plane (Session Completion)
@@ -23,7 +23,7 @@ Important: use jj for version control. Never use git commands. Always commit wit
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed) - Tests, linters, builds
 3. **Update issue status** - Close finished work, update in-progress items
-4. **Run br sync** - Ensure VCS captures issue updates
+4. **Run br sync --flush-only** - Export issue updates to `.beads/issues.jsonl`; `br` never runs VCS commands
 5. **Only work on one task at a time before committing to VCS**
 6. **Clean up**
 7. **Verify** - Create an appropriate jj description and then run `jj commit -m <description>`
@@ -35,7 +35,7 @@ Important: use jj for version control. Never use git commands. Always commit wit
 - Update status as you work (in_progress → closed)
 - Create new issues with `br create` when you discover tasks
 - Use descriptive titles and set appropriate priority/type, and dependencies between related items
-- Always `br sync` before committing
+- Always run `br sync --flush-only` before committing beads changes with `jj`
 - Commit between finishing one beads issue and starting another
 - Use jj commit with a description, don't use jj new with a description
 - Use a 5 minute timeout when running cucumber tests

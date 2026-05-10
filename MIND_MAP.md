@@ -1,139 +1,63 @@
 # Mind Map - InfoMunge
 
-> **For AI Agents:** Start with overview nodes [1-5], then follow inline references [N]. Update nodes immediately when behavior or workflow changes. Keep it compact (20-50 nodes). Use node IDs when referencing.
+> **For AI Agents:** Start with overview nodes [1-5], then follow inline references. Keep this file compact, roughly 20-50 nodes. When behavior, workflow, mistakes, or user preferences change, update the relevant compact node instead of appending duplicate one-off entries.
 
-[1] **Project Overview** - InfoMunge is a Go-based tool for transforming text data with a DataWeave-inspired syntax; it parses inputs, headers, rewrites syntax, evaluates an AST, and formats output [3][2]. It supports multiple inputs and multiple formats (JSON, XML, CSV, YAML, Java properties) [6][10].
+[1] **Project Overview** - InfoMunge is a Go tool for transforming text data with DataWeave-inspired syntax. It parses inputs and headers, rewrites syntax, evaluates an AST, then formats output [3].
 
-[2] **Repo Map** - Key entrypoints and modules: CLI `cmd/infomunge/main.go`, WASM build `cmd/infomunge-wasm/main.go`, CLI app `internal/cli/app.go`, inputs `internal/io/input.go`, runner `internal/runner/runner.go`, preprocessor `internal/preprocessor/*`, evaluator `internal/evaluator/*`, formats `pkg/formats/*`, core module scripts `modules/dw/core/*.im` (Arrays/Binaries/Strings/Objects/Numbers), standalone playground `docs/playground/index.html` [9][7][8][6][10][21].
+[2] **Repo Map** - Key entrypoints: CLI `cmd/infomunge/main.go`, CLI app `internal/cli/app.go`, WASM build `cmd/infomunge-wasm/main.go`, inputs `internal/io/input.go`, runner `internal/runner/runner.go`, preprocessor `internal/preprocessor/*`, evaluator `internal/evaluator/*`, formats `pkg/formats/*`, modules `modules/dw/core/*.im`, standalone playground `docs/playground/index.html`.
 
-[3] **Execution Pipeline** - Flow: CLI -> Inputs -> Header -> Preprocess -> Evaluate -> Format output [2]. Header directives are parsed in the runner, preprocessing rewrites DataWeave-like syntax, evaluation executes the AST with builtins, then output formatting occurs [7][8][9][6].
+[3] **Execution Pipeline** - Flow: CLI -> Inputs -> Header -> Preprocess -> Evaluate -> Format output. Header directives are parsed in the runner, preprocessing rewrites DataWeave-like syntax, evaluator executes builtins and lazy values, then output formatting serializes the result.
 
-[4] **CLI Usage** - Example: `./infomunge -i payload <payload.json> "%im 0.1 output text/csv --- payload"`; multiple inputs supported with repeated `-i` flags [10][6].
+[4] **User-Facing Modes** - CLI accepts scripts directly or with `-f`, supports repeated named `-i` inputs, and can run server mode via `./infomunge --server --listen :8080`. The playground posts scripts and inputs to `/run`.
 
-[5] **Server Mode** - `./infomunge --server --listen :8080` starts HTTP server with playground UI and `/run` endpoint for scripts and inputs [10].
+[5] **Formats** - Format readers/writers live in `pkg/formats/*` with the registry in `pkg/formats/registry.go`. JSON, XML, CSV, YAML, Java properties, and text behavior are user-visible. CSV output requires an array of objects.
 
-[6] **Formats** - Implemented in `pkg/formats/*` with registry in `pkg/formats/registry.go`; supports JSON, XML, CSV, YAML, Java properties [2]. CSV output expects an array of objects; otherwise validation error [18].
+[6] **Preprocessor** - Syntax transforms live in `internal/preprocessor/*`. Add operators in `internal/preprocessor/transformers_*`; be careful around bracket/brace scanning and grouped operands.
 
-[7] **Preprocessor** - Syntax transforms live in `internal/preprocessor/*`; add operators in `internal/preprocessor/transformers_*` [2].
+[7] **Evaluator** - AST evaluation and builtins live in `internal/evaluator/*`. New builtins usually belong in `internal/evaluator/builtins_*`; preserve lazy evaluation and nondeterministic builtin behavior such as `now()`.
 
-[8] **Evaluator** - AST evaluation and builtins in `internal/evaluator/*`; new builtins go in `internal/evaluator/builtins_*` [2].
+[8] **Runner And Modules** - Runner orchestration is in `internal/runner/runner.go`; module loading behavior is in `internal/runner/module_loader.go`. Core module scripts live under `modules/dw/core`.
 
-[9] **Runner** - `internal/runner/runner.go` orchestrates header parsing and execution pipeline; module loading behavior in `internal/runner/module_loader.go` [3][11].
+[9] **Testing** - Cucumber tests run with `go test -v ./test`. For feature work, add or update cucumber coverage. Use `GODOG_PATHS=features/...` because the test harness resolves feature paths relative to `./test`.
 
-[10] **Inputs** - Inputs are named, optional, and can include a `format`; format defaults to `text/plain` when omitted [4][5]. Inputs are parsed in `internal/io/input.go` [2].
+[10] **Quality Gates** - Prefer targeted package and cucumber tests for changed areas. Avoid blanket `go test ./...` when scratch helper `main` files exist under `tmp`; use scoped packages or remove helper conflicts first.
 
-[11] **Module Loading** - Adjust module loading logic in `internal/runner/module_loader.go`; keep in sync with runner behavior [9].
+[11] **Version Control** - Use `jj` only; never use git commands. Commit with `jj commit -m <description>` and do not use `jj new` with a message. Run JJ commands sequentially because status/describe/commit can touch working-copy state and ref locks.
 
-[12] **Testing** - Uses Cucumber for Go; run `go test -v ./test` [14]. When adding features, add a cucumber test [15].
+[12] **Beads Workflow** - Issue tracking uses `br` (beads rust): `bv --robot-triage`, `br show <id>`, `br update <id> --status in_progress`, `br close <id>`, `br sync --flush-only`. `br sync --flush-only` exports the beads database to `.beads/issues.jsonl`; `br` never runs VCS commands or commits. Use `jj` to commit the exported beads files.
 
-[13] **Version Control** - Use `jj` only; never use git commands. Commit with `jj commit -m <description>` and do not use `jj new` with a message [19].
+[13] **Landing The Plane** - Before handoff: file follow-up issues, run quality gates when code changed, close/update beads, run `br sync --flush-only`, clean up temporary artifacts, verify `jj status`, then `jj commit -m <description>`.
 
-[14] **Beads Workflow** - Issue tracking via `br` (beads rust): `bv --robot-triage` to find prioritized work, `br show <id>`, `br update <id> --status in_progress`, `br close <id>`, `br sync` [19].
+[14] **Agent Constraints** - Use Go only, do not install new software without asking, stay inside the infomunge directory, and put temp files under `tmp`. Track durable mistakes and user preferences here, compactly.
 
-[15] **Agent Constraints** - Use Go only; do not install new software; put temp files in `tmp`; run cucumber tests with a 5 minute timeout [12][14][19].
+[15] **Docs** - See `docs/ARCHITECTURE.md`, `docs/EXTENDING.md`, and `docs/TESTING.md` for deeper implementation and testing details.
 
-[16] **Docs** - See `docs/ARCHITECTURE.md`, `docs/EXTENDING.md`, and `docs/TESTING.md` for details [2][12].
+[16] **Standalone Playground** - Build WASM assets with `make playground-wasm`, then open `docs/playground/index.html`. Legacy gopherjs artifacts and `cmd/infomunge-js` have been removed.
 
-[17] **Example Script** - DataWeave-like example uses `%im 0.1`, `output application/json`, function definition, and expression block after `---` [4].
+[17] **User Preferences** - The user values explicit operating instructions in `AGENTS.md`, durable coordination in `MIND_MAP.md`, process-level improvements, and creating beads tickets for meaningful follow-up work instead of leaving implicit TODOs.
 
-[18] **CSV Output Constraint** - CSV output requires an array of objects; non-array results or non-object rows yield validation errors [6].
+[18] **Ticket Selection Preference** - When asked for the next ticket, start from `README.md`, `AGENTS.md`, and `MIND_MAP.md`, run `bv --robot-triage`, and prefer continuing work already marked `in_progress` before claiming new work.
 
-[19] **Landing the Plane** - Session completion: file issues, run quality gates, update issue status, run `br sync`, clean up, verify, then `jj commit -m <description>` [12][13][14].
+[19] **Review Preference** - For codebase quality reviews, focus on the biggest substantiated issues and turn significant findings into concrete beads tickets immediately.
 
-[20] **Multiple Inputs** - CLI supports multiple named inputs; server `/run` accepts `inputs` array with `name`, `content`, and optional `format` [4][5][10].
+[20] **Memory Hygiene** - Keep this file compact. Merge repeated pitfalls into category nodes, preserve prevention steps that materially change future behavior, and avoid growing a dated entry for every recurrence unless the recurrence reveals a new prevention rule.
 
-[21] **Standalone Playground (WASM)** - Build with `make playground-wasm` (runs `GOOS=js GOARCH=wasm go build -o docs/playground/infomunge.wasm ./cmd/infomunge-wasm`), then open `docs/playground/index.html` for a local WASM runner (no server). Legacy gopherjs artifacts and `cmd/infomunge-js` have been removed [4][5][2].
+[21] **Patch Discipline** - Use the dedicated `apply_patch` tool for manual edits. Do not invoke patching through shell commands. Keep broad refactors in small hunks and reopen edited regions before testing.
 
-[22] **Agent Memory Policy** - Keep a small running log in this file for (a) agent mistakes and prevention steps and (b) user preferences. Update it when new evidence appears.
+[22] **Search Discipline** - Use `rg` first for searches. Put all flags before `--`, and place patterns that may begin with `-` after `--`. Use `rg -U` only when true multiline matching is needed.
 
-[23] **Agent Mistakes Log** - 2026-02-08: During ScanState refactor, exponent rewrite briefly regressed for grouped operands (`(1 + 1) ** (2 + 1)` stayed untransformed). Why: stop-condition check ran before handling opening brackets. Prevention: in right-operand scanners, process open/close bracket transitions before operator-stop checks and verify grouped-operand cucumber scenarios before handoff [22].
+[23] **Stateful Command Discipline** - Do not parallelize beads mutations with reads (`br update`/`br close` then `br show`), and do not parallelize JJ operations. Run state-changing and state-inspecting VCS/beads commands sequentially.
 
-[24] **User Preferences Log** - Confirmed preference: keep persistent memory in `MIND_MAP.md` for both agent mistakes and things the user likes [22].
+[24] **Shell Quoting Discipline** - Avoid backticks inside double-quoted shell commands; they still execute command substitution, including in `rg` patterns. Avoid complex inline shell quoting for beads descriptions. Prefer simple descriptions or temp files under `tmp` when multiline payloads are needed.
 
-[25] **User Likes (Known So Far)** - Likes explicit operating instructions in `AGENTS.md`; likes using `MIND_MAP.md` as a durable coordination artifact; likes capturing process-level improvements, not just code changes [24].
+[25] **Cucumber Harness Pitfalls** - CLI failure scenarios usually need `Given the following input content`, while in-process runner scenarios use `Given the following script`. For multiline fixture files, use docstring-backed steps so real newlines are written.
 
-[26] **Ideas Backlog (Current)** - Add dated mini-entries for each future mistake/preference; add a short "Do/Don't" list for fast agent onboarding; keep this section concise to avoid noise while preserving learning value [22][23][24].
+[26] **Script Formatting Pitfalls** - Keep complex function calls in cucumber scripts on a single expression line unless multiline parser coverage exists. JSON output expectations are exact text comparisons, so match compact serialized output.
 
-[27] **Agent Mistakes Log** - 2026-02-08: Attempted file edits by invoking `apply_patch` through `exec_command` instead of using the dedicated `apply_patch` tool. Why: tool-routing oversight while parallelizing edits. Prevention: run patches only via the `apply_patch` tool and reserve `exec_command` for shell commands [22].
+[27] **Parser Fragility Notes** - Inline `if` expressions inside object literals and dense object-value expressions have repeatedly hit brace/branch scanning bugs. For unrelated coverage, use simpler objects, arrays, defaults, or isolate conditionals in parser-specific tests.
 
-[28] **Agent Mistakes Log** - 2026-02-08: Ran targeted cucumber test with `GODOG_PATHS=test/features/...` from repo root, but the test runner resolves paths relative to `./test` so it failed with "feature path ... is not available". Why: forgot path base in `test/godog_test.go` workflow. Prevention: use `GODOG_PATHS=features/...` when invoking `go test -run TestFeatures ./test` [22].
+[28] **Generated Test Data Pitfalls** - Property-generated source literals should avoid scientific notation and parser-active string sequences such as interpolation-looking `$(` unless explicitly testing those paths.
 
-[29] **Agent Mistakes Log** - 2026-02-12: Property tests used scientific-notation numeric literals (for example `6.103515625e-05`) directly in generated expressions; these conflicted with parser/operator handling around `**`/`default` and caused parse errors. Why: reused generic literal generators without constraining numeric source formatting for script embedding. Prevention: for algebraic property scripts, generate fixed-point numeric literals (for example via `FormatFloat(..., 'f', ...)`) and avoid exponent notation in source strings [22].
+[29] **Error Context Discipline** - When changing wrapped error messages or unified error plumbing, verify final rendered CLI stderr/output and preserve essential context such as filenames.
 
-[30] **Agent Mistakes Log** - 2026-02-12: Property tests reused unconstrained string literal generation and produced values like `"$(..."`, which collided with interpolation parsing when embedded in generated expressions. Why: string generators were not scoped to parser-safe source contexts. Prevention: for property-generated source literals, constrain to a safe ASCII subset unless a test is explicitly targeting interpolation/escape behavior [22].
-
-[31] **Agent Mistakes Log** - 2026-02-12: Mutation determinism checks initially treated all expressions as deterministic and failed on legitimate time/random outputs (for example `now()`). Why: deterministic invariant lacked a nondeterministic-builtin exclusion list. Prevention: keep no-panic checks universal, but gate deterministic-result assertions behind an explicit allow/deny list for known nondeterministic builtins [22].
-
-[32] **User Preferences Log** - 2026-02-13: User asked for codebase quality review focused on biggest issues and expects significant findings to be turned into detailed beads tickets immediately.
-
-[33] **Agent Mistakes Log** - 2026-02-13: Attempted to invoke `apply_patch` through `exec_command` again while editing multiple files. Why: defaulted to a parallel shell-edit pattern and skipped the dedicated patch tool. Prevention: use the `apply_patch` tool directly for all patch hunks, then parallelize only read/test commands [22].
-
-[34] **Agent Mistakes Log** - 2026-02-13: Changed widely used runner/evaluator function signatures directly (`Evaluate`, `parseHeader`, var-decl parsers), which caused broad compile fallout across tests and helpers. Why: optimized for strict API purity before checking compatibility surface. Prevention: preserve existing signatures and add context-aware variants first, then migrate call sites incrementally [22].
-
-[35] **Agent Mistakes Log** - 2026-02-13: Updated cucumber harness to use per-scenario work directories but kept the compiled CLI binary path relative (`../tmp/...`), causing parallel scenarios to fail with `fork/exec ... no such file or directory` when `cmd.Dir` changed. Why: overlooked path resolution behavior after setting per-scenario working directories. Prevention: use absolute paths for shared executables before running commands from scenario-specific directories [22].
-
-[36] **Agent Mistakes Log** - 2026-02-13: Created a beads issue with backticks inside a double-quoted shell command, which triggered command substitution (`test/features/...` attempted execution) and stripped key text from the issue description. Why: unsafe shell quoting while passing multiline descriptions to `br create`. Prevention: write descriptions to a file in `tmp` and pass with `--description \"$(cat tmp/<file>)\"`; avoid backticks in shell-quoted payloads [22].
-
-[37] **Agent Mistakes Log** - 2026-02-13: Ran `br update` and `br show` in parallel, which produced a stale `show` result (`open`) due command timing. Why: parallelized a state-mutating command with a state-reading command. Prevention: for beads state changes, run mutation (`br update`, `br close`) first, then run verification (`br show`) sequentially [22].
-
-[38] **Agent Mistakes Log** - 2026-02-14: Repeated the `br update`/`br show` parallelization mistake and observed conflicting ticket status reads in the same turn. Why: defaulted to parallel command batching without excluding stateful beads operations. Prevention: treat beads status mutations as strictly sequential workflows and avoid parallel wrappers around `br update` + `br show` [22].
-
-[39] **Agent Mistakes Log** - 2026-02-14: Added new cucumber script expressions using multi-line function argument formatting with commas; parser rejected them (`expected operand, found ','`). Why: assumed multi-line argument layout behaves like Go/JSON formatting. Prevention: keep complex function calls in feature scripts on a single expression line unless existing parser coverage confirms multiline argument separators [22].
-
-[40] **Agent Mistakes Log** - 2026-02-14: Ran `go test ./...` without excluding `tmp`, causing expected build collisions from multiple helper `main` files in `tmp/`. Why: used blanket quality gate in a repo that intentionally keeps multiple executable scratch files in `tmp`. Prevention: run targeted package/feature tests for changed areas (or exclude `tmp`) instead of full-recursive `./...` when scratch binaries are present [22].
-
-[41] **User Preferences Log** - 2026-02-14: User explicitly asked to create additional beads tickets whenever meaningful follow-up work is discovered during implementation, instead of leaving implicit TODOs.
-
-[42] **Agent Mistakes Log** - 2026-02-14: Invoked `apply_patch` through `exec_command` while editing `pkg/formats/reader.go`; tool warning confirmed the routing error. Why: slipped back into shell-based patch habit under time pressure. Prevention: invoke the dedicated `apply_patch` tool directly for every patch and reserve `exec_command` for non-edit shell operations [22].
-
-[43] **Agent Mistakes Log** - 2026-02-14: Added a cucumber script using multiline function arguments with commas again, and parser failed (`expected operand, found ','`). Why: ignored existing parser formatting constraint while drafting a new scenario. Prevention: keep feature-script function calls on one expression line unless there is proven multiline parser coverage for that pattern [22][39].
-
-[44] **Agent Mistakes Log** - 2026-02-13: Applied an oversized patch hunk to `internal/preprocessor/rewriter_handlers.go` that briefly corrupted the `handleCloseBrace` function body. Why: attempted a very broad single-shot patch edit instead of smaller targeted hunks. Prevention: split large refactors into scoped patches and immediately validate edited regions with focused `sed` checks before running tests [22].
-
-[45] **Agent Mistakes Log** - 2026-02-14: Ran `rg` with a search pattern beginning with `-` without using `--`, causing option parsing errors and a noisy search loop. Why: rushed CLI composition for ripgrep flags/pattern ordering. Prevention: when a pattern may begin with `-`, use `rg ... -- \"<pattern>\" <path>` and place `-g` options before `--` [22].
-
-[46] **Agent Mistakes Log** - 2026-02-14: Batched `br update` and `br show` in parallel again, producing contradictory status reads (`in_progress` and stale `open`) for the same ticket in one run. Why: reused parallel wrapper around a state mutation plus immediate read. Prevention: run beads mutations and status verification strictly sequentially (`br update` first, then `br show`) [22][37][38].
-
-[47] **User Preferences Log** - 2026-02-14: User asked to pick the next ticket from `README.md`, `AGENTS.md`, and `MIND_MAP.md` context with preference for work already marked `in_progress`; prioritize continuing active in-flight tickets first.
-
-[48] **Agent Mistakes Log** - 2026-02-14: Ran `rg` with a pattern beginning with `--lazy` without placing `--` before the search pattern, causing option parsing failure. Why: reused a quick search template without guarding flag-like patterns. Prevention: always insert `--` before any pattern that may start with `-` (for example `rg -n -- \"--lazy\" ...`) [22][45].
-
-[49] **Agent Mistakes Log** - 2026-02-14: While replacing duplicate determinism checks, introduced unrelated placeholder type assertions in `internal/testing/properties/nopanic_test.go`, creating noisy compile risk before correction. Why: rushed a broad patch instead of minimal targeted edits. Prevention: keep refactor patches narrowly scoped to intended lines and immediately re-open edited files for sanity checks before running tests [22].
-
-[50] **User Preferences Log** - 2026-02-14: User asked to create a dedicated beads ticket for measuring cucumber-driven coverage and increasing coverage where it adds practical confidence.
-
-[51] **Agent Mistakes Log** - 2026-02-14: Ran `br close` and `br show` in parallel, which again produced a stale `show` status (`in_progress`) even though the close succeeded. Why: reused parallel batching with a state mutation plus immediate read. Prevention: run all beads mutations (`br update`, `br close`) and verification (`br show`) strictly sequentially [22][37][38][46].
-
-[52] **Agent Mistakes Log** - 2026-02-14: Added cucumber failure scenarios using `Given the following script` together with `When I run the application and it fails`; this mismatched harness fields and produced a misleading parse error (`script must have a header with '---' separator`). Why: mixed runner-level and CLI-level step contracts. Prevention: use `Given the following input content` for CLI failure paths and reserve `Given the following script` for in-process runner steps [22].
-
-[53] **Agent Mistakes Log** - 2026-04-02: Added a cucumber scenario that used the quoted `a file named ... with content "..."` step for multiline script/module fixtures, so literal `\n` sequences were written and the parser failed with `script must have a header with '---' separator`. Why: reused the single-line fixture step without checking whether it unescapes newline sequences. Prevention: use a docstring-backed file fixture step for multiline files and prefer it for scripts/modules that require real line breaks [22].
-
-[54] **Agent Mistakes Log** - 2026-04-19: Ran `rg` with `--` before later `-g` flags while searching for `exprToString`, so ripgrep treated `-g` and `*.go` as paths and returned noisy errors. Why: inserted the end-of-options marker too early when guarding a pattern search. Prevention: keep all ripgrep flags before `--`, and only then pass the search pattern and paths [22].
-
-[55] **User Preferences Log** - 2026-04-19: User asked for a fresh-eyes audit that starts from `README.md`, `AGENTS.md`, and `MIND_MAP.md` context and turns substantiated quality findings into concrete beads tickets.
-
-[56] **Agent Mistakes Log** - 2026-04-19: Repeated the ripgrep flag-order mistake while searching for `dw::core` references, placing `--` before `-g` filters and getting noisy `No such file or directory` errors. Why: reused the guarded-pattern template without keeping glob flags ahead of the end-of-options marker. Prevention: for ripgrep, place every option such as `-g` before `--`, then pass the pattern and paths [22][54].
-
-[57] **Agent Mistakes Log** - 2026-04-19: Ran `jj describe` and `jj commit` in parallel, which raced on JJ's ref lock and caused the description update to fail while the commit succeeded. Why: treated stateful JJ mutations as parallel-safe. Prevention: run JJ metadata and commit commands sequentially, especially `jj describe`, `jj commit`, and other operations that write refs [22].
-
-[58] **Agent Mistakes Log** - 2026-04-19: Ran `br update` and `br show` in parallel again while picking up `bd-xpnk`, which produced a stale `OPEN` ticket view immediately after the successful status change to `in_progress`. Why: reused parallel batching on a state mutation plus immediate verification despite repeated prior incidents. Prevention: treat all beads mutations and follow-up reads as strictly sequential workflows; never batch `br update`/`br close` with `br show` [22][37][38][46][51].
-
-[59] **Agent Mistakes Log** - 2026-04-19: Added new cucumber expectations with pretty-spaced JSON arrays, but this harness compares output text exactly and the runner emits compact JSON, so the focused feature failed despite correct behavior. Why: assumed semantic JSON comparison instead of exact string comparison in `Then the output should be`. Prevention: when adding cucumber expectations for JSON output, match the repo's compact serialized form (or verify against nearby scenarios) before rerunning tests [22].
-
-[60] **Agent Mistakes Log** - 2026-04-20: Applied a ticket's suggested `WrapIOf` simplification verbatim in `internal/cli/app.go` before checking how `unifiederrors.Error` is rendered, which removed the missing filename from the CLI error. Why: trusted the issue text without validating the concrete user-visible error path for this error type. Prevention: when changing wrapped-error messages, verify the final rendered stderr/output path first and keep essential context such as filenames even if the low-level cause text is removed [22].
-
-[61] **Agent Mistakes Log** - 2026-04-20: Repeated the ripgrep flag-pattern mistake while searching for `--lazy`: first omitted the `--` separator, then placed `--` before later `-g` filters so ripgrep treated them as paths. Why: rushed a flag-like pattern search without following the established option ordering rule. Prevention: for ripgrep searches with patterns that may start with `-`, keep every option (including `-g`) before `--`, then pass the pattern and paths [22][45][48][54][56].
-
-[62] **Agent Mistakes Log** - 2026-04-25: Ran `jj status`, `jj diff --stat`, and `jj file list .beads` in parallel during verification; `jj file list` failed to obtain a keep-ref lock. Why: assumed read-only JJ commands were parallel-safe, but JJ may snapshot/touch refs during status-style reads. Prevention: run JJ commands sequentially whenever they may inspect or update working-copy state; parallelize only non-JJ file reads [22][57].
-
-[63] **Agent Mistakes Log** - 2026-04-25: Searched with an `rg` pattern containing a literal `\n`, which ripgrep rejected without multiline mode. Why: tried to combine multiline declaration discovery into a normal regex search. Prevention: use `rg -U` for true multiline searches, or search for stable single-line anchors and inspect nearby context [22].
-
-[64] **Agent Mistakes Log** - 2026-04-25: Ran `jj status` inside a parallel command batch while checking implementation changes, repeating the JJ parallelization hazard noted in [62]. Why: batched a harmless-looking VCS read together with file searches. Prevention: keep all `jj` invocations strictly sequential, even status/diff reads, and parallelize only non-VCS file reads/searches [22][62].
-
-[65] **Agent Mistakes Log** - 2026-04-26: Added a cucumber coverage scenario with an inline object literal containing an `if` expression, which failed during preprocessing with `closing brace without opener` before it could exercise the intended registry behavior. Why: chose a dense object expression to verify multiple values at once instead of respecting the parser's fragile object/conditional combination. Prevention: for coverage scenarios that only need dispatch proof, use simple arithmetic or arrays and keep inline `if` expressions outside object literals unless nearby parser coverage confirms that shape [22].
-
-[66] **Agent Mistakes Log** - 2026-05-02: While moving output metadata out of `evaluator.Context`, initially updated the cucumber runner helper to format structured results after canceling its timeout context and with headerless `FormatExecutionResult` semantics, briefly regressing lazy stream and no-header JSON expectations. Why: preserved the new production adapter shape but missed the test helper's older JSON/default-output contract and lazy context lifetime. Prevention: when refactoring runner result formatting, keep lazy result resolution inside the live Go context and verify headerless script formatting semantics separately from header-based CLI/server formatting [22].
-
-[67] **Agent Mistakes Log** - 2026-05-02: While adding full preprocessor trace/source-map coverage, drafted one-line object-value test inputs with inline `if` expressions and hit branch-scan/brace errors before the intended mapping assertion. Why: repeated the parser-fragility pattern already noted for object literals with inline conditionals. Prevention: when testing unrelated mapping or trace behavior, use simpler object/default/regex inputs, or isolate inline `if` coverage in parser-specific scenarios [22][65].
-
-[68] **Agent Mistakes Log** - 2026-05-10: Repeated the `rg` flag-like pattern mistake while auditing stale CLI docs, starting a broad search pattern with `-i` without guarding it with `--`. Why: composed an alternation quickly and forgot ripgrep treats leading-dash patterns as options. Prevention: keep all `rg` flags before `--`, then pass any pattern that may start with `-` after `--`, especially during docs audits [22][45][48][54][56][61].
+[30] **Context Refactor Discipline** - Preserve existing public/internal call signatures where practical by adding context-aware variants first, then migrate call sites incrementally to reduce compile fallout.
