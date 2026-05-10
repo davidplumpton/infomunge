@@ -13,6 +13,17 @@ Feature: Error Messages
     Then the exit status should be 1
     And the stderr should contain "flag provided but not defined: -bogus"
 
+  Scenario: Extra positional script arguments are rejected
+    When I run the application with arguments "first-script second-script" and it fails
+    Then the exit status should be 1
+    And the stderr should contain "Error: ValidationError: expected at most one inline script argument"
+
+  Scenario: Script file and inline script cannot be combined
+    When I run the application with arguments "-f missing.im inline-script" and it fails
+    Then the exit status should be 1
+    And the stderr should contain "Error: ValidationError: cannot combine -f with an inline script argument"
+    And the output should not contain "error reading script file"
+
   Scenario: Division by zero with simple expression
     Given the following input content:
       """

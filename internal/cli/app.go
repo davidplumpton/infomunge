@@ -97,6 +97,13 @@ func (app *App) parseFlags(args []string) (*Config, error) {
 		return nil, err
 	}
 
+	if fs.NArg() > 1 {
+		return nil, unifiederrors.ValidationError("expected at most one inline script argument")
+	}
+	if *scriptFile != "" && fs.NArg() > 0 {
+		return nil, unifiederrors.ValidationError("cannot combine -f with an inline script argument")
+	}
+
 	// Auto-detect piped stdin and default to JSON if no -s flag (non-server mode only)
 	processedInputs := inputs
 	if !*serverMode {
