@@ -48,6 +48,9 @@ type testContext struct {
 	lastHTTPStatus  int
 	workDir         string
 	timeout         time.Duration // Timeout for script execution to prevent infinite loops
+
+	runCLIOverride          func(args ...string) error
+	runCLIWithStdinOverride func(stdinContent string, args ...string) error
 }
 
 var (
@@ -281,16 +284,14 @@ func (tc *testContext) iRunTheApplicationWithAndItFails(arg string) error {
 	if err := tc.ensureWorkspace(); err != nil {
 		return err
 	}
-	_ = tc.runCLI("-f", arg)
-	return nil
+	return tc.expectCLIFailure(tc.runCLI("-f", arg))
 }
 
 func (tc *testContext) iRunTheApplicationWithArgumentsAndItFails(argsLine string) error {
 	if err := tc.ensureWorkspace(); err != nil {
 		return err
 	}
-	_ = tc.runCLI(strings.Fields(argsLine)...)
-	return nil
+	return tc.expectCLIFailure(tc.runCLI(strings.Fields(argsLine)...))
 }
 
 func (tc *testContext) iRunGoTestAllFromRepoRoot() error {
@@ -380,8 +381,7 @@ func (tc *testContext) iRunTheApplicationWithThisContentUsingLazyAndItFails() er
 	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
 		return err
 	}
-	_ = tc.runCLI("--lazy", "-f", "input.txt")
-	return nil
+	return tc.expectCLIFailure(tc.runCLI("--lazy", "-f", "input.txt"))
 }
 
 func (tc *testContext) iRunTheApplicationWithThisContentAndInputsAndItFails(content *godog.DocString) error {
@@ -402,8 +402,7 @@ func (tc *testContext) iRunTheApplicationWithThisContentAndInputsAndItFails(cont
 		args = append(args, "-i", line)
 	}
 
-	_ = tc.runCLI(args...)
-	return nil
+	return tc.expectCLIFailure(tc.runCLI(args...))
 }
 
 func (tc *testContext) iRunTheApplicationWithThisContentAndStdinBackedInputsAndItFails(content *godog.DocString) error {
@@ -424,8 +423,7 @@ func (tc *testContext) iRunTheApplicationWithThisContentAndStdinBackedInputsAndI
 		args = append(args, "-i", line)
 	}
 
-	_ = tc.runCLIWithStdin(tc.stdinContent, args...)
-	return nil
+	return tc.expectCLIFailure(tc.runCLIWithStdin(tc.stdinContent, args...))
 }
 
 func (tc *testContext) iRunTheApplicationAndItFails() error {
@@ -435,8 +433,7 @@ func (tc *testContext) iRunTheApplicationAndItFails() error {
 	if err := os.WriteFile(filepath.Join(tc.workDir, "input.txt"), []byte(tc.inputContent), 0644); err != nil {
 		return err
 	}
-	_ = tc.runCLI("-f", "input.txt")
-	return nil
+	return tc.expectCLIFailure(tc.runCLI("-f", "input.txt"))
 }
 
 func (tc *testContext) iRunTheApplicationWithRunSubcommand() error {
@@ -468,8 +465,8 @@ func (tc *testContext) theApplicationShouldFailWithErrorContaining(expected stri
 		return err
 	}
 	err := tc.runCLI("-f", "input.txt")
-	if err == nil {
-		return fmt.Errorf("expected application to fail, but it succeeded with output: %s", tc.lastOutput)
+	if err := tc.expectCLIFailure(err); err != nil {
+		return err
 	}
 	if !strings.Contains(tc.lastOutput, expected) {
 		return fmt.Errorf("expected error to contain %q, but got: %s", expected, tc.lastOutput)
@@ -477,7 +474,21 @@ func (tc *testContext) theApplicationShouldFailWithErrorContaining(expected stri
 	return nil
 }
 
+func (tc *testContext) expectCLIFailure(err error) error {
+	if err == nil {
+		return fmt.Errorf("expected application to fail, but it succeeded with exit status %d (stdout: %s, stderr: %s)", tc.lastExitCode, tc.lastStdout, tc.lastStderr)
+	}
+	if tc.lastExitCode == 0 {
+		return fmt.Errorf("expected application failure to set a non-zero exit status, but got 0 (error: %v, stdout: %s, stderr: %s)", err, tc.lastStdout, tc.lastStderr)
+	}
+	return nil
+}
+
 func (tc *testContext) runCLI(args ...string) error {
+	if tc.runCLIOverride != nil {
+		return tc.runCLIOverride(args...)
+	}
+
 	binPath, err := ensureGodogBinary()
 	if err != nil {
 		return err
@@ -508,6 +519,10 @@ func (tc *testContext) runCLI(args ...string) error {
 }
 
 func (tc *testContext) runCLIWithStdin(stdinContent string, args ...string) error {
+	if tc.runCLIWithStdinOverride != nil {
+		return tc.runCLIWithStdinOverride(stdinContent, args...)
+	}
+
 	binPath, err := ensureGodogBinary()
 	if err != nil {
 		return err

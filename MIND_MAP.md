@@ -18,7 +18,7 @@
 
 [8] **Runner And Modules** - Runner orchestration is in `internal/runner/runner.go`; module loading behavior is in `internal/runner/module_loader.go`. Core module scripts live under `modules/dw/core`.
 
-[9] **Testing** - Cucumber tests run with `go test -v ./test`. For feature work, add or update cucumber coverage. Use `GODOG_PATHS=features/...` because the test harness resolves feature paths relative to `./test`.
+[9] **Testing** - Cucumber tests run with `go test -v ./test`. For feature work, add or update cucumber coverage. Feature files live under `test/features` from the repo root; use `GODOG_PATHS=features/...` because the test harness resolves feature paths relative to `./test`.
 
 [10] **Quality Gates** - Prefer targeted package and cucumber tests for changed areas. Avoid blanket `go test ./...` when scratch helper `main` files exist under `tmp`; use scoped packages or remove helper conflicts first.
 
