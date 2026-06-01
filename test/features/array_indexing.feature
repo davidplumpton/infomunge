@@ -132,18 +132,18 @@ Feature: Array Indexing
       """
 
   Scenario: Range index inside function call arguments
-    Given the following input payload "payload" with format "json":
+    Given the following JSON input:
       """
       {"name": "hello"}
       """
-    And the following input content:
+    And the following script:
       """
       %im 0.1
       output application/json
       ---
       typeOf(payload.name[0 to 0])
       """
-    When I run the application with this content
+    When I run the script
     Then the output should be:
       """
       "String"

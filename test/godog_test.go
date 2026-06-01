@@ -126,6 +126,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	tc := &testContext{
 		timeout: 5 * time.Second, // Default 5-second timeout for all script executions
 	}
+	quotedStepArgument := `((?:[^"\\]|\\.)*)`
 
 	ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
 		if tc.serverClose != nil {
@@ -141,14 +142,14 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	})
 
 	// Steps for read_file.feature
-	ctx.Step(`^a file named "([^"]*)" with content "([^"]*)"$`, tc.aFileNamedWithContent)
+	ctx.Step(`^a file named "`+quotedStepArgument+`" with content "`+quotedStepArgument+`"$`, tc.aFileNamedWithContent)
 	ctx.Step(`^a file named "([^"]*)" with content:$`, tc.aFileNamedWithDocstringContent)
 	ctx.Step(`^a file named "([^"]*)" with "([^"]*)" repeated (\d+) times$`, tc.aFileNamedWithRepeatedContent)
 	ctx.Step(`^I run the application with "([^"]*)"$`, tc.iRunTheApplicationWith)
 	ctx.Step(`^I run the application with "([^"]*)" and it fails$`, tc.iRunTheApplicationWithAndItFails)
 	ctx.Step(`^I run the application with arguments "([^"]*)" and it fails$`, tc.iRunTheApplicationWithArgumentsAndItFails)
 	ctx.Step(`^I run repo-wide package discovery from the repo root$`, tc.iRunRepoWidePackageDiscoveryFromRepoRoot)
-	ctx.Step(`^the output should contain "((?:[^"\\]|\\.)*)"$`, tc.theOutputShouldContain)
+	ctx.Step(`^the output should contain "`+quotedStepArgument+`"$`, tc.theOutputShouldContain)
 	ctx.Step(`^the Makefile cucumber targets should use a 5 minute Go test timeout$`, tc.theMakefileCucumberTargetsShouldUseAFiveMinuteGoTestTimeout)
 	ctx.Step(`^the repo-wide go test regression step should use a 5 minute Go test timeout$`, tc.theRepoWideGoTestRegressionStepShouldUseAFiveMinuteGoTestTimeout)
 	ctx.Step(`^the testing docs should show cucumber commands with a 5 minute Go test timeout$`, tc.theTestingDocsShouldShowCucumberCommandsWithAFiveMinuteGoTestTimeout)
@@ -166,8 +167,8 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I run the application with this content and stdin-backed inputs and it fails:$`, tc.iRunTheApplicationWithThisContentAndStdinBackedInputsAndItFails)
 	ctx.Step(`^I run the application and it fails$`, tc.iRunTheApplicationAndItFails)
 	ctx.Step(`^the output should be:$`, tc.theOutputShouldBe)
-	ctx.Step(`^the error should contain "([^"]*)"$`, tc.theOutputShouldContain)
-	ctx.Step(`^the application should fail with error containing "([^"]*)"$`, tc.theApplicationShouldFailWithErrorContaining)
+	ctx.Step(`^the error should contain "`+quotedStepArgument+`"$`, tc.theOutputShouldContain)
+	ctx.Step(`^the application should fail with error containing "`+quotedStepArgument+`"$`, tc.theApplicationShouldFailWithErrorContaining)
 
 	// Steps for typed input data (xr3 refactoring)
 	ctx.Step(`^the following XML input:$`, tc.theFollowingXMLInput)
@@ -183,12 +184,12 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I execute the script through the structured runner API$`, tc.iExecuteTheScriptThroughStructuredRunnerAPI)
 	ctx.Step(`^the runner output MIME type should be "([^"]*)"$`, tc.theRunnerOutputMIMETypeShouldBe)
 	ctx.Step(`^I run the script through the runner output path$`, tc.iRunTheScriptThroughRunnerOutputPath)
-	ctx.Step(`^running the script through the runner output path should fail with error containing "([^"]*)"$`, tc.runningTheScriptThroughRunnerOutputPathShouldFailWithErrorContaining)
+	ctx.Step(`^running the script through the runner output path should fail with error containing "`+quotedStepArgument+`"$`, tc.runningTheScriptThroughRunnerOutputPathShouldFailWithErrorContaining)
 	ctx.Step(`^I run the script with a canceled evaluation context$`, tc.iRunTheScriptWithCanceledEvaluationContext)
 	ctx.Step(`^I run the script with an expired evaluation deadline$`, tc.iRunTheScriptWithExpiredEvaluationDeadline)
 	ctx.Step(`^I run the script with URL IO disabled$`, tc.iRunTheScriptWithURLIODisabled)
 	ctx.Step(`^I run the script with readUrl redirecting to "([^"]*)"$`, tc.iRunTheScriptWithReadURLRedirectingTo)
-	ctx.Step(`^running the script should fail with error containing "([^"]*)"$`, tc.runningTheScriptShouldFailWithErrorContaining)
+	ctx.Step(`^running the script should fail with error containing "`+quotedStepArgument+`"$`, tc.runningTheScriptShouldFailWithErrorContaining)
 
 	// Additional step for JSON input with script from input content
 	ctx.Step(`^I run the application with this JSON input:$`, tc.iRunTheApplicationWithThisJSONInput)
@@ -215,7 +216,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the output should be a valid RFC3339 timestamp$`, tc.theOutputShouldBeValidRFC3339Timestamp)
 	ctx.Step(`^the output should have UTC offset minutes (-?\d+)$`, tc.theOutputShouldHaveUTCOffsetMinutes)
 	ctx.Step(`^the stdout should be valid JSON equal to:$`, tc.theStdoutShouldBeValidJSONEqualTo)
-	ctx.Step(`^the stderr should contain "((?:[^"\\]|\\.)*)"$`, tc.theStderrShouldContain)
+	ctx.Step(`^the stderr should contain "`+quotedStepArgument+`"$`, tc.theStderrShouldContain)
 	ctx.Step(`^the exit status should be (\d+)$`, tc.theExitStatusShouldBe)
 
 	// Steps for namespace support
@@ -254,6 +255,8 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 
 // Existing steps
 func (tc *testContext) aFileNamedWithContent(fileName, content string) error {
+	fileName = unescapeStepArgument(fileName)
+	content = unescapeStepArgument(content)
 	if err := tc.ensureWorkspace(); err != nil {
 		return err
 	}
@@ -273,6 +276,17 @@ func (tc *testContext) aFileNamedWithRepeatedContent(fileName, fragment string, 
 		return fmt.Errorf("repeat count must be non-negative, got %d", count)
 	}
 	return tc.aFileNamedWithContent(fileName, strings.Repeat(fragment, count))
+}
+
+func unescapeStepArgument(value string) string {
+	if !strings.Contains(value, `\`) {
+		return value
+	}
+	unquoted, err := strconv.Unquote(`"` + value + `"`)
+	if err != nil {
+		return value
+	}
+	return unquoted
 }
 
 func (tc *testContext) iRunTheApplicationWith(arg string) error {
@@ -325,13 +339,7 @@ func (tc *testContext) iRunRepoWidePackageDiscoveryFromRepoRoot() error {
 }
 
 func (tc *testContext) theOutputShouldContain(expected string) error {
-	// Unquote if the string contains escaped quotes (common in Gherkin steps)
-	if strings.Contains(expected, `\"`) {
-		unquoted, err := strconv.Unquote(`"` + expected + `"`)
-		if err == nil {
-			expected = unquoted
-		}
-	}
+	expected = unescapeStepArgument(expected)
 
 	if !strings.Contains(tc.lastOutput, expected) {
 		return fmt.Errorf("expected output to contain %q, but got %q", expected, tc.lastOutput)
@@ -468,6 +476,7 @@ func (tc *testContext) theOutputShouldBe(expected *godog.DocString) error {
 }
 
 func (tc *testContext) theApplicationShouldFailWithErrorContaining(expected string) error {
+	expected = unescapeStepArgument(expected)
 	if err := tc.ensureWorkspace(); err != nil {
 		return err
 	}
@@ -685,6 +694,7 @@ func (tc *testContext) iRunTheScriptThroughRunnerOutputPath() error {
 }
 
 func (tc *testContext) runningTheScriptThroughRunnerOutputPathShouldFailWithErrorContaining(expected string) error {
+	expected = unescapeStepArgument(expected)
 	ctx := make(evaluator.Context)
 	if tc.payloadMime != "" {
 		payload, err := formats.Read(tc.payloadContent, tc.payloadMime)
@@ -895,6 +905,7 @@ func (rt redirectRoundTripper) RoundTrip(req *http.Request) (*http.Response, err
 }
 
 func (tc *testContext) runningTheScriptShouldFailWithErrorContaining(expected string) error {
+	expected = unescapeStepArgument(expected)
 	// Build context with payload
 	ctx := make(evaluator.Context)
 
@@ -1217,12 +1228,7 @@ func (tc *testContext) theStdoutShouldBeValidJSONEqualTo(expected *godog.DocStri
 }
 
 func (tc *testContext) theStderrShouldContain(expected string) error {
-	if strings.Contains(expected, `\"`) {
-		unquoted, err := strconv.Unquote(`"` + expected + `"`)
-		if err == nil {
-			expected = unquoted
-		}
-	}
+	expected = unescapeStepArgument(expected)
 
 	if !strings.Contains(tc.lastStderr, expected) {
 		return fmt.Errorf("expected stderr to contain %q, but got %q", expected, tc.lastStderr)
