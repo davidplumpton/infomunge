@@ -708,6 +708,19 @@ func (tc *testContext) runningTheScriptThroughRunnerOutputPathShouldFailWithErro
 // captureRunnerStdout calls RunFromStringWithContext and captures its stdout output.
 // Uses a mutex to serialize calls since os.Stdout is process-global.
 func captureRunnerStdout(script string, ctx evaluator.Context) (string, error) {
+	return captureStdout(func() error {
+		return runner.RunFromStringWithContext(script, ctx)
+	})
+}
+
+type stdoutCaptureResult struct {
+	output string
+	err    error
+}
+
+// captureStdout captures process stdout while run executes.
+// Uses a mutex to serialize calls since os.Stdout is process-global.
+func captureStdout(run func() error) (captured string, err error) {
 	stdoutMu.Lock()
 	defer stdoutMu.Unlock()
 
@@ -716,15 +729,38 @@ func captureRunnerStdout(script string, ctx evaluator.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create pipe: %v", err)
 	}
+
+	readDone := make(chan stdoutCaptureResult, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, copyErr := io.Copy(&buf, r)
+		readDone <- stdoutCaptureResult{
+			output: buf.String(),
+			err:    copyErr,
+		}
+	}()
+
+	defer func() {
+		closeErr := w.Close()
+		readResult := <-readDone
+		_ = r.Close()
+
+		captured = readResult.output
+		if err == nil {
+			if readResult.err != nil {
+				err = fmt.Errorf("failed to read captured stdout: %v", readResult.err)
+			} else if closeErr != nil {
+				err = fmt.Errorf("failed to close captured stdout writer: %v", closeErr)
+			}
+		}
+	}()
+
 	os.Stdout = w
+	defer func() {
+		os.Stdout = oldStdout
+	}()
 
-	runErr := runner.RunFromStringWithContext(script, ctx)
-
-	w.Close()
-	captured, _ := io.ReadAll(r)
-	os.Stdout = oldStdout
-
-	return string(captured), runErr
+	return captured, run()
 }
 
 func (tc *testContext) iRunTheScriptWithCanceledEvaluationContext() error {

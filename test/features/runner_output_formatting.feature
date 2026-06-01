@@ -15,6 +15,17 @@ Feature: Runner output formatting paths
     Then the output should contain "Alice"
     And the output should contain "30"
 
+  Scenario: Large JSON output through runner output path
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      range(100000)
+      """
+    When I run the script through the runner output path
+    Then the output should be valid JSON with array length of 100000
+
   Scenario: XML output with declaration through runner output path
     Given the following script:
       """

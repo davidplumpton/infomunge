@@ -20,7 +20,7 @@
 
 [9] **Testing** - Cucumber tests run with `go test -v ./test`. For feature work, add or update cucumber coverage. Feature files live under `test/features` from the repo root; use `GODOG_PATHS=features/...` because the test harness resolves feature paths relative to `./test`.
 
-[10] **Quality Gates** - Prefer targeted package and cucumber tests for changed areas. Avoid blanket `go test ./...` when scratch helper `main` files exist under `tmp`; use scoped packages or remove helper conflicts first.
+[10] **Quality Gates** - Prefer targeted package and cucumber tests for changed areas. Avoid blanket `go test ./...` when scratch helper `main` files exist under `tmp`; use scoped packages or remove helper conflicts first. Until bd-1jnq is fixed, bounded repo-wide `go test ./...` can also time out in `internal/testing/mutation`, so treat that failure as covered by the open mutation ticket rather than blocking unrelated work.
 
 [11] **Version Control** - Use `jj` only; never use git commands. Commit with `jj commit -m <description>` and do not use `jj new` with a message. Run JJ commands sequentially because status/describe/commit can touch working-copy state and ref locks.
 
