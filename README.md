@@ -145,7 +145,7 @@ flattenList([[1, [2, 3]], [4], 5])
 This project uses Cucumber for Go.
 
 ```bash
-go test -v ./test
+go test -v ./test -timeout 5m
 ```
 
 Repo-wide package tests should also pass:
@@ -163,7 +163,7 @@ cd tmp && go run ./your-helper.go
 Generate coverage from cucumber tests (runtime-focused packages):
 
 ```bash
-timeout 5m go test -v ./test -run TestFeatures -count=1 \
+timeout 5m go test -v ./test -run TestFeatures -count=1 -timeout 5m \
   -coverprofile=tmp/cucumber.cover \
   -coverpkg=./internal/runner,./internal/preprocessor,./internal/evaluator,./pkg/formats
 go tool cover -func=tmp/cucumber.cover | tail -n 1

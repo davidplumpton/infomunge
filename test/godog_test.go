@@ -147,8 +147,11 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I run the application with "([^"]*)"$`, tc.iRunTheApplicationWith)
 	ctx.Step(`^I run the application with "([^"]*)" and it fails$`, tc.iRunTheApplicationWithAndItFails)
 	ctx.Step(`^I run the application with arguments "([^"]*)" and it fails$`, tc.iRunTheApplicationWithArgumentsAndItFails)
-	ctx.Step(`^I run "go test \./\.\.\." from the repo root$`, tc.iRunGoTestAllFromRepoRoot)
+	ctx.Step(`^I run repo-wide package discovery from the repo root$`, tc.iRunRepoWidePackageDiscoveryFromRepoRoot)
 	ctx.Step(`^the output should contain "((?:[^"\\]|\\.)*)"$`, tc.theOutputShouldContain)
+	ctx.Step(`^the Makefile cucumber targets should use a 5 minute Go test timeout$`, tc.theMakefileCucumberTargetsShouldUseAFiveMinuteGoTestTimeout)
+	ctx.Step(`^the repo-wide go test regression step should use a 5 minute Go test timeout$`, tc.theRepoWideGoTestRegressionStepShouldUseAFiveMinuteGoTestTimeout)
+	ctx.Step(`^the testing docs should show cucumber commands with a 5 minute Go test timeout$`, tc.theTestingDocsShouldShowCucumberCommandsWithAFiveMinuteGoTestTimeout)
 
 	// Steps for docstring_input.feature
 	ctx.Step(`^the following input content:$`, tc.theFollowingInputContent)
@@ -295,10 +298,11 @@ func (tc *testContext) iRunTheApplicationWithArgumentsAndItFails(argsLine string
 	return tc.expectCLIFailure(tc.runCLI(strings.Fields(argsLine)...))
 }
 
-func (tc *testContext) iRunGoTestAllFromRepoRoot() error {
-	cmd := exec.Command("go", "test", "./...")
-	cmd.Dir = ".."
-	cmd.Env = append(os.Environ(), "INFOMUNGE_SKIP_GODOG=1")
+func (tc *testContext) iRunRepoWidePackageDiscoveryFromRepoRoot() error {
+	ctx, cancel := context.WithTimeout(context.Background(), repoWideGoTestTimeout)
+	defer cancel()
+
+	cmd := repoWideGoTestCommand(ctx)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -310,7 +314,10 @@ func (tc *testContext) iRunGoTestAllFromRepoRoot() error {
 	tc.lastStderr = stderr.String()
 	tc.lastOutput = tc.lastStdout + tc.lastStderr
 	if err != nil {
-		return fmt.Errorf("go test ./... failed: %v, output: %s", err, tc.lastOutput)
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("repo-wide package discovery timed out after %s, output: %s", repoWideGoTestTimeout, tc.lastOutput)
+		}
+		return fmt.Errorf("repo-wide package discovery failed: %v, output: %s", err, tc.lastOutput)
 	}
 	return nil
 }

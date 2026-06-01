@@ -6,19 +6,19 @@ build:
 
 # Run all tests (failed steps + periodic pass counts)
 test:
-	GODOG_FORMAT=failures go test -v ./test -timeout 10m
+	GODOG_FORMAT=failures go test -v ./test -timeout 5m
 
 # Run tests with full progress output (use to find hanging/timeout tests)
 test-verbose:
-	GODOG_FORMAT=progress go test -v ./test -timeout 10m
+	GODOG_FORMAT=progress go test -v ./test -timeout 5m
 
 # Run tests with minimal output (failed steps + periodic pass counts)
 test-failures:
-	GODOG_FORMAT=failures go test -v ./test -timeout 10m
+	GODOG_FORMAT=failures go test -v ./test -timeout 5m
 
 # Run a specific feature file (usage: make test-feature FEATURE=simple_types)
 test-feature:
-	GODOG_PATHS=features/$(FEATURE).feature go test -v ./test -run TestFeatures
+	GODOG_PATHS=features/$(FEATURE).feature go test -v ./test -run TestFeatures -timeout 5m
 
 # Run unit tests only (exclude cucumber)
 test-unit:

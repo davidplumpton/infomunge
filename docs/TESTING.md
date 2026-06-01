@@ -18,7 +18,7 @@ Targeted packages:
 ## Feature Tests (Godog)
 
 ```bash
-go test -v ./test
+go test -v ./test -timeout 5m
 ```
 
 Feature files live in `test/features/*.feature`.
@@ -28,7 +28,7 @@ Feature files live in `test/features/*.feature`.
 Use the Godog suite with a shared coverage profile over runtime-critical packages:
 
 ```bash
-timeout 5m go test -v ./test -run TestFeatures -count=1 \
+timeout 5m go test -v ./test -run TestFeatures -count=1 -timeout 5m \
   -coverprofile=tmp/cucumber.cover \
   -coverpkg=./internal/runner,./internal/preprocessor,./internal/evaluator,./pkg/formats
 ```
