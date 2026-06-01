@@ -461,10 +461,7 @@ Feature: Core evaluator runner coverage
       -(5)
       """
     When I run the script
-    Then the output should be:
-      """
-      -5
-      """
+    Then the output should be valid JSON with number: -5
 
   Scenario: Negation of non-numeric fails
     Given the following script:

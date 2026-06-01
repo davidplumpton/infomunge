@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -199,7 +200,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the output should be valid JSON with (\d+) keys$`, tc.theOutputShouldBeValidJSONWithKeys)
 	ctx.Step(`^the output should not contain "((?:[^"\\]|\\.)*)"$`, tc.theOutputShouldNotContain)
 	ctx.Step(`^the output should contain an error$`, tc.theOutputShouldContainError)
-	ctx.Step(`^the output should be valid JSON with number: (\d+)$`, tc.theOutputShouldBeValidJSONWithNumber)
+	ctx.Step(`^the output should be valid JSON with number: (-?\d+)$`, tc.theOutputShouldBeValidJSONWithNumber)
 	ctx.Step(`^the output should be valid JSON with number close to (-?\d+(?:\.\d+)?)$`, tc.theOutputShouldBeValidJSONWithNumberCloseTo)
 	ctx.Step(`^the output should be valid JSON boolean$`, tc.theOutputShouldBeValidJSONBoolean)
 	ctx.Step(`^the output should be true$`, tc.theOutputShouldBeTrue)
@@ -223,7 +224,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the input (-?\d+(?:\.\d+)?)$`, tc.theInputNumber)
 	ctx.Step(`^I evaluate "([^"]*)"$`, tc.iEvaluate)
 	ctx.Step(`^the result should be "([^"]*)"$`, tc.theOutputShouldBeString)
-	ctx.Step(`^the result should be (\d+)$`, tc.theOutputShouldBeValidJSONWithNumber)
+	ctx.Step(`^the result should be (-?\d+)$`, tc.theOutputShouldBeValidJSONWithNumber)
 	ctx.Step(`^the result should match "([^"]*)"$`, tc.theOutputShouldMatchRegex)
 	ctx.Step(`^the script:$`, tc.theFollowingScript)
 	ctx.Step(`^I execute the script$`, tc.iRunTheScript)
@@ -1014,25 +1015,25 @@ func (tc *testContext) iSetTheExecutionTimeoutToSeconds(seconds string) error {
 
 // theOutputShouldBeValidJSONWithNumber validates that the output is a specific JSON number
 func (tc *testContext) theOutputShouldBeValidJSONWithNumber(numStr string) error {
-	var num evaluator.Value
+	var num json.Number
 	if err := json.Unmarshal([]byte(tc.lastOutput), &num); err != nil {
 		return fmt.Errorf("expected valid JSON number, but got invalid JSON: %v, output: %s", err, tc.lastOutput)
 	}
 
-	expectedNum, err := strconv.Atoi(numStr)
+	expectedNum, err := strconv.ParseInt(numStr, 10, 64)
 	if err != nil {
 		return fmt.Errorf("invalid expected number: %v", err)
 	}
 
-	switch v := num.(type) {
-	case float64:
-		if int(v) != expectedNum {
-			return fmt.Errorf("expected number %d, but got %v", expectedNum, v)
-		}
-		return nil
-	default:
-		return fmt.Errorf("expected JSON number, but got %T: %v", num, num)
+	actual, ok := new(big.Rat).SetString(num.String())
+	if !ok {
+		return fmt.Errorf("expected valid JSON number, but got unparsable number: %s", num.String())
 	}
+	expected := new(big.Rat).SetInt64(expectedNum)
+	if actual.Cmp(expected) != 0 {
+		return fmt.Errorf("expected number %d, but got %s", expectedNum, num.String())
+	}
+	return nil
 }
 
 func (tc *testContext) theOutputShouldBeValidJSONWithNumberCloseTo(numStr string) error {
