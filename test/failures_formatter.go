@@ -21,7 +21,8 @@ func init() {
 	formatters.Format(failuresFormatName, "Shows only failed steps with periodic pass counts.", failuresFormatterFunc)
 }
 
-type failureDetail struct {
+type stepEvent struct {
+	kind     string
 	uri      string
 	scenario string
 	step     string
@@ -33,7 +34,7 @@ type failuresFormatter struct {
 	passInterval int
 	lock         sync.Mutex
 	passedSteps  int
-	failedSteps  []failureDetail
+	stepEvents   []stepEvent
 }
 
 func failuresFormatterFunc(_ string, out io.Writer) formatters.Formatter {
@@ -71,19 +72,27 @@ func (f *failuresFormatter) Passed(*messages.Pickle, *messages.PickleStep, *form
 	}
 }
 
-func (f *failuresFormatter) Skipped(*messages.Pickle, *messages.PickleStep, *formatters.StepDefinition) {
+func (f *failuresFormatter) Skipped(pickle *messages.Pickle, step *messages.PickleStep, _ *formatters.StepDefinition) {
+	f.recordStepEvent("skipped", pickle, step, nil)
 }
 
-func (f *failuresFormatter) Undefined(*messages.Pickle, *messages.PickleStep, *formatters.StepDefinition) {
+func (f *failuresFormatter) Undefined(pickle *messages.Pickle, step *messages.PickleStep, _ *formatters.StepDefinition) {
+	f.recordStepEvent("undefined", pickle, step, nil)
 }
 
-func (f *failuresFormatter) Pending(*messages.Pickle, *messages.PickleStep, *formatters.StepDefinition) {
+func (f *failuresFormatter) Pending(pickle *messages.Pickle, step *messages.PickleStep, _ *formatters.StepDefinition) {
+	f.recordStepEvent("pending", pickle, step, nil)
 }
 
-func (f *failuresFormatter) Ambiguous(*messages.Pickle, *messages.PickleStep, *formatters.StepDefinition, error) {
+func (f *failuresFormatter) Ambiguous(pickle *messages.Pickle, step *messages.PickleStep, _ *formatters.StepDefinition, err error) {
+	f.recordStepEvent("ambiguous", pickle, step, err)
 }
 
 func (f *failuresFormatter) Failed(pickle *messages.Pickle, step *messages.PickleStep, _ *formatters.StepDefinition, err error) {
+	f.recordStepEvent("failed", pickle, step, err)
+}
+
+func (f *failuresFormatter) recordStepEvent(kind string, pickle *messages.Pickle, step *messages.PickleStep, err error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -98,7 +107,8 @@ func (f *failuresFormatter) Failed(pickle *messages.Pickle, step *messages.Pickl
 		stepText = step.Text
 	}
 
-	f.failedSteps = append(f.failedSteps, failureDetail{
+	f.stepEvents = append(f.stepEvents, stepEvent{
+		kind:     kind,
 		uri:      uri,
 		scenario: scenario,
 		step:     stepText,
@@ -110,22 +120,24 @@ func (f *failuresFormatter) Summary() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	if len(f.failedSteps) == 0 {
-		if f.passedSteps > 0 && f.passedSteps%f.passInterval != 0 {
+	if len(f.stepEvents) == 0 {
+		if f.passInterval > 0 && f.passedSteps > 0 && f.passedSteps%f.passInterval != 0 {
 			fmt.Fprintf(f.out, "passed steps: %d\n", f.passedSteps)
 		}
 		return
 	}
 
 	fmt.Fprintln(f.out, "")
-	fmt.Fprintln(f.out, "Failed steps:")
-	for index, failure := range f.failedSteps {
-		line := fmt.Sprintf("%d) %s", index+1, failure.scenario)
+	fmt.Fprintln(f.out, "Non-passing steps:")
+	for index, failure := range f.stepEvents {
+		line := fmt.Sprintf("%d) %s: %s", index+1, failure.kind, failure.scenario)
 		if failure.uri != "" {
 			line = fmt.Sprintf("%s (%s)", line, failure.uri)
 		}
 		fmt.Fprintln(f.out, line)
 		fmt.Fprintf(f.out, "   %s\n", failure.step)
-		fmt.Fprintf(f.out, "   error: %v\n", failure.err)
+		if failure.err != nil {
+			fmt.Fprintf(f.out, "   error: %v\n", failure.err)
+		}
 	}
 }
