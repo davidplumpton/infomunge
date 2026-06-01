@@ -1,9 +1,12 @@
 package test
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 )
@@ -69,6 +72,53 @@ func (tc *testContext) theTestingDocsShouldShowCucumberCommandsWithAFiveMinuteGo
 	return nil
 }
 
+func (tc *testContext) theTestingDocsShouldShowBoundedRepoWidePackageTestCommands() error {
+	expected := []string{
+		"INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m",
+		"INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/mutation -run TestMutatedCorpusExpressions_NoPanics_AndDeterministic -timeout 30m",
+	}
+	for _, path := range []string{"../README.md", "../docs/TESTING.md"} {
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+		text := string(body)
+		for _, command := range expected {
+			if !strings.Contains(text, command) {
+				return fmt.Errorf("%s should document %q", path, command)
+			}
+		}
+	}
+	return nil
+}
+
+func (tc *testContext) theDefaultMutationCorpusTestShouldBeSkippedOutsideSoakMode() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "go", "test", "-v", "./internal/testing/mutation", "-run", "TestMutatedCorpusExpressions_NoPanics_AndDeterministic", "-count=1", "-timeout", "5m")
+	cmd.Dir = ".."
+	cmd.Env = append(withoutEnv(os.Environ(), "INTENSIVE_TEST_SOAK"), "INTENSIVE_TEST_SOAK=0")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	output := stdout.String() + stderr.String()
+	if err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("default mutation corpus test timed out, output: %s", output)
+		}
+		return fmt.Errorf("default mutation corpus test failed: %v, output: %s", err, output)
+	}
+	if !strings.Contains(output, "skipping mutation corpus soak; set INTENSIVE_TEST_SOAK=1 to run") {
+		return fmt.Errorf("default mutation corpus test should skip outside soak mode, output: %s", output)
+	}
+	return nil
+}
+
 func readMakefileTargets(path string) (map[string][]string, error) {
 	body, err := os.ReadFile(path)
 	if err != nil {
@@ -112,4 +162,15 @@ func hasTimeoutArg(args []string, expected string) bool {
 		}
 	}
 	return false
+}
+
+func withoutEnv(env []string, name string) []string {
+	prefix := name + "="
+	out := make([]string, 0, len(env))
+	for _, value := range env {
+		if !strings.HasPrefix(value, prefix) {
+			out = append(out, value)
+		}
+	}
+	return out
 }

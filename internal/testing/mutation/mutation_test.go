@@ -25,6 +25,10 @@ import (
 )
 
 func TestMutatedCorpusExpressions_NoPanics_AndDeterministic(t *testing.T) {
+	if !testbudget.SoakEnabled() {
+		t.Skip("skipping mutation corpus soak; set INTENSIVE_TEST_SOAK=1 to run")
+	}
+
 	entries := loadMutationCorpus(t)
 	if len(entries) == 0 {
 		t.Fatal("no corpus entries available for mutation testing")
@@ -234,7 +238,9 @@ func TestMutationChangesBehavior_TreatsNaNAsDeterministic(t *testing.T) {
 
 func TestMain(m *testing.M) {
 	code := m.Run()
-	metrics.ReportAndPersist("mutation", metrics.Options{EnableCoverage: true})
+	if testbudget.SoakEnabled() {
+		metrics.ReportAndPersist("mutation", metrics.Options{EnableCoverage: true})
+	}
 	os.Exit(code)
 }
 

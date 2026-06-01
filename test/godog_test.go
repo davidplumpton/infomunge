@@ -152,6 +152,8 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the Makefile cucumber targets should use a 5 minute Go test timeout$`, tc.theMakefileCucumberTargetsShouldUseAFiveMinuteGoTestTimeout)
 	ctx.Step(`^the repo-wide go test regression step should use a 5 minute Go test timeout$`, tc.theRepoWideGoTestRegressionStepShouldUseAFiveMinuteGoTestTimeout)
 	ctx.Step(`^the testing docs should show cucumber commands with a 5 minute Go test timeout$`, tc.theTestingDocsShouldShowCucumberCommandsWithAFiveMinuteGoTestTimeout)
+	ctx.Step(`^the testing docs should show bounded repo-wide package test commands$`, tc.theTestingDocsShouldShowBoundedRepoWidePackageTestCommands)
+	ctx.Step(`^the default mutation corpus test should be skipped outside soak mode$`, tc.theDefaultMutationCorpusTestShouldBeSkippedOutsideSoakMode)
 
 	// Steps for docstring_input.feature
 	ctx.Step(`^the following input content:$`, tc.theFollowingInputContent)

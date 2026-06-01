@@ -148,16 +148,22 @@ This project uses Cucumber for Go.
 go test -v ./test -timeout 5m
 ```
 
-Repo-wide package tests should also pass:
+Repo-wide package tests should also pass. This skips Godog because feature tests have their own command:
 
 ```bash
-go test ./...
+INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m
 ```
 
 Scratch helper programs under `tmp/` are isolated in a nested Go module so they do not participate in the repo-root `go test ./...` package walk. Run helpers from inside `tmp/` by passing the helper file you created:
 
 ```bash
 cd tmp && go run ./your-helper.go
+```
+
+The bounded repo-wide command skips the mutation corpus soak by default. Run the mutation soak explicitly when needed:
+
+```bash
+INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/mutation -run TestMutatedCorpusExpressions_NoPanics_AndDeterministic -timeout 30m
 ```
 
 Generate coverage from cucumber tests (runtime-focused packages):

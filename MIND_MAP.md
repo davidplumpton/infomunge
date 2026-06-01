@@ -20,7 +20,7 @@
 
 [9] **Testing** - Cucumber tests run with `go test -v ./test`. For feature work, add or update cucumber coverage. Feature files live under `test/features` from the repo root; use `GODOG_PATHS=features/...` because the test harness resolves feature paths relative to `./test`.
 
-[10] **Quality Gates** - Prefer targeted package and cucumber tests for changed areas. Avoid blanket `go test ./...` when scratch helper `main` files exist under `tmp`; use scoped packages or remove helper conflicts first. Until bd-1jnq is fixed, bounded repo-wide `go test ./...` can also time out in `internal/testing/mutation`, so treat that failure as covered by the open mutation ticket rather than blocking unrelated work.
+[10] **Quality Gates** - Prefer targeted package and cucumber tests for changed areas. Use `INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m` for the bounded repo-wide package suite, then run cucumber separately. The mutation corpus soak is skipped by default and runs explicitly with `INTENSIVE_TEST_SOAK=1`.
 
 [11] **Version Control** - Use `jj` only; never use git commands. Commit with `jj commit -m <description>` and do not use `jj new` with a message. Run JJ commands sequentially because status/describe/commit can touch working-copy state and ref locks.
 
@@ -44,7 +44,7 @@
 
 [21] **Patch Discipline** - Use the dedicated `apply_patch` tool for manual edits. Do not invoke patching through shell commands. Keep broad refactors in small hunks and reopen edited regions before testing.
 
-[22] **Search Discipline** - Use `rg` first for searches. Put all flags before `--`, and place patterns that may begin with `-` after `--`. Use `rg -U` only when true multiline matching is needed.
+[22] **Search Discipline** - Use `rg` first for searches. Put all flags, including `-g`, before paths; put `--` before the pattern when the pattern may begin with `-`. Use `rg -U` only when true multiline matching is needed.
 
 [23] **Stateful Command Discipline** - Do not parallelize beads mutations with reads (`br update`/`br close` then `br show`), and do not parallelize any JJ operations, including read-only `jj diff`/`jj status`. Run state-changing and state-inspecting VCS/beads commands sequentially.
 

@@ -5,10 +5,16 @@ InfoMunge uses Go unit tests plus Godog feature tests.
 ## Unit Tests
 
 ```bash
-go test ./...
+INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m
 ```
 
-The `tmp/` scratch area is a nested Go module, so ad hoc helpers there do not participate in repo-root package discovery. Run scratch helpers from inside `tmp/` when needed.
+This skips Godog because feature tests have their own command. The `tmp/` scratch area is a nested Go module, so ad hoc helpers there do not participate in repo-root package discovery. Run scratch helpers from inside `tmp/` when needed.
+
+The bounded repo-wide command skips the mutation corpus soak by default. Run the mutation soak explicitly when needed:
+
+```bash
+INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/mutation -run TestMutatedCorpusExpressions_NoPanics_AndDeterministic -timeout 30m
+```
 
 Targeted packages:
 - `internal/evaluator/*_test.go`
