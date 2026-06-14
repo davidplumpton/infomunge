@@ -34,6 +34,7 @@ Notes:
 - `text/plain` output writes string values as-is. Non-string values are rendered as compact JSON, with `null` rendered as `null`.
 - Date formatting uses a documented subset of Java SimpleDateFormat tokens; see `docs/DATE_FORMATS.md`.
 - For null literals, use `null` for DataWeave compatibility. InfoMunge also accepts `nil` as an alias.
+- Header `input` directives are accepted for DataWeave compatibility and documentation only. Input data is parsed before execution by the CLI `-i` flags, server `/run` inputs, or embedding test harness; header `input` lines do not reparse, rename, validate, or create inputs.
 
 ### Comparison to Datawave
 

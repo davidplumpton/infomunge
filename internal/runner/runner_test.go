@@ -690,7 +690,7 @@ func TestParseHeader(t *testing.T) {
 			wantMimeType: "application/xml",
 		},
 		{
-			name:         "input directive",
+			name:         "input directive compatibility metadata",
 			header:       "input application/json\noutput application/json",
 			hasHeader:    true,
 			wantMimeType: "application/json",

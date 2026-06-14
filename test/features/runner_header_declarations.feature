@@ -515,19 +515,23 @@ Feature: Runner header declaration paths (in-process coverage)
 
   # --- Input directive ---
 
-  Scenario: Input directive sets mime type via in-process runner
-    Given the following script:
+  Scenario: Input directive is accepted as compatibility-only metadata
+    Given the following JSON input:
+      """
+      {"name": "Ada"}
+      """
+    And the following script:
       """
       %im 0.1
-      input application/json
+      input application/xml
       output application/json
       ---
-      "ok"
+      payload.name
       """
     When I run the script
     Then the output should be:
       """
-      "ok"
+      "Ada"
       """
 
   # --- Single-line header normalization ---

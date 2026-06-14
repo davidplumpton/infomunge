@@ -28,7 +28,9 @@ CLI -> Inputs -> Header -> Preprocess -> Evaluate -> Format output
 
 The header block is parsed before evaluation to build the context. This includes
 output format directives, namespace declarations, function/type definitions, and
-module imports. See `internal/runner/runner.go`.
+module imports. Header `input` directives are accepted as compatibility
+metadata, but input bytes are parsed by CLI, server, or embedding adapter layers
+before the runner receives an evaluation context. See `internal/runner/runner.go`.
 
 ## Preprocessor and Source Mapping
 

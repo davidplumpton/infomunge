@@ -204,6 +204,8 @@ func applyOutputDeclaration(decl *OutputDeclaration, outputMimeType *string, met
 }
 
 func applyInputDeclaration(decl *InputDeclaration) {
+	// Input directives are accepted as DataWeave-compatible metadata. Input
+	// bytes are parsed by the adapter layer before the runner receives context.
 	_ = decl
 }
 

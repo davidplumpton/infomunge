@@ -44,6 +44,13 @@ payload map (x) -> x.value reduce (acc, v) -> acc + v
 (payload map (x) -> x.value) reduce (acc, v) -> acc + v
 ```
 
+### 5. **Input Headers Are Compatibility Metadata**
+InfoMunge accepts `input application/json` and `input payload application/json`
+header lines so DataWeave examples remain readable, but those lines do not parse,
+reparse, rename, validate, or create inputs. The CLI `-i` flags, server `/run`
+inputs, or embedding API context choose input names and formats before the runner
+evaluates the script.
+
 ## 1. Extract Data - Simple Field Access
 
 ### DataWeave Example
@@ -771,6 +778,9 @@ output application/json
 ```
 
 **Usage:**
+The `payload` and `users` variables below are created by the `-i` flags. The
+matching `input` header lines are accepted as compatibility documentation only.
+
 ```bash
 ./infomunge -i payload=orders.json -i users=users.json "%im 0.1
 input payload application/json
@@ -879,7 +889,7 @@ output application/json
 | **Default Parameters** | `$` (value), `$$` (index) | Named parameters required |
 | **String Concat in Objects** | `{key: val1 ++ val2}` | Must use `{key: (val1 ++ val2)}` (requires parens) |
 | **Complex Expressions in Objects** | Can use operators directly | Require parentheses: `{key: (expr1 op expr2)}` |
-| **Multiple Inputs** | `input <name> <format>` | `input <name> <format>` |
+| **Multiple Inputs** | `input <name> <format>` | CLI/server input names create variables; `input <name> <format>` headers are compatibility metadata |
 | **Null Literal** | `null` | `null` (preferred), `nil` alias also accepted |
 | **Type System** | Complex type definitions | Basic types with `as` coercion |
 | **Supported Formats** | JSON, XML, CSV, YAML, Properties | JSON, XML, CSV, YAML; Properties input only |
