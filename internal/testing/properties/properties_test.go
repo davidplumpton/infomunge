@@ -1,6 +1,7 @@
 package properties_test
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"reflect"
@@ -186,7 +187,15 @@ func TestStringOperationProperties(t *testing.T) {
 }
 
 func evalExpr(expr string) (evaluator.Value, error) {
-	return runner.RunString(exprgen.WrapScript(expr), nil)
+	result, err := runner.ExecuteString(context.Background(), exprgen.WrapScript(expr), nil, runner.RunnerOptions{})
+	if err != nil {
+		return nil, err
+	}
+	resolved, err := result.Resolved()
+	if err != nil {
+		return nil, err
+	}
+	return resolved.Value, nil
 }
 
 func assertExpressionTrue(t *rapid.T, expr string) {

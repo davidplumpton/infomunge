@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"context"
 	"fmt"
 	declparser "infomunge/internal/declarations"
 	unifiederrors "infomunge/internal/errors"
@@ -10,8 +9,6 @@ import (
 	"infomunge/internal/preprocessor"
 	"infomunge/internal/runtimeio"
 	"infomunge/internal/stringutils"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -54,97 +51,12 @@ func installEvaluationCapabilities(scope *evaluator.Scope, opts RunnerOptions) *
 	return scope
 }
 
-// Run executes the infomunge process on the given file.
-func Run(filePath string) error {
-	return RunWithConfig(filePath, RunnerOptions{})
-}
-
-// RunWithConfig executes the infomunge process on the given file with options.
-func RunWithConfig(filePath string, opts RunnerOptions) error {
-	content, err := ReadScriptFile(filePath)
-	if err != nil {
-		return err
-	}
-	absPath, err := filepath.Abs(filePath)
-	if err != nil {
-		absPath = filePath
-	}
-
-	if opts.BaseDir == "" {
-		opts.BaseDir = filepath.Dir(absPath)
-	}
-
-	return runFromStringWithConfig(context.Background(), content, nil, opts)
-}
-
-// RunFromString executes an infomunge script from a string and prints formatted output.
-func RunFromString(raw string) error {
-	return RunFromStringWithContext(raw, nil)
-}
-
-// RunFromStringWithContext executes an infomunge script with additional context variables.
-func RunFromStringWithContext(raw string, additionalContext evaluator.Context) error {
-	baseDir, err := os.Getwd()
-	if err != nil {
-		baseDir = "."
-	}
-	return runFromStringWithConfig(context.Background(), raw, additionalContext, RunnerOptions{BaseDir: baseDir})
-}
-
-// RunFromStringWithContextAndOptions executes an infomunge script with additional context variables and options.
-func RunFromStringWithContextAndOptions(raw string, additionalContext evaluator.Context, opts RunnerOptions) error {
-	return RunFromStringWithContextAndOptionsAndGoContext(context.Background(), raw, additionalContext, opts)
-}
-
-// RunFromStringWithContextAndOptionsAndGoContext executes an infomunge script with additional context variables, options, and Go context.
-func RunFromStringWithContextAndOptionsAndGoContext(goCtx context.Context, raw string, additionalContext evaluator.Context, opts RunnerOptions) error {
-	if opts.BaseDir == "" {
-		baseDir, err := os.Getwd()
-		if err != nil {
-			opts.BaseDir = "."
-		} else {
-			opts.BaseDir = baseDir
-		}
-	}
-	return runFromStringWithConfig(goCtx, raw, additionalContext, opts)
-}
-
-// runFromStringWithConfig executes an infomunge script with configuration.
-func runFromStringWithConfig(goCtx context.Context, raw string, additionalContext evaluator.Context, opts RunnerOptions) error {
-	if opts.Lazy {
-		return unifiederrors.ValidationError(lazyFlagUnsupportedMessage)
-	}
-
-	if err := RequireScriptHeader(raw); err != nil {
-		return err
-	}
-
-	result, err := ExecuteString(goCtx, raw, additionalContext, opts)
-	if err != nil {
-		return err
-	}
-
-	return PrintExecutionResult(result)
-}
-
 // RequireScriptHeader validates that an output-oriented script includes a header separator.
 func RequireScriptHeader(raw string) error {
 	_, _, bodyOffset := preprocessor.ExtractHeaderAndBody(raw)
 	if bodyOffset == 0 {
 		return unifiederrors.ParseError("script must have a header with '---' separator")
 	}
-	return nil
-}
-
-// PrintExecutionResult formats and writes an execution result to stdout.
-// New callers should prefer ExecuteString plus FormatExecutionResult so output
-// destinations stay owned by the adapter layer.
-func PrintExecutionResult(result ExecutionResult) error {
-	formatted, err := FormatExecutionResult(result)
-	if err != nil {
-		return err
-	}
-	fmt.Print(formatted)
 	return nil
 }
 
@@ -158,24 +70,6 @@ func FormatExecutionResult(result ExecutionResult) (string, error) {
 		return fmt.Sprint(resolved.Value), nil
 	}
 	return output.FormatResultWithMetadata(resolved.Value, resolved.OutputMimeType, resolved.Context, resolved.OutputMetadata)
-}
-
-// RunString executes an infomunge script from a string with optional additional context
-// and returns only the resolved value. Use ExecuteString when callers need header
-// metadata or formatting policy.
-func RunString(script string, additionalContext evaluator.Context) (evaluator.Value, error) {
-	return RunStringWithGoContext(context.Background(), script, additionalContext)
-}
-
-// RunStringWithGoContext executes an infomunge script with optional additional
-// context and Go context, returning only the resolved value. Use ExecuteString
-// when callers need header metadata or formatting policy.
-func RunStringWithGoContext(goCtx context.Context, script string, additionalContext evaluator.Context) (evaluator.Value, error) {
-	result, err := ExecuteString(goCtx, script, additionalContext, RunnerOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return ResolveResult(result.Value)
 }
 
 func applyOutputDeclaration(decl *OutputDeclaration, outputMimeType *string, metadata *output.Metadata) error {

@@ -58,7 +58,6 @@ var (
 	godogBuildOnce sync.Once
 	godogBinary    string
 	godogBuildErr  error
-	stdoutMu       sync.Mutex // Serializes scenarios that capture os.Stdout
 )
 
 func TestFeatures(t *testing.T) {
@@ -674,7 +673,8 @@ func (tc *testContext) theRunnerOutputMIMETypeShouldBe(expected string) error {
 	return nil
 }
 
-// iRunTheScriptThroughRunnerOutputPath calls RunFromStringWithContext and captures stdout.
+// iRunTheScriptThroughRunnerOutputPath exercises the output adapter contract
+// without depending on the deprecated stdout-printing runner wrappers.
 func (tc *testContext) iRunTheScriptThroughRunnerOutputPath() error {
 	ctx := make(evaluator.Context)
 	if tc.payloadMime != "" {
@@ -685,11 +685,11 @@ func (tc *testContext) iRunTheScriptThroughRunnerOutputPath() error {
 		ctx["payload"] = payload
 	}
 
-	captured, runErr := captureRunnerStdout(tc.scriptContent, ctx)
+	formatted, runErr := formatRunnerOutputPath(tc.scriptContent, ctx)
 	if runErr != nil {
 		return runErr
 	}
-	tc.lastOutput = captured
+	tc.lastOutput = formatted
 	return nil
 }
 
@@ -707,7 +707,7 @@ func (tc *testContext) runningTheScriptThroughRunnerOutputPathShouldFailWithErro
 		ctx["payload"] = payload
 	}
 
-	_, runErr := captureRunnerStdout(tc.scriptContent, ctx)
+	_, runErr := formatRunnerOutputPath(tc.scriptContent, ctx)
 	if runErr == nil {
 		return fmt.Errorf("expected script to fail, but it succeeded")
 	}
@@ -717,62 +717,27 @@ func (tc *testContext) runningTheScriptThroughRunnerOutputPathShouldFailWithErro
 	return nil
 }
 
-// captureRunnerStdout calls RunFromStringWithContext and captures its stdout output.
-// Uses a mutex to serialize calls since os.Stdout is process-global.
-func captureRunnerStdout(script string, ctx evaluator.Context) (string, error) {
-	return captureStdout(func() error {
-		return runner.RunFromStringWithContext(script, ctx)
-	})
-}
-
-type stdoutCaptureResult struct {
-	output string
-	err    error
-}
-
-// captureStdout captures process stdout while run executes.
-// Uses a mutex to serialize calls since os.Stdout is process-global.
-func captureStdout(run func() error) (captured string, err error) {
-	stdoutMu.Lock()
-	defer stdoutMu.Unlock()
-
-	oldStdout := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		return "", fmt.Errorf("failed to create pipe: %v", err)
+func formatRunnerOutputPath(script string, ctx evaluator.Context) (string, error) {
+	if err := runner.RequireScriptHeader(script); err != nil {
+		return "", err
 	}
+	result, err := runner.ExecuteString(context.Background(), script, ctx, runner.RunnerOptions{})
+	if err != nil {
+		return "", err
+	}
+	return runner.FormatExecutionResult(result)
+}
 
-	readDone := make(chan stdoutCaptureResult, 1)
-	go func() {
-		var buf bytes.Buffer
-		_, copyErr := io.Copy(&buf, r)
-		readDone <- stdoutCaptureResult{
-			output: buf.String(),
-			err:    copyErr,
-		}
-	}()
-
-	defer func() {
-		closeErr := w.Close()
-		readResult := <-readDone
-		_ = r.Close()
-
-		captured = readResult.output
-		if err == nil {
-			if readResult.err != nil {
-				err = fmt.Errorf("failed to read captured stdout: %v", readResult.err)
-			} else if closeErr != nil {
-				err = fmt.Errorf("failed to close captured stdout writer: %v", closeErr)
-			}
-		}
-	}()
-
-	os.Stdout = w
-	defer func() {
-		os.Stdout = oldStdout
-	}()
-
-	return captured, run()
+func executeRunnerValue(goCtx context.Context, script string, ctx evaluator.Context, opts runner.RunnerOptions) (evaluator.Value, error) {
+	result, err := runner.ExecuteString(goCtx, script, ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	resolved, err := result.Resolved()
+	if err != nil {
+		return nil, err
+	}
+	return resolved.Value, nil
 }
 
 func (tc *testContext) iRunTheScriptWithCanceledEvaluationContext() error {
@@ -789,7 +754,7 @@ func (tc *testContext) iRunTheScriptWithCanceledEvaluationContext() error {
 	goCtx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := runner.RunStringWithGoContext(goCtx, tc.scriptContent, ctx)
+	_, err := executeRunnerValue(goCtx, tc.scriptContent, ctx, runner.RunnerOptions{})
 	if err == nil {
 		return fmt.Errorf("expected script to fail, but it succeeded")
 	}
@@ -812,7 +777,7 @@ func (tc *testContext) iRunTheScriptWithExpiredEvaluationDeadline() error {
 	goCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
 	defer cancel()
 
-	_, err := runner.RunStringWithGoContext(goCtx, tc.scriptContent, ctx)
+	_, err := executeRunnerValue(goCtx, tc.scriptContent, ctx, runner.RunnerOptions{})
 	if err == nil {
 		return fmt.Errorf("expected script to fail, but it succeeded")
 	}
@@ -832,7 +797,7 @@ func (tc *testContext) iRunTheScriptWithURLIODisabled() error {
 		ctx["payload"] = payload
 	}
 
-	_, err := runner.ExecuteString(
+	_, err := executeRunnerValue(
 		context.Background(),
 		tc.scriptContent,
 		ctx,
@@ -925,7 +890,7 @@ func (tc *testContext) runningTheScriptShouldFailWithErrorContaining(expected st
 	// Run the script with injected context
 	goCtx, cancel := context.WithTimeout(context.Background(), tc.timeout)
 	defer cancel()
-	_, err := runner.RunStringWithGoContext(goCtx, tc.scriptContent, ctx)
+	_, err := executeRunnerValue(goCtx, tc.scriptContent, ctx, runner.RunnerOptions{})
 	if err == nil {
 		return fmt.Errorf("expected script to fail, but it succeeded")
 	}

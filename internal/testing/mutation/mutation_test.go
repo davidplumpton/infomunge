@@ -1,6 +1,7 @@
 package mutation
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -198,8 +199,15 @@ func safeRun(script string, ctx evaluator.Context) (result evaluator.Value, err 
 		}
 	}()
 
-	result, err = runner.RunString(script, ctx)
-	return result, err, nil, ""
+	execution, err := runner.ExecuteString(context.Background(), script, ctx, runner.RunnerOptions{})
+	if err != nil {
+		return nil, err, nil, ""
+	}
+	resolved, err := execution.Resolved()
+	if err != nil {
+		return nil, err, nil, ""
+	}
+	return resolved.Value, nil, nil, ""
 }
 
 func recordMutationFailure(property, originalExpr, mutatedExpr string, seed int64, ctx evaluator.Context, panicStack string, detectedAt time.Time) {

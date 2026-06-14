@@ -1,6 +1,7 @@
 package differential
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -81,8 +82,15 @@ func safeEvalInfomunge(script string, ctx evaluator.Context) (result evaluator.V
 			err = fmt.Errorf("panic: %v\n%s", recovered, debug.Stack())
 		}
 	}()
-	result, err = runner.RunString(script, ctx)
-	return
+	execution, err := runner.ExecuteString(context.Background(), script, ctx, runner.RunnerOptions{})
+	if err != nil {
+		return nil, err
+	}
+	resolved, err := execution.Resolved()
+	if err != nil {
+		return nil, err
+	}
+	return resolved.Value, nil
 }
 
 func setRapidChecks(t *testing.T, checks int) {

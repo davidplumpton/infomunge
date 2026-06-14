@@ -1,16 +1,19 @@
 package runner
 
 import (
+	"bytes"
 	"errors"
-	"infomunge/internal/evaluator"
-	"infomunge/internal/output"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"infomunge/internal/evaluator"
+	"infomunge/internal/output"
 )
 
-func TestRunString(t *testing.T) {
+func TestExecuteStringResolvedValue(t *testing.T) {
 	tests := []struct {
 		name     string
 		script   string
@@ -70,26 +73,101 @@ func TestRunString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := RunString(tt.script, tt.context)
+			result, err := ExecuteString(t.Context(), tt.script, tt.context, RunnerOptions{})
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("RunString() expected error, got nil")
+					t.Errorf("ExecuteString() expected error, got nil")
 					return
 				}
 				if tt.errMatch != "" && !containsString(err.Error(), tt.errMatch) {
-					t.Errorf("RunString() error = %v, want error containing %q", err, tt.errMatch)
+					t.Errorf("ExecuteString() error = %v, want error containing %q", err, tt.errMatch)
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("RunString() unexpected error: %v", err)
+				t.Errorf("ExecuteString() unexpected error: %v", err)
 				return
 			}
+			resolved, err := result.Resolved()
+			if err != nil {
+				t.Errorf("ExecutionResult.Resolved() unexpected error: %v", err)
+				return
+			}
+			got := resolved.Value
 			if !deepEqual(got, tt.want) {
-				t.Errorf("RunString() = %v, want %v", got, tt.want)
+				t.Errorf("ExecuteString().Resolved().Value = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+func TestRunStringDeprecatedWrapperDelegatesToExecuteString(t *testing.T) {
+	got, err := RunString("%im 0.1\noutput application/json\n---\n1 + 2", nil)
+	if err != nil {
+		t.Fatalf("RunString() unexpected error: %v", err)
+	}
+	if got != 3 {
+		t.Fatalf("RunString() = %v, want 3", got)
+	}
+}
+
+func TestRunFromStringWithContextDeprecatedWrapperPrintsFormattedOutput(t *testing.T) {
+	script := `%im 0.1
+output application/json
+---
+{ answer: 42 }`
+
+	captured, err := captureStdoutForRunnerTest(t, func() error {
+		return RunFromStringWithContext(script, nil)
+	})
+	if err != nil {
+		t.Fatalf("RunFromStringWithContext() unexpected error: %v", err)
+	}
+	if captured != `{"answer":42}` {
+		t.Fatalf("RunFromStringWithContext() printed %q, want %q", captured, `{"answer":42}`)
+	}
+}
+
+func captureStdoutForRunnerTest(t *testing.T, run func() error) (captured string, err error) {
+	t.Helper()
+
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		return "", err
+	}
+
+	readDone := make(chan struct {
+		output string
+		err    error
+	}, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, copyErr := io.Copy(&buf, r)
+		readDone <- struct {
+			output string
+			err    error
+		}{output: buf.String(), err: copyErr}
+	}()
+
+	os.Stdout = w
+	defer func() {
+		os.Stdout = oldStdout
+		closeErr := w.Close()
+		readResult := <-readDone
+		_ = r.Close()
+
+		captured = readResult.output
+		if err == nil {
+			if readResult.err != nil {
+				err = readResult.err
+			} else if closeErr != nil {
+				err = closeErr
+			}
+		}
+	}()
+
+	return captured, run()
 }
 
 func TestExecuteString_LazyFlagUnsupported(t *testing.T) {

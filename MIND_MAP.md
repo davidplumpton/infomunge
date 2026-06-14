@@ -14,7 +14,7 @@
 
 [6] **Preprocessor** - Syntax transforms live in `internal/preprocessor/*`. Add operators in `internal/preprocessor/transformers_*`; be careful around bracket/brace scanning and grouped operands.
 
-[7] **Evaluator** - AST evaluation and builtins live in `internal/evaluator/*`. New builtins usually belong in `internal/evaluator/builtins_*`; preserve lazy evaluation and nondeterministic builtin behavior such as `now()`.
+[7] **Evaluator** - AST evaluation and builtins live in `internal/evaluator/*`. New builtins usually belong in `internal/evaluator/builtins_*`; preserve lazy evaluation and nondeterministic builtin behavior such as `now()`. When migrating value/error checks from `RunString` to `ExecuteString`, call `ExecutionResult.Resolved()` before treating execution as successful because lazy/stream errors can surface during resolution.
 
 [8] **Runner And Modules** - Runner orchestration is in `internal/runner/runner.go`; module loading behavior is in `internal/runner/module_loader.go`. Core module scripts live under `modules/dw/core`.
 

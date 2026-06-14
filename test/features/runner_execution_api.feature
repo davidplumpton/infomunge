@@ -34,6 +34,13 @@ Feature: Runner execution API
       """
     And the runner output MIME type should be "application/json"
 
+  Scenario: Output adapter rejects no-header scripts before formatting
+    Given the following script:
+      """
+      1 + 2
+      """
+    Then running the script through the runner output path should fail with error containing "script must have a header"
+
   Scenario: CLI output adapter prints formatted execution result
     Given the following input content:
       """

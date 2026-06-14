@@ -697,7 +697,7 @@ Feature: Runner header declaration paths (in-process coverage)
       """
     Then running the script should fail with error containing "invalid output option"
 
-  # --- RunFromStringWithContext output path ---
+  # --- Structured runner output formatting path ---
 
   Scenario: JSON output through full output path
     Given the following script:

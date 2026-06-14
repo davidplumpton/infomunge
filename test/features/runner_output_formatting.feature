@@ -1,7 +1,7 @@
 Feature: Runner output formatting paths
   In order to verify the runner's built-in output formatting logic
   As a developer
-  I want to exercise formatOutputWithContext and related helper functions in-process
+  I want to exercise structured execution result formatting in-process
 
   Scenario: JSON output through runner output path
     Given the following script:
@@ -95,7 +95,7 @@ Feature: Runner output formatting paths
       """
     Then running the script through the runner output path should fail with error containing "output option writeDeclaration"
 
-  Scenario: No header prints raw result through runner output path
+  Scenario: Scalar JSON result through runner output path
     Given the following script:
       """
       %im 0.1
