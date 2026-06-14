@@ -2,10 +2,10 @@ package runner
 
 import (
 	goparser "go/parser"
+	declparser "infomunge/internal/declarations"
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
 	"infomunge/internal/sourcemap"
-	"infomunge/internal/stringutils"
 	"strings"
 )
 
@@ -64,12 +64,7 @@ func buildFunLambda(params []evaluator.ParamDef, bodyStr string, env evaluator.C
 }
 
 func isDirectiveLine(trimmedLine string) bool {
-	for _, kw := range directiveKeywords {
-		if strings.HasPrefix(trimmedLine, kw) {
-			return true
-		}
-	}
-	return false
+	return declparser.IsDirectiveLine(trimmedLine)
 }
 
 func paramDeclarationsToParamDefs(params []ParamDeclaration) []evaluator.ParamDef {
@@ -102,51 +97,11 @@ func buildFunctionDeclaration(decl *FunctionDeclaration, source DeclarationSourc
 }
 
 func collapseWhitespaceOutsideStrings(input string) string {
-	collapsed, _ := collapseWhitespaceOutsideStringsWithMapping(input)
-	return collapsed
+	return declparser.CollapseWhitespaceOutsideStrings(input)
 }
 
 func collapseWhitespaceOutsideStringsWithMapping(input string) (string, []int) {
-	var b strings.Builder
-	var sc stringutils.ScanState
-	lastWasSpace := false
-	var mapping []int
-
-	for i := 0; i < len(input); i++ {
-		ch := input[i]
-		sc.Advance(ch)
-
-		if sc.InString() {
-			b.WriteByte(ch)
-			mapping = append(mapping, i)
-			lastWasSpace = false
-			continue
-		}
-
-		switch ch {
-		case ' ', '\t', '\n', '\r':
-			if !lastWasSpace {
-				b.WriteByte(' ')
-				mapping = append(mapping, i)
-				lastWasSpace = true
-			}
-		default:
-			b.WriteByte(ch)
-			mapping = append(mapping, i)
-			lastWasSpace = false
-		}
-	}
-
-	collapsed := b.String()
-	start := 0
-	for start < len(collapsed) && collapsed[start] == ' ' {
-		start++
-	}
-	end := len(collapsed)
-	for end > start && collapsed[end-1] == ' ' {
-		end--
-	}
-	return collapsed[start:end], mapping[start:end]
+	return declparser.CollapseWhitespaceOutsideStringsWithMapping(input)
 }
 
 func sourceMapForDeclExpr(fullRaw string, baseOffset int, declRaw string, exprStart int, collapseWhitespace bool) sourcemap.Map {
@@ -175,16 +130,6 @@ func sourceMapForDeclExpr(fullRaw string, baseOffset int, declRaw string, exprSt
 func collapseGeneratedWhitespaceMap(exprMap sourcemap.Map) sourcemap.Map {
 	collapsed, mapping := collapseWhitespaceOutsideStringsWithMapping(exprMap.Generated())
 	return exprMap.Compose(collapsed, mapping)
-}
-
-// isDelimiterBalanced checks if brackets, braces, and parentheses are balanced,
-// respecting string literals.
-func isDelimiterBalanced(s string) bool {
-	var sc stringutils.ScanState
-	for i := 0; i < len(s); i++ {
-		sc.Advance(s[i])
-	}
-	return sc.Depth() == 0
 }
 
 func bindTypeDeclaration(decl *TypeDeclaration) (*evaluator.TypeDef, error) {

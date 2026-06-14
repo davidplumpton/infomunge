@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
+	declparser "infomunge/internal/declarations"
 	unifiederrors "infomunge/internal/errors"
-	"infomunge/internal/preprocessor"
 	"infomunge/internal/stringutils"
 	"infomunge/pkg/values"
 )
@@ -81,21 +81,9 @@ type ImportDeclaration struct {
 	NamespaceOnly bool
 }
 
-type VarDeclaration struct {
-	Name       string
-	Expression string
-}
-
-type ParamDeclaration struct {
-	Name string
-	Type string
-}
-
-type FunctionDeclaration struct {
-	Name   string
-	Params []ParamDeclaration
-	Body   string
-}
+type VarDeclaration = declparser.VarDeclaration
+type ParamDeclaration = declparser.ParamDeclaration
+type FunctionDeclaration = declparser.FunctionDeclaration
 
 type TypeDeclaration struct {
 	Name       string
@@ -163,189 +151,15 @@ func parseImportDeclaration(trimmedLine string) ImportDeclaration {
 }
 
 func parseVarDeclarationFromLines(lines []string, start int) (*VarDeclaration, int, error) {
-	if start >= len(lines) {
-		return nil, 0, nil
-	}
-
-	firstLine := lines[start]
-	trimmedFirst := strings.TrimSpace(firstLine)
-	if !strings.HasPrefix(trimmedFirst, "var ") {
-		return nil, 0, nil
-	}
-
-	rest := strings.TrimSpace(strings.TrimPrefix(trimmedFirst, "var "))
-	if rest == "" {
-		return nil, 0, unifiederrors.ParseErrorf("invalid variable declaration: missing variable name in %q", trimmedFirst)
-	}
-
-	namePart := rest
-	if eqIdx := strings.Index(rest, "="); eqIdx >= 0 {
-		namePart = strings.TrimSpace(rest[:eqIdx])
-	}
-	fields := strings.Fields(namePart)
-	if len(fields) != 1 {
-		return nil, 0, unifiederrors.ParseErrorf("invalid variable declaration: expected a single variable name in %q", trimmedFirst)
-	}
-	varName := fields[0]
-
-	declLines := []string{firstLine}
-	declRaw := firstLine
-	eqIdx := strings.Index(declRaw, "=")
-	if eqIdx < 0 {
-		return nil, 0, unifiederrors.ParseErrorf("invalid variable declaration: missing '=' in %q", trimmedFirst)
-	}
-	exprStr := strings.TrimSpace(declRaw[eqIdx+1:])
-	if exprStr != "" {
-		strippedExpr := preprocessor.StripSingleLineComment(exprStr)
-		if strings.TrimSpace(strippedExpr) != "" && isDelimiterBalanced(strippedExpr) {
-			return &VarDeclaration{
-				Name:       varName,
-				Expression: exprStr,
-			}, 1, nil
-		}
-	}
-
-	i := start + 1
-	for i < len(lines) {
-		line := lines[i]
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			declLines = append(declLines, line)
-			i++
-			continue
-		}
-		if isDirectiveLine(trimmed) || (trimmed == "---" && parsedVarLinesAreComplete(declLines)) {
-			break
-		}
-		declLines = append(declLines, line)
-		i++
-	}
-
-	declRaw = strings.Join(declLines, "\n")
-	eqIdx = strings.Index(declRaw, "=")
-	exprStr = strings.TrimSpace(declRaw[eqIdx+1:])
-	if exprStr == "" {
-		return nil, 0, unifiederrors.ParseErrorf("invalid variable declaration: missing expression for %q", varName)
-	}
-	if strings.ContainsAny(exprStr, "\n\r") {
-		exprStr = collapseWhitespaceOutsideStrings(exprStr)
-	}
-
-	return &VarDeclaration{
-		Name:       varName,
-		Expression: exprStr,
-	}, len(declLines), nil
-}
-
-func parsedVarLinesAreComplete(lines []string) bool {
-	declRaw := strings.Join(lines, "\n")
-	eqIdx := strings.Index(declRaw, "=")
-	if eqIdx < 0 {
-		return false
-	}
-	exprStr := strings.TrimSpace(declRaw[eqIdx+1:])
-	return exprStr != "" && isDelimiterBalanced(exprStr)
+	return declparser.ParseVarDeclarationFromLines(lines, start)
 }
 
 func parseFunctionDeclarationLine(trimmedLine string) (string, []ParamDeclaration, string, error) {
-	rest := strings.TrimPrefix(trimmedLine, "fun ")
-
-	parenIdx := strings.Index(rest, "(")
-	if parenIdx < 0 {
-		return "", nil, "", unifiederrors.ParseError("invalid function declaration: missing parameter list")
-	}
-	fnName := strings.TrimSpace(rest[:parenIdx])
-	if fnName == "" {
-		return "", nil, "", unifiederrors.ParseError("invalid function declaration: missing function name")
-	}
-
-	closeParenIdx := strings.Index(rest, ")")
-	if closeParenIdx < 0 || closeParenIdx < parenIdx {
-		return "", nil, "", unifiederrors.ParseError("invalid function declaration: missing closing parenthesis")
-	}
-
-	paramStr := rest[parenIdx+1 : closeParenIdx]
-	var params []ParamDeclaration
-	if strings.TrimSpace(paramStr) != "" {
-		for _, p := range strings.Split(paramStr, ",") {
-			trimmed := strings.TrimSpace(p)
-			paramType := ""
-			if colonIdx := strings.Index(trimmed, ":"); colonIdx >= 0 {
-				paramType = strings.TrimSpace(trimmed[colonIdx+1:])
-				trimmed = strings.TrimSpace(trimmed[:colonIdx])
-			}
-			if trimmed == "" {
-				continue
-			}
-			params = append(params, ParamDeclaration{Name: trimmed, Type: paramType})
-		}
-	}
-
-	afterParams := strings.TrimSpace(rest[closeParenIdx+1:])
-	eqIdx := strings.Index(afterParams, "=")
-	if eqIdx < 0 {
-		return "", nil, "", unifiederrors.ParseError("invalid function declaration: missing '=' after parameters")
-	}
-
-	bodyStr := strings.TrimSpace(afterParams[eqIdx+1:])
-	return fnName, params, bodyStr, nil
+	return declparser.ParseFunctionDeclarationLine(trimmedLine)
 }
 
 func parseFunctionDeclarationFromLines(lines []string, start int) (*FunctionDeclaration, int, error) {
-	trimmedLine := strings.TrimSpace(lines[start])
-	fnName, params, bodyStr, err := parseFunctionDeclarationLine(trimmedLine)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if bodyStr != "" {
-		strippedBody := preprocessor.StripSingleLineComment(bodyStr)
-		if strings.TrimSpace(strippedBody) != "" && isDelimiterBalanced(strippedBody) {
-			return &FunctionDeclaration{
-				Name:   fnName,
-				Params: params,
-				Body:   strippedBody,
-			}, 1, nil
-		}
-	}
-
-	var bodyLines []string
-	if bodyStr != "" {
-		bodyLines = append(bodyLines, bodyStr)
-	}
-	i := start + 1
-	for i < len(lines) {
-		line := lines[i]
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			bodyLines = append(bodyLines, "")
-			i++
-			continue
-		}
-		if strings.HasPrefix(trimmed, "//") {
-			i++
-			continue
-		}
-		if isDirectiveLine(trimmed) {
-			candidate := strings.TrimSpace(strings.Join(bodyLines, "\n"))
-			if candidate != "" {
-				candidate = preprocessor.StripLineComments(candidate)
-				if isDelimiterBalanced(candidate) {
-					break
-				}
-			}
-		}
-		bodyLines = append(bodyLines, line)
-		i++
-	}
-
-	bodyStr = strings.TrimSpace(strings.Join(bodyLines, "\n"))
-	bodyStr = preprocessor.StripLineComments(bodyStr)
-	return &FunctionDeclaration{
-		Name:   fnName,
-		Params: params,
-		Body:   bodyStr,
-	}, i - start, nil
+	return declparser.ParseFunctionDeclarationFromLines(lines, start)
 }
 
 func parseTypeDeclaration(trimmedLine string) (*TypeDeclaration, error) {

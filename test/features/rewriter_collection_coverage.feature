@@ -355,6 +355,29 @@ Feature: Preprocessor rewriter and collection transformer coverage
       7
       """
 
+  Scenario: do block declarations share typed function and multiline var parsing
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      do {
+        fun double(n: Number) =
+          n * 2
+        var payload =
+          {
+            value: 4
+          }
+        ---
+        double(payload.value)
+      }
+      """
+    When I run the script
+    Then the output should be:
+      """
+      8
+      """
+
   # --- while / break / continue via runner (handleWhileLoop, handleBreak, handleContinue) ---
 
   Scenario: break at end of expression

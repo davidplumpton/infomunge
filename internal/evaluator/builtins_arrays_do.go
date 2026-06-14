@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	declparser "infomunge/internal/declarations"
 	unifiederrors "infomunge/internal/errors"
 )
 
@@ -84,107 +85,90 @@ func callBuiltinDo(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	return evalASTInScopeWithDepth(parsedExpr, localScope, depth+1)
 }
 
-// parseVarDeclaration parses a var declaration and adds it to the context.
-// Format: var name = expression
-func parseVarDeclaration(line string, scope *Scope, depth int) error {
-	rest := strings.TrimPrefix(line, "var ")
-	parts := strings.SplitN(rest, "=", 2)
-	if len(parts) != 2 {
-		return unifiederrors.EvalErrorf("invalid var declaration: %s", line)
+func bindDoVarDeclaration(decl *declparser.VarDeclaration, scope *Scope, depth int) error {
+	if decl == nil {
+		return unifiederrors.InternalError("internal error: missing do block variable declaration")
 	}
-	varName := strings.TrimSpace(parts[0])
-	if IsReservedBindingName(varName) {
-		return unifiederrors.EvalErrorf("%q is reserved for runtime metadata", varName)
+	if IsReservedBindingName(decl.Name) {
+		return unifiederrors.EvalErrorf("%q is reserved for runtime metadata", decl.Name)
 	}
-	exprStr := strings.TrimSpace(parts[1])
 
-	parsedExpr, err := compileExpressionInScope(scope, exprStr)
+	parsedExpr, err := compileExpressionInScope(scope, decl.Expression)
 	if err != nil {
-		return unifiederrors.EvalErrorf("compile error in var declaration '%s': %s", varName, err)
+		return unifiederrors.EvalErrorf("compile error in var declaration '%s': %s", decl.Name, err)
 	}
 	value, err := evalASTInScopeWithDepth(parsedExpr, scope, depth+1)
 	if err != nil {
 		return err
 	}
-	scope.Vars[varName] = value
+	scope.Vars[decl.Name] = value
 	return nil
 }
 
-// parseFunDeclaration parses a fun declaration and adds it to the context.
-// Format: fun name(params) = body
-func parseFunDeclaration(line string, scope *Scope) error {
-	rest := strings.TrimPrefix(line, "fun ")
-
-	parenIdx := strings.Index(rest, "(")
-	if parenIdx == -1 {
-		return unifiederrors.EvalErrorf("invalid fun declaration (missing parentheses): %s", line)
+func bindDoFunctionDeclaration(decl *declparser.FunctionDeclaration, scope *Scope) error {
+	if decl == nil {
+		return unifiederrors.InternalError("internal error: missing do block function declaration")
 	}
-	funName := strings.TrimSpace(rest[:parenIdx])
-	if IsReservedBindingName(funName) {
-		return unifiederrors.EvalErrorf("%q is reserved for runtime metadata", funName)
+	if IsReservedBindingName(decl.Name) {
+		return unifiederrors.EvalErrorf("%q is reserved for runtime metadata", decl.Name)
 	}
 
-	closeParenIdx := strings.Index(rest, ")")
-	if closeParenIdx == -1 {
-		return unifiederrors.EvalErrorf("invalid fun declaration (unclosed parentheses): %s", line)
-	}
-
-	params := parseFunParams(rest[parenIdx+1 : closeParenIdx])
-
-	eqIdx := strings.Index(rest[closeParenIdx:], "=")
-	if eqIdx == -1 {
-		return unifiederrors.EvalErrorf("invalid fun declaration (missing '='): %s", line)
-	}
-	bodyStr := strings.TrimSpace(rest[closeParenIdx+eqIdx+1:])
-
-	parsedBody, err := compileExpressionInScope(scope, bodyStr)
+	parsedBody, err := compileExpressionInScope(scope, decl.Body)
 	if err != nil {
-		return unifiederrors.EvalErrorf("compile error in fun declaration '%s': %s", funName, err)
+		return unifiederrors.EvalErrorf("compile error in fun declaration '%s': %s", decl.Name, err)
 	}
 
-	scope.Vars[funName] = &Lambda{
-		Params:  params,
-		Body:    bodyStr,
+	scope.Vars[decl.Name] = &Lambda{
+		Params:  paramDeclarationsToParamDefs(decl.Params),
+		Body:    decl.Body,
 		BodyAST: parsedBody,
 		Env:     scope.Vars,
 	}
 	return nil
 }
 
-// parseFunParams parses function parameters from a comma-separated string.
-func parseFunParams(paramsStr string) []ParamDef {
-	var params []ParamDef
-	if strings.TrimSpace(paramsStr) == "" {
-		return params
-	}
-	for _, p := range strings.Split(paramsStr, ",") {
-		params = append(params, ParamDef{
-			Name:         strings.TrimSpace(p),
+func paramDeclarationsToParamDefs(params []declparser.ParamDeclaration) []ParamDef {
+	defs := make([]ParamDef, 0, len(params))
+	for _, param := range params {
+		defs = append(defs, ParamDef{
+			Name:         param.Name,
 			ExpectedKind: KindUnknown,
 		})
 	}
-	return params
+	return defs
 }
 
 // parseDoDeclarations parses and evaluates declarations (var, fun) in a do block
 func parseDoDeclarations(declsStr string, scope *Scope, depth int) error {
-	for _, line := range strings.Split(declsStr, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
+	lines := strings.Split(declsStr, "\n")
+	for i := 0; i < len(lines); {
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") {
+			i++
 			continue
 		}
 
 		switch {
 		case strings.HasPrefix(trimmed, "var "):
-			if err := parseVarDeclaration(trimmed, scope, depth); err != nil {
+			decl, consumed, err := declparser.ParseVarDeclarationFromLines(lines, i)
+			if err != nil {
 				return err
 			}
+			if err := bindDoVarDeclaration(decl, scope, depth); err != nil {
+				return err
+			}
+			i += consumed
 		case strings.HasPrefix(trimmed, "fun "):
-			if err := parseFunDeclaration(trimmed, scope); err != nil {
+			decl, consumed, err := declparser.ParseFunctionDeclarationFromLines(lines, i)
+			if err != nil {
 				return err
 			}
+			if err := bindDoFunctionDeclaration(decl, scope); err != nil {
+				return err
+			}
+			i += consumed
 		default:
-			return unifiederrors.EvalErrorf("unknown declaration in do block: %s", line)
+			return unifiederrors.EvalErrorf("unknown declaration in do block: %s", lines[i])
 		}
 	}
 	return nil

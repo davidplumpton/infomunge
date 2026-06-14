@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	declparser "infomunge/internal/declarations"
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
 	"infomunge/internal/output"
@@ -295,7 +296,7 @@ func applyNamespaceDeclaration(decl *NamespaceDeclaration, namespaces map[string
 	return nil
 }
 
-var directiveKeywords = []string{"output ", "input ", "%dw ", "%im ", "ns ", "import ", "var ", "fun ", "type "}
+var directiveKeywords = declparser.DirectiveKeywords
 
 // normalizeHeader converts a single-line header into multi-line format by inserting
 // newlines before directive keywords, being careful to skip keywords inside brackets or strings.
