@@ -3,6 +3,7 @@ package preprocessor
 import (
 	"fmt"
 	"go/parser"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -61,6 +62,20 @@ func TestFunctionalContractsUseExactTypedOperatorMappings(t *testing.T) {
 		if contract.Loop != TransformLoopFixpoint {
 			t.Fatalf("%s loop = %q, want %q", name, contract.Loop, TransformLoopFixpoint)
 		}
+	}
+}
+
+func TestFullPreprocessingPipelineUsesStandalonePostProcessingSuffix(t *testing.T) {
+	fullNames := CreateFullPreprocessingPipelineWithOptions(Options{}).GetStageNames()
+	postNames := CreateModularPostProcessingPipelineWithOptions(Options{}).GetStageNames()
+
+	if len(fullNames) < len(postNames) {
+		t.Fatalf("full pipeline stages %v shorter than post pipeline stages %v", fullNames, postNames)
+	}
+
+	fullSuffix := fullNames[len(fullNames)-len(postNames):]
+	if !reflect.DeepEqual(fullSuffix, postNames) {
+		t.Fatalf("full pipeline suffix = %v, want post pipeline stages %v", fullSuffix, postNames)
 	}
 }
 

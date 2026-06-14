@@ -295,12 +295,8 @@ func CreateFullPreprocessingPipelineWithOptions(opts Options) *ModularPipeline {
 		createRegexLiteralStage(opts.TraceTransforms),
 		createWrapperProcessingStage(opts.TraceTransforms),
 		createCoreRewriterStage(opts),
-		createStringProcessingStage(opts.TraceTransforms),
-		createOperatorProcessingStage(opts.TraceTransforms),
-		createSelectorProcessingStage(opts.TraceTransforms),
-		createFunctionalProcessingStage(opts.TraceTransforms),
-		createSyntaxProcessingStage(opts.TraceTransforms),
 	}
+	stages = append(stages, postProcessingStages(opts)...)
 
 	return NewModularPipeline(stages)
 }
@@ -315,13 +311,15 @@ func CreateModularPostProcessingPipeline() *ModularPipeline {
 // is part of the transform contract: string -> low-precedence operator ->
 // selector -> functional -> syntax.
 func CreateModularPostProcessingPipelineWithOptions(opts Options) *ModularPipeline {
-	stages := []PipelineStage{
+	return NewModularPipeline(postProcessingStages(opts))
+}
+
+func postProcessingStages(opts Options) []PipelineStage {
+	return []PipelineStage{
 		createStringProcessingStage(opts.TraceTransforms),
 		createOperatorProcessingStage(opts.TraceTransforms),
 		createSelectorProcessingStage(opts.TraceTransforms),
 		createFunctionalProcessingStage(opts.TraceTransforms),
 		createSyntaxProcessingStage(opts.TraceTransforms),
 	}
-
-	return NewModularPipeline(stages)
 }
