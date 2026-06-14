@@ -2,28 +2,30 @@ package core
 
 import (
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/values"
 	"strings"
 	"sync"
 )
 
 // Reader is a function that parses content into an interface{} representation.
-// Readers should return one of: Object, Array, string, float64, bool, or nil.
+// Readers should return one of: values.Object, values.Array, string, float64,
+// bool, or nil.
 type Reader func(content string) (interface{}, error)
 
 // Writer is a function that serializes an interface{} into a string.
 type Writer func(result interface{}) (string, error)
 
-// ObjectReader is a typed reader that returns an Object directly.
-type ObjectReader func(content string) (Object, error)
+// ObjectReader is a typed reader that returns an object directly.
+type ObjectReader func(content string) (values.Object, error)
 
-// ArrayReader is a typed reader that returns an Array directly.
-type ArrayReader func(content string) (Array, error)
+// ArrayReader is a typed reader that returns an array directly.
+type ArrayReader func(content string) (values.Array, error)
 
 // ReadOptionsHandler parses content using format-specific options.
-type ReadOptionsHandler func(content string, options Object) (interface{}, error)
+type ReadOptionsHandler func(content string, options values.Object) (interface{}, error)
 
 // WriteOptionsHandler serializes a value using format-specific options.
-type WriteOptionsHandler func(result interface{}, options Object) (string, error)
+type WriteOptionsHandler func(result interface{}, options values.Object) (string, error)
 
 // Registry owns format readers, writers, extension lookup, and option handlers.
 type Registry struct {

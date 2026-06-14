@@ -167,6 +167,24 @@ Feature: JSON Reading
       {"count":2,"first_user":"Alice"}
       """
 
+  Scenario: Runtime JSON values remain interoperable through evaluator and output
+    Given the following JSON input:
+      """
+      {"users":[{"name":"Alice","scores":[10,20]},{"name":"Bob","scores":[30]}],"meta":{"count":2}}
+      """
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      { count: payload.meta.count, first: payload.users[0].name, secondScore: payload.users[1].scores[0] }
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"count":2,"first":"Alice","secondScore":30}
+      """
+
   Scenario: Read empty JSON object and array
     Given the following JSON input:
       """

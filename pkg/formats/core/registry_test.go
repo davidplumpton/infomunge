@@ -1,8 +1,8 @@
 package core
 
 import (
-	"errors"
 	"fmt"
+	"infomunge/pkg/values"
 	"sync"
 	"testing"
 )
@@ -11,7 +11,7 @@ func TestRegistryCanRunWithoutCodecPackage(t *testing.T) {
 	registry := NewRegistry()
 
 	registry.RegisterReader("application/x-test", func(content string) (interface{}, error) {
-		return Object{"content": content}, nil
+		return values.Object{"content": content}, nil
 	})
 	registry.RegisterWriter("application/x-test", func(result interface{}) (string, error) {
 		return fmt.Sprintf("encoded:%v", result), nil
@@ -26,7 +26,7 @@ func TestRegistryCanRunWithoutCodecPackage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected reader error: %v", err)
 	}
-	if got := value.(Object)["content"]; got != "payload" {
+	if got := value.(values.Object)["content"]; got != "payload" {
 		t.Fatalf("expected payload value, got %v", got)
 	}
 
@@ -49,10 +49,10 @@ func TestRegistryCanRunWithoutCodecPackage(t *testing.T) {
 func TestRegistryOptionsHandlersFollowAliases(t *testing.T) {
 	registry := NewRegistry()
 
-	registry.RegisterReadOptionsHandler("application/x-test", func(content string, options Object) (interface{}, error) {
-		return Object{"content": content, "mode": options["mode"]}, nil
+	registry.RegisterReadOptionsHandler("application/x-test", func(content string, options values.Object) (interface{}, error) {
+		return values.Object{"content": content, "mode": options["mode"]}, nil
 	})
-	registry.RegisterWriteOptionsHandler("application/x-test", func(result interface{}, options Object) (string, error) {
+	registry.RegisterWriteOptionsHandler("application/x-test", func(result interface{}, options values.Object) (string, error) {
 		return fmt.Sprintf("%v:%v", result, options["mode"]), nil
 	})
 	registry.RegisterOptionsAlias("application/vnd.test", "application/x-test")
@@ -61,11 +61,11 @@ func TestRegistryOptionsHandlersFollowAliases(t *testing.T) {
 	if !ok {
 		t.Fatal("expected read options handler through alias")
 	}
-	readValue, err := readHandler("payload", Object{"mode": "alias"})
+	readValue, err := readHandler("payload", values.Object{"mode": "alias"})
 	if err != nil {
 		t.Fatalf("unexpected read handler error: %v", err)
 	}
-	if got := readValue.(Object)["mode"]; got != "alias" {
+	if got := readValue.(values.Object)["mode"]; got != "alias" {
 		t.Fatalf("expected alias option, got %v", got)
 	}
 
@@ -73,7 +73,7 @@ func TestRegistryOptionsHandlersFollowAliases(t *testing.T) {
 	if !ok {
 		t.Fatal("expected write options handler through alias")
 	}
-	written, err := writeHandler("payload", Object{"mode": "alias"})
+	written, err := writeHandler("payload", values.Object{"mode": "alias"})
 	if err != nil {
 		t.Fatalf("unexpected write handler error: %v", err)
 	}
@@ -114,23 +114,5 @@ func TestRegistryConcurrentRegisterAndLookup(t *testing.T) {
 	}
 	if got := registry.DetectMimeType("sample.x0"); got != "application/x-test-0" {
 		t.Fatalf("expected extension lookup after concurrent registration, got %q", got)
-	}
-}
-
-func TestResultHelpers(t *testing.T) {
-	ok := Ok("value")
-	if !ok.IsOk() || ok.IsErr() {
-		t.Fatalf("expected ok result")
-	}
-	if got := ok.OrElse("fallback"); got != "value" {
-		t.Fatalf("expected ok value, got %q", got)
-	}
-
-	errResult := Err[string](errors.New("boom"))
-	if errResult.IsOk() || !errResult.IsErr() {
-		t.Fatalf("expected error result")
-	}
-	if got := errResult.OrElse("fallback"); got != "fallback" {
-		t.Fatalf("expected fallback value, got %q", got)
 	}
 }
