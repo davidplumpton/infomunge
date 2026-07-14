@@ -154,6 +154,8 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the testing docs should show cucumber commands with a 5 minute Go test timeout$`, tc.theTestingDocsShouldShowCucumberCommandsWithAFiveMinuteGoTestTimeout)
 	ctx.Step(`^the testing docs should show bounded repo-wide package test commands$`, tc.theTestingDocsShouldShowBoundedRepoWidePackageTestCommands)
 	ctx.Step(`^the default mutation corpus test should be skipped outside soak mode$`, tc.theDefaultMutationCorpusTestShouldBeSkippedOutsideSoakMode)
+	ctx.Step(`^the README DataWeave example should use a named file input and be executable$`, tc.theREADMEDataWeaveExampleShouldUseANamedFileInputAndBeExecutable)
+	ctx.Step(`^I post the README server example$`, tc.iPostTheREADMEServerExample)
 
 	// Steps for docstring_input.feature
 	ctx.Step(`^the following input content:$`, tc.theFollowingInputContent)

@@ -1,6 +1,6 @@
 # InfoMunge
 
-`InfoMunge` is a Go-based tool for processing and transforming text data. It is intended to be an experiment in vibe-coding a subset of functionality of DataWeave 2, an extremely powerful data transformation language from Mulesoft and Salesforce. It was announced that DataWeave would be open-sourced, although that seems to be taking a while. DataWeave is a trademarked name, so we will call this InfoMunge.
+`InfoMunge` is a Go-based experiment that implements a subset of DataWeave-style data transformations. [DataWeave](https://docs.mulesoft.com/mule-runtime/latest/dataweave) is MuleSoft's language for accessing and transforming data in Mule applications; InfoMunge is an independent project with its own syntax and runtime.
 
 ## Requirements
 
@@ -36,13 +36,13 @@ Notes:
 - For null literals, use `null` for DataWeave compatibility. InfoMunge also accepts `nil` as an alias.
 - Header `input` directives are accepted for DataWeave compatibility and documentation only. Input data is parsed before execution by the CLI `-i` flags, server `/run` inputs, or embedding test harness; header `input` lines do not reparse, rename, validate, or create inputs.
 
-### Comparison to Datawave
+### Comparison with DataWeave
 
-To compare the operating of infomunge to dataweave we can run the dataweave cli, for example:
+To compare InfoMunge with DataWeave using the [DataWeave CLI](https://github.com/mulesoft/data-weave-cli), provide each input as `Name=File`:
 ```bash
-dw run -i payload <payload.json> "%dw 2.0 output application/xml --- payload"
+dw run -i=payload=payload.json "%dw 2.0 output application/xml --- payload"
 ```
-Note that dw uses an extra "run" command.
+The DataWeave CLI requires the `run` subcommand; InfoMunge accepts `run` as an optional compatibility subcommand.
 
 ### Server Mode
 
@@ -66,7 +66,7 @@ POST a script with optional inputs:
 curl -X POST http://localhost:8080/run \
   -H 'Content-Type: application/json' \
   -H 'X-API-Key: your-secret' \
-  -d '{"script":"%im 0.1\\noutput application/json\\n---\\nsizeOf(payload)","output":"json","inputs":[{"name":"payload","format":"json","content":"[1,2,3]"}]}'
+  -d '{"script":"%im 0.1\noutput application/json\n---\nsizeOf(payload)","output":"json","inputs":[{"name":"payload","format":"json","content":"[1,2,3]"}]}'
 ```
 
 Notes:
