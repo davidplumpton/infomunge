@@ -32,7 +32,7 @@
 
 [15] **Docs** - See `docs/ARCHITECTURE.md`, `docs/EXTENDING.md`, and `docs/TESTING.md` for deeper implementation and testing details.
 
-[16] **Standalone Playground** - Build WASM assets with `make playground-wasm`, then open `docs/playground/index.html`. Legacy gopherjs artifacts and `cmd/infomunge-js` have been removed.
+[16] **Standalone Playground** - Run `make playground-wasm-serve`, then open `http://127.0.0.1:8081/`; the target builds the WASM assets and serves `docs/playground` over HTTP with the repository's Go static server. This browser-local WASM mode does not expose `/run`; use `make playground` for the Go server backend. Use `make playground-wasm` only to rebuild assets. Legacy gopherjs artifacts and `cmd/infomunge-js` have been removed.
 
 [17] **User Preferences** - The user values explicit operating instructions in `AGENTS.md`, durable coordination in `MIND_MAP.md`, process-level improvements, and creating beads tickets for meaningful follow-up work instead of leaving implicit TODOs.
 
@@ -48,7 +48,7 @@
 
 [23] **Stateful Command Discipline** - Do not parallelize beads mutations with reads (`br update`/`br close` then `br show`), and do not parallelize any JJ operations, including read-only help/status/diff discovery commands. Run state-changing and state-inspecting VCS/beads commands sequentially.
 
-[24] **Shell Quoting Discipline** - Avoid backticks inside double-quoted shell commands; they still execute command substitution, including in `rg` patterns. Avoid complex inline shell quoting for beads descriptions. Prefer simple descriptions or temp files under `tmp` when multiline payloads are needed.
+[24] **Shell Quoting Discipline** - Avoid backticks inside double-quoted shell commands; they still execute command substitution, including in `rg` patterns. Use single-quoted patterns when searching for Markdown code spans. Avoid complex inline shell quoting for beads descriptions. Prefer simple descriptions or temp files under `tmp` when multiline payloads are needed.
 
 [25] **Cucumber Harness Pitfalls** - CLI failure scenarios usually need `Given the following input content`, while in-process runner scenarios use `Given the following script`. For multiline fixture files, use docstring-backed steps so real newlines are written.
 

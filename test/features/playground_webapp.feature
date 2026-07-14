@@ -26,6 +26,13 @@ Feature: Playground webapp
     And the output should contain "new Go()"
     And the output should contain "WebAssembly.instantiateStreaming"
 
+  Scenario: Documented standalone launch flow serves WebAssembly assets over HTTP
+    Given the standalone playground is served over HTTP
+    When I load the standalone playground and its WebAssembly assets
+    Then the response status should be 200
+    And the output should contain "wasm_exec.js: text/javascript"
+    And the output should contain "infomunge.wasm: application/wasm"
+
   Scenario: Playground XML pretty printer handles inline close tags
     Given the server is running
     When I request the playground page

@@ -82,13 +82,20 @@ Notes:
 
 ### Standalone Playground (WASM)
 
-Build standalone browser assets:
+Build and serve the standalone browser playground:
 
 ```bash
-make playground-wasm
+make playground-wasm-serve
 ```
 
-Then open `docs/playground/index.html` in a browser. The page uses a local JS runner and does not require the server.
+Then open `http://127.0.0.1:8081/` in a browser. This target builds the WASM
+artifacts and serves `docs/playground` over HTTP using the repository's Go-based
+static server; no additional software is required. Use `make playground-wasm`
+when you only need to rebuild the assets.
+
+Standalone mode evaluates scripts locally in WebAssembly and does not expose the
+`/run` endpoint. To use the Go server backend and `/run` API instead, run
+`make playground` and open `http://localhost:8080/`.
 
 ## How It Works
 

@@ -26,6 +26,7 @@ import (
 	"infomunge/internal/cli"
 	"infomunge/internal/evaluator"
 	resultoutput "infomunge/internal/output"
+	standaloneplayground "infomunge/internal/playground"
 	"infomunge/internal/runner"
 	"infomunge/internal/runtimeio"
 	"infomunge/pkg/formats"
@@ -241,6 +242,8 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the server is running with API key "([^"]*)"$`, tc.theServerIsRunningWithAPIKey)
 	ctx.Step(`^I request the playground page$`, tc.iRequestThePlaygroundPage)
 	ctx.Step(`^I read the standalone playground page$`, tc.iReadTheStandalonePlaygroundPage)
+	ctx.Step(`^the standalone playground is served over HTTP$`, tc.theStandalonePlaygroundIsServedOverHTTP)
+	ctx.Step(`^I load the standalone playground and its WebAssembly assets$`, tc.iLoadTheStandalonePlaygroundAndItsWebAssemblyAssets)
 	ctx.Step(`^the response status should be (\d+)$`, tc.theResponseStatusShouldBe)
 	ctx.Step(`^I run the server script without specifying output$`, tc.iRunTheServerScriptWithoutOutput)
 	ctx.Step(`^I run the server script with output "([^"]*)"$`, tc.iRunTheServerScriptWithOutput)
@@ -1591,6 +1594,64 @@ func (tc *testContext) iReadTheStandalonePlaygroundPage() error {
 	}
 	tc.lastHTTPStatus = 200
 	tc.lastOutput = string(body)
+	return nil
+}
+
+func (tc *testContext) theStandalonePlaygroundIsServedOverHTTP() error {
+	if tc.serverClose != nil {
+		return nil
+	}
+	server := httptest.NewServer(standaloneplayground.Handler("../docs/playground"))
+	tc.serverURL = server.URL
+	tc.serverClose = server.Close
+	return nil
+}
+
+func (tc *testContext) iLoadTheStandalonePlaygroundAndItsWebAssemblyAssets() error {
+	if tc.serverURL == "" {
+		return fmt.Errorf("standalone playground server is not running")
+	}
+
+	assets := []struct {
+		path        string
+		contentType string
+	}{
+		{path: "/", contentType: "text/html"},
+		{path: "/wasm_exec.js", contentType: "text/javascript"},
+		{path: "/infomunge.wasm", contentType: "application/wasm"},
+	}
+
+	var loaded strings.Builder
+	for _, asset := range assets {
+		resp, err := http.Get(tc.serverURL + asset.path)
+		if err != nil {
+			return fmt.Errorf("failed to load standalone playground asset %q: %v", asset.path, err)
+		}
+		_, readErr := io.Copy(io.Discard, resp.Body)
+		closeErr := resp.Body.Close()
+		if readErr != nil {
+			return fmt.Errorf("failed to read standalone playground asset %q: %v", asset.path, readErr)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("failed to close standalone playground asset %q: %v", asset.path, closeErr)
+		}
+		if resp.StatusCode != http.StatusOK {
+			tc.lastHTTPStatus = resp.StatusCode
+			return fmt.Errorf("standalone playground asset %q returned status %d", asset.path, resp.StatusCode)
+		}
+		actualContentType := resp.Header.Get("Content-Type")
+		if !strings.HasPrefix(actualContentType, asset.contentType) {
+			return fmt.Errorf("standalone playground asset %q has content type %q, want %q", asset.path, actualContentType, asset.contentType)
+		}
+		name := strings.TrimPrefix(asset.path, "/")
+		if name == "" {
+			name = "index.html"
+		}
+		fmt.Fprintf(&loaded, "%s: %s\n", name, asset.contentType)
+	}
+
+	tc.lastHTTPStatus = http.StatusOK
+	tc.lastOutput = loaded.String()
 	return nil
 }
 
