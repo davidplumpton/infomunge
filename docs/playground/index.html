@@ -385,19 +385,42 @@ payload</textarea>
             : index === 0
             ? "payload"
             : "input" + (index + 1);
-        card.innerHTML =
-          '<label>Input name <input type="text" value="' + defaultName + '" /></label>' +
-          '<label>Format' +
-          '  <select>' +
-          '    <option value="">auto</option>' +
-          '    <option value="json">json</option>' +
-          '    <option value="xml">xml</option>' +
-          '    <option value="csv">csv</option>' +
-          '    <option value="yaml">yaml</option>' +
-          '    <option value="text/plain">text</option>' +
-          '  </select>' +
-          '</label>' +
-          '<label>Content <textarea placeholder="Paste input data here"></textarea></label>';
+
+        const nameLabel = document.createElement("label");
+        nameLabel.appendChild(document.createTextNode("Input name "));
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.value = defaultName;
+        nameLabel.appendChild(nameInput);
+
+        const formatLabel = document.createElement("label");
+        formatLabel.appendChild(document.createTextNode("Format"));
+        const formatSelect = document.createElement("select");
+        const formatOptions = [
+          { value: "", label: "auto" },
+          { value: "json", label: "json" },
+          { value: "xml", label: "xml" },
+          { value: "csv", label: "csv" },
+          { value: "yaml", label: "yaml" },
+          { value: "text/plain", label: "text" },
+        ];
+        formatOptions.forEach((item) => {
+          const option = document.createElement("option");
+          option.value = item.value;
+          option.textContent = item.label;
+          formatSelect.appendChild(option);
+        });
+        formatLabel.appendChild(formatSelect);
+
+        const contentLabel = document.createElement("label");
+        contentLabel.appendChild(document.createTextNode("Content "));
+        const contentInput = document.createElement("textarea");
+        contentInput.placeholder = "Paste input data here";
+        contentLabel.appendChild(contentInput);
+
+        card.appendChild(nameLabel);
+        card.appendChild(formatLabel);
+        card.appendChild(contentLabel);
         if (preset) {
           card.querySelector("select").value = preset.format || "";
           card.querySelector("textarea").value = preset.content || "";

@@ -242,6 +242,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the server is running with API key "([^"]*)"$`, tc.theServerIsRunningWithAPIKey)
 	ctx.Step(`^I request the playground page$`, tc.iRequestThePlaygroundPage)
 	ctx.Step(`^I read the standalone playground page$`, tc.iReadTheStandalonePlaygroundPage)
+	ctx.Step(`^the standalone input-card builder should match the server playground$`, tc.theStandaloneInputCardBuilderShouldMatchTheServerPlayground)
 	ctx.Step(`^the standalone playground is served over HTTP$`, tc.theStandalonePlaygroundIsServedOverHTTP)
 	ctx.Step(`^I load the standalone playground and its WebAssembly assets$`, tc.iLoadTheStandalonePlaygroundAndItsWebAssemblyAssets)
 	ctx.Step(`^the response status should be (\d+)$`, tc.theResponseStatusShouldBe)
@@ -1595,6 +1596,44 @@ func (tc *testContext) iReadTheStandalonePlaygroundPage() error {
 	tc.lastHTTPStatus = 200
 	tc.lastOutput = string(body)
 	return nil
+}
+
+func (tc *testContext) theStandaloneInputCardBuilderShouldMatchTheServerPlayground() error {
+	serverPage, err := os.ReadFile("../internal/cli/playground.html")
+	if err != nil {
+		return fmt.Errorf("failed to read server playground page: %v", err)
+	}
+	standalonePage, err := os.ReadFile("../docs/playground/index.html")
+	if err != nil {
+		return fmt.Errorf("failed to read standalone playground page: %v", err)
+	}
+
+	serverBuilder, err := extractInputCardBuilder(string(serverPage))
+	if err != nil {
+		return fmt.Errorf("server playground: %v", err)
+	}
+	standaloneBuilder, err := extractInputCardBuilder(string(standalonePage))
+	if err != nil {
+		return fmt.Errorf("standalone playground: %v", err)
+	}
+	if standaloneBuilder != serverBuilder {
+		return fmt.Errorf("standalone input-card builder differs from server playground")
+	}
+	return nil
+}
+
+func extractInputCardBuilder(page string) (string, error) {
+	const startMarker = "function createInputCard(index, preset) {"
+	const endMarker = "function addInputCard(preset) {"
+	start := strings.Index(page, startMarker)
+	if start < 0 {
+		return "", fmt.Errorf("input-card builder start marker not found")
+	}
+	end := strings.Index(page[start:], endMarker)
+	if end < 0 {
+		return "", fmt.Errorf("input-card builder end marker not found")
+	}
+	return strings.TrimSpace(page[start : start+end]), nil
 }
 
 func (tc *testContext) theStandalonePlaygroundIsServedOverHTTP() error {
