@@ -10,11 +10,11 @@
 
 [4] **User-Facing Modes** - CLI accepts scripts directly or with `-f`, supports repeated named `-i` inputs, and can run server mode via `./infomunge --server --listen :8080`. The playground posts scripts and inputs to `/run`.
 
-[5] **Formats** - Format readers/writers live in `pkg/formats/*` with the registry in `pkg/formats/registry.go`. JSON, XML, CSV, YAML, Java properties, and text behavior are user-visible. CSV output requires an array of objects.
+[5] **Formats** - Format readers/writers live in codec-local `pkg/formats/*.go` files and register MIME types/extensions from their `init` functions through `pkg/formats/registry.go`; option handlers and MIME aliases register through `pkg/formats/options_dispatch.go`. JSON, XML, CSV, YAML, Java properties, and text behavior are user-visible. CSV output requires an array of objects.
 
-[6] **Preprocessor** - Syntax transforms live in `internal/preprocessor/*`. Add operators in `internal/preprocessor/transformers_*`; be careful around bracket/brace scanning and grouped operands.
+[6] **Preprocessor** - Syntax transforms live in `internal/preprocessor/*`. Add operators in `internal/preprocessor/transformers_*.go`, then register an ordered phase/loop/mapping contract in `internal/preprocessor/stages.go` under the lifecycle defined by `internal/preprocessor/transform_contract.go`; be careful around bracket/brace scanning, grouped operands, and source mapping.
 
-[7] **Evaluator** - AST evaluation and builtins live in `internal/evaluator/*`. New builtins usually belong in `internal/evaluator/builtins_*`; preserve lazy evaluation and nondeterministic builtin behavior such as `now()`. When migrating value/error checks from `RunString` to `ExecuteString`, call `ExecutionResult.Resolved()` before treating execution as successful because lazy/stream errors can surface during resolution.
+[7] **Evaluator** - AST evaluation and builtins live in `internal/evaluator/*`. New builtin handlers usually belong in `internal/evaluator/builtins_*.go` and must have a matching dispatch/metadata entry in `internal/evaluator/builtin_specs_*.go`; add a new spec group to `defaultBuiltinSpecs` only when introducing a category. Preserve lazy evaluation and nondeterministic builtin behavior such as `now()`. When migrating value/error checks from `RunString` to `ExecuteString`, call `ExecutionResult.Resolved()` before treating execution as successful because lazy/stream errors can surface during resolution.
 
 [8] **Runner And Modules** - Runner orchestration is in `internal/runner/runner.go`; module loading behavior is in `internal/runner/module_loader.go`. Core module scripts live under `modules/dw/core`.
 

@@ -157,6 +157,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the default mutation corpus test should be skipped outside soak mode$`, tc.theDefaultMutationCorpusTestShouldBeSkippedOutsideSoakMode)
 	ctx.Step(`^the README DataWeave example should use a named file input and be executable$`, tc.theREADMEDataWeaveExampleShouldUseANamedFileInputAndBeExecutable)
 	ctx.Step(`^I post the README server example$`, tc.iPostTheREADMEServerExample)
+	ctx.Step(`^every repository path referenced by the extension guide should exist$`, tc.everyRepositoryPathReferencedByTheExtensionGuideShouldExist)
 
 	// Steps for docstring_input.feature
 	ctx.Step(`^the following input content:$`, tc.theFollowingInputContent)

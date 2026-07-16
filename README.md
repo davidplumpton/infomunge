@@ -120,9 +120,13 @@ Key entrypoint: `internal/runner/runner.go`.
 
 ### Where To Add Things
 
-- New operator: `internal/preprocessor/transformers_*`
-- New builtin: `internal/evaluator/builtins_*`
-- New format: `pkg/formats/*` + `pkg/formats/registry.go`
+- New operator: implement in `internal/preprocessor/transformers_*.go` and add
+  its ordered transform contract in `internal/preprocessor/stages.go`
+- New builtin: implement in `internal/evaluator/builtins_*.go` and add its
+  metadata/dispatch spec in `internal/evaluator/builtin_specs_*.go`
+- New format: implement and register the codec in its local
+  `pkg/formats/*.go` `init`; option handlers use
+  `pkg/formats/options_dispatch.go`
 - Module loading behavior: `internal/runner/module_loader.go`
 
 See `docs/ARCHITECTURE.md`, `docs/EXTENDING.md`, and `docs/TESTING.md` for details.
