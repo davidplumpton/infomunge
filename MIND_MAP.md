@@ -8,7 +8,7 @@
 
 [3] **Execution Pipeline** - Flow: CLI -> Inputs -> Header -> Preprocess -> Evaluate -> Format output. Header directives are parsed in the runner, preprocessing rewrites DataWeave-like syntax, evaluator executes builtins and lazy values, then output formatting serializes the result.
 
-[4] **User-Facing Modes** - CLI accepts scripts directly or with `-f`, supports repeated named `-i` inputs, and can run server mode via `./infomunge --server --listen :8080`. The playground posts scripts and inputs to `/run`.
+[4] **User-Facing Modes** - CLI accepts scripts directly or with `-f`, supports repeated named `-i` inputs, and can run loopback-only server mode via `./infomunge --server`. The playground posts scripts and inputs to `/run`; network-facing binds require `--api-key` [31].
 
 [5] **Formats** - Format readers/writers live in codec-local `pkg/formats/*.go` files and register MIME types/extensions from their `init` functions through `pkg/formats/registry.go`; option handlers and MIME aliases register through `pkg/formats/options_dispatch.go`. `docs/FORMATS.md` is the user-facing registry and fidelity matrix, including the distinction between structured codecs and raw passthrough; its consistency test must change with registrations. Java properties are input-only, and CSV output requires an array of objects.
 
@@ -61,3 +61,5 @@
 [29] **Error Context Discipline** - When changing wrapped error messages or unified error plumbing, verify final rendered CLI stderr/output and preserve essential context such as filenames.
 
 [30] **Context Refactor Discipline** - Preserve existing public/internal call signatures where practical by adding context-aware variants first, then migrate call sites incrementally to reduce compile fallout.
+
+[31] **Server Exposure Safety** - HTTP server mode defaults to `127.0.0.1:8080`. Unauthenticated server mode accepts only loopback listen hosts; configuring a non-loopback or wildcard address requires `--api-key` because `/run` evaluates caller-supplied scripts.

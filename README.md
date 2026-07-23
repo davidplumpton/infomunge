@@ -50,14 +50,20 @@ The DataWeave CLI requires the `run` subcommand; InfoMunge accepts `run` as an o
 Run the HTTP server:
 
 ```bash
-./infomunge --server --listen :8080
+./infomunge --server
 ```
 
-Protect the `/run` endpoint with a shared API key:
+The server defaults to `127.0.0.1:8080`, so it is reachable only from the local
+machine. The `/run` endpoint evaluates caller-supplied transformation scripts;
+only expose it to trusted users. To listen on a network interface, configure a
+shared API key:
 
 ```bash
-./infomunge --server --listen :8080 --api-key your-secret
+./infomunge --server --listen 0.0.0.0:8080 --api-key your-secret
 ```
+
+InfoMunge rejects non-loopback server addresses when `--api-key` is omitted.
+Clients must send the key in `X-API-Key` or as a bearer token.
 
 Open the playground at `http://localhost:8080/` to use the interactive UI. It offers input panels on the left (add, name, and format each input), a script editor in the center, and a live result panel on the right that runs through the `/run` endpoint.
 

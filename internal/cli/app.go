@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-const defaultListenAddr = ":8080"
+const defaultListenAddr = "127.0.0.1:8080"
 
 // Config holds the application configuration
 type Config struct {

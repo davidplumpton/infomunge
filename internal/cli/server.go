@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os/signal"
 	"regexp"
@@ -14,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/handlers"
 	"infomunge/internal/runner"
 )
@@ -30,9 +32,9 @@ const (
 var absolutePathPattern = regexp.MustCompile(`(?:[A-Za-z]:\\|/)[^\s:"]+`)
 
 func (app *App) serve(config *Config) error {
-	addr := config.Listen
-	if addr == "" {
-		addr = defaultListenAddr
+	addr := effectiveListenAddr(config.Listen)
+	if err := validateServerExposure(addr, config.ServerAPIKey); err != nil {
+		return err
 	}
 
 	mux := app.serverMux(config)
@@ -73,6 +75,38 @@ func (app *App) serve(config *Config) error {
 		<-errCh
 		return nil
 	}
+}
+
+func effectiveListenAddr(addr string) string {
+	if addr == "" {
+		return defaultListenAddr
+	}
+	return addr
+}
+
+func validateServerExposure(addr, apiKey string) error {
+	if apiKey != "" {
+		return nil
+	}
+
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return unifiederrors.ValidationErrorf(
+			"invalid server listen address %q: unauthenticated server mode requires a loopback host and port",
+			addr,
+		)
+	}
+	if strings.EqualFold(host, "localhost") {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip != nil && ip.IsLoopback() {
+		return nil
+	}
+
+	return unifiederrors.ValidationError(
+		"server mode without --api-key must listen on a loopback address; use --listen 127.0.0.1:8080 or configure --api-key for network exposure",
+	)
 }
 
 func (app *App) ServerHandler(config *Config) http.Handler {

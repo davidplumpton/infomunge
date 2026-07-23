@@ -148,6 +148,8 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I run the application with "([^"]*)"$`, tc.iRunTheApplicationWith)
 	ctx.Step(`^I run the application with "([^"]*)" and it fails$`, tc.iRunTheApplicationWithAndItFails)
 	ctx.Step(`^I run the application with arguments "([^"]*)" and it fails$`, tc.iRunTheApplicationWithArgumentsAndItFails)
+	ctx.Step(`^I inspect the application help$`, tc.iInspectTheApplicationHelp)
+	ctx.Step(`^the server listen default should be "([^"]*)"$`, tc.theServerListenDefaultShouldBe)
 	ctx.Step(`^I run repo-wide package discovery from the repo root$`, tc.iRunRepoWidePackageDiscoveryFromRepoRoot)
 	ctx.Step(`^the output should contain "`+quotedStepArgument+`"$`, tc.theOutputShouldContain)
 	ctx.Step(`^the Makefile cucumber targets should use a 5 minute Go test timeout$`, tc.theMakefileCucumberTargetsShouldUseAFiveMinuteGoTestTimeout)
@@ -318,6 +320,26 @@ func (tc *testContext) iRunTheApplicationWithArgumentsAndItFails(argsLine string
 		return err
 	}
 	return tc.expectCLIFailure(tc.runCLI(strings.Fields(argsLine)...))
+}
+
+func (tc *testContext) iInspectTheApplicationHelp() error {
+	if err := tc.ensureWorkspace(); err != nil {
+		return err
+	}
+	_ = tc.runCLI("--help")
+	if tc.lastOutput == "" {
+		return errors.New("application help produced no output")
+	}
+	return nil
+}
+
+func (tc *testContext) theServerListenDefaultShouldBe(expected string) error {
+	defaultText := "-listen string"
+	valueText := fmt.Sprintf(`(default %q)`, expected)
+	if !strings.Contains(tc.lastOutput, defaultText) || !strings.Contains(tc.lastOutput, valueText) {
+		return fmt.Errorf("expected server listen help to contain %q and %q, got %q", defaultText, valueText, tc.lastOutput)
+	}
+	return nil
 }
 
 func (tc *testContext) iRunRepoWidePackageDiscoveryFromRepoRoot() error {
