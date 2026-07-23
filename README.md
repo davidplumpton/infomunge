@@ -195,3 +195,9 @@ This project uses `jj` for version control.
 ### Tasks and Issues
 
 This project uses Beads https://github.com/steveyegge/beads
+
+## Third-Party Software
+
+The standalone playground and compiled binaries include third-party software.
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the applicable license
+and attribution notices.
