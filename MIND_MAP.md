@@ -10,7 +10,7 @@
 
 [4] **User-Facing Modes** - CLI accepts scripts directly or with `-f`, supports repeated named `-i` inputs, and can run server mode via `./infomunge --server --listen :8080`. The playground posts scripts and inputs to `/run`.
 
-[5] **Formats** - Format readers/writers live in codec-local `pkg/formats/*.go` files and register MIME types/extensions from their `init` functions through `pkg/formats/registry.go`; option handlers and MIME aliases register through `pkg/formats/options_dispatch.go`. JSON, XML, CSV, YAML, Java properties, and text behavior are user-visible. CSV output requires an array of objects.
+[5] **Formats** - Format readers/writers live in codec-local `pkg/formats/*.go` files and register MIME types/extensions from their `init` functions through `pkg/formats/registry.go`; option handlers and MIME aliases register through `pkg/formats/options_dispatch.go`. `docs/FORMATS.md` is the user-facing registry and fidelity matrix, including the distinction between structured codecs and raw passthrough; its consistency test must change with registrations. Java properties are input-only, and CSV output requires an array of objects.
 
 [6] **Preprocessor** - Syntax transforms live in `internal/preprocessor/*`. Add operators in `internal/preprocessor/transformers_*.go`, then register an ordered phase/loop/mapping contract in `internal/preprocessor/stages.go` under the lifecycle defined by `internal/preprocessor/transform_contract.go`; be careful around bracket/brace scanning, grouped operands, and source mapping.
 
@@ -22,7 +22,7 @@
 
 [10] **Quality Gates** - Prefer targeted tests for the changed layer. Use `INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m` for the bounded repo-wide package suite, then run cucumber separately when user-visible behavior changed. For documentation- or workflow-only edits, validate the affected commands, links, examples, or formatting; cucumber is unnecessary unless runtime behavior changes. The mutation corpus soak is skipped by default and runs explicitly with `INTENSIVE_TEST_SOAK=1`.
 
-[11] **Version Control** - Use `jj` only; never use git commands. Commit with `jj commit -m <description>` and do not use `jj new` with a message. Run JJ commands sequentially because status/describe/commit can touch working-copy state and ref locks.
+[11] **Version Control** - Use `jj` only; never use git commands. Commit with `jj commit -m <description>` and do not use `jj new` with a message. Run JJ commands sequentially because status/describe/commit can touch working-copy state and ref locks. `jj diff` has no `--check` flag; use targeted text checks for whitespace validation.
 
 [12] **Beads Workflow** - Issue tracking uses `br` (beads rust): `bv --robot-triage`, `br show <id>`, `br update <id> --status in_progress`, `br close <id>`, `br sync --flush-only`. `br sync --flush-only` exports the beads database to `.beads/issues.jsonl`; `br` never runs VCS commands or commits. Use `jj` to commit the exported beads files.
 
@@ -52,7 +52,7 @@
 
 [25] **Cucumber Harness Pitfalls** - CLI failure scenarios usually need `Given the following input content`, while in-process runner scenarios use `Given the following script`. For multiline fixture files, use docstring-backed steps so real newlines are written.
 
-[26] **Script Formatting Pitfalls** - Keep complex function calls in cucumber scripts on a single expression line unless multiline parser coverage exists. JSON output expectations are exact text comparisons, so match compact serialized output.
+[26] **Script Formatting Pitfalls** - Keep complex function calls in cucumber scripts on a single expression line unless multiline parser coverage exists. Documentation snippets intended to run as standalone CLI scripts need a header and `---` separator. JSON output expectations are exact text comparisons, so match compact serialized output.
 
 [27] **Parser Fragility Notes** - Inline `if` expressions inside object literals and dense object-value expressions have repeatedly hit brace/branch scanning bugs. For unrelated coverage, use simpler objects, arrays, defaults, or isolate conditionals in parser-specific tests.
 

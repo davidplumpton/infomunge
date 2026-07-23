@@ -3,6 +3,7 @@ package core
 import (
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/pkg/values"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -26,6 +27,17 @@ type ReadOptionsHandler func(content string, options values.Object) (interface{}
 
 // WriteOptionsHandler serializes a value using format-specific options.
 type WriteOptionsHandler func(result interface{}, options values.Object) (string, error)
+
+// RegistrationSnapshot is a deterministic, read-only view of a Registry's
+// registered MIME types, extensions, aliases, and option handlers.
+type RegistrationSnapshot struct {
+	Readers           []string
+	Writers           []string
+	Extensions        map[string]string
+	OptionMIMEAliases map[string]string
+	ReadOptionsMIMEs  []string
+	WriteOptionsMIMEs []string
+}
 
 // Registry owns format readers, writers, extension lookup, and option handlers.
 type Registry struct {
@@ -217,6 +229,22 @@ func (r *Registry) GetWriteOptionsHandler(mimeType string) (WriteOptionsHandler,
 	return handler, ok
 }
 
+// RegistrationSnapshot returns a copy of the registry metadata. MIME type
+// slices are sorted so callers can compare snapshots deterministically.
+func (r *Registry) RegistrationSnapshot() RegistrationSnapshot {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return RegistrationSnapshot{
+		Readers:           sortedStringKeys(r.readers),
+		Writers:           sortedStringKeys(r.writers),
+		Extensions:        cloneStringMap(r.extensions),
+		OptionMIMEAliases: cloneStringMap(r.optionMimeAliases),
+		ReadOptionsMIMEs:  sortedStringKeys(r.readOptionsHandlers),
+		WriteOptionsMIMEs: sortedStringKeys(r.writeOptionsHandlers),
+	}
+}
+
 func (r *Registry) canonicalOptionsMimeTypeLocked(mimeType string) string {
 	seen := make(map[string]struct{})
 	for {
@@ -230,4 +258,21 @@ func (r *Registry) canonicalOptionsMimeTypeLocked(mimeType string) string {
 		seen[mimeType] = struct{}{}
 		mimeType = canonical
 	}
+}
+
+func sortedStringKeys[V any](values map[string]V) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	clone := make(map[string]string, len(values))
+	for key, value := range values {
+		clone[key] = value
+	}
+	return clone
 }

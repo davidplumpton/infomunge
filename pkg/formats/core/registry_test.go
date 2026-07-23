@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"infomunge/pkg/values"
+	"reflect"
 	"sync"
 	"testing"
 )
@@ -79,6 +80,50 @@ func TestRegistryOptionsHandlersFollowAliases(t *testing.T) {
 	}
 	if written != "payload:alias" {
 		t.Fatalf("expected aliased handler output, got %q", written)
+	}
+}
+
+func TestRegistrationSnapshotIsSortedAndIndependent(t *testing.T) {
+	registry := NewRegistry()
+	registry.RegisterReader("application/z-last", func(content string) (interface{}, error) {
+		return content, nil
+	})
+	registry.RegisterReader("application/a-first", func(content string) (interface{}, error) {
+		return content, nil
+	})
+	registry.RegisterWriter("application/z-last", func(result interface{}) (string, error) {
+		return fmt.Sprint(result), nil
+	})
+	registry.RegisterExtension(".last", "application/z-last")
+	registry.RegisterOptionsAlias("application/x-last", "application/z-last")
+	registry.RegisterReadOptionsHandler("application/z-last", func(content string, options values.Object) (interface{}, error) {
+		return content, nil
+	})
+	registry.RegisterWriteOptionsHandler("application/z-last", func(result interface{}, options values.Object) (string, error) {
+		return fmt.Sprint(result), nil
+	})
+
+	snapshot := registry.RegistrationSnapshot()
+	if want := []string{"application/a-first", "application/z-last"}; !reflect.DeepEqual(snapshot.Readers, want) {
+		t.Fatalf("readers = %q, want %q", snapshot.Readers, want)
+	}
+	if want := []string{"application/z-last"}; !reflect.DeepEqual(snapshot.Writers, want) {
+		t.Fatalf("writers = %q, want %q", snapshot.Writers, want)
+	}
+	if want := []string{"application/z-last"}; !reflect.DeepEqual(snapshot.ReadOptionsMIMEs, want) {
+		t.Fatalf("read options MIME types = %q, want %q", snapshot.ReadOptionsMIMEs, want)
+	}
+	if want := []string{"application/z-last"}; !reflect.DeepEqual(snapshot.WriteOptionsMIMEs, want) {
+		t.Fatalf("write options MIME types = %q, want %q", snapshot.WriteOptionsMIMEs, want)
+	}
+
+	snapshot.Extensions[".last"] = "changed"
+	snapshot.OptionMIMEAliases["application/x-last"] = "changed"
+	if got := registry.DetectMimeType("record.last"); got != "application/z-last" {
+		t.Fatalf("mutating snapshot changed extension registry to %q", got)
+	}
+	if _, ok := registry.GetReadOptionsHandler("application/x-last"); !ok {
+		t.Fatal("mutating snapshot changed option alias registry")
 	}
 }
 
