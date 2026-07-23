@@ -18,7 +18,7 @@
 
 [8] **Runner And Modules** - Runner orchestration is in `internal/runner/runner.go`; module loading behavior is in `internal/runner/module_loader.go`. Core module scripts live under `modules/dw/core`.
 
-[9] **Testing** - Cucumber tests run with `go test -v ./test`. Add or update cucumber coverage for new or changed user-visible behavior; use focused Go unit tests for internal behavior and refactors. Feature files live under `test/features` from the repo root; use `GODOG_PATHS=features/...` because the test harness resolves feature paths relative to `./test`.
+[9] **Testing** - Cucumber tests run with `go test -v ./test -timeout 5m`. Add or update cucumber coverage for new or changed user-visible behavior; use focused Go unit tests for internal behavior and refactors. Feature files live under `test/features` from the repo root; use `GODOG_PATHS=features/...` because the test harness resolves feature paths relative to `./test`.
 
 [10] **Quality Gates** - Prefer targeted tests for the changed layer. Use `INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m` for the bounded repo-wide package suite, then run cucumber separately when user-visible behavior changed. For documentation- or workflow-only edits, validate the affected commands, links, examples, or formatting; cucumber is unnecessary unless runtime behavior changes. The mutation corpus soak is skipped by default and runs explicitly with `INTENSIVE_TEST_SOAK=1`.
 

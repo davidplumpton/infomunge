@@ -52,12 +52,21 @@ func (tc *testContext) theRepoWideGoTestRegressionStepShouldUseAFiveMinuteGoTest
 	return nil
 }
 
-func (tc *testContext) theTestingDocsShouldShowCucumberCommandsWithAFiveMinuteGoTestTimeout() error {
-	expected := []string{
-		"go test -v ./test -timeout 5m",
-		"timeout 5m go test -v ./test -run TestFeatures -count=1 -timeout 5m",
+func (tc *testContext) theAuthoritativeTestingDocsShouldShowPortableCucumberCommandsWithAFiveMinuteGoTestTimeout() error {
+	expectedByPath := map[string][]string{
+		"../README.md": {
+			"go test -v ./test -timeout 5m",
+			"go test -v ./test -run TestFeatures -count=1 -timeout 5m",
+		},
+		"../docs/TESTING.md": {
+			"go test -v ./test -timeout 5m",
+			"go test -v ./test -run TestFeatures -count=1 -timeout 5m",
+		},
+		"../MIND_MAP.md": {
+			"go test -v ./test -timeout 5m",
+		},
 	}
-	for _, path := range []string{"../README.md", "../docs/TESTING.md"} {
+	for path, expected := range expectedByPath {
 		body, err := os.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("read %s: %w", path, err)
@@ -68,16 +77,28 @@ func (tc *testContext) theTestingDocsShouldShowCucumberCommandsWithAFiveMinuteGo
 				return fmt.Errorf("%s should document %q", path, command)
 			}
 		}
+		if strings.Contains(text, "timeout 5m go test") {
+			return fmt.Errorf("%s should use Go's portable -timeout flag instead of the external timeout command", path)
+		}
 	}
 	return nil
 }
 
-func (tc *testContext) theTestingDocsShouldShowBoundedRepoWidePackageTestCommands() error {
-	expected := []string{
-		"INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m",
-		"INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/mutation -run TestMutatedCorpusExpressions_NoPanics_AndDeterministic -timeout 30m",
+func (tc *testContext) theAuthoritativeTestingDocsShouldShowBoundedRepoWidePackageTestCommands() error {
+	expectedByPath := map[string][]string{
+		"../README.md": {
+			"INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m",
+			"INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/mutation -run TestMutatedCorpusExpressions_NoPanics_AndDeterministic -timeout 30m",
+		},
+		"../docs/TESTING.md": {
+			"INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m",
+			"INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/mutation -run TestMutatedCorpusExpressions_NoPanics_AndDeterministic -timeout 30m",
+		},
+		"../MIND_MAP.md": {
+			"INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m",
+		},
 	}
-	for _, path := range []string{"../README.md", "../docs/TESTING.md"} {
+	for path, expected := range expectedByPath {
 		body, err := os.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("read %s: %w", path, err)

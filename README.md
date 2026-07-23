@@ -188,7 +188,7 @@ INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/mutation -run TestMutatedCor
 Generate coverage from cucumber tests (runtime-focused packages):
 
 ```bash
-timeout 5m go test -v ./test -run TestFeatures -count=1 -timeout 5m \
+go test -v ./test -run TestFeatures -count=1 -timeout 5m \
   -coverprofile=tmp/cucumber.cover \
   -coverpkg=./internal/runner,./internal/preprocessor,./internal/evaluator,./pkg/formats
 go tool cover -func=tmp/cucumber.cover | tail -n 1
