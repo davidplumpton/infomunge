@@ -40,8 +40,8 @@ Important: use jj for version control. Never use git commands. Always commit wit
 - Use jj commit with a description, don't use jj new with a description
 - Use a 5 minute timeout when running cucumber tests
 - Do not install new software
-- Use golang only
-- Always verify new features or changes by adding a cucumber test
+- Prefer Go for implementation and runtime logic. Edit repository-owned HTML, JavaScript, Markdown, Makefiles, and shell-facing configuration when the task requires it, but do not introduce another runtime language or dependency without approval.
+- Add or update cucumber coverage for new or changed user-visible behavior. Use focused Go unit tests for internal behavior and refactors. For documentation- or workflow-only changes, validate the affected commands, links, examples, or formatting; cucumber coverage is not required unless runtime behavior changes.
 - Stay within the infomunge directory, put temp files in tmp
 - Track agent mistakes in `MIND_MAP.md` as they are discovered (what happened, why, and how to avoid repeating it)
 - Track user preferences in `MIND_MAP.md` as they become clear (for example workflow/style likes and dislikes)

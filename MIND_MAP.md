@@ -18,9 +18,9 @@
 
 [8] **Runner And Modules** - Runner orchestration is in `internal/runner/runner.go`; module loading behavior is in `internal/runner/module_loader.go`. Core module scripts live under `modules/dw/core`.
 
-[9] **Testing** - Cucumber tests run with `go test -v ./test`. For feature work, add or update cucumber coverage. Feature files live under `test/features` from the repo root; use `GODOG_PATHS=features/...` because the test harness resolves feature paths relative to `./test`.
+[9] **Testing** - Cucumber tests run with `go test -v ./test`. Add or update cucumber coverage for new or changed user-visible behavior; use focused Go unit tests for internal behavior and refactors. Feature files live under `test/features` from the repo root; use `GODOG_PATHS=features/...` because the test harness resolves feature paths relative to `./test`.
 
-[10] **Quality Gates** - Prefer targeted package and cucumber tests for changed areas. Use `INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m` for the bounded repo-wide package suite, then run cucumber separately. The mutation corpus soak is skipped by default and runs explicitly with `INTENSIVE_TEST_SOAK=1`.
+[10] **Quality Gates** - Prefer targeted tests for the changed layer. Use `INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m` for the bounded repo-wide package suite, then run cucumber separately when user-visible behavior changed. For documentation- or workflow-only edits, validate the affected commands, links, examples, or formatting; cucumber is unnecessary unless runtime behavior changes. The mutation corpus soak is skipped by default and runs explicitly with `INTENSIVE_TEST_SOAK=1`.
 
 [11] **Version Control** - Use `jj` only; never use git commands. Commit with `jj commit -m <description>` and do not use `jj new` with a message. Run JJ commands sequentially because status/describe/commit can touch working-copy state and ref locks.
 
@@ -28,7 +28,7 @@
 
 [13] **Landing The Plane** - Before handoff: file follow-up issues, run quality gates when code changed, close/update beads, run `br sync --flush-only`, clean up temporary artifacts, verify `jj status`, then `jj commit -m <description>`.
 
-[14] **Agent Constraints** - Use Go only, do not install new software without asking, stay inside the infomunge directory, and put temp files under `tmp`. Track durable mistakes and user preferences here, compactly.
+[14] **Agent Constraints** - Prefer Go for implementation and runtime logic, while editing repository-owned HTML, JavaScript, Markdown, Makefiles, and shell-facing configuration when required. Do not introduce another runtime language, dependency, or new software without approval. Stay inside the infomunge directory, put temp files under `tmp`, and track durable mistakes and user preferences here compactly.
 
 [15] **Docs** - See `docs/ARCHITECTURE.md`, `docs/EXTENDING.md`, and `docs/TESTING.md` for deeper implementation and testing details.
 
