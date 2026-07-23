@@ -200,7 +200,15 @@ This project uses `jj` for version control.
 
 ### Tasks and Issues
 
-This project uses Beads https://github.com/steveyegge/beads
+This project uses [beads_rust](https://github.com/Dicklesworthstone/beads_rust)
+and its `br` executable for issue tracking. Follow [AGENTS.md](AGENTS.md) for the
+project's complete `br` and `jj` workflow.
+
+`bv --robot-triage` may emit legacy suggestions that invoke `bd`. Translate those
+commands to the equivalent `br` commands instead of copying them verbatim. In
+particular, export issue updates with `br sync --flush-only`; `br` does not run
+version-control commands, so commit the exported files separately with `jj` as
+described in [AGENTS.md](AGENTS.md).
 
 ## Third-Party Software
 
