@@ -102,7 +102,8 @@ when you only need to rebuild the assets.
 
 Standalone mode evaluates scripts locally in WebAssembly and does not expose the
 `/run` endpoint. To use the Go server backend and `/run` API instead, run
-`make playground` and open `http://localhost:8080/`.
+`make playground`; it binds to `127.0.0.1:8080`, so open
+`http://127.0.0.1:8080/`.
 
 ## How It Works
 

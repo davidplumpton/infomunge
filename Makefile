@@ -45,9 +45,9 @@ test-soak:
 	go test ./internal/preprocessor/ -fuzz=FuzzPrepareForParsing -fuzztime=30m -timeout 45m
 	go test ./internal/preprocessor/ -fuzz=FuzzExtractHeaderAndBody -fuzztime=30m -timeout 45m
 
-# Run the server playground locally at http://localhost:8080
+# Run the server playground locally at http://127.0.0.1:8080
 playground:
-	go run ./cmd/infomunge --server --listen :8080
+	go run ./cmd/infomunge --server --listen 127.0.0.1:8080
 
 # Build standalone WebAssembly playground artifacts.
 playground-wasm:

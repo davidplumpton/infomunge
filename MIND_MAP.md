@@ -32,7 +32,7 @@
 
 [15] **Docs** - See `docs/ARCHITECTURE.md`, `docs/EXTENDING.md`, and `docs/TESTING.md` for deeper implementation and testing details.
 
-[16] **Standalone Playground** - Run `make playground-wasm-serve`, then open `http://127.0.0.1:8081/`; the target builds the WASM assets and serves `docs/playground` over HTTP with the repository's Go static server. This browser-local WASM mode does not expose `/run`; use `make playground` for the Go server backend. Use `make playground-wasm` only to rebuild assets. Legacy gopherjs artifacts and `cmd/infomunge-js` have been removed.
+[16] **Standalone Playground** - Run `make playground-wasm-serve`, then open `http://127.0.0.1:8081/`; the target builds the WASM assets and serves `docs/playground` over HTTP with the repository's Go static server. This browser-local WASM mode does not expose `/run`; use `make playground` for the Go server backend, which binds explicitly to `127.0.0.1:8080`. Use `make playground-wasm` only to rebuild assets. Legacy gopherjs artifacts and `cmd/infomunge-js` have been removed.
 
 [17] **User Preferences** - The user values explicit operating instructions in `AGENTS.md`, durable coordination in `MIND_MAP.md`, process-level improvements, and creating beads tickets for meaningful follow-up work instead of leaving implicit TODOs.
 
