@@ -38,7 +38,7 @@
 
 [18] **Ticket Selection Preference** - When asked for the next ticket, start from `README.md`, `AGENTS.md`, and `MIND_MAP.md`, run `bv --robot-triage`, and prefer continuing work already marked `in_progress` before claiming new work.
 
-[19] **Review Preference** - For codebase quality reviews, focus on the biggest substantiated issues and turn significant findings into concrete beads tickets immediately.
+[19] **Review Preference** - For codebase quality reviews, focus on the biggest substantiated issues, turn significant findings into concrete beads tickets immediately, and apply the `quality` label when requested.
 
 [20] **Memory Hygiene** - Keep this file compact. Merge repeated pitfalls into category nodes, preserve prevention steps that materially change future behavior, and avoid growing a dated entry for every recurrence unless the recurrence reveals a new prevention rule.
 
