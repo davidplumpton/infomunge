@@ -46,7 +46,7 @@
 
 [22] **Search Discipline** - Use `rg` first for searches. Put all flags, including `-g`, before paths; put `--` before the pattern when the pattern may begin with `-`. Use `rg -U` only when true multiline matching is needed.
 
-[23] **Stateful Command Discipline** - Do not parallelize beads mutations with reads (`br update`/`br close` then `br show`), and do not parallelize any JJ operations, including read-only help/status/diff discovery commands. Run state-changing and state-inspecting VCS/beads commands sequentially.
+[23] **Stateful Command Discipline** - Do not parallelize beads mutations with reads (`br update`/`br close` then `br show`), and do not parallelize any JJ operations, including read-only help/status/diff discovery commands. Run state-changing and state-inspecting VCS/beads commands sequentially. When a long-running command yields, preserve its session or cell ID and poll that same process through completion; do not discard the handle or infer success from partial output.
 
 [24] **Shell Quoting Discipline** - Avoid backticks inside double-quoted shell commands; they still execute command substitution, including in `rg` patterns. Use single-quoted patterns when searching for Markdown code spans. Avoid complex inline shell quoting for beads descriptions. Prefer simple descriptions or temp files under `tmp` when multiline payloads are needed.
 
