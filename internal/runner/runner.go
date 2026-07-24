@@ -143,7 +143,11 @@ func parseOutputOptions(input string) (map[string]string, error) {
 		if key == "" {
 			return nil, unifiederrors.ParseErrorf("invalid output option %q", part)
 		}
-		if unquoted, ok := unquoteOptionValue(value); ok {
+		unquoted, quoted, err := unquoteOptionValue(value)
+		if err != nil {
+			return nil, unifiederrors.ParseErrorf("invalid output option %q: %v", part, err)
+		}
+		if quoted {
 			value = unquoted
 		}
 		options[key] = value
@@ -170,18 +174,51 @@ func splitOptions(input string) []string {
 	return parts
 }
 
-func unquoteOptionValue(value string) (string, bool) {
-	if len(value) < 2 {
-		return value, false
+func unquoteOptionValue(value string) (string, bool, error) {
+	if value == "" || (value[0] != '"' && value[0] != '\'') {
+		return value, false, nil
 	}
-	if (value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'') {
+
+	quote := value[0]
+	if len(value) < 2 || value[len(value)-1] != quote || stringutils.IsEscapedAt(value, len(value)-1) {
+		return value, true, fmt.Errorf("unterminated quoted value")
+	}
+
+	if quote == '"' {
 		unquoted, err := strconv.Unquote(value)
 		if err != nil {
-			return value, false
+			return value, true, fmt.Errorf("invalid double-quoted value: %w", err)
 		}
-		return unquoted, true
+		return unquoted, true, nil
 	}
-	return value, false
+
+	var unquoted strings.Builder
+	unquoted.Grow(len(value) - 2)
+	for i := 1; i < len(value)-1; i++ {
+		ch := value[i]
+		if ch == '\'' {
+			return value, true, fmt.Errorf("unescaped quote in single-quoted value")
+		}
+		if ch != '\\' {
+			unquoted.WriteByte(ch)
+			continue
+		}
+
+		if i+1 >= len(value)-1 {
+			return value, true, fmt.Errorf("unterminated escape in single-quoted value")
+		}
+		next := value[i+1]
+		switch next {
+		case '\'', '\\':
+			unquoted.WriteByte(next)
+			i++
+		default:
+			// InfoMunge single-quoted strings preserve unknown backslash
+			// sequences rather than interpreting Go escape syntax.
+			unquoted.WriteByte(ch)
+		}
+	}
+	return unquoted.String(), true, nil
 }
 
 func applyNamespaceDeclaration(decl *NamespaceDeclaration, namespaces map[string]string) error {

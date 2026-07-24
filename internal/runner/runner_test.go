@@ -101,6 +101,55 @@ func TestExecuteStringResolvedValue(t *testing.T) {
 	}
 }
 
+func TestUnquoteOptionValue(t *testing.T) {
+	tests := []struct {
+		name       string
+		value      string
+		want       string
+		wantQuoted bool
+		wantErr    bool
+	}{
+		{name: "unquoted", value: "elements", want: "elements"},
+		{name: "double quoted empty", value: `""`, want: "", wantQuoted: true},
+		{name: "double quoted one character", value: `"x"`, want: "x", wantQuoted: true},
+		{name: "double quoted multiple characters", value: `"elements"`, want: "elements", wantQuoted: true},
+		{name: "double quoted escapes", value: `"line\n\"quoted\""`, want: "line\n\"quoted\"", wantQuoted: true},
+		{name: "double quoted malformed escape", value: `"bad\q"`, wantQuoted: true, wantErr: true},
+		{name: "double quoted unterminated", value: `"elements`, wantQuoted: true, wantErr: true},
+		{name: "single quoted empty", value: `''`, want: "", wantQuoted: true},
+		{name: "single quoted one character", value: `'x'`, want: "x", wantQuoted: true},
+		{name: "single quoted multiple characters", value: `'elements'`, want: "elements", wantQuoted: true},
+		{name: "single quoted escapes", value: `'it\'s\\fine\n'`, want: "it's\\fine\\n", wantQuoted: true},
+		{name: "single quoted malformed escape", value: `'bad\'`, wantQuoted: true, wantErr: true},
+		{name: "single quoted unterminated", value: `'elements`, wantQuoted: true, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, quoted, err := unquoteOptionValue(tt.value)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("unquoteOptionValue(%q) error = %v, wantErr %v", tt.value, err, tt.wantErr)
+			}
+			if quoted != tt.wantQuoted {
+				t.Errorf("unquoteOptionValue(%q) quoted = %v, want %v", tt.value, quoted, tt.wantQuoted)
+			}
+			if !tt.wantErr && got != tt.want {
+				t.Errorf("unquoteOptionValue(%q) = %q, want %q", tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseOutputOptionsRejectsMalformedQuotedValues(t *testing.T) {
+	for _, input := range []string{`skipNullOn="elements`, `skipNullOn='elements`} {
+		t.Run(input, func(t *testing.T) {
+			if _, err := parseOutputOptions(input); err == nil {
+				t.Fatalf("parseOutputOptions(%q) expected an error", input)
+			}
+		})
+	}
+}
+
 func TestRunStringDeprecatedWrapperDelegatesToExecuteString(t *testing.T) {
 	got, err := RunString("%im 0.1\noutput application/json\n---\n1 + 2", nil)
 	if err != nil {

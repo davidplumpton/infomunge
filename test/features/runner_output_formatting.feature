@@ -65,7 +65,7 @@ Feature: Runner output formatting paths
     Given the following script:
       """
       %im 0.1
-      output application/xml skipNullOn="elements"
+      output application/xml skipNullOn='elements'
       ---
       root: { item: null, keep: "yes" }
       """
