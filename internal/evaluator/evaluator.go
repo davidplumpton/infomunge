@@ -397,6 +397,35 @@ func quo(left, right Value) (Value, error) {
 	return numericOp(left, right, func(l, r float64) float64 { return l / r }, "division", "divide")
 }
 
+// rem performs the InfoMunge-specific % modulo operation. Integer operands
+// retain an integer result; operands involving a float use floating-point
+// remainder semantics, matching the mod builtin.
+func rem(left, right Value) (Value, error) {
+	if l, r, ok := BothInts(left, right); ok {
+		if r == 0 {
+			return nil, unifiederrors.EvalError("modulo by zero")
+		}
+		return l % r, nil
+	}
+
+	if hasInexactFloatInt(left, right) {
+		return exactMixedNumericOp(left, right, "modulo")
+	}
+
+	l, r, ok := BothFloats(left, right)
+	if !ok {
+		return nil, unifiederrors.EvalErrorf("cannot apply modulo to %T and %T", left, right)
+	}
+	if r == 0 {
+		return nil, unifiederrors.EvalError("modulo by zero")
+	}
+	result := math.Mod(l, r)
+	if err := validateFloat(result, "modulo"); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // land performs logical AND operation
 func land(left, right Value) (Value, error) {
 	l, okL := left.(bool)
@@ -610,6 +639,15 @@ func exactMixedNumericOp(left, right Value, opName string) (Value, error) {
 			return nil, unifiederrors.EvalError("division by zero")
 		}
 		result.Quo(l, r)
+	case "modulo":
+		if r.Sign() == 0 {
+			return nil, unifiederrors.EvalError("modulo by zero")
+		}
+		quotientNumerator := new(big.Int).Mul(l.Num(), r.Denom())
+		quotientDenominator := new(big.Int).Mul(l.Denom(), r.Num())
+		quotient := new(big.Int).Quo(quotientNumerator, quotientDenominator)
+		product := new(big.Rat).Mul(new(big.Rat).SetInt(quotient), r)
+		result.Sub(l, product)
 	default:
 		return nil, unifiederrors.EvalErrorf("unsupported numeric operation %s", opName)
 	}
@@ -690,6 +728,14 @@ func evalBinaryOp(left, right Value, op token.Token, pos token.Pos) (Value, erro
 			// If it's a unified error, upgrade it with position info using posError to preserve pos
 			if unifiedErr, ok := err.(*unifiederrors.Error); ok && unifiedErr.Message == "division by zero" {
 				return nil, &posError{msg: "division by zero", pos: pos}
+			}
+		}
+		return result, err
+	case token.REM:
+		result, err := rem(left, right)
+		if err != nil {
+			if unifiedErr, ok := err.(*unifiederrors.Error); ok && unifiedErr.Message == "modulo by zero" {
+				return nil, &posError{msg: "modulo by zero", pos: pos}
 			}
 		}
 		return result, err

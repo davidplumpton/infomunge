@@ -182,6 +182,20 @@ Feature: Basic Operators
       5
       """
 
+  Scenario: Arithmetic percent modulo
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [5 % 2, -5 % 2, 5.5 % 2, 2 + 5 % 3 * 4]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,-1,1.5,10]
+      """
+
   Scenario: String Concatenation
     Given the following input content:
       """

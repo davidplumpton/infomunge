@@ -20,10 +20,15 @@ func TestEvaluate_Arithmetic(t *testing.T) {
 		{"float subtraction", "5.0 - 2.0", 3.0},
 		{"float multiplication", "2.0 * 3.0", 6.0},
 		{"float division", "10.0 / 4.0", 2.5},
+		{"int modulo", "5 % 2", 1},
+		{"negative int modulo", "-5 % 2", -1},
+		{"float modulo", "5.5 % 2", 1.5},
+		{"mixed modulo", "10 % 4.0", 2.0},
 		{"int + float", "2 + 3.5", 5.5},
 		{"float + int", "2.5 + 3", 5.5},
 		{"string concat", `"hello" + " world"`, "hello world"},
 		{"complex expression", "(2 + 3) * 4", 20},
+		{"modulo precedence", "2 + 5 % 3 * 4", 10},
 	}
 
 	ctx := make(Context)
@@ -54,6 +59,7 @@ func TestEvaluate_ExactNumericSemantics(t *testing.T) {
 		{"large int differs from rounded float", "9007199254740993 == 9007199254740992.0", false},
 		{"large int orders after rounded float", "9007199254740993 > 9007199254740992.0", true},
 		{"adding decimal zero preserves large int", "9007199254740993 + 0.0", 9007199254740993},
+		{"large int modulo decimal preserves precision", "9007199254740993 % 2.0", 1},
 	}
 
 	for _, tt := range tests {
@@ -97,6 +103,9 @@ func TestEvaluate_ArithmeticErrors(t *testing.T) {
 	}{
 		{"division by zero int", "5 / 0"},
 		{"division by zero float", "5.0 / 0.0"},
+		{"modulo by zero int", "5 % 0"},
+		{"modulo by zero float", "5.0 % 0.0"},
+		{"modulo rejects non-number", "true % 2"},
 	}
 
 	ctx := make(Context)

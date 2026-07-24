@@ -35,6 +35,7 @@ Notes:
 - See the [supported-format and fidelity matrix](docs/FORMATS.md) for MIME aliases, file extensions, input/output direction, structured options, and passthrough limitations.
 - Date formatting uses a documented subset of Java SimpleDateFormat tokens; see `docs/DATE_FORMATS.md`.
 - For null literals, use `null` for DataWeave compatibility. InfoMunge also accepts `nil` as an alias.
+- InfoMunge supports `%` as a modulo operator. DataWeave-compatible scripts should use the `mod` operator instead.
 - Header `input` directives are accepted for DataWeave compatibility and documentation only. Input data is parsed before execution by the CLI `-i` flags, server `/run` inputs, or embedding test harness; header `input` lines do not reparse, rename, validate, or create inputs.
 
 ### Comparison with DataWeave
