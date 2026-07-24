@@ -2,12 +2,14 @@ package runner
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"infomunge/internal/evaluator"
 	"infomunge/internal/output"
@@ -110,6 +112,29 @@ func TestExecuteStringRemapsBuiltinErrorPosition(t *testing.T) {
 	}
 	if got, want := err.Error(), "4:3: sqrt: cannot take square root of negative number -1"; got != want {
 		t.Fatalf("ExecuteString() error = %q, want %q", got, want)
+	}
+}
+
+func TestExecuteStringHonorsPreCanceledContext(t *testing.T) {
+	goCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := ExecuteString(goCtx, "1 + 2", nil, RunnerOptions{})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("ExecuteString() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestExecuteStringPreservesDeadlineExceededIdentity(t *testing.T) {
+	goCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	_, err := ExecuteString(goCtx, "1 + 2", nil, RunnerOptions{})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("ExecuteString() error = %v, want context.DeadlineExceeded", err)
+	}
+	if !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("ExecuteString() error = %q, want user-facing timeout context", err)
 	}
 }
 

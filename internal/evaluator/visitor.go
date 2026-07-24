@@ -57,6 +57,9 @@ func NewDefaultVisitorForScope(scope *Scope, depth int) *DefaultVisitor {
 // Visit dispatches an AST node to the appropriate Visit* method based on its type.
 // This is the entry point for the visitor pattern.
 func (v *DefaultVisitor) Visit(expr ast.Expr) (Value, error) {
+	if err := v.scope.ContextErr(); err != nil {
+		return nil, err
+	}
 	if v.depth > MaxEvalDepth {
 		return nil, newPosError("expression evaluation depth limit exceeded (possible infinite recursion)", expr.Pos())
 	}

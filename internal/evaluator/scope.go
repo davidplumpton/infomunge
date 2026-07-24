@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 )
@@ -119,6 +120,20 @@ func (s *Scope) GoContext() context.Context {
 		return context.Background()
 	}
 	return s.Runtime.GoContext
+}
+
+// ContextErr reports cancellation of the active evaluation context. Deadline
+// failures retain the existing user-facing "timed out" wording while wrapping
+// context.DeadlineExceeded for errors.Is callers.
+func (s *Scope) ContextErr() error {
+	err := s.GoContext().Err()
+	if err == nil {
+		return nil
+	}
+	if err == context.DeadlineExceeded {
+		return fmt.Errorf("evaluation timed out: %w", err)
+	}
+	return err
 }
 
 // SetExpressionCompiler sets the compiler used by nested runtime constructs

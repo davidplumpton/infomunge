@@ -41,7 +41,7 @@ func callBuiltinWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 loop:
 	for i := 0; ; i++ {
 		// Check for timeout
-		if err := checkTimeout(i, startTime, deadline, e); err != nil {
+		if err := checkTimeout(i, startTime, deadline, scope, e); err != nil {
 			return nil, err
 		}
 
@@ -88,9 +88,15 @@ func getDeadline(scope *Scope, startTime time.Time) time.Time {
 }
 
 // checkTimeout verifies the loop hasn't exceeded the deadline
-func checkTimeout(i int, startTime, deadline time.Time, e *ast.CallExpr) error {
+func checkTimeout(i int, startTime, deadline time.Time, scope *Scope, e *ast.CallExpr) error {
 	// Check for timeout every TimeoutCheckInterval iterations to balance overhead and responsiveness
-	if i%TimeoutCheckInterval == 0 && time.Now().After(deadline) {
+	if i%TimeoutCheckInterval != 0 {
+		return nil
+	}
+	if err := scope.ContextErr(); err != nil {
+		return err
+	}
+	if time.Now().After(deadline) {
 		return newPosError(fmt.Sprintf("while loop timed out after %v", time.Since(startTime)), e.Pos())
 	}
 	return nil

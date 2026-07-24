@@ -54,3 +54,14 @@ Feature: Runner execution API
       """
       {"city":"Wellington","count":2}
       """
+
+  Scenario: Structured runner API rejects eager work after cancellation
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      1 + 2
+      """
+    When I run the script with a canceled evaluation context
+    Then the output should contain "context canceled"

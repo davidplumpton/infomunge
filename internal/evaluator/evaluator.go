@@ -221,6 +221,9 @@ func newLambdaInvocationScope(lambda *Lambda, caller *Scope) *Scope {
 }
 
 func evalLambdaWithBindingsAtDepth(lambda *Lambda, caller *Scope, depth int, bind func(Context)) (Value, error) {
+	if err := caller.ContextErr(); err != nil {
+		return nil, err
+	}
 	lambdaScope := newLambdaInvocationScope(lambda, caller)
 	if bind != nil {
 		bind(lambdaScope.Vars)
