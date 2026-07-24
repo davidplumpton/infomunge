@@ -83,3 +83,4 @@ tmp/**
 !tmp/README.md
 tmp/intensive-testing/failures/
 tmp/intensive-testing/candidates/
+**/tmp/intensive-testing/

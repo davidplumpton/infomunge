@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-)
 
-const defaultCandidatesDir = "tmp/intensive-testing/candidates"
+	"infomunge/internal/testing/teststore"
+)
 
 // GenerateScenario produces a candidate .feature snippet for a failure artifact.
 func GenerateScenario(a Artifact) string {
@@ -61,7 +61,11 @@ Feature: Auto-generated intensive-testing failures
 // WriteCandidateScenario writes an auto-generated .feature file.
 // If a candidate for the artifact already exists, it is skipped.
 func WriteCandidateScenario(a Artifact) (string, bool, error) {
-	return WriteCandidateScenarioToDir(defaultCandidatesDir, a)
+	dir, err := teststore.Path("candidates")
+	if err != nil {
+		return "", false, fmt.Errorf("resolve candidates dir: %w", err)
+	}
+	return WriteCandidateScenarioToDir(dir, a)
 }
 
 // WriteCandidateScenarioToDir writes an auto-generated .feature file to dir.
@@ -90,7 +94,14 @@ func WriteCandidateScenarioToDir(dir string, a Artifact) (string, bool, error) {
 // GenerateAllCandidates creates candidate scenarios for artifacts that do not
 // already have matching candidate files.
 func GenerateAllCandidates() ([]string, error) {
-	return GenerateAllCandidatesFromDirs(defaultFailuresDir, defaultCandidatesDir)
+	root, err := teststore.Root()
+	if err != nil {
+		return nil, fmt.Errorf("resolve intensive-testing dir: %w", err)
+	}
+	return GenerateAllCandidatesFromDirs(
+		filepath.Join(root, "failures"),
+		filepath.Join(root, "candidates"),
+	)
 }
 
 // GenerateAllCandidatesFromDirs is the directory-configurable variant used by tests.

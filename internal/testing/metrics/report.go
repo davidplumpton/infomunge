@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"infomunge/internal/testing/failures"
+	"infomunge/internal/testing/teststore"
 )
 
 const reportPath = "tmp/intensive-testing/report.json"
@@ -198,7 +199,7 @@ func averageTimeToMinimalRepro(artifacts []failures.Artifact) *float64 {
 }
 
 func countPromotedRegressions() int {
-	root, err := repoRoot()
+	root, err := teststore.RepositoryRoot()
 	if err != nil {
 		return 0
 	}
@@ -227,7 +228,7 @@ func countPromotedRegressions() int {
 }
 
 func currentCoverage() (preprocessor *float64, evaluator *float64) {
-	root, err := repoRoot()
+	root, err := teststore.RepositoryRoot()
 	if err != nil {
 		return nil, nil
 	}
@@ -257,11 +258,11 @@ func runCoverage(root, pkg string) *float64 {
 }
 
 func readPreviousCoverage() (MetricSnapshot, bool) {
-	root, err := repoRoot()
+	path, err := teststore.Path("report.json")
 	if err != nil {
 		return MetricSnapshot{}, false
 	}
-	data, err := os.ReadFile(filepath.Join(root, reportPath))
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return MetricSnapshot{}, false
 	}
@@ -273,12 +274,11 @@ func readPreviousCoverage() (MetricSnapshot, bool) {
 }
 
 func writeReportFile(current Report) error {
-	root, err := repoRoot()
+	path, err := teststore.Path("report.json")
 	if err != nil {
 		return err
 	}
 
-	path := filepath.Join(root, reportPath)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create report dir: %w", err)
 	}
@@ -314,25 +314,6 @@ func printSummary(report Report) {
 	fmt.Printf("  preprocessor coverage: %s (delta %s)\n", formatPct(m.PreprocessorCoveragePct), formatSigned(m.PreprocessorCoverageDelta))
 	fmt.Printf("  evaluator coverage: %s (delta %s)\n", formatPct(m.EvaluatorCoveragePct), formatSigned(m.EvaluatorCoverageDelta))
 	fmt.Printf("  report file: %s\n\n", reportPath)
-}
-
-func repoRoot() (string, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	cur := wd
-	for {
-		if _, err := os.Stat(filepath.Join(cur, "go.mod")); err == nil {
-			return cur, nil
-		}
-		parent := filepath.Dir(cur)
-		if parent == cur {
-			return "", fmt.Errorf("go.mod not found from %s", wd)
-		}
-		cur = parent
-	}
 }
 
 func formatRatio(v *float64) string {

@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
-)
 
-const defaultFailuresDir = "tmp/intensive-testing/failures"
+	"infomunge/internal/testing/teststore"
+)
 
 // Artifact records a minimized failing case from intensive testing.
 type Artifact struct {
@@ -35,7 +35,11 @@ type Artifact struct {
 // SaveArtifact writes an artifact JSON file to tmp/intensive-testing/failures.
 // If an artifact with the same fingerprint already exists, it is skipped.
 func SaveArtifact(a Artifact) (string, bool, error) {
-	return SaveArtifactToDir(defaultFailuresDir, a)
+	dir, err := teststore.Path("failures")
+	if err != nil {
+		return "", false, fmt.Errorf("resolve failures dir: %w", err)
+	}
+	return SaveArtifactToDir(dir, a)
 }
 
 // SaveArtifactToDir writes an artifact JSON file to the provided directory.
@@ -90,7 +94,11 @@ func SaveArtifactToDir(dir string, a Artifact) (string, bool, error) {
 
 // LoadArtifacts reads all artifact JSON files from tmp/intensive-testing/failures.
 func LoadArtifacts() ([]Artifact, error) {
-	return LoadArtifactsFromDir(defaultFailuresDir)
+	dir, err := teststore.Path("failures")
+	if err != nil {
+		return nil, fmt.Errorf("resolve failures dir: %w", err)
+	}
+	return LoadArtifactsFromDir(dir)
 }
 
 // LoadArtifactsFromDir reads all artifact JSON files from dir.
