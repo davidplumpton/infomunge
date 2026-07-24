@@ -131,29 +131,27 @@ func callBuiltinUpper(args []Value, e *ast.CallExpr) (Value, error) {
 func splitCamelCase(s string) []string {
 	var words []string
 	var currentWord []rune
+	var previous rune
 
-	for i, r := range s {
+	for _, r := range s {
 		if unicode.IsSpace(r) {
 			if len(currentWord) > 0 {
 				words = append(words, string(currentWord))
 				currentWord = nil
 			}
+			previous = 0
 			continue
 		}
 
 		// Check for camelCase boundary: uppercase letter preceded by lowercase
-		if i > 0 && unicode.IsUpper(r) {
-			prevRune := rune(s[i-1])
-			if unicode.IsLower(prevRune) {
-				// Boundary: lowercase followed by uppercase (e.g., "storeO" in "storeOfOrigin")
-				if len(currentWord) > 0 {
-					words = append(words, string(currentWord))
-					currentWord = nil
-				}
-			}
+		if len(currentWord) > 0 && unicode.IsUpper(r) && unicode.IsLower(previous) {
+			// Boundary: lowercase followed by uppercase (e.g., "storeO" in "storeOfOrigin")
+			words = append(words, string(currentWord))
+			currentWord = nil
 		}
 
 		currentWord = append(currentWord, r)
+		previous = r
 	}
 
 	if len(currentWord) > 0 {
@@ -173,19 +171,27 @@ func callBuiltinCapitalize(args []Value, e *ast.CallExpr) (Value, error) {
 	// Split on camelCase boundaries and whitespace, then capitalize each word
 	words := splitCamelCase(text)
 	for i, word := range words {
-		if len(word) > 0 {
-			words[i] = strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
-		}
+		words[i] = uppercaseFirst(strings.ToLower(word))
 	}
 	return strings.Join(words, " "), nil
 }
 
-// lowercaseFirst returns the string with only its first character lowercased.
-func lowercaseFirst(s string) string {
-	if len(s) == 0 {
+// uppercaseFirst returns the string with only its first character uppercased.
+func uppercaseFirst(s string) string {
+	if s == "" {
 		return s
 	}
-	return strings.ToLower(s[:1]) + s[1:]
+	first, size := utf8.DecodeRuneInString(s)
+	return string(unicode.ToUpper(first)) + s[size:]
+}
+
+// lowercaseFirst returns the string with only its first character lowercased.
+func lowercaseFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	first, size := utf8.DecodeRuneInString(s)
+	return string(unicode.ToLower(first)) + s[size:]
 }
 
 // callBuiltinCamelize implements the camelize(string) function.
@@ -205,12 +211,23 @@ func callBuiltinCamelize(args []Value, e *ast.CallExpr) (Value, error) {
 	// Lowercase only the first character of the first part, preserving the rest
 	result := lowercaseFirst(parts[0])
 	for _, part := range parts[1:] {
-		if len(part) > 0 {
-			// Uppercase only the first character, preserving the rest
-			result += strings.ToUpper(part[:1]) + part[1:]
-		}
+		// Uppercase only the first character, preserving the rest
+		result += uppercaseFirst(part)
 	}
 	return result, nil
+}
+
+func separateCamelCase(text string, separator rune) string {
+	runes := []rune(text)
+	var result []rune
+	for i, r := range runes {
+		if i > 0 && unicode.IsUpper(r) &&
+			((i+1 < len(runes) && unicode.IsLower(runes[i+1])) || unicode.IsLower(runes[i-1])) {
+			result = append(result, separator)
+		}
+		result = append(result, unicode.ToLower(r))
+	}
+	return string(result)
 }
 
 // callBuiltinDasherize implements the dasherize(string) function.
@@ -220,15 +237,7 @@ func callBuiltinDasherize(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	// Convert camelCase to dash-separated
-	var result []rune
-	for i, r := range text {
-		if i > 0 && unicode.IsUpper(r) && (i+1 < len(text) && unicode.IsLower(rune(text[i+1])) || unicode.IsLower(rune(text[i-1]))) {
-			result = append(result, '-')
-		}
-		result = append(result, unicode.ToLower(r))
-	}
-	return string(result), nil
+	return separateCamelCase(text, '-'), nil
 }
 
 // callBuiltinUnderscore implements the underscore(string) function.
@@ -238,15 +247,7 @@ func callBuiltinUnderscore(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	// Convert camelCase to underscore separated
-	var result []rune
-	for i, r := range text {
-		if i > 0 && unicode.IsUpper(r) && (i+1 < len(text) && unicode.IsLower(rune(text[i+1])) || unicode.IsLower(rune(text[i-1]))) {
-			result = append(result, '_')
-		}
-		result = append(result, unicode.ToLower(r))
-	}
-	return string(result), nil
+	return separateCamelCase(text, '_'), nil
 }
 
 // callBuiltinLeftPad implements the leftPad(string, size, padText) function.

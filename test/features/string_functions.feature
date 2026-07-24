@@ -316,6 +316,34 @@ Feature: String Functions
        "Store Of Origin"
        """
 
+   Scenario: capitalize handles accented and emoji-leading words
+     Given the following input content:
+       """
+       %im 0.1
+       output application/json
+       ---
+       [capitalize("éclair"), capitalize("🙂 smile")]
+       """
+     When I run the application with this content
+     Then the output should be:
+       """
+       ["Éclair","🙂 Smile"]
+       """
+
+   Scenario: capitalize detects non-ASCII camel-case boundaries
+     Given the following input content:
+       """
+       %im 0.1
+       output application/json
+       ---
+       capitalize("déjàVu")
+       """
+     When I run the application with this content
+     Then the output should be:
+       """
+       "Déjà Vu"
+       """
+
    Scenario: camelize basic usage
      Given the following input content:
        """
@@ -386,6 +414,20 @@ Feature: String Functions
        "someVersionNo"
        """
 
+   Scenario: camelize handles accented and emoji-leading parts
+     Given the following input content:
+       """
+       %im 0.1
+       output application/json
+       ---
+       [camelize("Éclair_test"), camelize("🙂_smile")]
+       """
+     When I run the application with this content
+     Then the output should be:
+       """
+       ["éclairTest","🙂Smile"]
+       """
+
    Scenario: dasherize basic usage
      Given the following input content:
        """
@@ -414,6 +456,20 @@ Feature: String Functions
        "user-name-info"
        """
 
+   Scenario: dasherize detects non-ASCII camel-case boundaries
+     Given the following input content:
+       """
+       %im 0.1
+       output application/json
+       ---
+       dasherize("déjàVu")
+       """
+     When I run the application with this content
+     Then the output should be:
+       """
+       "déjà-vu"
+       """
+
    Scenario: underscore basic usage
      Given the following input content:
        """
@@ -440,6 +496,20 @@ Feature: String Functions
      Then the output should be:
        """
        "user_name_info"
+       """
+
+   Scenario: underscore detects non-ASCII camel-case boundaries
+     Given the following input content:
+       """
+       %im 0.1
+       output application/json
+       ---
+       underscore("déjàVu")
+       """
+     When I run the application with this content
+     Then the output should be:
+       """
+       "déjà_vu"
        """
 
    Scenario: capitalize requires string
