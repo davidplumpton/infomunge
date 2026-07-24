@@ -37,18 +37,6 @@ var regexPrefixKeywords = map[string]struct{}{
 	"while":    {},
 }
 
-// replaceRegexLiterals converts /pattern/ regex literals to string literals "pattern".
-// This must run early in the pipeline before other operators try to parse the slashes.
-//
-// Context rules for distinguishing regex from division:
-// - After operators, open brackets, colon, comma → regex
-// - After identifier or closing bracket → division
-// - At start of expression → regex
-func replaceRegexLiterals(s string) string {
-	result, _ := replaceRegexLiteralsWithMapping(s)
-	return result
-}
-
 // replaceRegexLiteralsWithMapping converts /pattern/ regex literals to regex("pattern", "flags")
 // function calls, returning exact source-position mappings for the sourcemap pipeline.
 func replaceRegexLiteralsWithMapping(s string) (string, []int) {
@@ -312,7 +300,7 @@ func canStartRegexAfter(kind regexTokenKind) bool {
 }
 
 // scanRegexPrefixKind classifies the token kind immediately before position end.
-// This mirrors replaceRegexLiterals context tracking but only for the prefix.
+// This mirrors the regex-literal rewrite's context tracking but only for the prefix.
 // It intentionally re-parses nested/quoted constructs so comment stripping and
 // other slash-aware passes can answer "would '/' start a regex here?" without
 // running the full rewrite pipeline.

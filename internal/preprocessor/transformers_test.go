@@ -50,7 +50,7 @@ func TestReplaceDotNotation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := replaceDotNotation(tt.input)
+			got, _ := replaceDotNotationWithMapping(tt.input)
 			if got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
@@ -70,7 +70,7 @@ func TestReplaceRecursiveDescent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := replaceRecursiveDescent(tt.input)
+			got, _ := replaceRecursiveDescentWithMapping(tt.input)
 			if got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
@@ -424,7 +424,7 @@ func TestReplaceAsOperator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := replaceAsOperator(tt.input)
+			got, _ := replaceAsOperatorWithMapping(tt.input)
 			if got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
@@ -446,7 +446,7 @@ func TestReplaceIsOperator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := replaceIsOperator(tt.input)
+			got, _ := replaceIsOperatorWithMapping(tt.input)
 			if got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
@@ -603,7 +603,10 @@ func TestReplaceDefaultOperator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := replaceDefaultOperator(tt.input)
+			got, _, err := replaceConfiguredBinaryOperatorWithMapping(tt.input, binaryOpDefault)
+			if err != nil {
+				t.Fatalf("replaceConfiguredBinaryOperatorWithMapping() error = %v", err)
+			}
 			if got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
@@ -625,7 +628,10 @@ func TestReplaceConcatenateOperator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := replaceConcatenateOperator(tt.input)
+			got, _, err := replaceConfiguredBinaryOperatorWithMapping(tt.input, binaryOpConcatenate)
+			if err != nil {
+				t.Fatalf("replaceConfiguredBinaryOperatorWithMapping() error = %v", err)
+			}
 			if got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
@@ -646,7 +652,10 @@ func TestReplaceContainsOperator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := replaceContainsOperator(tt.input)
+			got, _, err := replaceConfiguredBinaryOperatorWithMapping(tt.input, binaryOpContains)
+			if err != nil {
+				t.Fatalf("replaceConfiguredBinaryOperatorWithMapping() error = %v", err)
+			}
 			if got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
@@ -676,7 +685,10 @@ func TestReplaceModOperatorPreservesMultiplicativeAssociativity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := replaceModOperator(tt.input)
+			got, _, err := replaceConfiguredBinaryOperatorWithMapping(tt.input, binaryOpMod)
+			if err != nil {
+				t.Fatalf("replaceConfiguredBinaryOperatorWithMapping() error = %v", err)
+			}
 			if got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
@@ -686,7 +698,7 @@ func TestReplaceModOperatorPreservesMultiplicativeAssociativity(t *testing.T) {
 
 func TestReplaceConfiguredBinaryOperator_MissingConfigReturnsError(t *testing.T) {
 	input := "x default 0"
-	result, err := replaceConfiguredBinaryOperator(input, "missing-config-key")
+	result, _, err := replaceConfiguredBinaryOperatorWithMapping(input, "missing-config-key")
 	if err == nil {
 		t.Fatal("expected missing binary operator config error, got nil")
 	}

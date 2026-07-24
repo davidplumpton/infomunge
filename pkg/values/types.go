@@ -64,21 +64,12 @@ func sweepDeadObjectOrders() {
 // NewObject constructs an object whose insertion order is tracked.
 func NewObject(capacity int) Object {
 	object := make(Object, capacity)
-	RegisterObjectOrder(object, nil)
-	return object
-}
-
-// RegisterObjectOrder records the known key order for an object.
-func RegisterObjectOrder(object Object, keys []string) {
 	identity, pointer := objectIdentity(object)
-	if pointer == nil {
-		return
-	}
-	copied := append([]string(nil), keys...)
-	_, loaded := objectOrders.Swap(identity, &objectOrder{keys: copied})
+	_, loaded := objectOrders.Swap(identity, &objectOrder{})
 	if !loaded {
 		installObjectOrderCleanup(object, identity, pointer)
 	}
+	return object
 }
 
 // SetObjectValue sets a field and records its first insertion position.

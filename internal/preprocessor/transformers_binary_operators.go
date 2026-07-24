@@ -114,14 +114,6 @@ var binaryOperatorScanOverridesByKey = map[string]binaryOperatorScanOverrides{
 	},
 }
 
-func replaceConfiguredBinaryOperator(s string, key string) (string, error) {
-	if _, ok := binaryOperatorConfigs[key]; !ok {
-		return s, unifiederrors.ParseErrorf("missing binary operator config: %s", key)
-	}
-	result, _, err := replaceConfiguredBinaryOperatorWithMapping(s, key)
-	return result, err
-}
-
 func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, []int, error) {
 	config, ok := binaryOperatorConfigs[key]
 	if !ok {

@@ -195,10 +195,6 @@ func WrapDWScript(expr string) string {
 	return "%dw 2.0\noutput application/json\n---\n" + expr
 }
 
-func expressionAtDepth(depth int, features Feature) *rapid.Generator[string] {
-	return expressionAtDepthWithScope(depth, features, lambdaScope{}, exprConfig{})
-}
-
 func expressionAtDepthWithScope(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
 	if depth <= 0 {
 		if scope.hasReferences() {

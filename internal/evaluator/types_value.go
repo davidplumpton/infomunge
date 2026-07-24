@@ -18,32 +18,6 @@ type Context = map[string]Value
 // context.Context into NewScope. Runtime code should use Scope.GoContext.
 const GoContextKey = "__go_ctx__"
 
-// GetGoContext retrieves a legacy Go context.Context from an evaluation context.
-// New evaluation code should use Scope.GoContext instead.
-func GetGoContext(evalCtx Context) context.Context {
-	if evalCtx == nil {
-		return context.Background()
-	}
-	if ctx, ok := evalCtx[GoContextKey].(context.Context); ok {
-		return ctx
-	}
-	return context.Background()
-}
-
-func withGoContext(evalCtx Context, goCtx context.Context) Context {
-	if evalCtx == nil {
-		evalCtx = make(Context)
-	}
-	if goCtx == nil {
-		goCtx = context.Background()
-	}
-	evalCtx[GoContextKey] = goCtx
-	if deadline, ok := goCtx.Deadline(); ok {
-		evalCtx[deadlineContextKey] = deadline
-	}
-	return evalCtx
-}
-
 // Object represents a structured data object (map with string keys).
 type Object = values.Object
 
@@ -202,45 +176,6 @@ func KindOf(v Value) ValueKind {
 	}
 }
 
-// Type-safe value extractors with ok pattern
-
-// AsString extracts a string from a Value, returning false if not a string.
-func AsString(v Value) (string, bool) {
-	s, ok := v.(string)
-	return s, ok
-}
-
-// AsInt extracts an int from a Value, returning false if not an int.
-func AsInt(v Value) (int, bool) {
-	i, ok := v.(int)
-	return i, ok
-}
-
-// AsFloat extracts a float64 from a Value, returning false if not a float64.
-func AsFloat(v Value) (float64, bool) {
-	f, ok := v.(float64)
-	return f, ok
-}
-
-// AsNumber extracts a numeric value as float64, returning false if not numeric.
-// Works for both int and float64 values.
-func AsNumber(v Value) (float64, bool) {
-	switch n := v.(type) {
-	case int:
-		return float64(n), true
-	case float64:
-		return n, true
-	default:
-		return 0, false
-	}
-}
-
-// AsBool extracts a bool from a Value, returning false if not a bool.
-func AsBool(v Value) (bool, bool) {
-	b, ok := v.(bool)
-	return b, ok
-}
-
 // AsArray extracts an Array from a Value, returning false if not an array.
 func AsArray(v Value) (Array, bool) {
 	switch arr := v.(type) {
@@ -263,21 +198,6 @@ func AsObject(v Value) (Object, bool) {
 func AsLambda(v Value) (*Lambda, bool) {
 	l, ok := v.(*Lambda)
 	return l, ok
-}
-
-// IsNil returns true if the Value is nil.
-func IsNil(v Value) bool {
-	return v == nil
-}
-
-// IsNumeric returns true if the Value is a number (int or float64).
-func IsNumeric(v Value) bool {
-	switch v.(type) {
-	case int, float64:
-		return true
-	default:
-		return false
-	}
 }
 
 // ParamDef defines a lambda parameter with optional type constraint and default value.

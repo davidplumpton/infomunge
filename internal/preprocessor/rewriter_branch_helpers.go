@@ -166,10 +166,6 @@ func findExpressionEnd(input string, start int, allowNewlines bool) int {
 	return len(input)
 }
 
-func isBranchOpener(ch byte) bool {
-	return ch == '(' || ch == '{' || ch == '['
-}
-
 func isBranchCloser(ch byte) bool {
 	return ch == ')' || ch == '}' || ch == ']'
 }

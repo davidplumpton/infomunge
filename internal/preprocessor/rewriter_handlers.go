@@ -527,13 +527,6 @@ func (r *rewriter) findKeywordCondition(keyword string) (int, int, int, bool) {
 	return startPos, condStartPos, condEndPos, true
 }
 
-func normalizeCondition(condition string) string {
-	return stringutils.ReplaceOperatorsOutsideStrings(strings.TrimSpace(condition), []stringutils.OperatorReplacement{
-		{Pattern: " and ", Replacement: []rune(" && ")},
-		{Pattern: " or ", Replacement: []rune(" || ")},
-	})
-}
-
 func (r *rewriter) rewriteBranch(raw string) (string, bool) {
 	rewritten, _, ok := r.rewriteBranchWithMapping(raw, 0)
 	return rewritten, ok

@@ -244,12 +244,6 @@ func extractInterpolationExpr(content string, pos int) (expr string, endPos int)
 	return content[start:pos], pos + 1
 }
 
-// replaceRecursiveDescent converts "obj..field" to "__deep(obj, \"field\")"
-func replaceRecursiveDescent(s string) string {
-	result, _ := replaceRecursiveDescentWithMapping(s)
-	return result
-}
-
 func replaceRecursiveDescentWithMapping(s string) (string, []int) {
 	buf := newMappedBuffer(len(s) + 32)
 	sc := stringutils.NewExpressionScanner(s)
@@ -420,12 +414,6 @@ func replaceMetadataSelectors(s string) string {
 	return string(result)
 }
 
-// replaceDotNotation converts "obj.field" to "obj[\"field\"]"
-func replaceDotNotation(s string) string {
-	result, _ := replaceDotNotationWithMapping(s)
-	return result
-}
-
 func replaceDotNotationWithMapping(s string) (string, []int) {
 	buf := newMappedBuffer(len(s) + 16)
 	sc := stringutils.NewExpressionScanner(s)
@@ -484,23 +472,6 @@ func replaceDotNotationWithMapping(s string) (string, []int) {
 		sc.Advance(1)
 	}
 	return buf.String(), buf.mapping
-}
-
-func appendDotNotationSelector(result []rune, isAt bool, fieldName string, suffix rune) []rune {
-	result = append(result, '[')
-	result = append(result, '"')
-	if isAt {
-		result = append(result, '@')
-	}
-	for _, ch := range fieldName {
-		result = append(result, ch)
-	}
-	if suffix != 0 {
-		result = append(result, suffix)
-	}
-	result = append(result, '"')
-	result = append(result, ']')
-	return result
 }
 
 func appendDotNotationSelectorWithMapping(buf *mappedBuffer, src string, dotPos, markerPos, fieldStart, fieldEnd int, fieldName string, suffix rune, suffixPos int, isNamespace bool) {

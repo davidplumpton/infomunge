@@ -150,71 +150,6 @@ func TestValueKindString(t *testing.T) {
 	}
 }
 
-func TestAsString(t *testing.T) {
-	s, ok := AsString("hello")
-	if !ok || s != "hello" {
-		t.Errorf("AsString(\"hello\") = %v, %v, want \"hello\", true", s, ok)
-	}
-
-	_, ok = AsString(42)
-	if ok {
-		t.Error("AsString(42) should return false")
-	}
-}
-
-func TestAsInt(t *testing.T) {
-	i, ok := AsInt(42)
-	if !ok || i != 42 {
-		t.Errorf("AsInt(42) = %v, %v, want 42, true", i, ok)
-	}
-
-	_, ok = AsInt("hello")
-	if ok {
-		t.Error("AsInt(\"hello\") should return false")
-	}
-}
-
-func TestAsFloat(t *testing.T) {
-	f, ok := AsFloat(3.14)
-	if !ok || f != 3.14 {
-		t.Errorf("AsFloat(3.14) = %v, %v, want 3.14, true", f, ok)
-	}
-
-	_, ok = AsFloat("hello")
-	if ok {
-		t.Error("AsFloat(\"hello\") should return false")
-	}
-}
-
-func TestAsNumber(t *testing.T) {
-	n, ok := AsNumber(42)
-	if !ok || n != 42.0 {
-		t.Errorf("AsNumber(42) = %v, %v, want 42.0, true", n, ok)
-	}
-
-	n, ok = AsNumber(3.14)
-	if !ok || n != 3.14 {
-		t.Errorf("AsNumber(3.14) = %v, %v, want 3.14, true", n, ok)
-	}
-
-	_, ok = AsNumber("hello")
-	if ok {
-		t.Error("AsNumber(\"hello\") should return false")
-	}
-}
-
-func TestAsBool(t *testing.T) {
-	b, ok := AsBool(true)
-	if !ok || !b {
-		t.Errorf("AsBool(true) = %v, %v, want true, true", b, ok)
-	}
-
-	_, ok = AsBool("hello")
-	if ok {
-		t.Error("AsBool(\"hello\") should return false")
-	}
-}
-
 func TestAsArray(t *testing.T) {
 	arr, ok := AsArray(Array{1, 2, 3})
 	if !ok || len(arr) != 3 {
@@ -249,26 +184,5 @@ func TestAsLambda(t *testing.T) {
 	_, ok = AsLambda("hello")
 	if ok {
 		t.Error("AsLambda(\"hello\") should return false")
-	}
-}
-
-func TestIsNil(t *testing.T) {
-	if !IsNil(nil) {
-		t.Error("IsNil(nil) should return true")
-	}
-	if IsNil("hello") {
-		t.Error("IsNil(\"hello\") should return false")
-	}
-}
-
-func TestIsNumeric(t *testing.T) {
-	if !IsNumeric(42) {
-		t.Error("IsNumeric(42) should return true")
-	}
-	if !IsNumeric(3.14) {
-		t.Error("IsNumeric(3.14) should return true")
-	}
-	if IsNumeric("hello") {
-		t.Error("IsNumeric(\"hello\") should return false")
 	}
 }

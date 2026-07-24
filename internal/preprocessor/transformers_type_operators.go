@@ -2,20 +2,8 @@ package preprocessor
 
 import "strconv"
 
-// replaceAsOperator converts "value as TypeExpr" to "__coerce(value, \"TypeExpr\")".
-func replaceAsOperator(s string) string {
-	result, _ := replaceAsOperatorWithMapping(s)
-	return result
-}
-
 func replaceAsOperatorWithMapping(s string) (string, []int) {
 	return replaceTypedOperatorWithMapping(s, " as ", "__coerce", true)
-}
-
-// replaceIsOperator converts "value is Type" to "__isType(value, \"Type\")".
-func replaceIsOperator(s string) string {
-	result, _ := replaceIsOperatorWithMapping(s)
-	return result
 }
 
 func replaceIsOperatorWithMapping(s string) (string, []int) {

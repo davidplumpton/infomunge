@@ -61,26 +61,6 @@ func findLeftOperandBoundsRunes(result []rune, cfg leftOperandScanConfig) (int, 
 	return leftStart, leftOp, true
 }
 
-func findTypedOperatorLeftOperandStart(result []rune) int {
-	leftStart := stringutils.FindLeftOperandStart(result, []rune{':', '&', '|'})
-	if leftStart >= len(result) {
-		return leftStart
-	}
-
-	leftOp := string(result[leftStart:])
-	lastBoundary := -1
-	for _, op := range typedOperatorLeftBoundaryOps {
-		pos := strings.LastIndex(leftOp, op)
-		if pos > lastBoundary {
-			lastBoundary = pos + len(op)
-		}
-	}
-	if lastBoundary > 0 {
-		return leftStart + lastBoundary
-	}
-	return leftStart
-}
-
 func findTypedOperatorLeftOperandStartBytes(result []byte) int {
 	leftStart := findLeftOperandStartBytesWithStops(result, defaultStopBytes([]rune{':', '&', '|'}))
 	if leftStart >= len(result) {
@@ -227,14 +207,6 @@ func scanRightOperandBounds(input string, start int, cfg rightOperandScanConfig)
 
 	trimStart, trimEnd := trimSpaceBounds(input, start, end)
 	return trimStart, trimEnd, end, trimStart < trimEnd
-}
-
-func scanTypedOperatorRight(input string, start int, allowConfig bool) (string, string, int, bool) {
-	span, ok := scanTypedOperatorRightSpan(input, start, allowConfig)
-	if !ok {
-		return "", "", start, false
-	}
-	return span.TypeExpr, span.ConfigArg, span.Next, true
 }
 
 func scanTypedOperatorRightSpan(input string, start int, allowConfig bool) (typedOperatorRightSpan, bool) {

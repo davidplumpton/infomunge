@@ -8,76 +8,6 @@ import (
 	"infomunge/internal/stringutils"
 )
 
-// replaceDefaultOperator converts "expr default value" to "__default(expr, value)"
-func replaceDefaultOperator(s string) string {
-	result, _, _ := replaceDefaultOperatorErr(s)
-	return result
-}
-
-func replaceDefaultOperatorErr(s string) (string, []int, error) {
-	return replaceConfiguredBinaryOperatorWithMapping(s, binaryOpDefault)
-}
-
-// replaceOnNullOperator converts "expr onNull value" to "onNull(expr, value)"
-func replaceOnNullOperator(s string) string {
-	result, _, _ := replaceOnNullOperatorErr(s)
-	return result
-}
-
-func replaceOnNullOperatorErr(s string) (string, []int, error) {
-	return replaceConfiguredBinaryOperatorWithMapping(s, binaryOpOnNull)
-}
-
-// replaceThenOperator converts "expr then value" to "then(expr, value)"
-func replaceThenOperator(s string) string {
-	result, _, _ := replaceThenOperatorErr(s)
-	return result
-}
-
-func replaceThenOperatorErr(s string) (string, []int, error) {
-	return replaceConfiguredBinaryOperatorWithMapping(s, binaryOpThen)
-}
-
-// replaceUpdateOperator converts "obj ~ {field: value}" to "__update(obj, {field: value})"
-func replaceUpdateOperator(s string) string {
-	result, _ := replaceUpdateOperatorErr(s)
-	return result
-}
-
-func replaceUpdateOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpUpdate)
-}
-
-// replaceFindOperator converts "source find value" to "find(source, value)"
-func replaceFindOperator(s string) string {
-	result, _ := replaceFindOperatorErr(s)
-	return result
-}
-
-func replaceFindOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpFind)
-}
-
-// replaceConcatenateOperator converts "++" to "__concat".
-func replaceConcatenateOperator(s string) string {
-	result, _ := replaceConcatenateOperatorErr(s)
-	return result
-}
-
-func replaceConcatenateOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpConcatenate)
-}
-
-// replaceRemoveOperator converts "--" to "__remove".
-func replaceRemoveOperator(s string) string {
-	result, _ := replaceRemoveOperatorErr(s)
-	return result
-}
-
-func replaceRemoveOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpRemove)
-}
-
 // replaceExponentOperator converts "**" to "pow".
 func replaceExponentOperator(s string) string {
 	var result []rune
@@ -145,36 +75,6 @@ func shouldStopExponentAtOperator(s string, pos int, start int) bool {
 	}
 
 	return false
-}
-
-// replaceSplitByOperator converts "splitBy".
-func replaceSplitByOperator(s string) string {
-	result, _ := replaceSplitByOperatorErr(s)
-	return result
-}
-
-func replaceSplitByOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpSplitBy)
-}
-
-// replaceJoinByOperator converts "joinBy".
-func replaceJoinByOperator(s string) string {
-	result, _ := replaceJoinByOperatorErr(s)
-	return result
-}
-
-func replaceJoinByOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpJoinBy)
-}
-
-// replaceToOperator converts "start to end" to "to(start, end)" for range expressions.
-func replaceToOperator(s string) string {
-	result, _, _ := replaceToOperatorErr(s)
-	return result
-}
-
-func replaceToOperatorErr(s string) (string, []int, error) {
-	return replaceConfiguredBinaryOperatorWithMapping(s, binaryOpTo)
 }
 
 // replacePipeToFunctionOperator converts "expr | funcName" to "funcName(expr)"
@@ -270,59 +170,6 @@ func replacePipeToFunctionOperator(s string) string {
 // isIdentStart returns true if ch can start an identifier (letter or underscore)
 func isIdentStart(ch byte) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_'
-}
-
-// replaceMatchOperator converts "str match pattern" to "match(str, pattern)"
-// This transforms the infix match operator into a function call.
-// Note: In DataWeave, `match` returns capture groups, while `matches` returns a boolean.
-func replaceMatchOperator(s string) string {
-	result, _ := replaceMatchOperatorErr(s)
-	return result
-}
-
-func replaceMatchOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpMatch)
-}
-
-// replaceContainsOperator converts "arr contains value" to "contains(arr, value)"
-func replaceContainsOperator(s string) string {
-	result, _ := replaceContainsOperatorErr(s)
-	return result
-}
-
-func replaceContainsOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpContains)
-}
-
-// replaceMatchesOperator converts "str matches pattern" to "matches(str, pattern)"
-// This transforms the infix matches operator into a function call.
-func replaceMatchesOperator(s string) string {
-	result, _ := replaceMatchesOperatorErr(s)
-	return result
-}
-
-func replaceMatchesOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpMatches)
-}
-
-// replaceRepeatOperator converts "str repeat n" to "repeat(str, n)"
-func replaceRepeatOperator(s string) string {
-	result, _ := replaceRepeatOperatorErr(s)
-	return result
-}
-
-func replaceRepeatOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpRepeat)
-}
-
-// replaceModOperator converts "a mod b" to "mod(a, b)"
-func replaceModOperator(s string) string {
-	result, _ := replaceModOperatorErr(s)
-	return result
-}
-
-func replaceModOperatorErr(s string) (string, error) {
-	return replaceConfiguredBinaryOperator(s, binaryOpMod)
 }
 
 // replaceMethodCallOperator is a generic transformer for "left operator(args)" → "operator(left, args)".

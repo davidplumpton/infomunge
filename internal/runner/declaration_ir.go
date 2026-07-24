@@ -153,10 +153,6 @@ func parseVarDeclarationFromLines(lines []string, start int) (*VarDeclaration, i
 	return declparser.ParseVarDeclarationFromLines(lines, start)
 }
 
-func parseFunctionDeclarationLine(trimmedLine string) (string, []ParamDeclaration, string, error) {
-	return declparser.ParseFunctionDeclarationLine(trimmedLine)
-}
-
 func parseFunctionDeclarationFromLines(lines []string, start int) (*FunctionDeclaration, int, error) {
 	return declparser.ParseFunctionDeclarationFromLines(lines, start)
 }

@@ -11,9 +11,6 @@ type PipelineStage interface {
 	Execute(input string, mapping []int) (string, []int, error)
 }
 
-// errorAwareHandler is a transformation function that can return errors.
-type errorAwareHandler func(string) (string, error)
-
 type mappedErrorAwareHandler func(string) (string, []int, error)
 
 func inferredTransform(name string, phase TransformPhase, order int, loop TransformLoopMode, fn transformHandler) TransformContract {
@@ -55,24 +52,6 @@ func exactErrorTransform(name string, phase TransformPhase, order int, loop Tran
 		Mapping:       TransformMappingExact,
 		Loop:          loop,
 		Handler:       fn,
-	}
-}
-
-func inferredErrorTransform(name string, phase TransformPhase, order int, loop TransformLoopMode, fn errorAwareHandler) TransformContract {
-	return TransformContract{
-		Name:          name,
-		Phase:         phase,
-		Order:         order,
-		Associativity: TransformAssociativityNone,
-		Mapping:       TransformMappingInferred,
-		Loop:          loop,
-		Handler: func(input string) (string, []int, error) {
-			result, err := fn(input)
-			if err != nil {
-				return result, nil, err
-			}
-			return result, inferStageMapping(input, result), nil
-		},
 	}
 }
 

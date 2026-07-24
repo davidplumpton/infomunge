@@ -63,10 +63,6 @@ func buildFunLambda(params []evaluator.ParamDef, bodyStr string, env evaluator.C
 	}, nil
 }
 
-func isDirectiveLine(trimmedLine string) bool {
-	return declparser.IsDirectiveLine(trimmedLine)
-}
-
 func paramDeclarationsToParamDefs(params []ParamDeclaration) []evaluator.ParamDef {
 	defs := make([]evaluator.ParamDef, 0, len(params))
 	for _, param := range params {
@@ -94,10 +90,6 @@ func buildFunctionDeclaration(decl *FunctionDeclaration, source DeclarationSourc
 	}
 
 	return buildFunLambda(paramDeclarationsToParamDefs(decl.Params), decl.Body, env, bodyMap)
-}
-
-func collapseWhitespaceOutsideStrings(input string) string {
-	return declparser.CollapseWhitespaceOutsideStrings(input)
 }
 
 func collapseWhitespaceOutsideStringsWithMapping(input string) (string, []int) {
