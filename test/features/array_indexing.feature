@@ -148,3 +148,63 @@ Feature: Array Indexing
       """
       "String"
       """
+
+  Scenario: Multiple range indexes in one expression
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ["hello"[0 to 0], "world"[1 to 2]]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["h","or"]
+      """
+
+  Scenario: Negative range index bounds
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2, 3][-2 to -1]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [2,3]
+      """
+
+  Scenario: Descending range index bounds
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {
+        array: [0, 1, 2][-1 to 0],
+        text: "é🙂x"[-1 to 0]
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"array":[2,1,0],"text":"x🙂é"}
+      """
+
+  Scenario: Computed range index end
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      var last = 2
+      ---
+      [10, 20, 30, 40][1 to last]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [20,30]
+      """

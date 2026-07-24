@@ -96,85 +96,126 @@ func interpolateString(content string) string {
 	return "(" + strings.Join(parts, " + ") + ")"
 }
 
-// replaceArrayRangeIndexing converts arr[start to end] to slice(arr, start, end+1)
+// replaceArrayRangeIndexing converts each arr[start to end] selector to an
+// inclusive range-index call. It rewrites innermost selectors first so nested
+// brackets and multiple independent selectors are handled without confusing an
+// array literal for the indexed expression.
 func replaceArrayRangeIndexing(s string) string {
-	// Find patterns like expr[ start to end ]
-	// Replace with slice(expr, start, end+1)
-	// We scan right-to-left for ']' then find its matching '[', respecting nesting and strings.
-
-	// Find the last ']' outside strings
-	j := -1
-	inString := false
-	for k := len(s) - 1; k >= 0; k-- {
-		if s[k] == '"' && !stringutils.IsEscapedAt(s, k) {
-			inString = !inString
+	result := s
+	for {
+		next, changed := replaceFirstArrayRangeIndex(result)
+		if !changed {
+			return result
 		}
-		if !inString && s[k] == ']' {
-			j = k
-			break
-		}
+		result = next
 	}
-	if j == -1 {
-		return s
-	}
+}
 
-	// Find the matching '[' by walking backwards from j, respecting nesting
-	depth := 0
-	i := -1
-	inString = false
-	for k := j; k >= 0; k-- {
-		if s[k] == '"' && !stringutils.IsEscapedAt(s, k) {
-			inString = !inString
-		}
-		if inString {
+func replaceFirstArrayRangeIndex(s string) (string, bool) {
+	var bracketStack []int
+	var quote byte
+
+	for pos := 0; pos < len(s); pos++ {
+		ch := s[pos]
+		if quote != 0 {
+			if ch == quote && !stringutils.IsEscapedAt(s, pos) {
+				quote = 0
+			}
 			continue
 		}
-		if s[k] == ']' {
-			depth++
-		} else if s[k] == '[' {
-			depth--
-			if depth == 0 {
-				i = k
-				break
-			}
+		if ch == '"' || ch == '\'' {
+			quote = ch
+			continue
 		}
-	}
-	if i == -1 {
-		return s
-	}
 
-	if i+1 >= j {
-		return s
-	}
-	ch := s[i+1]
-	if !unicode.IsDigit(rune(ch)) && !unicode.IsLetter(rune(ch)) && ch != '(' {
-		return s
-	}
-
-	bracketContent := s[i+1 : j]
-	if strings.Contains(bracketContent, " to ") {
-		parts := strings.Split(bracketContent, " to ")
-		if len(parts) == 2 {
-			start := strings.TrimSpace(parts[0])
-			endStr := strings.TrimSpace(parts[1])
-			endInt, err := strconv.Atoi(endStr)
-			if err != nil {
-				return s
+		switch ch {
+		case '[':
+			bracketStack = append(bracketStack, pos)
+		case ']':
+			if len(bracketStack) == 0 {
+				continue
 			}
-			endPlusOne := endInt + 1
+			open := bracketStack[len(bracketStack)-1]
+			bracketStack = bracketStack[:len(bracketStack)-1]
+			start, end, ok := splitRangeIndexBounds(s[open+1 : pos])
+			if !ok {
+				continue
+			}
 
-			// Find the start of the expression being indexed by walking backwards
-			// from the '[' position. We need just the indexed expression, not any
-			// enclosing function call or other context.
-			prefix := []rune(s[:i])
+			prefix := []rune(s[:open])
 			exprStart := stringutils.FindLeftOperandStart(prefix, nil)
-			arrayExpr := strings.TrimSpace(string(prefix[exprStart:]))
-			beforeExpr := string(prefix[:exprStart])
-			suffix := s[j+1:]
-			return fmt.Sprintf("%sslice(%s, %s, %d)%s", beforeExpr, arrayExpr, start, endPlusOne, suffix)
+			operandStart := exprStart
+			for operandStart < len(prefix) && unicode.IsSpace(prefix[operandStart]) {
+				operandStart++
+			}
+			indexedExpr := strings.TrimSpace(string(prefix[operandStart:]))
+			if indexedExpr == "" {
+				continue
+			}
+
+			beforeExpr := string(prefix[:operandStart])
+			replacement := fmt.Sprintf("__rangeIndex(%s, %s, %s)", indexedExpr, start, end)
+			return beforeExpr + replacement + s[pos+1:], true
 		}
 	}
-	return s
+
+	return s, false
+}
+
+func splitRangeIndexBounds(content string) (string, string, bool) {
+	var quote byte
+	parenDepth := 0
+	bracketDepth := 0
+	braceDepth := 0
+	rangePos := -1
+
+	for pos := 0; pos < len(content); pos++ {
+		ch := content[pos]
+		if quote != 0 {
+			if ch == quote && !stringutils.IsEscapedAt(content, pos) {
+				quote = 0
+			}
+			continue
+		}
+		if ch == '"' || ch == '\'' {
+			quote = ch
+			continue
+		}
+
+		switch ch {
+		case '(':
+			parenDepth++
+		case ')':
+			parenDepth--
+		case '[':
+			bracketDepth++
+		case ']':
+			bracketDepth--
+		case '{':
+			braceDepth++
+		case '}':
+			braceDepth--
+		default:
+			if parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 &&
+				strings.HasPrefix(content[pos:], " to ") {
+				if rangePos != -1 {
+					return "", "", false
+				}
+				rangePos = pos
+				pos += len(" to ") - 1
+			}
+		}
+	}
+
+	if rangePos == -1 {
+		return "", "", false
+	}
+	start := strings.TrimSpace(content[:rangePos])
+	end := strings.TrimSpace(content[rangePos+len(" to "):])
+	if start == "" || end == "" {
+		return "", "", false
+	}
+	return start, end, true
 }
 
 // extractInterpolationExpr extracts the expression inside $(...).

@@ -111,6 +111,91 @@ func callBuiltinSlice(args []Value, e *ast.CallExpr) (Value, error) {
 	return nil, newPosError("slice first argument must be an array or string", e.Args[0].Pos())
 }
 
+// callBuiltinRangeIndex implements DataWeave's inclusive start-to-end selector.
+// Negative bounds are resolved relative to the collection, and descending
+// bounds return values in reverse index order.
+func callBuiltinRangeIndex(args []Value, e *ast.CallExpr) (Value, error) {
+	start, ok := numericIndex(args[1])
+	if !ok {
+		return nil, newPosError("range index start must be a number", e.Args[1].Pos())
+	}
+	end, ok := numericIndex(args[2])
+	if !ok {
+		return nil, newPosError("range index end must be a number", e.Args[2].Pos())
+	}
+
+	switch value := args[0].(type) {
+	case Array:
+		start, end, ok := inclusiveRangeBounds(start, end, len(value))
+		if !ok {
+			return Array{}, nil
+		}
+		if start > end {
+			result := make(Array, 0, start-end+1)
+			for index := start; index >= end; index-- {
+				result = append(result, value[index])
+			}
+			return result, nil
+		}
+		return value[start : end+1], nil
+	case string:
+		runes := []rune(value)
+		start, end, ok := inclusiveRangeBounds(start, end, len(runes))
+		if !ok {
+			return "", nil
+		}
+		if start > end {
+			result := make([]rune, 0, start-end+1)
+			for index := start; index >= end; index-- {
+				result = append(result, runes[index])
+			}
+			return string(result), nil
+		}
+		return string(runes[start : end+1]), nil
+	default:
+		return nil, newPosError("range index first argument must be an array or string", e.Args[0].Pos())
+	}
+}
+
+func numericIndex(value Value) (int, bool) {
+	switch index := value.(type) {
+	case int:
+		return index, true
+	case float64:
+		return int(index), true
+	default:
+		return 0, false
+	}
+}
+
+func inclusiveRangeBounds(start, end, length int) (normalizedStart, normalizedEnd int, ok bool) {
+	if length == 0 {
+		return 0, 0, false
+	}
+	if start < 0 {
+		start += length
+	}
+	if end < 0 {
+		end += length
+	}
+	if start < 0 {
+		start = 0
+	}
+	if start > length {
+		start = length
+	}
+	if end < -1 {
+		end = -1
+	}
+	if end >= length {
+		end = length - 1
+	}
+	if start == length || end == -1 {
+		return 0, 0, false
+	}
+	return start, end, true
+}
+
 // callBuiltinMapInternal is a helper for internal map operations
 func callBuiltinMapInternal(array Array, lambda *Lambda, scope *Scope, depth int) (Value, error) {
 	result := make(Array, 0, len(array))

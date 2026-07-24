@@ -508,16 +508,21 @@ func TestReplaceArrayRangeIndexing(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"simple range", "arr[0 to 2]", "slice(arr, 0, 3)"},
-		// Variable start is supported, only the end must be numeric for slice conversion
-		{"range with variable start", "arr[start to 5]", "slice(arr, start, 6)"},
+		{"simple range", "arr[0 to 2]", "__rangeIndex(arr, 0, 2)"},
+		{"range with variable start", "arr[start to 5]", "__rangeIndex(arr, start, 5)"},
 		{"no range", "arr[0]", "arr[0]"},
-		// Variable end is not supported - returns unchanged
-		{"range with variable end", "arr[0 to end]", "arr[0 to end]"},
+		{"range with variable end", "arr[0 to end]", "__rangeIndex(arr, 0, end)"},
+		{"range with computed end", "arr[0 to sizeOf(arr) - 2]", "__rangeIndex(arr, 0, sizeOf(arr) - 2)"},
+		{"negative bounds", "arr[-2 to -1]", "__rangeIndex(arr, -2, -1)"},
+		{"multiple independent ranges", `["hello"[0 to 0], "world"[1 to 2]]`, `[__rangeIndex("hello", 0, 0), __rangeIndex("world", 1, 2)]`},
+		{"chained ranges", `arr[0 to 3][1 to 2]`, `__rangeIndex(__rangeIndex(arr, 0, 3), 1, 2)`},
 		// Range inside function call arguments (bug q022)
-		{"range inside function call", `typeOf(payload["name"][0 to 0])`, `typeOf(slice(payload["name"], 0, 1))`},
-		{"range inside function call with dot notation", `typeOf(payload.name[0 to 0])`, `typeOf(slice(payload.name, 0, 1))`},
-		{"range inside nested brackets", `foo(bar["x"][1 to 3])`, `foo(slice(bar["x"], 1, 4))`},
+		{"range inside function call", `typeOf(payload["name"][0 to 0])`, `typeOf(__rangeIndex(payload["name"], 0, 0))`},
+		{"range inside function call with dot notation", `typeOf(payload.name[0 to 0])`, `typeOf(__rangeIndex(payload.name, 0, 0))`},
+		{"range inside nested brackets", `foo(bar["x"][1 to 3])`, `foo(__rangeIndex(bar["x"], 1, 3))`},
+		{"nested bracket in end expression", `arr[0 to indexes[1]]`, `__rangeIndex(arr, 0, indexes[1])`},
+		{"range text inside string", `arr[0 to sizeOf("x[y to z]")]`, `__rangeIndex(arr, 0, sizeOf("x[y to z]"))`},
+		{"array range expression is not indexing", `[-2 to -1]`, `[-2 to -1]`},
 	}
 
 	for _, tt := range tests {

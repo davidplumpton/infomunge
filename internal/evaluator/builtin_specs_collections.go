@@ -59,6 +59,7 @@ func collectionBuiltinSpecs() []BuiltinSpec {
 		regularBuiltinSpec("with", builtinCategoryObjects, exactArity(2), callBuiltinWith, "replace selected value"),
 		regularBuiltinSpec("xsiType", builtinCategoryObjects, exactArity(1), callBuiltinXsiType, "XML xsi:type object"),
 		regularBuiltinSpec("slice", builtinCategoryArrays, exactArity(3), callBuiltinSlice, "slice array or string"),
+		regularBuiltinSpec("__rangeIndex", builtinCategoryArrays, exactArity(3), callBuiltinRangeIndex, "inclusive range index"),
 		regularBuiltinSpec("prepend", builtinCategoryArrays, exactArity(2), callBuiltinPrepend, "prepend value"),
 		regularBuiltinSpec("append", builtinCategoryArrays, exactArity(2), callBuiltinAppend, "append value"),
 		regularBuiltinSpec("safe", builtinCategoryObjects, exactArity(2), callBuiltinSafeAccess, "safe access"),
