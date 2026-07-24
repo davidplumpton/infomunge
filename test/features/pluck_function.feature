@@ -164,3 +164,14 @@ Feature: Pluck Function
       """
     When I run the application and it fails
     Then the output should contain "pluck expects an array or object"
+
+  Scenario: pluck on object requires a lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {"a": 1} pluck "a"
+      """
+    When I run the application and it fails
+    Then the output should contain "pluck on object expects a lambda function"

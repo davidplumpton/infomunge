@@ -1,4 +1,0 @@
-%im 0.1
-output application/json
----
-[10, 20, 30] map { index: $$, value: $ }

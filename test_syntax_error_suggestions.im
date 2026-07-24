@@ -1,8 +1,0 @@
-%im 0.1
-output application/json
----
-{
-  "map_on_obj_error": {"a": 1} map (v,k) -> v + 1,
-  "filter_on_obj_error": {"a": 1} filter (v,k) -> v > 0,
-  "pluck_on_obj_error": {"a": 1} pluck "a"
-}

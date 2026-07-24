@@ -386,6 +386,17 @@ Feature: Filtering and Transformation Functions
     When I run the application and it fails
     Then the output should contain "map expects an array"
 
+  Scenario: map on object suggests mapObject
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {"a": 1} map (value, key) -> value + 1
+      """
+    When I run the application and it fails
+    Then the output should contain "Did you mean to use 'mapObject'?"
+
   Scenario: distinctBy with multiple same values
     Given the following input content:
       """

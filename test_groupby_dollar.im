@@ -1,4 +1,0 @@
-%im 0.1
-output application/json
----
-[{"name": "A", "val": 1}, {"name": "B", "val": 1}, {"name": "C", "val": 2}] groupBy $.val

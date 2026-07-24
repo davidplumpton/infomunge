@@ -183,6 +183,62 @@ Feature: Implicit Lambda Parameters ($ and $$)
       [4,6,8,10]
       """
 
+  Scenario: GroupBy with $ field selector
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{"name": "A", "value": 1}, {"name": "B", "value": 1}, {"name": "C", "value": 2}] groupBy $.value
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"1":[{"name":"A","value":1},{"name":"B","value":1}],"2":[{"name":"C","value":2}]}
+      """
+
+  Scenario: Sort with $ field selector
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{"id": 3}, {"id": 1}, {"id": 2}] sort $.id
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [{"id":1},{"id":2},{"id":3}]
+      """
+
+  Scenario: DistinctBy with $ current element
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2, 2, 3] distinctBy $
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,2,3]
+      """
+
+  Scenario: Map object literal with $ and $$ values
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [10, 20, 30] map {index: $$, value: $}
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [{"index":0,"value":10},{"index":1,"value":20},{"index":2,"value":30}]
+      """
+
   Scenario: Explicit lambda still works alongside implicit
     Given the following input content:
       """

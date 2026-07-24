@@ -1,8 +1,0 @@
-%im 0.1
-output application/json
-var item = {"a": 1, "b": 2}
----
-{
-  "book": item mapObject (k,v) -> [upper(k), v],
-  "other": 1
-}

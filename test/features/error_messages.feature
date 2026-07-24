@@ -158,6 +158,16 @@ Feature: Error Messages
       "h"
       """
 
+  Scenario: String field access requires an integer index
+    Given the following input content:
+      """
+      %im 0.1
+      ---
+      "hello".name
+      """
+    When I run the application and it fails
+    Then the error should contain "string index must be an integer"
+
   Scenario: Presence selector
     Given the following input content:
       """

@@ -153,3 +153,14 @@ Feature: Filter Operator
       """
     When I run the application and it fails
     Then the output should contain "filter expects an array"
+
+  Scenario: Filter on object suggests filterObject
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {"a": 1} filter (value, key) -> value > 0
+      """
+    When I run the application and it fails
+    Then the output should contain "Did you mean to use 'filterObject'?"

@@ -1,6 +1,0 @@
-%im 0.1
-output application/json
----
-{
-  "result": {"a": 1} mapObject (k,v) -> { (upper(k)): v * 2 }
-}

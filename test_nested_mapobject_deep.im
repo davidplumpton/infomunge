@@ -1,7 +1,0 @@
-%im 0.1
-output application/json
-var item = {"a": {"x": 1}, "b": {"y": 2}}
----
-{
-  "nested": item mapObject (k,v) -> [k, v mapObject (k2,v2) -> [upper(k2), v2]]
-}
