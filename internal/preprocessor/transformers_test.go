@@ -1,8 +1,10 @@
 package preprocessor
 
 import (
-	"infomunge/internal/stringutils"
+	"strings"
 	"testing"
+
+	"infomunge/internal/stringutils"
 )
 
 func TestReplaceImplicitLambdas(t *testing.T) {
@@ -418,7 +420,10 @@ func TestReplaceAsOperator(t *testing.T) {
 		{"as with expression", "(a + b) as Number", `__coerce((a + b), "Number")`},
 		{"as in string ignored", `"x as y"`, `"x as y"`},
 		{"as with optional type", "x as String?", `__coerce(x, "String?")`},
+		{"as with union type", "x as String | Number", `__coerce(x, "String | Number")`},
 		{"as stays on immediate rhs operand", "value default other as String", `value default __coerce(other, "String")`},
+		{"as preserves following keyword operator", "5 as Number mod 2", `__coerce(5, "Number") mod 2`},
+		{"as preserves following configured operator", `1 as String ++ "2"`, `__coerce(1, "String") ++ "2"`},
 		{"as keeps config object", `payload as String map[string]interface{}{"format": "yyyy"}`, `__coerce(payload, "String", map[string]interface{}{"format": "yyyy"})`},
 	}
 
@@ -442,6 +447,8 @@ func TestReplaceIsOperator(t *testing.T) {
 		{"is with expression", "(a) is Number", `__isType((a), "Number")`},
 		{"is in string ignored", `"x is y"`, `"x is y"`},
 		{"is stays on immediate boolean operand", `left and right is String`, `left and __isType(right, "String")`},
+		{"is preserves following keyword operator", `"abc" is String contains true`, `__isType("abc", "String") contains true`},
+		{"is preserves following configured operator", `value is String ++ suffix`, `__isType(value, "String") ++ suffix`},
 	}
 
 	for _, tt := range tests {
@@ -451,6 +458,103 @@ func TestReplaceIsOperator(t *testing.T) {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
 		})
+	}
+}
+
+func TestTypedOperatorsStayOnRightOperandOfKeywordOperators(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"default", "left default value as String", `left default __coerce(value, "String")`},
+		{"onNull", "left onNull value as String", `left onNull __coerce(value, "String")`},
+		{"then", "left then value as String", `left then __coerce(value, "String")`},
+		{"update", "left ~ value as String", `left ~ __coerce(value, "String")`},
+		{"find", "left find value as String", `left find __coerce(value, "String")`},
+		{"contains", "left contains value as String", `left contains __coerce(value, "String")`},
+		{"concatenate", "left ++ value as String", `left ++ __coerce(value, "String")`},
+		{"remove", "left -- value as String", `left -- __coerce(value, "String")`},
+		{"splitBy", "left splitBy value as String", `left splitBy __coerce(value, "String")`},
+		{"joinBy", "left joinBy value as String", `left joinBy __coerce(value, "String")`},
+		{"to", "left to value as Number", `left to __coerce(value, "Number")`},
+		{"match", "left match value as String", `left match __coerce(value, "String")`},
+		{"matches", "left matches value as String", `left matches __coerce(value, "String")`},
+		{"repeat", "left repeat value as Number", `left repeat __coerce(value, "Number")`},
+		{"mod", "left mod value as Number", `left mod __coerce(value, "Number")`},
+		{"replace replacement", "left replace pattern with value as String", `left replace pattern with __coerce(value, "String")`},
+		{"map", "left map value as String", `left map __coerce(value, "String")`},
+	}
+
+	typedOperators := []struct {
+		name        string
+		token       string
+		replacement string
+		transform   mappedTransformHandler
+	}{
+		{name: "as", token: " as ", replacement: "__coerce", transform: replaceAsOperatorWithMapping},
+		{name: "is", token: " is ", replacement: "__isType", transform: replaceIsOperatorWithMapping},
+	}
+
+	for _, typed := range typedOperators {
+		for _, tt := range tests {
+			t.Run(typed.name+"/"+tt.name, func(t *testing.T) {
+				input := strings.Replace(tt.input, " as ", typed.token, 1)
+				expected := strings.Replace(tt.expected, "__coerce", typed.replacement, 1)
+				got, _ := typed.transform(input)
+				if got != expected {
+					t.Fatalf("expected %q, got %q", expected, got)
+				}
+			})
+		}
+	}
+}
+
+func TestTypedOperatorsPreserveFollowingInfixOperators(t *testing.T) {
+	suffixes := []struct {
+		name   string
+		suffix string
+	}{
+		{"default", " default fallback"},
+		{"onNull", " onNull fallback"},
+		{"then", " then fallback"},
+		{"update", " ~ fallback"},
+		{"find", " find fallback"},
+		{"contains", " contains fallback"},
+		{"concatenate", " ++ fallback"},
+		{"remove", " -- fallback"},
+		{"splitBy", " splitBy fallback"},
+		{"joinBy", " joinBy fallback"},
+		{"to", " to fallback"},
+		{"match", " match fallback"},
+		{"matches", " matches fallback"},
+		{"repeat", " repeat fallback"},
+		{"mod", " mod fallback"},
+		{"replace", " replace pattern with fallback"},
+		{"and", " and fallback"},
+		{"or", " or fallback"},
+		{"map", " map fallback"},
+	}
+	typedOperators := []struct {
+		name      string
+		input     string
+		rewritten string
+		transform mappedTransformHandler
+	}{
+		{name: "as", input: "value as String", rewritten: `__coerce(value, "String")`, transform: replaceAsOperatorWithMapping},
+		{name: "is", input: "value is String", rewritten: `__isType(value, "String")`, transform: replaceIsOperatorWithMapping},
+	}
+
+	for _, typed := range typedOperators {
+		for _, suffix := range suffixes {
+			t.Run(typed.name+"/"+suffix.name, func(t *testing.T) {
+				got, _ := typed.transform(typed.input + suffix.suffix)
+				expected := typed.rewritten + suffix.suffix
+				if got != expected {
+					t.Fatalf("expected %q, got %q", expected, got)
+				}
+			})
+		}
 	}
 }
 

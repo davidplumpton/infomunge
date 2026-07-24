@@ -40,7 +40,10 @@ func replaceTypedOperatorWithMapping(s string, token string, funcName string, al
 			}
 
 			leftBytes, leftMapping := buf.Slice(leftTrimStart)
-			buf.Truncate(leftStart)
+			// Keep separator whitespace between a preceding operator/delimiter
+			// and the rewritten typed operand. Later transforms match exact
+			// spaced tokens such as " ++ " and " ~ ".
+			buf.Truncate(leftTrimStart)
 
 			buf.AppendLiteral(funcName+"(", i)
 			buf.AppendBytes(leftBytes, leftMapping)

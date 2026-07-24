@@ -166,6 +166,24 @@ func TestConfiguredBinaryOperatorsPreserveMixedLeftAssociativity(t *testing.T) {
 			input:    "a repeat b mod c",
 			expected: "mod(repeat(a, b), c)",
 		},
+		{
+			name:     "default stays inside trailing type coercion",
+			stage:    createOperatorProcessingStage(nil),
+			input:    `null as String default "x"`,
+			expected: `__default(null, "x") as String`,
+		},
+		{
+			name:     "parentheses keep coercion inside default",
+			stage:    createOperatorProcessingStage(nil),
+			input:    `(null as String) default "x"`,
+			expected: `__default((null as String), "x")`,
+		},
+		{
+			name:     "missing default operand preserves typed expression",
+			stage:    createOperatorProcessingStage(nil),
+			input:    `null as String default `,
+			expected: `null as String default `,
+		},
 	}
 
 	for _, tt := range tests {
@@ -179,6 +197,57 @@ func TestConfiguredBinaryOperatorsPreserveMixedLeftAssociativity(t *testing.T) {
 			}
 			if len(mapping) != len(got) {
 				t.Fatalf("mapping length = %d, want %d", len(mapping), len(got))
+			}
+		})
+	}
+}
+
+func TestTypedOperatorsComposeWithConfiguredAndKeywordOperators(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "as before mod",
+			input:    `5 as Number mod 2`,
+			expected: `mod(__coerce(5, "Number"), 2)`,
+		},
+		{
+			name:     "as before contains",
+			input:    `"abc" as String contains "a"`,
+			expected: `contains(__coerce("abc", "String"), "a")`,
+		},
+		{
+			name:     "as before concatenation",
+			input:    `1 as String ++ "2"`,
+			expected: `__concat(__coerce(1, "String"), "2")`,
+		},
+		{
+			name:     "as outside default",
+			input:    `null as String default "x"`,
+			expected: `__coerce(__default(null, "x"), "String")`,
+		},
+		{
+			name:     "as after mod",
+			input:    `5 mod 2 as String`,
+			expected: `mod(5, __coerce(2, "String"))`,
+		},
+		{
+			name:     "is before logical operator",
+			input:    `1 is Number and true`,
+			expected: `__isType(1, "Number") && true`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, _, err := PrepareForParsing(tt.input, Options{})
+			if err != nil {
+				t.Fatalf("PrepareForParsing returned error: %v", err)
+			}
+			if result != tt.expected {
+				t.Fatalf("expected %q, got %q", tt.expected, result)
 			}
 		})
 	}
@@ -326,6 +395,28 @@ func TestTypedOperatorSourceMapErrorLocation(t *testing.T) {
 	formatted := sourcemap.New(input, result, mapping).FormatParseError(parseErr)
 	if !strings.Contains(formatted.Error(), "1:26:") {
 		t.Fatalf("expected source-mapped error at 1:26, got %q from %q", formatted.Error(), result)
+	}
+}
+
+func TestTypedOperatorPreservesFollowingOperatorSourceMap(t *testing.T) {
+	input := `1 as String ++ (2 + )`
+	result, mapping, err := PrepareForParsing(input, Options{})
+	if err != nil {
+		t.Fatalf("PrepareForParsing returned error: %v", err)
+	}
+
+	if result != `__concat(__coerce(1, "String"), (2 + ))` {
+		t.Fatalf("unexpected transformed expression: %q", result)
+	}
+
+	_, parseErr := parser.ParseExpr(result)
+	if parseErr == nil {
+		t.Fatalf("expected transformed expression to fail parsing: %q", result)
+	}
+
+	formatted := sourcemap.New(input, result, mapping).FormatParseError(parseErr)
+	if !strings.Contains(formatted.Error(), "1:21:") {
+		t.Fatalf("expected source-mapped error at 1:21, got %q from %q", formatted.Error(), result)
 	}
 }
 

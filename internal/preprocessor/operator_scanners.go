@@ -34,7 +34,11 @@ var typedOperatorLeftBoundaryOps = []string{
 	" match ", " matches ", " scan ",
 	" default ", " onNull ", " then ",
 	" find ", " contains ",
-	" splitBy ", " joinBy ", " replace ",
+	" splitBy ", " joinBy ", " replace ", " with ",
+	" to ", " repeat ", " mod ",
+	" map ", " filter ", " reduce ", " flatMap ", " groupBy ", " pluck ",
+	" sort ", " orderBy ", " maxBy ", " minBy ", " distinctBy ",
+	" filterObject ", " mapObject ",
 	" and ", " or ", " && ", " || ",
 }
 
@@ -62,7 +66,7 @@ func findLeftOperandBoundsRunes(result []rune, cfg leftOperandScanConfig) (int, 
 }
 
 func findTypedOperatorLeftOperandStartBytes(result []byte) int {
-	leftStart := findLeftOperandStartBytesWithStops(result, defaultStopBytes([]rune{':', '&', '|'}))
+	leftStart := findLeftOperandStartBytesWithStops(result, defaultStopBytes([]rune{':', '&', '|', '~'}))
 	if leftStart >= len(result) {
 		return leftStart
 	}
@@ -185,21 +189,20 @@ func scanRightOperandBounds(input string, start int, cfg rightOperandScanConfig)
 }
 
 func scanTypedOperatorRightSpan(input string, start int, allowConfig bool) (typedOperatorRightSpan, bool) {
-	end := start
-	for end < len(input) && IsTypeExprChar(input[end]) {
-		if allowConfig && end+4 <= len(input) && input[end:end+4] == "map[" {
-			break
-		}
-		end++
+	typeStart := start
+	for typeStart < len(input) && unicode.IsSpace(rune(input[typeStart])) {
+		typeStart++
 	}
 
-	typeStart, typeEnd := trimSpaceBounds(input, start, end)
-	if typeStart >= typeEnd {
+	typeEnd, ok := scanTypeExpressionEnd(input, typeStart)
+	if !ok {
 		return typedOperatorRightSpan{}, false
 	}
 
 	typeExpr := input[typeStart:typeEnd]
-	next := end
+	// Leave separator whitespace after the type in the input stream. Later
+	// transforms match spaced operator tokens such as " mod " and " ++ ".
+	next := typeEnd
 	configArg := ""
 	configStart := -1
 	configEnd := -1
@@ -244,4 +247,60 @@ func scanTypedOperatorRightSpan(input string, start int, allowConfig bool) (type
 		ConfigEnd:   configEnd,
 		Next:        next,
 	}, true
+}
+
+func scanTypeExpressionEnd(input string, start int) (int, bool) {
+	end, ok := scanTypeNameEnd(input, start)
+	if !ok {
+		return start, false
+	}
+	if end < len(input) && input[end] == '?' {
+		end++
+	}
+
+	for {
+		separatorStart := end
+		pos := end
+		for pos < len(input) && unicode.IsSpace(rune(input[pos])) {
+			pos++
+		}
+		if pos >= len(input) || input[pos] != '|' || pos+1 < len(input) && input[pos+1] == '|' {
+			return end, true
+		}
+
+		pos++
+		for pos < len(input) && unicode.IsSpace(rune(input[pos])) {
+			pos++
+		}
+		nextEnd, nextOK := scanTypeNameEnd(input, pos)
+		if !nextOK {
+			return separatorStart, true
+		}
+		end = nextEnd
+		if end < len(input) && input[end] == '?' {
+			end++
+		}
+	}
+}
+
+func scanTypeNameEnd(input string, start int) (int, bool) {
+	if start >= len(input) || !IsIdentifierStart(input[start]) {
+		return start, false
+	}
+
+	end := start + 1
+	for end < len(input) && IsIdentifierPart(input[end]) {
+		end++
+	}
+	for end < len(input) && input[end] == '.' {
+		segmentStart := end + 1
+		if segmentStart >= len(input) || !IsIdentifierStart(input[segmentStart]) {
+			break
+		}
+		end = segmentStart + 1
+		for end < len(input) && IsIdentifierPart(input[end]) {
+			end++
+		}
+	}
+	return end, true
 }

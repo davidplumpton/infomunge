@@ -163,6 +163,14 @@ func replaceConfiguredBinaryOperatorWithMappingAndPeers(s string, key string, pe
 
 			leftBytes, leftMapping := buf.Slice(leftTrimStart)
 			buf.Truncate(leftStart)
+			var typedSuffixBytes []byte
+			var typedSuffixMapping []int
+			if key == binaryOpDefault {
+				// DataWeave applies an ungrouped trailing type annotation to
+				// the value selected by default, while an explicitly grouped
+				// coercion remains the left operand of default.
+				leftBytes, leftMapping, typedSuffixBytes, typedSuffixMapping = splitTrailingTypedOperator(leftBytes, leftMapping)
+			}
 
 			rightStart := i + opLen
 			rightTrimStart, rightTrimEnd, rightEnd, ok := scanRightOperandBounds(s, rightStart, rightOperandScanConfig{
@@ -171,6 +179,7 @@ func replaceConfiguredBinaryOperatorWithMappingAndPeers(s string, key string, pe
 			})
 			if !ok {
 				buf.AppendBytes(leftBytes, leftMapping)
+				buf.AppendBytes(typedSuffixBytes, typedSuffixMapping)
 				buf.AppendOriginal(s, i, i+opLen)
 				i += opLen
 				continue
@@ -181,6 +190,7 @@ func replaceConfiguredBinaryOperatorWithMappingAndPeers(s string, key string, pe
 			buf.AppendLiteral(", ", i)
 			buf.AppendOriginal(s, rightTrimStart, rightTrimEnd)
 			buf.AppendLiteral(")", rightTrimEnd-1)
+			buf.AppendBytes(typedSuffixBytes, typedSuffixMapping)
 			i = rightEnd
 			continue
 		}
@@ -190,6 +200,41 @@ func replaceConfiguredBinaryOperatorWithMappingAndPeers(s string, key string, pe
 	}
 
 	return buf.String(), buf.mapping, nil
+}
+
+func splitTrailingTypedOperator(data []byte, mapping []int) ([]byte, []int, []byte, []int) {
+	input := string(data)
+	var state ScanState
+
+	for pos := 0; pos < len(input); pos++ {
+		if !state.InString() && state.Depth() == 0 {
+			for _, candidate := range []struct {
+				token       string
+				allowConfig bool
+			}{
+				{token: " as ", allowConfig: true},
+				{token: " is ", allowConfig: false},
+			} {
+				if pos+len(candidate.token) > len(input) || input[pos:pos+len(candidate.token)] != candidate.token {
+					continue
+				}
+				span, ok := scanTypedOperatorRightSpan(input, pos+len(candidate.token), candidate.allowConfig)
+				if !ok {
+					continue
+				}
+				end := span.Next
+				for end < len(input) && isWhitespace(input[end]) {
+					end++
+				}
+				if end == len(input) {
+					return data[:pos], mapping[:pos], data[pos:], mapping[pos:]
+				}
+			}
+		}
+		state.Advance(input[pos])
+	}
+
+	return data, mapping, nil, nil
 }
 
 func mergeOperatorStops(existing, peers []string) []string {

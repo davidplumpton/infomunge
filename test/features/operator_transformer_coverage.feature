@@ -197,6 +197,59 @@ Feature: Operator transformer rewrite coverage
       42
       """
 
+  Scenario: As operator preserves following mod operator
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      5 as Number mod 2
+      """
+    When I run the script
+    Then the output should be:
+      """
+      1
+      """
+
+  Scenario: As operator preserves following contains operator
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "abc" as String contains "a"
+      """
+    When I run the script
+    Then the output should be true
+
+  Scenario: As operator preserves following concatenate operator
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      1 as String ++ "2"
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "12"
+      """
+
+  Scenario: Default is evaluated before a preceding as coercion
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      null as String default "x"
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "x"
+      """
+
   # --- Type checking (is) operator edge cases ---
 
   Scenario: Is operator checks Number type
