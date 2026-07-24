@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -46,7 +47,7 @@ func TestEvaluate_CompositeLiterals(t *testing.T) {
 	}
 
 	t.Run("map literal", func(t *testing.T) {
-		result, err := Evaluate(`map[string]interface{}{"a": 1}`, ctx, mapping, 0, `map[string]interface{}{"a": 1}`)
+		result, err := Evaluate(`map[string]interface{}{a: 1}`, ctx, mapping, 0, `map[string]interface{}{a: 1}`)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -56,6 +57,22 @@ func TestEvaluate_CompositeLiterals(t *testing.T) {
 		}
 		if m["a"] != 1 {
 			t.Errorf("expected m[a]=1, got %v", m["a"])
+		}
+	})
+
+	t.Run("dynamic map key", func(t *testing.T) {
+		ctx := Context{"key": "answer"}
+		expr := `map[string]interface{}{(key): 42}`
+		result, err := Evaluate(expr, ctx, mapping, 0, expr)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		m, ok := result.(Object)
+		if !ok {
+			t.Fatalf("expected map, got %T", result)
+		}
+		if m["answer"] != 42 {
+			t.Errorf("expected m[answer]=42, got %v", m["answer"])
 		}
 	})
 
@@ -72,6 +89,56 @@ func TestEvaluate_CompositeLiterals(t *testing.T) {
 			t.Errorf("expected len=3, got %d", len(arr))
 		}
 	})
+}
+
+func TestEvaluate_IdentifierResolution(t *testing.T) {
+	t.Run("declared variable", func(t *testing.T) {
+		result, err := Evaluate("answer", Context{"answer": 42}, []int{0}, 0, "answer")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != 42 {
+			t.Fatalf("expected 42, got %v", result)
+		}
+	})
+
+	t.Run("builtin call", func(t *testing.T) {
+		expr := `sizeOf([]interface{}{1, 2})`
+		mapping := make([]int, len(expr))
+		for i := range mapping {
+			mapping[i] = i
+		}
+		result, err := Evaluate(expr, nil, mapping, 0, expr)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != 2 {
+			t.Fatalf("expected 2, got %v", result)
+		}
+	})
+
+	for _, expr := range []string{
+		"missing",
+		"missing + 1",
+		`missing == "missing"`,
+	} {
+		t.Run("unresolved reference in "+expr, func(t *testing.T) {
+			mapping := make([]int, len(expr))
+			for i := range mapping {
+				mapping[i] = i
+			}
+			_, err := Evaluate(expr, nil, mapping, 0, expr)
+			if err == nil {
+				t.Fatal("expected unresolved reference error")
+			}
+			if !strings.Contains(err.Error(), "unresolved reference: missing") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(err.Error(), "1:1") {
+				t.Fatalf("expected positional error, got: %v", err)
+			}
+		})
+	}
 }
 
 func TestEvaluate_NilSafety(t *testing.T) {

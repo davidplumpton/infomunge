@@ -131,9 +131,18 @@ func (v *DefaultVisitor) VisitCompositeLit(expr *ast.CompositeLit) (Value, error
 		for _, elt := range expr.Elts {
 			switch node := elt.(type) {
 			case *ast.KeyValueExpr:
-				key, err := childVisitor.Visit(node.Key)
-				if err != nil {
-					return nil, err
+				var key Value
+				if ident, ok := node.Key.(*ast.Ident); ok {
+					// DataWeave object literals allow bare keys such as
+					// {name: "Alice"}. They are key names, not variable
+					// references; parenthesized keys remain dynamic.
+					key = ident.Name
+				} else {
+					var err error
+					key, err = childVisitor.Visit(node.Key)
+					if err != nil {
+						return nil, err
+					}
 				}
 				val, err := childVisitor.Visit(node.Value)
 				if err != nil {

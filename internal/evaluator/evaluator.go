@@ -308,7 +308,10 @@ func evalIdent(e *ast.Ident, context Context) (Value, error) {
 	if val, ok := context[e.Name]; ok {
 		return val, nil
 	}
-	return e.Name, nil
+	return nil, &posError{
+		msg: fmt.Sprintf("unresolved reference: %s", e.Name),
+		pos: e.Pos(),
+	}
 }
 
 // Binary operations

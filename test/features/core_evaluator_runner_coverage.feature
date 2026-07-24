@@ -14,6 +14,32 @@ Feature: Core evaluator runner coverage
     When I run the script
     Then the output should be valid JSON with number: 12
 
+  Scenario: Misspelled variable reference fails instead of becoming output data
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      missing
+      """
+    Then running the script should fail with error containing "unresolved reference: missing"
+    And running the script should fail with error containing "4:1:"
+
+  Scenario: Identifiers remain valid in variables, lambdas, builtins, and object keys
+    Given the following script:
+      """
+      %im 0.1
+      var increment = 1
+      output application/json
+      ---
+      {values: [1, 2] map (value) -> value + increment, count: sizeOf([1, 2])}
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"count":2,"values":[2,3]}
+      """
+
   # --- Logical OR operator (lor) ---
 
   Scenario: Logical OR with both true
