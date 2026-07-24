@@ -113,6 +113,45 @@ Feature: Playground webapp
     And the output should contain "xmlns:ns0=\"http://www.abc.com\""
     And the output should not contain "<?xml"
 
+  Scenario: Run endpoint reports incompatible CSV output as a client error
+    Given the server is running
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {name: "Alice"}
+      """
+    When I run the server script with output "csv"
+    Then the response status should be 400
+    And the output should contain "CSV output expects an array of objects"
+
+  Scenario: Run endpoint reports invalid XML output options as a client error
+    Given the server is running
+    And the following script:
+      """
+      %im 0.1
+      output application/xml writeDeclaration=""
+      ---
+      {name: "Alice"}
+      """
+    When I run the server script without specifying output
+    Then the response status should be 400
+    And the output should contain "output option writeDeclaration"
+
+  Scenario: Run endpoint reports unsupported qualified MIME types as a client error
+    Given the server is running
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {name: "Alice"}
+      """
+    When I run the server script with output "application/x-unknown"
+    Then the response status should be 400
+    And the output should contain "unsupported output mimeType: application/x-unknown"
+
   Scenario: Run endpoint returns timeout when request context is canceled
     Given the server is running
     And the following script:

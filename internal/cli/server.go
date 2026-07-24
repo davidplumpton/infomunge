@@ -29,7 +29,7 @@ const (
 	runRequestBodyMaxBytes  = 1 * 1024 * 1024
 )
 
-var absolutePathPattern = regexp.MustCompile(`(?:[A-Za-z]:\\|/)[^\s:"]+`)
+var absolutePathPattern = regexp.MustCompile(`(^|[\s("'=])((?:[A-Za-z]:\\|/)[^\s:"]+)`)
 
 func (app *App) serve(config *Config) error {
 	addr := effectiveListenAddr(config.Listen)
@@ -194,6 +194,10 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 		execution.OutputMimeType = outputMimeType
 		formatted, err := runner.FormatExecutionResult(execution)
 		if err != nil {
+			if isClientFormattingError(err) {
+				writeSanitizedBadRequest(w, err)
+				return
+			}
 			log.Printf("run endpoint format error: %v", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
@@ -230,9 +234,17 @@ func sanitizeClientErrorMessage(err error) string {
 	message = strings.ReplaceAll(message, "\r", " ")
 	message = strings.ReplaceAll(message, "\n", " ")
 	message = strings.Join(strings.Fields(message), " ")
-	message = absolutePathPattern.ReplaceAllString(message, "<path>")
+	message = absolutePathPattern.ReplaceAllString(message, "${1}<path>")
 
 	return strings.TrimSpace(message)
+}
+
+func isClientFormattingError(err error) bool {
+	var typedErr *unifiederrors.Error
+	if !errors.As(err, &typedErr) {
+		return false
+	}
+	return typedErr.Type == unifiederrors.TypeParse || typedErr.Type == unifiederrors.TypeValidate
 }
 
 func authorizedRunRequest(r *http.Request, expectedAPIKey string) bool {
