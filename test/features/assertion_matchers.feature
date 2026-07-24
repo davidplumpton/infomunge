@@ -640,6 +640,20 @@ Feature: Assertion Matchers
       {"Success":true,"Message":""}
       """
 
+  Scenario: haveSize counts Unicode characters
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      must("é🙂", haveSize(2))
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"Success":true,"Message":""}
+      """
+
   Scenario: haveSize with object of correct size
     Given the following input content:
       """

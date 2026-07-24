@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"fmt"
+	"unicode/utf8"
 
 	unifiederrors "infomunge/internal/errors"
 )
@@ -254,19 +255,21 @@ func endWith(suffix string) Matcher {
 	}
 }
 
-// haveSize validates that the array/string/object has the given size
+// haveSize validates that the string/binary/array/object has the given size.
 func haveSize(expectedSize int) Matcher {
 	return func(value Value) *MatcherResult {
 		var size int
 		switch v := value.(type) {
 		case string:
+			size = utf8.RuneCountInString(v)
+		case []byte:
 			size = len(v)
 		case Array:
 			size = len(v)
 		case Object:
 			size = len(v)
 		default:
-			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected string, array, or object, got %T", value)}
+			return &MatcherResult{Success: false, Message: fmt.Sprintf("expected string, binary, array, or object, got %T", value)}
 		}
 
 		if size == expectedSize {

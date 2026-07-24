@@ -45,6 +45,20 @@ Feature: Selector Features
       2
       """
 
+  Scenario: Metadata selector counts Unicode characters
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "é🙂".^size
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      2
+      """
+
   Scenario: Presence selector returns boolean
     Given the following input content:
       """

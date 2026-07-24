@@ -6,6 +6,7 @@ import (
 	"infomunge/pkg/values"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // executeLambdaOnArrayElements iterates over an array, evaluates a lambda on each element,
@@ -130,6 +131,8 @@ func callBuiltinMetadata(args []Value, e *ast.CallExpr) (Value, error) {
 	case "size":
 		switch v := value.(type) {
 		case string:
+			return utf8.RuneCountInString(v), nil
+		case []byte:
 			return len(v), nil
 		case Array:
 			return len(v), nil

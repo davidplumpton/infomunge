@@ -31,6 +31,20 @@ Feature: Size Of Function
       0
       """
 
+  Scenario: Count Unicode characters instead of UTF-8 bytes
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [sizeOf("é"), sizeOf("é🙂"), "é"[0 to sizeOf("é") - 1]]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,2,"é"]
+      """
+
   Scenario: Get length of an array literal
     Given the following input content:
       """

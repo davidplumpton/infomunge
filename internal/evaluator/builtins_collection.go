@@ -7,6 +7,7 @@ import (
 	"infomunge/pkg/values"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // validateArgCount checks that args has the expected count and returns an error if not.
@@ -24,6 +25,8 @@ func callBuiltinSizeOf(args []Value, e *ast.CallExpr) (Value, error) {
 	}
 	switch v := args[0].(type) {
 	case string:
+		return utf8.RuneCountInString(v), nil
+	case []byte:
 		return len(v), nil
 	case Array:
 		return len(v), nil
