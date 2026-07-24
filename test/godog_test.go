@@ -152,6 +152,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the server listen default should be "([^"]*)"$`, tc.theServerListenDefaultShouldBe)
 	ctx.Step(`^I run repo-wide package discovery from the repo root$`, tc.iRunRepoWidePackageDiscoveryFromRepoRoot)
 	ctx.Step(`^the output should contain "`+quotedStepArgument+`"$`, tc.theOutputShouldContain)
+	ctx.Step(`^the Makefile unit target should cover representative repository unit packages$`, tc.theMakefileUnitTargetShouldCoverRepresentativeRepositoryUnitPackages)
 	ctx.Step(`^the Makefile cucumber targets should use a 5 minute Go test timeout$`, tc.theMakefileCucumberTargetsShouldUseAFiveMinuteGoTestTimeout)
 	ctx.Step(`^the repo-wide go test regression step should use a 5 minute Go test timeout$`, tc.theRepoWideGoTestRegressionStepShouldUseAFiveMinuteGoTestTimeout)
 	ctx.Step(`^the authoritative testing docs should show portable cucumber commands with a 5 minute Go test timeout$`, tc.theAuthoritativeTestingDocsShouldShowPortableCucumberCommandsWithAFiveMinuteGoTestTimeout)

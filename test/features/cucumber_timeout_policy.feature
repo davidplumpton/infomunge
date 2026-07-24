@@ -1,4 +1,7 @@
-Feature: Cucumber timeout policy
+Feature: Test workflow policy
+
+  Scenario: The unit target covers the repository unit suite
+    Then the Makefile unit target should cover representative repository unit packages
 
   Scenario: Cucumber entry points use five minute Go test timeouts
     Then the Makefile cucumber targets should use a 5 minute Go test timeout

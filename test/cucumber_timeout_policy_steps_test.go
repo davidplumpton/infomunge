@@ -147,20 +147,20 @@ func readMakefileTargets(path string) (map[string][]string, error) {
 	}
 
 	targets := make(map[string][]string)
-	currentTarget := ""
+	var currentTargets []string
 	for _, line := range strings.Split(string(body), "\n") {
 		if strings.HasPrefix(line, "\t") {
-			if currentTarget != "" {
-				targets[currentTarget] = append(targets[currentTarget], strings.TrimSpace(line))
+			for _, target := range currentTargets {
+				targets[target] = append(targets[target], strings.TrimSpace(line))
 			}
 			continue
 		}
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ".") {
-			currentTarget = ""
+			currentTargets = nil
 			continue
 		}
 		if before, _, ok := strings.Cut(line, ":"); ok {
-			currentTarget = strings.TrimSpace(before)
+			currentTargets = strings.Fields(before)
 		}
 	}
 	return targets, nil

@@ -5,16 +5,12 @@ build:
 	go build -o infomunge ./cmd/infomunge
 
 # Run all tests (failed steps + periodic pass counts)
-test:
+test test-failures:
 	GODOG_FORMAT=failures go test -v ./test -timeout 5m
 
 # Run tests with full progress output (use to find hanging/timeout tests)
 test-verbose:
 	GODOG_FORMAT=progress go test -v ./test -timeout 5m
-
-# Run tests with minimal output (failed steps + periodic pass counts)
-test-failures:
-	GODOG_FORMAT=failures go test -v ./test -timeout 5m
 
 # Run a specific feature file (usage: make test-feature FEATURE=simple_types)
 test-feature:
@@ -22,7 +18,7 @@ test-feature:
 
 # Run unit tests only (exclude cucumber)
 test-unit:
-	go test ./test -run 'Test[^F]'
+	INFOMUNGE_SKIP_GODOG=1 go test ./... -timeout 5m
 
 # Run intensive property/mutation tests (CI budget, ~30s)
 test-intensive:
