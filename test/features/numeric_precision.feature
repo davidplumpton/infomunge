@@ -40,6 +40,20 @@ Feature: Exact numeric behavior
       false
       """
 
+  Scenario: Coercion equality preserves integer strings above float precision
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "9007199254740993" ~= 9007199254740992
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      false
+      """
+
   Scenario: Ordering preserves integers above float precision
     Given the following input content:
       """

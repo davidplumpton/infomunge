@@ -465,6 +465,62 @@ Feature: Basic Operators
       true
       """
 
+  Scenario: Equality compares nested numeric values recursively
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [[1] == [1.0], {a: 1} == {a: 1.0}]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [true,true]
+      """
+
+  Scenario: Coercion equality applies recursively to collections
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [["1"] ~= [1], {a: "1"} ~= {a: 1}]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [true,true]
+      """
+
+  Scenario: Coercion equality does not expose Go null formatting
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      null ~= "<nil>"
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      false
+      """
+
+  Scenario: Equality safely compares repeated object values
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ({a: 1, a: 2}).a == ({a: 1, a: 2}).a
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      true
+      """
+
   Scenario: Algebraic identity smoke checks
     Given the following input content:
       """

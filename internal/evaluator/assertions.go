@@ -377,67 +377,7 @@ func notBeNull() Matcher {
 // Helper functions
 
 func isEqual(a, b Value) bool {
-	// Handle nil cases
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-
-	// For numbers, compare as float64
-	aNum, aIsNum := ToFloat(a)
-	bNum, bIsNum := ToFloat(b)
-	if aIsNum && bIsNum {
-		return aNum == bNum
-	}
-
-	// For strings
-	aStr, aIsStr := a.(string)
-	bStr, bIsStr := b.(string)
-	if aIsStr && bIsStr {
-		return aStr == bStr
-	}
-
-	// For booleans
-	aBool, aIsBool := a.(bool)
-	bBool, bIsBool := b.(bool)
-	if aIsBool && bIsBool {
-		return aBool == bBool
-	}
-
-	// For arrays
-	aArr, aIsArr := a.(Array)
-	bArr, bIsArr := b.(Array)
-	if aIsArr && bIsArr {
-		if len(aArr) != len(bArr) {
-			return false
-		}
-		for i := range aArr {
-			if !isEqual(aArr[i], bArr[i]) {
-				return false
-			}
-		}
-		return true
-	}
-
-	// For objects
-	aObj, aIsObj := a.(Object)
-	bObj, bIsObj := b.(Object)
-	if aIsObj && bIsObj {
-		if len(aObj) != len(bObj) {
-			return false
-		}
-		for key, val := range aObj {
-			bVal, exists := bObj[key]
-			if !exists || !isEqual(val, bVal) {
-				return false
-			}
-		}
-		return true
-	}
-
-	return false
+	return numericEquals(a, b)
 }
 
 func compareValues(a, b Value) (int, error) {

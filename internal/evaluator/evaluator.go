@@ -8,7 +8,6 @@ import (
 	"go/token"
 	"math"
 	"math/big"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -830,71 +829,6 @@ func extractNamespaceValue(obj Object) Value {
 		}
 	}
 	return nil
-}
-
-// CoerceEquals implements the ~= coercion equality operator
-func CoerceEquals(left, right Value) bool {
-	// Guard against uncomparable types (slices, maps) that would panic with ==.
-	switch left.(type) {
-	case Array, Object:
-		return reflect.DeepEqual(left, right)
-	}
-	switch right.(type) {
-	case Array, Object:
-		return reflect.DeepEqual(left, right)
-	}
-	if left == right {
-		return true
-	}
-
-	leftNum, leftIsNum := tryParseNumber(left)
-	rightNum, rightIsNum := tryParseNumber(right)
-	if leftIsNum && rightIsNum {
-		return leftNum == rightNum
-	}
-
-	leftStr := fmt.Sprintf("%v", left)
-	rightStr := fmt.Sprintf("%v", right)
-	return leftStr == rightStr
-}
-
-// tryParseNumber attempts to convert a value to float64 for coercion equality
-func tryParseNumber(v Value) (float64, bool) {
-	if f, ok := ToFloat(v); ok {
-		return f, true
-	}
-	if s, ok := v.(string); ok {
-		if f, err := strconv.ParseFloat(s, 64); err == nil {
-			return f, true
-		}
-	}
-	return 0, false
-}
-
-// numericEquals compares two values for equality, treating int and float64 as comparable.
-// Handles uncomparable types (slices, maps) via reflect.DeepEqual.
-func numericEquals(left, right Value) bool {
-	// Handle uncomparable types (slices, maps) that would panic with ==.
-	switch left.(type) {
-	case Array, Object:
-		return reflect.DeepEqual(left, right)
-	}
-	switch right.(type) {
-	case Array, Object:
-		return reflect.DeepEqual(left, right)
-	}
-
-	if left == right {
-		return true
-	}
-
-	leftNum, leftOK := exactNumericRat(left)
-	rightNum, rightOK := exactNumericRat(right)
-	if leftOK && rightOK {
-		return leftNum.Cmp(rightNum) == 0
-	}
-
-	return false
 }
 
 // callUserDefinedFunction calls a user-defined function (Lambda) with the provided arguments
