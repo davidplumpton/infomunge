@@ -763,6 +763,20 @@ Feature: Array Functions
        [{"x":1},{"x":2}]
        """
 
+   Scenario: distinct distinguishes nested values by language type
+     Given the following input content:
+       """
+       %im 0.1
+       output application/json
+       ---
+       distinct([[1], ["1"], [1]])
+       """
+     When I run the application with this content
+     Then the output should be:
+       """
+       [[1],["1"]]
+       """
+
    Scenario: distinct with empty array
      Given the following input content:
        """

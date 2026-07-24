@@ -313,14 +313,12 @@ func callBuiltinDistinctBy(e *ast.CallExpr, scope *Scope, depth int) (Value, err
 		return nil, err
 	}
 
-	seenValues := make(map[string]bool)
+	seenValues := make(Array, 0, len(array))
 	result := make(Array, 0, len(array))
 
 	err = executeLambdaOnArrayElements(array, lambda, scope, depth, func(elem Value, _ int, key Value) error {
-		// Convert key to string for tracking uniqueness
-		keyStr := fmt.Sprintf("%v", key)
-		if !seenValues[keyStr] {
-			seenValues[keyStr] = true
+		if !containsEqualValue(seenValues, key) {
+			seenValues = append(seenValues, key)
 			result = append(result, elem)
 		}
 		return nil

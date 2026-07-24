@@ -2,6 +2,53 @@ package evaluator
 
 import "testing"
 
+func TestDistinctValuesUsesStructuralLanguageEquality(t *testing.T) {
+	values := Array{
+		1,
+		"1",
+		true,
+		"true",
+		nil,
+		"<nil>",
+		Array{1},
+		Array{"1"},
+		Array{1},
+		Object{"a": 1},
+		Object{"a": "1"},
+		Object{"a": 1},
+	}
+
+	result := distinctValues(values)
+	expected := Array{
+		1,
+		"1",
+		true,
+		"true",
+		nil,
+		"<nil>",
+		Array{1},
+		Array{"1"},
+		Object{"a": 1},
+		Object{"a": "1"},
+	}
+
+	if !numericEquals(result, expected) {
+		t.Fatalf("distinctValues() = %#v, want %#v", result, expected)
+	}
+}
+
+func TestDistinctValuesTreatsExactlyEquivalentNumericTypesAsEqual(t *testing.T) {
+	result := distinctValues(Array{1, 1.0, 2.5, 2.5})
+	expected := Array{1, 2.5}
+
+	if !numericEquals(result, expected) {
+		t.Fatalf("distinctValues() = %#v, want %#v", result, expected)
+	}
+	if _, ok := result[0].(int); !ok {
+		t.Fatalf("distinctValues() did not preserve the first numeric representation: %#v", result[0])
+	}
+}
+
 func TestInclusiveRangeBounds(t *testing.T) {
 	tests := []struct {
 		name          string

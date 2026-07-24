@@ -188,6 +188,20 @@ Feature: Core Collection Functions
       [5]
       """
 
+  Scenario: unique distinguishes nested values by language type
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      unique([{a: 1}, {a: "1"}, {a: 1}])
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [{"a":1},{"a":"1"}]
+      """
+
   Scenario: unique on non-array fails
     Given the following input content:
       """

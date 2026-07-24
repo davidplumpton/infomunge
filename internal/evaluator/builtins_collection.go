@@ -82,19 +82,7 @@ func callBuiltinUnique(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("unique: expected array, got %T", args[0]), e.Pos())
 	}
 
-	// Use a map to track seen values, including type to distinguish different types with same string representation
-	seen := make(map[string]bool)
-	result := make(Array, 0, len(arr))
-
-	for _, item := range arr {
-		key := fmt.Sprintf("%T:%v", item, item)
-		if !seen[key] {
-			seen[key] = true
-			result = append(result, item)
-		}
-	}
-
-	return result, nil
+	return distinctValues(arr), nil
 }
 
 // callBuiltinDistinct implements the distinct(array) function.
@@ -111,19 +99,30 @@ func callBuiltinDistinct(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("distinct: expected array, got %T", args[0]), e.Pos())
 	}
 
-	// Use a map to track seen values, including type to distinguish different types with same string representation
-	seen := make(map[string]bool)
-	result := make(Array, 0, len(arr))
+	return distinctValues(arr), nil
+}
 
-	for _, item := range arr {
-		key := fmt.Sprintf("%T:%v", item, item)
-		if !seen[key] {
-			seen[key] = true
-			result = append(result, item)
+// distinctValues preserves the first occurrence of each value according to
+// the language's structural equality semantics. A linear scan is intentional:
+// arrays and objects are not Go-comparable, and display-string keys erase type
+// information from nested values.
+func distinctValues(values Array) Array {
+	result := make(Array, 0, len(values))
+	for _, candidate := range values {
+		if !containsEqualValue(result, candidate) {
+			result = append(result, candidate)
 		}
 	}
+	return result
+}
 
-	return result, nil
+func containsEqualValue(values Array, candidate Value) bool {
+	for _, existing := range values {
+		if numericEquals(existing, candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 // callBuiltinReverse implements the reverse(array) function.

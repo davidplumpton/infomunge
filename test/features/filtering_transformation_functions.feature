@@ -64,6 +64,34 @@ Feature: Filtering and Transformation Functions
     When I run the application with this content
     Then the output should be valid JSON with array length of 2
 
+  Scenario: distinctBy distinguishes numbers from strings
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, "1"] distinctBy $
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,"1"]
+      """
+
+  Scenario: distinctBy distinguishes booleans null and matching strings
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [true, "true", null, "<nil>"] distinctBy $
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [true,"true",null,"\u003cnil\u003e"]
+      """
+
   Scenario: distinctBy preserves order
     Given the following input content:
       """
