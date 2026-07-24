@@ -102,7 +102,7 @@ func callBuiltinContains(args []Value, e *ast.CallExpr) (Value, error) {
 		}
 
 		// Only use regex if pattern looks like a regex
-		if looksLikeRegex(pattern) {
+		if looksLikeRegexPattern(pattern) {
 			re, regexErr := compileRegex(pattern, "")
 			if regexErr == nil {
 				return re.MatchString(first), nil
@@ -151,7 +151,7 @@ func callBuiltinReplace(args []Value, e *ast.CallExpr) (Value, error) {
 	}
 
 	// Only use regex if pattern looks like a regex
-	if looksLikeRegex(pattern) {
+	if looksLikeRegexPattern(pattern) {
 		re, regexErr := compileRegex(pattern, "")
 		if regexErr == nil {
 			return re.ReplaceAllString(text, replacement), nil

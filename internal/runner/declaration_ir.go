@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"strconv"
 	"strings"
 
 	declparser "infomunge/internal/declarations"
@@ -281,7 +280,7 @@ func parseTypeDeclarationPropertyValue(s string) (values.Value, error) {
 		return s[1 : len(s)-1], nil
 	}
 
-	if b, ok := parseDeclarationBoolLiteral(s); ok {
+	if b, ok := values.ParseBoolLiteral(s); ok {
 		return b, nil
 	}
 
@@ -289,39 +288,9 @@ func parseTypeDeclarationPropertyValue(s string) (values.Value, error) {
 		return nil, nil
 	}
 
-	if num, ok := parseDeclarationNumericLiteral(s); ok {
+	if num, ok := values.ParseNumericLiteral(s); ok {
 		return num, nil
 	}
 
 	return nil, unifiederrors.ParseErrorf("cannot parse value: %s", s)
-}
-
-func parseDeclarationBoolLiteral(s string) (bool, bool) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "true":
-		return true, true
-	case "false":
-		return false, true
-	default:
-		return false, false
-	}
-}
-
-func parseDeclarationNumericLiteral(s string) (values.Value, bool) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return nil, false
-	}
-
-	if !strings.ContainsAny(s, ".eE") {
-		if iv, err := strconv.Atoi(s); err == nil {
-			return iv, true
-		}
-	}
-
-	if fv, err := strconv.ParseFloat(s, 64); err == nil {
-		return fv, true
-	}
-
-	return nil, false
 }

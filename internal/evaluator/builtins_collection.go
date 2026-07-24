@@ -627,12 +627,6 @@ func findSubstringInString(s, searchStr string) Array {
 	return result
 }
 
-// looksLikeRegex returns true if the pattern appears to be a regex.
-func looksLikeRegex(pattern string) bool {
-	return strings.ContainsAny(pattern, "*+?()[]{}|^$\\") ||
-		(len(pattern) > 1 && strings.Contains(pattern, "."))
-}
-
 func callBuiltinFind(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return nil, newPosError("find requires 2 or 3 arguments: source, value, [flags]", e.Pos())
@@ -667,7 +661,7 @@ func callBuiltinFind(args []Value, e *ast.CallExpr) (Value, error) {
 		if !ok {
 			return nil, newPosError(fmt.Sprintf("find on string expects search value to be a string or Regex, got %T", searchValue), e.Pos())
 		}
-		if flags != "" || looksLikeRegex(searchStr) {
+		if flags != "" || looksLikeRegexPattern(searchStr) {
 			if result, ok := findRegexInString(s, searchStr, flags); ok {
 				return result, nil
 			}

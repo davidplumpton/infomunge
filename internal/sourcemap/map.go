@@ -105,7 +105,7 @@ func (m Map) RemapGeneratedOffset(offset int) int {
 	if len(m.positions) == 0 {
 		return clampOffset(m.baseOffset, len(m.source))
 	}
-	idx := clampIndex(offset, len(m.positions))
+	idx := ClampIndex(offset, len(m.positions))
 	return clampOffset(m.positions[idx]+m.baseOffset, len(m.source))
 }
 
@@ -179,7 +179,7 @@ func ComposePositions(prev, local []int) []int {
 	}
 	out := make([]int, len(local))
 	for i, pos := range local {
-		out[i] = prev[clampIndex(pos, len(prev))]
+		out[i] = prev[ClampIndex(pos, len(prev))]
 	}
 	return out
 }
@@ -205,7 +205,8 @@ func clonePositions(positions []int) []int {
 	return cloned
 }
 
-func clampIndex(pos, length int) int {
+// ClampIndex clamps an index to the valid range for a sequence of length.
+func ClampIndex(pos, length int) int {
 	if length <= 0 {
 		return 0
 	}

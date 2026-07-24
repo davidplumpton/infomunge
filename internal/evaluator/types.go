@@ -10,6 +10,7 @@ import (
 	"time"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/values"
 )
 
 // TypeDef represents a custom type definition declared with the 'type' keyword.
@@ -554,7 +555,7 @@ func coerceToNumber(value Value, pos token.Pos) (Value, error) {
 	case float64:
 		return v, nil
 	case string:
-		if num, ok := ParseNumericLiteral(v); ok {
+		if num, ok := values.ParseNumericLiteral(v); ok {
 			return num, nil
 		}
 		return nil, newCoercionError(v, "Number", pos)
@@ -576,7 +577,7 @@ func coerceToBoolean(value Value, pos token.Pos) (Value, error) {
 	case bool:
 		return v, nil
 	case string:
-		if b, ok := ParseBoolLiteral(v); ok {
+		if b, ok := values.ParseBoolLiteral(v); ok {
 			return b, nil
 		}
 		return nil, newCoercionError(v, "Boolean", pos)
@@ -588,38 +589,6 @@ func coerceToBoolean(value Value, pos token.Pos) (Value, error) {
 		return false, nil
 	default:
 		return nil, newCoercionTypeError(value, "Boolean", pos)
-	}
-}
-
-// ParseNumericLiteral parses a string as int or float with strict semantics.
-func ParseNumericLiteral(s string) (Value, bool) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return nil, false
-	}
-
-	if !strings.ContainsAny(s, ".eE") {
-		if iv, err := strconv.Atoi(s); err == nil {
-			return iv, true
-		}
-	}
-
-	if fv, err := strconv.ParseFloat(s, 64); err == nil {
-		return fv, true
-	}
-
-	return nil, false
-}
-
-// ParseBoolLiteral parses "true"/"false" (case-insensitive) into bool.
-func ParseBoolLiteral(s string) (bool, bool) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "true":
-		return true, true
-	case "false":
-		return false, true
-	default:
-		return false, false
 	}
 }
 

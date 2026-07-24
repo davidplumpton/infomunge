@@ -13,6 +13,7 @@ import (
 
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/stringutils"
+	"infomunge/pkg/values"
 )
 
 // callBuiltinLazyEval implements the lazy_eval(expr) function.
@@ -123,7 +124,7 @@ func parseDefaultValue(s string) (Value, error) {
 	}
 
 	// Check for boolean
-	if b, ok := ParseBoolLiteral(s); ok {
+	if b, ok := values.ParseBoolLiteral(s); ok {
 		return b, nil
 	}
 
@@ -133,7 +134,7 @@ func parseDefaultValue(s string) (Value, error) {
 	}
 
 	// Check for number
-	if num, ok := ParseNumericLiteral(s); ok {
+	if num, ok := values.ParseNumericLiteral(s); ok {
 		return num, nil
 	}
 

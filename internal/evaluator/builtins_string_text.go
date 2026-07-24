@@ -109,13 +109,6 @@ func callBuiltinSplitBy(args []Value, e *ast.CallExpr) (Value, error) {
 	return result, nil
 }
 
-// looksLikeRegexPattern returns true if the pattern appears to be a regex.
-// This is used to decide whether to use regex or literal string matching.
-func looksLikeRegexPattern(pattern string) bool {
-	return strings.ContainsAny(pattern, "*+?()[]{}|^$\\") ||
-		(len(pattern) > 1 && strings.Contains(pattern, "."))
-}
-
 // callBuiltinLower implements the lower(string) function.
 func callBuiltinLower(args []Value, e *ast.CallExpr) (Value, error) {
 	text, err := requireOneStringArg(args, "lower", e)

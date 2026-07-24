@@ -42,7 +42,7 @@ func inferStageMapping(before, after string) []int {
 
 	oldStart, oldEnd := leftBefore, rightBefore
 	if oldStart > oldEnd {
-		anchor := clampIndex(oldStart, len(before))
+		anchor := sourcemap.ClampIndex(oldStart, len(before))
 		for i := leftAfter; i <= rightAfter; i++ {
 			out[i] = anchor
 		}
@@ -61,19 +61,6 @@ func inferStageMapping(before, after string) []int {
 	}
 
 	return out
-}
-
-func clampIndex(pos, length int) int {
-	if length <= 0 {
-		return 0
-	}
-	if pos < 0 {
-		return 0
-	}
-	if pos >= length {
-		return length - 1
-	}
-	return pos
 }
 
 func identityMapping(length int) []int {
