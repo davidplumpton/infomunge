@@ -54,13 +54,25 @@ func TestInclusiveRangeBounds(t *testing.T) {
 			expectedOK: false,
 		},
 		{
-			name:          "end beyond collection is clamped",
-			start:         1,
-			end:           4,
-			length:        3,
-			expectedStart: 1,
-			expectedEnd:   2,
-			expectedOK:    true,
+			name:       "negative start beyond collection",
+			start:      -4,
+			end:        1,
+			length:     3,
+			expectedOK: false,
+		},
+		{
+			name:       "end beyond collection",
+			start:      1,
+			end:        4,
+			length:     3,
+			expectedOK: false,
+		},
+		{
+			name:       "negative end beyond collection",
+			start:      1,
+			end:        -4,
+			length:     3,
+			expectedOK: false,
 		},
 	}
 

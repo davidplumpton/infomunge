@@ -128,7 +128,7 @@ func callBuiltinRangeIndex(args []Value, e *ast.CallExpr) (Value, error) {
 	case Array:
 		start, end, ok := inclusiveRangeBounds(start, end, len(value))
 		if !ok {
-			return Array{}, nil
+			return nil, nil
 		}
 		if start > end {
 			result := make(Array, 0, start-end+1)
@@ -142,7 +142,7 @@ func callBuiltinRangeIndex(args []Value, e *ast.CallExpr) (Value, error) {
 		runes := []rune(value)
 		start, end, ok := inclusiveRangeBounds(start, end, len(runes))
 		if !ok {
-			return "", nil
+			return nil, nil
 		}
 		if start > end {
 			result := make([]rune, 0, start-end+1)
@@ -178,19 +178,7 @@ func inclusiveRangeBounds(start, end, length int) (normalizedStart, normalizedEn
 	if end < 0 {
 		end += length
 	}
-	if start < 0 {
-		start = 0
-	}
-	if start > length {
-		start = length
-	}
-	if end < -1 {
-		end = -1
-	}
-	if end >= length {
-		end = length - 1
-	}
-	if start == length || end == -1 {
+	if start < 0 || start >= length || end < 0 || end >= length {
 		return 0, 0, false
 	}
 	return start, end, true

@@ -194,6 +194,29 @@ Feature: Array Indexing
       {"array":[2,1,0],"text":"x🙂é"}
       """
 
+  Scenario: Out-of-range bounds make ascending and descending range indexes null
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {
+        arrayEnd: [0, 1, 2][1 to 5],
+        arrayNegativeStart: [0, 1, 2][-5 to 1],
+        arrayStart: [0, 1, 2][5 to 7],
+        arrayDescending: [0, 1, 2][2 to -5],
+        textEnd: "é🙂x"[1 to 5],
+        textNegativeStart: "é🙂x"[-5 to 1],
+        textStart: "é🙂x"[5 to 7],
+        textDescending: "é🙂x"[2 to -5]
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"arrayEnd":null,"arrayNegativeStart":null,"arrayStart":null,"arrayDescending":null,"textEnd":null,"textNegativeStart":null,"textStart":null,"textDescending":null}
+      """
+
   Scenario: Computed range index end
     Given the following input content:
       """

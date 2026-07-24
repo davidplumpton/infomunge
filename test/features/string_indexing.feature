@@ -30,3 +30,14 @@ Feature: String Indexing
       """
       "é🙂"
       """
+
+  Scenario: Direct string indexes remain strict when out of range
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "é🙂x"[5]
+      """
+    When I run the application and it fails
+    Then the error should contain "string index out of bounds"
