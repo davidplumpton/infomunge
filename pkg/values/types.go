@@ -2,8 +2,11 @@ package values
 
 import (
 	"reflect"
+	"runtime"
 	"sort"
 	"sync"
+	"sync/atomic"
+	"weak"
 )
 
 // Value is the shared runtime value shape used by evaluation and format adapters.
@@ -19,11 +22,43 @@ type objectOrder struct {
 
 var objectOrders sync.Map
 
-func objectIdentity(object Object) uintptr {
+var objectOrderRegistrations atomic.Uint64
+
+const objectOrderSweepInterval = 64
+
+type objectOrderIdentity = weak.Pointer[byte]
+
+// objectIdentity uses the runtime map allocation as a weak registry key. Weak
+// pointers distinguish allocation generations, so a later map that reuses the
+// same address cannot observe the reclaimed map's order metadata.
+func objectIdentity(object Object) (objectOrderIdentity, *byte) {
 	if object == nil {
-		return 0
+		return objectOrderIdentity{}, nil
 	}
-	return reflect.ValueOf(object).Pointer()
+	pointer := (*byte)(reflect.ValueOf(object).UnsafePointer())
+	return weak.Make(pointer), pointer
+}
+
+func removeObjectOrder(identity objectOrderIdentity) {
+	objectOrders.Delete(identity)
+}
+
+func installObjectOrderCleanup(object Object, identity objectOrderIdentity, pointer *byte) {
+	runtime.AddCleanup(pointer, removeObjectOrder, identity)
+	if objectOrderRegistrations.Add(1)%objectOrderSweepInterval == 0 {
+		sweepDeadObjectOrders()
+	}
+	runtime.KeepAlive(object)
+}
+
+func sweepDeadObjectOrders() {
+	objectOrders.Range(func(key, _ any) bool {
+		identity := key.(objectOrderIdentity)
+		if identity.Value() == nil {
+			objectOrders.Delete(identity)
+		}
+		return true
+	})
 }
 
 // NewObject constructs an object whose insertion order is tracked.
@@ -35,12 +70,15 @@ func NewObject(capacity int) Object {
 
 // RegisterObjectOrder records the known key order for an object.
 func RegisterObjectOrder(object Object, keys []string) {
-	identity := objectIdentity(object)
-	if identity == 0 {
+	identity, pointer := objectIdentity(object)
+	if pointer == nil {
 		return
 	}
 	copied := append([]string(nil), keys...)
-	objectOrders.Store(identity, &objectOrder{keys: copied})
+	_, loaded := objectOrders.Swap(identity, &objectOrder{keys: copied})
+	if !loaded {
+		installObjectOrderCleanup(object, identity, pointer)
+	}
 }
 
 // SetObjectValue sets a field and records its first insertion position.
@@ -53,10 +91,13 @@ func SetObjectValue(object Object, key string, value Value) {
 	if existed {
 		return
 	}
-	identity := objectIdentity(object)
+	identity, pointer := objectIdentity(object)
 	recordValue, loaded := objectOrders.Load(identity)
 	if !loaded {
-		recordValue, _ = objectOrders.LoadOrStore(identity, &objectOrder{})
+		recordValue, loaded = objectOrders.LoadOrStore(identity, &objectOrder{})
+		if !loaded {
+			installObjectOrderCleanup(object, identity, pointer)
+		}
 	}
 	record := recordValue.(*objectOrder)
 	record.mu.Lock()
@@ -70,7 +111,7 @@ func ObjectKeys(object Object) []string {
 	if object == nil {
 		return nil
 	}
-	identity := objectIdentity(object)
+	identity, _ := objectIdentity(object)
 	if recordValue, ok := objectOrders.Load(identity); ok {
 		record := recordValue.(*objectOrder)
 		record.mu.RLock()
