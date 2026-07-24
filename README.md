@@ -137,7 +137,8 @@ Key entrypoint: `internal/runner/runner.go`.
   `pkg/formats/options_dispatch.go`
 - Module loading behavior: `internal/runner/module_loader.go`
 
-See `docs/ARCHITECTURE.md`, `docs/EXTENDING.md`, and `docs/TESTING.md` for details.
+See the [documentation index](docs/README.md) for current user and contributor
+guides.
 
 ### Example: Define a function to flatten a list
 
@@ -195,8 +196,9 @@ go test -v ./test -run TestFeatures -count=1 -timeout 5m \
 go tool cover -func=tmp/cucumber.cover | tail -n 1
 ```
 
-See [docs/TESTING.md](docs/TESTING.md) for the authoritative test and coverage
-workflows, including the package-level coverage summary.
+See [docs/TESTING.md](docs/TESTING.md) for the authoritative test,
+intensive-testing, and coverage workflows, including the package-level coverage
+summary.
 
 ### Version Control
 

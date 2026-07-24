@@ -1,88 +1,59 @@
-# While Loop Implementation Design
+# While Loops
 
-## Overview
+InfoMunge supports stateful `while` loops in script bodies.
 
-While loops will be added to InfoMunge to support iteration with state management. The implementation follows the same pattern as `if/else` expressions, transforming DataWeave-like syntax into Go-compatible function calls.
+## Syntax
 
-## Architecture
-
-### 1. Syntax
-
-```
-while(condition) {
-  body;
-  var = var + 1
+```im
+var i = 0
+var result = []
+---
+while (i < 3) {
+  result = result + [i]
+  i = i + 1
 }
+result
 ```
 
-### 2. Transformation Pipeline
+This script returns `[0,1,2]`. Statements in the loop body run in order, and
+assignments update variables for later statements and iterations.
 
-**Preprocessor** (`internal/preprocessor/preprocessor.go`) will transform:
-```
-while(x < 10) {
-  x = x + 1
+The condition must evaluate to a Boolean. It is checked before every iteration,
+so a false initial condition skips the body.
+
+## Control Flow
+
+`break` exits the nearest loop. `continue` skips the rest of the current body
+and begins the next condition check:
+
+```im
+var i = 0
+var result = []
+---
+while (i < 5) {
+  i = i + 1
+  if (i == 3) continue
+  result = result + [i]
 }
+result
 ```
 
-Into a function call:
-```
-__while(x < 10, (): {
-  x = x + 1
-})
-```
+This returns `[1,2,4,5]`. Nested loops keep their own `break` and `continue`
+handling.
 
-Note: The body is passed as a lambda closure to maintain variable scope.
+## Result
 
-### 3. Evaluator Implementation
+A loop expression returns the last completed body result. It returns `null`
+when the body never completes an iteration or the loop exits with `break`
+before producing a body result. Scripts commonly read an updated variable
+after the loop instead of using the loop expression directly.
 
-**Evaluator** (`internal/evaluator/evaluator.go`, `internal/evaluator/builtins_control_flow.go`, and `internal/evaluator/modular_registry.go`) implements `__while` as a special builtin that:
+## Timeouts
 
-1. Evaluates the condition
-2. If true, executes the body (which updates variables in context)
-3. Re-evaluates the condition
-4. Repeats until condition is false or a `break` statement is encountered
-5. Returns the result of the last body expression
+Loop evaluation uses the caller's execution-context deadline when one is
+present. Without a caller deadline, a loop has a 30-second default deadline.
+This prevents an unbounded loop from running forever. The Godog harness uses a
+shorter per-scenario deadline and lets timeout scenarios override it explicitly.
 
-### 4. Key Design Decisions
-
-- **State Management**: Variables modified in the loop body must persist across iterations. This requires mutable context variables.
-- **Break/Continue**: These control flow statements must be implemented as special error/signal types that propagate up.
-- **Timeout Protection**: Tests enforce a 5-second timeout by default to prevent infinite loops.
-- **Lambda Closure**: The body is represented as a lambda to handle variable scoping naturally.
-
-### 5. Related Features for Future Work
-
-- `do...while` - executes body at least once before checking condition
-- Counter variable shorthand (e.g., `for(i = 0; i < 10; i++)`)
-
-## Testing Strategy
-
-Feature file: `test/features/while_loops.feature` includes scenarios for:
-1. Basic while loop counting
-2. Collection accumulation
-3. Break/continue statements  
-4. Early termination
-5. Infinite loop timeout protection
-
-All tests run with default 5-second timeout via the test harness in `test/godog_test.go`.
-
-## Implementation Order
-
-1. ✅ Test infrastructure with timeout (COMPLETE)
-2. ✅ Preprocessor handler for `while` syntax (COMPLETE - basic parsing done)
-3. ✅ `__while` builtin in evaluator
-4. ✅ Assignment expression support
-5. ✅ Break/continue control flow signals
-6. ✅ Feature test scenarios
-
-## Status Notes
-
-Assignment expressions are supported by rewriting `x = y` into `__assign("x", y)` and mutating the evaluation context. Break/continue are implemented via control-flow signals that the while builtin handles.
-
-## Complexity Considerations
-
-- **Variable Mutation**: The biggest complexity is handling mutable state. Variables must be modified in-place in the context map during loop execution.
-  - Solution: Add `__assign(varName, value)` builtin that mutates context
-- **Control Flow**: Break/continue require a signal mechanism (similar to exceptions).
-- **Nested Loops**: Must support loops within loops with proper variable scoping.
-- **Infinite Loop Protection**: Timeout in test harness prevents test hangs, but long-running scripts will need progress tracking.
+Behavioral coverage lives in `test/features/while_loops.feature`; preprocessing
+and evaluator edge cases also have focused Go tests.

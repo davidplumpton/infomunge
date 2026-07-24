@@ -1,15 +1,12 @@
 Feature: While Loops
 
-  # While loop tests - NOTE: While loops are not yet implemented
-  # These test scenarios define the expected behavior once while loops are added
-
   Scenario: Simple while loop that counts up
     Given the following script:
       """
       var i = 0
       ---
-      while(i < 5) { 
-        i = i + 1 
+      while(i < 5) {
+        i = i + 1
       }
       i
       """

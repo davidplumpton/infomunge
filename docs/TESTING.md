@@ -17,9 +17,65 @@ INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/mutation -run TestMutatedCor
 ```
 
 Targeted packages:
+
 - `internal/evaluator/*_test.go`
 - `internal/preprocessor/*_test.go`
 - `pkg/formats/*_test.go`
+
+## Intensive Expression Testing
+
+The intensive-testing system exercises source expressions through the full
+preprocess, parse, evaluate, and format pipeline. Its implementation is under
+`internal/testing`:
+
+- `exprgen` builds bounded, source-level expressions and payload contexts.
+- `properties` checks no-panic, determinism, algebraic, structural, type, and
+  JSON round-trip properties.
+- `mutation` extracts scripts from the Godog corpus and applies reproducible
+  source mutations.
+- `differential` compares the compatible expression subset with the DataWeave
+  CLI using normalized, path-aware structural comparison. It skips when `dw`
+  is not on `PATH`.
+- `failures` deduplicates minimized findings and produces reviewable candidate
+  Godog scenarios.
+- `metrics` reports failure, shrinking, mutation, promotion, panic, and optional
+  coverage measurements.
+
+Run the bounded property, mutation, and differential packages:
+
+```bash
+make test-intensive
+```
+
+Run each Go fuzz target for its short local budget:
+
+```bash
+make test-fuzz
+```
+
+Run the extended property/mutation/differential budgets and fuzz targets:
+
+```bash
+make test-soak
+```
+
+The soak target is intentionally a long-running local workflow. The regular
+repository suite does not enable it.
+
+### Failure Review
+
+Findings are stored beneath `tmp/intensive-testing/` regardless of the package
+working directory:
+
+- `failures/` contains sequential JSON artifacts deduplicated by property and
+  minimized-expression fingerprint.
+- `candidates/` contains generated `.feature` scenario drafts for human review.
+- `report.json` contains the latest metrics and history.
+
+Candidate scenarios are starting points, not automatic regressions. Confirm the
+finding, replace the placeholder assertion with the exact expected result or
+error, move the scenario into the appropriate file under `test/features`, and
+run that focused feature before committing it.
 
 ## Feature Tests (Godog)
 
