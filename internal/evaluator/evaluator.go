@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"math"
+	"math/big"
 	"reflect"
 	"strconv"
 	"strings"
@@ -337,8 +338,10 @@ func add(left, right Value) (Value, error) {
 		}
 	}
 
+	if l, r, ok := BothInts(left, right); ok {
+		return checkedIntOp(l, r, "addition")
+	}
 	return numericOp(left, right,
-		func(l, r int) int { return l + r },
 		func(l, r float64) float64 { return l + r },
 		"addition", "add")
 }
@@ -358,16 +361,20 @@ func sub(left, right Value) (Value, error) {
 		}
 	}
 
+	if l, r, ok := BothInts(left, right); ok {
+		return checkedIntOp(l, r, "subtraction")
+	}
 	return numericOp(left, right,
-		func(l, r int) int { return l - r },
 		func(l, r float64) float64 { return l - r },
 		"subtraction", "subtract")
 }
 
 // mul performs multiplication
 func mul(left, right Value) (Value, error) {
+	if l, r, ok := BothInts(left, right); ok {
+		return checkedIntOp(l, r, "multiplication")
+	}
 	return numericOp(left, right,
-		func(l, r int) int { return l * r },
 		func(l, r float64) float64 { return l * r },
 		"multiplication", "multiply")
 }
@@ -381,10 +388,10 @@ func quo(left, right Value) (Value, error) {
 	if r, ok := right.(float64); ok && r == 0 {
 		return nil, unifiederrors.EvalError("division by zero")
 	}
-	return numericOp(left, right,
-		func(l, r int) int { return l / r },
-		func(l, r float64) float64 { return l / r },
-		"division", "divide")
+	if l, r, ok := BothInts(left, right); ok {
+		return exactIntDivision(l, r)
+	}
+	return numericOp(left, right, func(l, r float64) float64 { return l / r }, "division", "divide")
 }
 
 // land performs logical AND operation
@@ -409,22 +416,22 @@ func lor(left, right Value) (Value, error) {
 
 // lss performs < comparison
 func lss(left, right Value) (Value, error) {
-	return numericCompare(left, right, func(l, r float64) bool { return l < r }, "<")
+	return numericCompare(left, right, func(cmp int) bool { return cmp < 0 }, "<")
 }
 
 // gtr performs > comparison
 func gtr(left, right Value) (Value, error) {
-	return numericCompare(left, right, func(l, r float64) bool { return l > r }, ">")
+	return numericCompare(left, right, func(cmp int) bool { return cmp > 0 }, ">")
 }
 
 // leq performs <= comparison
 func leq(left, right Value) (Value, error) {
-	return numericCompare(left, right, func(l, r float64) bool { return l <= r }, "<=")
+	return numericCompare(left, right, func(cmp int) bool { return cmp <= 0 }, "<=")
 }
 
 // geq performs >= comparison
 func geq(left, right Value) (Value, error) {
-	return numericCompare(left, right, func(l, r float64) bool { return l >= r }, ">=")
+	return numericCompare(left, right, func(cmp int) bool { return cmp >= 0 }, ">=")
 }
 
 // prepend implements the >> operator: element >> array → [element, ...array]
@@ -459,6 +466,9 @@ func negate(val Value) (Value, error) {
 	case float64:
 		return -v, nil
 	case int:
+		if v == minInt() {
+			return nil, unifiederrors.EvalError("integer overflow during negation")
+		}
 		return -v, nil
 	default:
 		return nil, unifiederrors.EvalErrorf("cannot negate %T", val)
@@ -475,14 +485,13 @@ func not(val Value) (Value, error) {
 
 // Helper functions
 
-// numericOp performs a numeric operation with automatic type coercion.
-func numericOp(left, right Value, intOp func(int, int) int, floatOp func(float64, float64) float64, opName, verb string) (Value, error) {
-	// Prefer int arithmetic for precision when both operands are ints
-	if l, r, ok := BothInts(left, right); ok {
-		return intOp(l, r), nil
+// numericOp performs a float or mixed numeric operation. Integer-only
+// arithmetic is handled separately so it cannot silently wrap.
+func numericOp(left, right Value, floatOp func(float64, float64) float64, opName, verb string) (Value, error) {
+	if hasInexactFloatInt(left, right) {
+		return exactMixedNumericOp(left, right, opName)
 	}
 
-	// Fall back to float64 for mixed int/float operations
 	if l, r, ok := BothFloats(left, right); ok {
 		result := floatOp(l, r)
 		if err := validateFloat(result, opName); err != nil {
@@ -494,12 +503,131 @@ func numericOp(left, right Value, intOp func(int, int) int, floatOp func(float64
 	return nil, unifiederrors.EvalErrorf("cannot %s %T and %T", verb, left, right)
 }
 
-// numericCompare performs a numeric comparison with automatic type coercion.
-func numericCompare(left, right Value, op func(float64, float64) bool, opName string) (Value, error) {
-	if l, r, ok := BothFloats(left, right); ok {
-		return op(l, r), nil
+// numericCompare uses the exact rational values represented by ints and
+// float64s, avoiding lossy int-to-float coercion above 2^53.
+func numericCompare(left, right Value, op func(int) bool, opName string) (Value, error) {
+	l, okL := exactNumericRat(left)
+	r, okR := exactNumericRat(right)
+	if okL && okR {
+		return op(l.Cmp(r)), nil
 	}
 	return nil, unifiederrors.EvalErrorf("cannot compare %T and %T with %s", left, right, opName)
+}
+
+func checkedIntOp(left, right int, opName string) (Value, error) {
+	l := big.NewInt(int64(left))
+	r := big.NewInt(int64(right))
+	result := new(big.Int)
+	switch opName {
+	case "addition":
+		result.Add(l, r)
+	case "subtraction":
+		result.Sub(l, r)
+	case "multiplication":
+		result.Mul(l, r)
+	default:
+		return nil, unifiederrors.EvalErrorf("unsupported integer operation %s", opName)
+	}
+	if !result.IsInt64() || int64(int(result.Int64())) != result.Int64() {
+		return nil, unifiederrors.EvalErrorf("integer overflow during %s", opName)
+	}
+	return int(result.Int64()), nil
+}
+
+func exactIntDivision(left, right int) (Value, error) {
+	result := new(big.Rat).SetFrac(big.NewInt(int64(left)), big.NewInt(int64(right)))
+	if result.IsInt() {
+		if !result.Num().IsInt64() {
+			return nil, unifiederrors.EvalError("integer overflow during division")
+		}
+		n := result.Num().Int64()
+		if int64(int(n)) != n {
+			return nil, unifiederrors.EvalError("integer overflow during division")
+		}
+		return int(n), nil
+	}
+	quotient, exact := result.Float64()
+	if !exact && (!intExactlyRepresentableAsFloat(left) || !intExactlyRepresentableAsFloat(right)) {
+		return nil, unifiederrors.EvalError("numeric precision loss during division")
+	}
+	if err := validateFloat(quotient, "division"); err != nil {
+		return nil, err
+	}
+	return quotient, nil
+}
+
+func exactMixedNumericOp(left, right Value, opName string) (Value, error) {
+	l, okL := exactNumericRat(left)
+	r, okR := exactNumericRat(right)
+	if !okL || !okR {
+		return nil, unifiederrors.EvalErrorf("cannot apply %s to %T and %T", opName, left, right)
+	}
+
+	result := new(big.Rat)
+	switch opName {
+	case "addition":
+		result.Add(l, r)
+	case "subtraction":
+		result.Sub(l, r)
+	case "multiplication":
+		result.Mul(l, r)
+	case "division":
+		if r.Sign() == 0 {
+			return nil, unifiederrors.EvalError("division by zero")
+		}
+		result.Quo(l, r)
+	default:
+		return nil, unifiederrors.EvalErrorf("unsupported numeric operation %s", opName)
+	}
+
+	if result.IsInt() && result.Num().IsInt64() {
+		n := result.Num().Int64()
+		if int64(int(n)) == n {
+			return int(n), nil
+		}
+	}
+	f, exact := result.Float64()
+	if !exact {
+		return nil, unifiederrors.EvalErrorf("numeric precision loss during %s", opName)
+	}
+	if err := validateFloat(f, opName); err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+func hasInexactFloatInt(left, right Value) bool {
+	for _, value := range []Value{left, right} {
+		if n, ok := value.(int); ok && !intExactlyRepresentableAsFloat(n) {
+			return true
+		}
+	}
+	return false
+}
+
+func intExactlyRepresentableAsFloat(value int) bool {
+	asInt := new(big.Rat).SetInt64(int64(value))
+	asFloat := new(big.Rat)
+	asFloat.SetFloat64(float64(value))
+	return asInt.Cmp(asFloat) == 0
+}
+
+func exactNumericRat(value Value) (*big.Rat, bool) {
+	switch n := value.(type) {
+	case int:
+		return new(big.Rat).SetInt64(int64(n)), true
+	case float64:
+		if math.IsNaN(n) || math.IsInf(n, 0) {
+			return nil, false
+		}
+		return new(big.Rat).SetFloat64(n), true
+	default:
+		return nil, false
+	}
+}
+
+func minInt() int {
+	return -int(^uint(0)>>1) - 1
 }
 
 // validateFloat checks if float result is valid
@@ -680,9 +808,10 @@ func numericEquals(left, right Value) bool {
 		return true
 	}
 
-	leftNum, rightNum, ok := BothFloats(left, right)
-	if ok {
-		return leftNum == rightNum
+	leftNum, leftOK := exactNumericRat(left)
+	rightNum, rightOK := exactNumericRat(right)
+	if leftOK && rightOK {
+		return leftNum.Cmp(rightNum) == 0
 	}
 
 	return false

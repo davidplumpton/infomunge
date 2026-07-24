@@ -16,6 +16,7 @@ func TestParseNumericLiteral(t *testing.T) {
 		{name: "negative integer with whitespace", input: " -7 ", want: -7, ok: true},
 		{name: "decimal", input: "3.5", want: 3.5, ok: true},
 		{name: "exponent", input: "1e3", want: 1000.0, ok: true},
+		{name: "overflowing integer is not rounded to float", input: "9223372036854775808", ok: false},
 		{name: "empty", input: " ", ok: false},
 		{name: "trailing text", input: "12px", ok: false},
 		{name: "multiple signs", input: "--1", ok: false},

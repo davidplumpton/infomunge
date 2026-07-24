@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -13,7 +14,8 @@ func TestEvaluate_Arithmetic(t *testing.T) {
 		{"int addition", "2 + 3", 5},
 		{"int subtraction", "10 - 4", 6},
 		{"int multiplication", "3 * 4", 12},
-		{"int division", "15 / 3", 5},
+		{"exact int division", "15 / 3", 5},
+		{"fractional int division", "5 / 2", 2.5},
 		{"float addition", "1.5 + 2.5", 4.0},
 		{"float subtraction", "5.0 - 2.0", 3.0},
 		{"float multiplication", "2.0 * 3.0", 6.0},
@@ -38,6 +40,51 @@ func TestEvaluate_Arithmetic(t *testing.T) {
 			}
 			if result != tt.expected {
 				t.Errorf("expected %v (%T), got %v (%T)", tt.expected, tt.expected, result, result)
+			}
+		})
+	}
+}
+
+func TestEvaluate_ExactNumericSemantics(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected Value
+	}{
+		{"large int differs from rounded float", "9007199254740993 == 9007199254740992.0", false},
+		{"large int orders after rounded float", "9007199254740993 > 9007199254740992.0", true},
+		{"adding decimal zero preserves large int", "9007199254740993 + 0.0", 9007199254740993},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(tt.expr, Context{}, nil, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Fatalf("expected %v (%T), got %v (%T)", tt.expected, tt.expected, result, result)
+			}
+		})
+	}
+}
+
+func TestEvaluate_IntegerOverflowIsExplicit(t *testing.T) {
+	tests := []string{
+		"9223372036854775807 + 1",
+		"-9223372036854775807 - 2",
+		"9223372036854775807 * 2",
+		"(-9223372036854775807 - 1) / -1",
+	}
+
+	for _, expr := range tests {
+		t.Run(expr, func(t *testing.T) {
+			_, err := Evaluate(expr, Context{}, nil, 0, expr)
+			if err == nil {
+				t.Fatal("expected overflow error")
+			}
+			if !strings.Contains(err.Error(), "integer overflow") {
+				t.Fatalf("expected integer overflow error, got %v", err)
 			}
 		})
 	}

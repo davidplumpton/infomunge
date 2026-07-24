@@ -16,6 +16,9 @@ func ParseNumericLiteral(s string) (Value, bool) {
 		if iv, err := strconv.Atoi(s); err == nil {
 			return iv, true
 		}
+		// Integer-shaped values that do not fit must not silently fall back to
+		// an imprecise float.
+		return nil, false
 	}
 
 	if fv, err := strconv.ParseFloat(s, 64); err == nil {
