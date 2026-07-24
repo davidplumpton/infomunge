@@ -187,6 +187,13 @@ The bounded repo-wide command skips the mutation corpus soak by default. Run the
 INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/mutation -run TestMutatedCorpusExpressions_NoPanics_AndDeterministic -timeout 30m
 ```
 
+When the external DataWeave CLI is installed, the bounded suite runs 50
+differential comparisons. Run the larger 500-comparison budget explicitly:
+
+```bash
+make test-differential-soak
+```
+
 Generate coverage from cucumber tests (runtime-focused packages):
 
 ```bash

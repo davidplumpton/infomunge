@@ -9,6 +9,11 @@ import (
 	"strings"
 )
 
+const (
+	defaultDiffChecks = 50
+	soakDiffChecks    = 500
+)
+
 // SoakEnabled returns true when INTENSIVE_TEST_SOAK is set.
 func SoakEnabled() bool {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv("INTENSIVE_TEST_SOAK")))
@@ -40,11 +45,13 @@ func StructuralChecks() int {
 }
 
 // DiffChecks returns the rapid iteration count for differential comparison tests.
+// Each check starts an external DataWeave CLI process, so this budget is lower
+// than the in-process property-test budgets.
 func DiffChecks() int {
 	if SoakEnabled() {
-		return 50000
+		return soakDiffChecks
 	}
-	return 500
+	return defaultDiffChecks
 }
 
 // MutationSampleSize returns the number of corpus entries to sample.

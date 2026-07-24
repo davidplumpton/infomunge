@@ -13,6 +13,18 @@ func TestMakefileTestUnitCoversRepositoryUnitPackages(t *testing.T) {
 	}
 }
 
+func TestMakefileDifferentialSoakHasExplicitLargerBudget(t *testing.T) {
+	targets, err := readMakefileTargets("../Makefile")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const expectedCommand = "INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/differential/ -timeout 15m"
+	if commands := targets["test-differential-soak"]; !containsString(commands, expectedCommand) {
+		t.Fatalf("Makefile target %q should include %q, got %v", "test-differential-soak", expectedCommand, commands)
+	}
+}
+
 func (tc *testContext) theMakefileUnitTargetShouldCoverRepresentativeRepositoryUnitPackages() error {
 	return validateMakefileTestUnitTarget()
 }

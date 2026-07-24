@@ -1,4 +1,4 @@
-.PHONY: build test test-verbose test-failures test-feature test-unit test-intensive test-fuzz test-soak playground playground-wasm playground-wasm-serve clean
+.PHONY: build test test-verbose test-failures test-feature test-unit test-intensive test-fuzz test-differential-soak test-soak playground playground-wasm playground-wasm-serve clean
 
 # Build the infomunge binary
 build:
@@ -31,6 +31,10 @@ test-fuzz:
 	go test ./internal/testing/properties/ -fuzz=FuzzExprDeep -fuzztime=30s -timeout 2m
 	go test ./internal/preprocessor/ -fuzz=FuzzPrepareForParsing -fuzztime=30s -timeout 2m
 	go test ./internal/preprocessor/ -fuzz=FuzzExtractHeaderAndBody -fuzztime=30s -timeout 2m
+
+# Run the larger external DataWeave comparison budget.
+test-differential-soak:
+	INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/differential/ -timeout 15m
 
 # Run soak tests locally (full budget, INTENSIVE_TEST_SOAK=1)
 test-soak:
