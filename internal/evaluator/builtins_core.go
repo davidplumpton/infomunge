@@ -120,7 +120,11 @@ func parseDefaultValue(s string) (Value, error) {
 
 	// Check for quoted string
 	if strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\"") && len(s) >= 2 {
-		return s[1 : len(s)-1], nil
+		unquoted, err := strconv.Unquote(s)
+		if err != nil {
+			return nil, unifiederrors.EvalErrorf("invalid string literal: %v", err)
+		}
+		return unquoted, nil
 	}
 
 	// Check for boolean

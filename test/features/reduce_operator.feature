@@ -284,6 +284,47 @@ Feature: Reduce Operator
       24
       """
 
+  Scenario: Reduce decodes escapes in a string initial value
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [] reduce (x, acc = "line1\nline2\t\"quoted\"\\path\u263A") -> acc
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      "line1\nline2\t\"quoted\"\\path☺"
+      """
+
+  Scenario: Reduce decodes escapes in nested initial values
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [] reduce (x, acc = ["a\tb", {message: "hello\nworld", nested: ["x\u263Ay", "\\"]}]) -> acc
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["a\tb",{"message":"hello\nworld","nested":["x☺y","\\"]}]
+      """
+
+  Scenario: Reduce rejects a malformed escape in an initial value
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [] reduce (x, acc = "bad\q") -> acc
+      """
+    When I run the application and it fails
+    Then the output should contain "invalid default value for parameter acc"
+    And the output should contain "invalid string literal"
+    And the output should contain "4:11"
+
   Scenario: Reduce empty array without initial value raises error
     Given the following input content:
       """
