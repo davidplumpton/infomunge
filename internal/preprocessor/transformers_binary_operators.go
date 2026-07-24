@@ -109,8 +109,8 @@ type binaryOperatorScanOverrides struct {
 
 var binaryOperatorScanOverridesByKey = map[string]binaryOperatorScanOverrides{
 	binaryOpMod: {
-		leftOperandStart:   findMultiplicativeLeftOperandStartBytes,
-		rightStopPredicate: shouldStopMultiplicativeRightOperand,
+		leftOperandStart:   findModuloLeftOperandStartBytes,
+		rightStopPredicate: shouldStopModuloRightOperand,
 	},
 }
 

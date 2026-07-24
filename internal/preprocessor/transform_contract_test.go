@@ -65,6 +65,28 @@ func TestFunctionalContractsUseExactTypedOperatorMappings(t *testing.T) {
 	}
 }
 
+func TestModContractDeclaresDataWeavePrecedence(t *testing.T) {
+	contract, ok := findTransformContract(functionalProcessingContracts(), "replaceModOperator")
+	if !ok {
+		t.Fatal("missing replaceModOperator contract")
+	}
+	if contract.Precedence != TransformPrecedenceModulo {
+		t.Fatalf("mod precedence = %d, want %d", contract.Precedence, TransformPrecedenceModulo)
+	}
+	if contract.Associativity != TransformAssociativityLeft {
+		t.Fatalf("mod associativity = %q, want %q", contract.Associativity, TransformAssociativityLeft)
+	}
+	if !(TransformPrecedenceComparison < contract.Precedence &&
+		contract.Precedence < TransformPrecedenceAdditive) {
+		t.Fatalf(
+			"mod precedence %d should be between comparison %d and additive %d",
+			contract.Precedence,
+			TransformPrecedenceComparison,
+			TransformPrecedenceAdditive,
+		)
+	}
+}
+
 func TestConfiguredBinaryOperatorsPreserveMixedLeftAssociativity(t *testing.T) {
 	tests := []struct {
 		name     string

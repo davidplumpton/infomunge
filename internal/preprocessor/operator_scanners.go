@@ -81,10 +81,11 @@ func findTypedOperatorLeftOperandStartBytes(result []byte) int {
 	return leftStart
 }
 
-// findMultiplicativeLeftOperandStartBytes includes earlier multiplicative
-// operators in the left operand while stopping at lower-precedence operators.
-// Unary signs remain part of the multiplicative chain.
-func findMultiplicativeLeftOperandStartBytes(result []byte) int {
+// findModuloLeftOperandStartBytes includes additive and multiplicative
+// arithmetic in the left operand. DataWeave's infix mod binds less tightly
+// than those operators, but more tightly than comparisons and logical
+// operators.
+func findModuloLeftOperandStartBytes(result []byte) int {
 	pos := len(result) - 1
 	for pos >= 0 && isWhitespace(result[pos]) {
 		pos--
@@ -109,7 +110,7 @@ func findMultiplicativeLeftOperandStartBytes(result []byte) int {
 			continue
 		}
 
-		if depth == 0 && isMultiplicativeLeftBoundary(result, pos) {
+		if depth == 0 && isModuloLeftBoundary(result[pos]) {
 			return pos + 1
 		}
 
@@ -128,10 +129,8 @@ func findMultiplicativeLeftOperandStartBytes(result []byte) int {
 	return 0
 }
 
-func isMultiplicativeLeftBoundary(input []byte, pos int) bool {
-	switch input[pos] {
-	case '+', '-':
-		return !isUnarySignBytes(input, pos, 0)
+func isModuloLeftBoundary(ch byte) bool {
+	switch ch {
 	case '=', '<', '>', '!', '&', '|', ',', ';', ':', '(', '[', '{':
 		return true
 	default:
@@ -139,33 +138,9 @@ func isMultiplicativeLeftBoundary(input []byte, pos int) bool {
 	}
 }
 
-func isUnarySignBytes(input []byte, pos, operandStart int) bool {
-	previous := pos - 1
-	for previous >= operandStart && isWhitespace(input[previous]) {
-		previous--
-	}
-	if previous < operandStart {
-		return true
-	}
-
-	switch input[previous] {
-	case '+', '-', '*', '/', '%', '=', '<', '>', '!', '&', '|', ',', ';', ':', '(', '[', '{':
-		return true
-	default:
-		return false
-	}
-}
-
-func shouldStopMultiplicativeRightOperand(input string, pos, operandStart int) bool {
+func shouldStopModuloRightOperand(input string, pos, _ int) bool {
 	switch input[pos] {
-	case '+', '-':
-		return !isUnarySignBytes([]byte(input), pos, operandStart)
-	case '*':
-		// Exponentiation binds more tightly. It is normally rewritten before
-		// this scanner runs, but retaining it here keeps the boundary correct
-		// when the helper is exercised directly.
-		return !((pos > 0 && input[pos-1] == '*') || (pos+1 < len(input) && input[pos+1] == '*'))
-	case '/', '%', '=', '<', '>', '!', '&', '|', ';', ':':
+	case '=', '<', '>', '!', '&', '|', ';', ':':
 		return true
 	default:
 		return false

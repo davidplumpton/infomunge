@@ -355,18 +355,18 @@ Feature: Operator transformer rewrite coverage
     When I run the script
     Then the output should be true
 
-  Scenario: Infix mod preserves multiplicative associativity and parentheses
+  Scenario: Infix mod uses DataWeave precedence and preserves parentheses
     Given the following script:
       """
       %im 0.1
       output application/json
       ---
-      [8 / 4 mod 3, 8 * 4 mod 3, 20 % 6 mod 4, 20 mod 6 mod 4, 20 mod 6 * 4, 20 mod 6 / 4, 20 mod 6 % 4, (8 / 4) mod 3, 8 / (4 mod 3)]
+      [5 mod 2 * 2, 5 - 2 mod 2, 20 mod 6 / 2, 8 / 4 mod 3, 20 % 6 mod 4, 20 mod 6 mod 4, 20 mod 6 * 4, 20 mod 6 % 4, (8 / 4) mod 3, 8 / (4 mod 3), (5 mod 2) * 2, 5 - (2 mod 2)]
       """
     When I run the script
     Then the output should be:
       """
-      [2,2,2,2,8,0.5,2,2,8]
+      [1,1,2,2,2,2,20,0,2,8,2,5]
       """
 
   # --- Infix repeat operator ---

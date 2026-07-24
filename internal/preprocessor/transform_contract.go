@@ -64,6 +64,9 @@ const (
 	TransformPrecedenceCollection
 	TransformPrecedenceType
 	TransformPrecedenceComparison
+	// TransformPrecedenceModulo matches DataWeave's infix mod operator:
+	// it binds less tightly than additive and multiplicative arithmetic.
+	TransformPrecedenceModulo
 	TransformPrecedenceAdditive
 	TransformPrecedenceMultiplicative
 	TransformPrecedencePower

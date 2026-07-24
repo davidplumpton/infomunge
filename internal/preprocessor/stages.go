@@ -182,7 +182,7 @@ func functionalProcessingContracts() []TransformContract {
 		inferredTransform("replaceExponentOperator", TransformPhaseFunctional, 270, TransformLoopFixpoint, replaceExponentOperator),
 		configuredBinaryOperatorTransform("replaceMatchOperator", TransformPhaseFunctional, 280, binaryOpMatch, TransformPrecedenceComparison, TransformAssociativityLeft),
 		configuredBinaryOperatorTransform("replaceMatchesOperator", TransformPhaseFunctional, 290, binaryOpMatches, TransformPrecedenceComparison, TransformAssociativityLeft),
-		configuredBinaryOperatorTransform("replaceModOperator", TransformPhaseFunctional, 300, binaryOpMod, TransformPrecedenceMultiplicative, TransformAssociativityLeft),
+		configuredBinaryOperatorTransform("replaceModOperator", TransformPhaseFunctional, 300, binaryOpMod, TransformPrecedenceModulo, TransformAssociativityLeft),
 		configuredBinaryOperatorTransform("replaceRepeatOperator", TransformPhaseFunctional, 310, binaryOpRepeat, TransformPrecedenceMultiplicative, TransformAssociativityLeft),
 		inferredTransform("replaceSubstringOperator", TransformPhaseFunctional, 320, TransformLoopFixpoint, replaceSubstringOperator),
 		inferredTransform("replaceContainsMethodCall", TransformPhaseFunctional, 330, TransformLoopFixpoint, replaceContainsMethodCall),

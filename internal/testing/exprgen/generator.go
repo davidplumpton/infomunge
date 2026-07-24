@@ -127,10 +127,15 @@ func allWeightedBinaryOps() []string {
 // dwIncompatibleOps lists binary operators that have different syntax or
 // semantics in DataWeave and should be excluded from DW-compatible generation.
 var dwIncompatibleOps = map[string]bool{
-	"%":  true, // DW uses "mod" keyword
 	"++": true, // concatenation semantics may differ
 	"**": true, // DW uses pow() function
 	"~=": true, // infomunge-specific regex match
+}
+
+// dwOperatorReplacements keeps equivalent operators in differential
+// generation when DataWeave spells them differently.
+var dwOperatorReplacements = map[string]string{
+	"%": "mod",
 }
 
 // exprConfig controls expression generation behavior. The zero value produces
@@ -155,6 +160,10 @@ func (c exprConfig) filterOps(ops []string) []string {
 	}
 	var result []string
 	for _, op := range ops {
+		if replacement, ok := dwOperatorReplacements[op]; ok {
+			result = append(result, replacement)
+			continue
+		}
 		if !dwIncompatibleOps[op] {
 			result = append(result, op)
 		}
