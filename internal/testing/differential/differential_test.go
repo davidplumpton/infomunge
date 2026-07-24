@@ -63,7 +63,7 @@ func TestDifferential_InfomungeVsDataWeave(t *testing.T) {
 				Expected:            dwResult,
 				Actual:              imResult,
 			}
-			if _, _, saveErr := failures.SaveArtifact(artifact); saveErr != nil {
+			if _, saveErr := failures.SaveArtifact(artifact); saveErr != nil {
 				t.Logf("failed to save artifact: %v", saveErr)
 			}
 

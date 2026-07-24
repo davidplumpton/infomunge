@@ -32,31 +32,41 @@ type Artifact struct {
 	Fingerprint         string      `json:"fingerprint"`
 }
 
+// SaveResult describes the canonical artifact selected by persistence.
+type SaveResult struct {
+	Artifact Artifact
+	Path     string
+	Saved    bool
+}
+
 // SaveArtifact writes an artifact JSON file to tmp/intensive-testing/failures.
-// If an artifact with the same fingerprint already exists, it is skipped.
-func SaveArtifact(a Artifact) (string, bool, error) {
+// It returns the canonical artifact, including its assigned ID. If an artifact
+// with the same fingerprint already exists, that artifact is returned and no
+// new file is written.
+func SaveArtifact(a Artifact) (SaveResult, error) {
 	dir, err := teststore.Path("failures")
 	if err != nil {
-		return "", false, fmt.Errorf("resolve failures dir: %w", err)
+		return SaveResult{}, fmt.Errorf("resolve failures dir: %w", err)
 	}
 	return SaveArtifactToDir(dir, a)
 }
 
 // SaveArtifactToDir writes an artifact JSON file to the provided directory.
-// It returns filepath, whether a new file was written, and any error.
-func SaveArtifactToDir(dir string, a Artifact) (string, bool, error) {
+// It returns the canonical artifact, filepath, and whether a new file was
+// written.
+func SaveArtifactToDir(dir string, a Artifact) (SaveResult, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", false, fmt.Errorf("create failures dir: %w", err)
+		return SaveResult{}, fmt.Errorf("create failures dir: %w", err)
 	}
 
 	fingerprint := Fingerprint(a.MinimizedExpression, a.Property)
 	existing, err := LoadArtifactsFromDir(dir)
 	if err != nil {
-		return "", false, err
+		return SaveResult{}, err
 	}
 	for _, item := range existing {
 		if item.Fingerprint == fingerprint {
-			return "", false, nil
+			return SaveResult{Artifact: item}, nil
 		}
 	}
 
@@ -83,13 +93,17 @@ func SaveArtifactToDir(dir string, a Artifact) (string, bool, error) {
 
 	data, err := json.MarshalIndent(a, "", "  ")
 	if err != nil {
-		return "", false, fmt.Errorf("marshal artifact: %w", err)
+		return SaveResult{}, fmt.Errorf("marshal artifact: %w", err)
 	}
 	if err := os.WriteFile(path, data, 0o644); err != nil {
-		return "", false, fmt.Errorf("write artifact file: %w", err)
+		return SaveResult{}, fmt.Errorf("write artifact file: %w", err)
 	}
 
-	return path, true, nil
+	return SaveResult{
+		Artifact: a,
+		Path:     path,
+		Saved:    true,
+	}, nil
 }
 
 // LoadArtifacts reads all artifact JSON files from tmp/intensive-testing/failures.

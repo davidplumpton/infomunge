@@ -222,10 +222,11 @@ func recordMutationFailure(property, originalExpr, mutatedExpr string, seed int6
 		DetectedAt:          detectedAt.Format(time.RFC3339),
 		MinimizedAt:         minimizedAt.Format(time.RFC3339),
 	}
-	if _, _, err := failures.SaveArtifact(artifact); err != nil {
+	saveResult, err := failures.SaveArtifact(artifact)
+	if err != nil {
 		return
 	}
-	_, _, _ = failures.WriteCandidateScenario(artifact)
+	_, _, _ = failures.WriteCandidateScenario(saveResult.Artifact)
 }
 
 func mutationChangesBehavior(baseRes interface{}, baseErr error, mutatedRes interface{}, mutatedErr error) bool {

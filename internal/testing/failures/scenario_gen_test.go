@@ -59,7 +59,7 @@ func TestGenerateAllCandidatesSkipsExisting(t *testing.T) {
 	failuresDir := t.TempDir()
 	candidatesDir := t.TempDir()
 
-	_, _, err := SaveArtifactToDir(failuresDir, Artifact{
+	_, err := SaveArtifactToDir(failuresDir, Artifact{
 		Property:            "no-panic",
 		MinimizedExpression: "payload.a + 1",
 		OriginalExpression:  "payload.a + payload.b",
@@ -69,7 +69,7 @@ func TestGenerateAllCandidatesSkipsExisting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SaveArtifactToDir(first): %v", err)
 	}
-	_, _, err = SaveArtifactToDir(failuresDir, Artifact{
+	_, err = SaveArtifactToDir(failuresDir, Artifact{
 		Property:            "determinism",
 		MinimizedExpression: "payload.b * 2",
 		OriginalExpression:  "payload.b * 2 + 0",
@@ -108,5 +108,84 @@ func TestGenerateAllCandidatesSkipsExisting(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(candidatesDir, "001_no-panic.feature")); err != nil {
 		t.Fatalf("expected existing candidate still present: %v", err)
+	}
+}
+
+func TestSavedArtifactsGenerateDistinctNumberedCandidates(t *testing.T) {
+	t.Parallel()
+
+	failuresDir := t.TempDir()
+	candidatesDir := t.TempDir()
+
+	firstResult, err := SaveArtifactToDir(failuresDir, Artifact{
+		Property:            "mutation-determinism",
+		MinimizedExpression: "payload.a + 1",
+		OriginalExpression:  "payload.a + 2",
+		InputPayload:        evaluator.Object{"a": float64(1)},
+		Seed:                1,
+	})
+	if err != nil {
+		t.Fatalf("SaveArtifactToDir(first): %v", err)
+	}
+	if !firstResult.Saved {
+		t.Fatal("SaveArtifactToDir(first) saved = false, want true")
+	}
+
+	duplicateResult, err := SaveArtifactToDir(failuresDir, Artifact{
+		Property:            "mutation-determinism",
+		MinimizedExpression: "payload.a + 1",
+		OriginalExpression:  "different original expression",
+		InputPayload:        evaluator.Object{"a": float64(99)},
+		Seed:                99,
+	})
+	if err != nil {
+		t.Fatalf("SaveArtifactToDir(duplicate): %v", err)
+	}
+	if duplicateResult.Saved {
+		t.Fatal("SaveArtifactToDir(duplicate) saved = true, want fingerprint deduplication")
+	}
+	if duplicateResult.Artifact.ID != firstResult.Artifact.ID {
+		t.Fatalf(
+			"duplicate artifact ID = %d, want canonical ID %d",
+			duplicateResult.Artifact.ID,
+			firstResult.Artifact.ID,
+		)
+	}
+
+	firstCandidate, saved, err := WriteCandidateScenarioToDir(candidatesDir, duplicateResult.Artifact)
+	if err != nil {
+		t.Fatalf("WriteCandidateScenarioToDir(first): %v", err)
+	}
+	if !saved {
+		t.Fatal("WriteCandidateScenarioToDir(first) saved = false, want true")
+	}
+
+	secondResult, err := SaveArtifactToDir(failuresDir, Artifact{
+		Property:            "mutation-determinism",
+		MinimizedExpression: "payload.b * 2",
+		OriginalExpression:  "payload.b * 3",
+		InputPayload:        evaluator.Object{"b": float64(2)},
+		Seed:                2,
+	})
+	if err != nil {
+		t.Fatalf("SaveArtifactToDir(second): %v", err)
+	}
+	if !secondResult.Saved {
+		t.Fatal("SaveArtifactToDir(second) saved = false, want true")
+	}
+
+	secondCandidate, saved, err := WriteCandidateScenarioToDir(candidatesDir, secondResult.Artifact)
+	if err != nil {
+		t.Fatalf("WriteCandidateScenarioToDir(second): %v", err)
+	}
+	if !saved {
+		t.Fatal("WriteCandidateScenarioToDir(second) saved = false, want true")
+	}
+
+	if got := filepath.Base(firstCandidate); got != "001_mutation-determinism.feature" {
+		t.Fatalf("first candidate = %q, want 001_mutation-determinism.feature", got)
+	}
+	if got := filepath.Base(secondCandidate); got != "002_mutation-determinism.feature" {
+		t.Fatalf("second candidate = %q, want 002_mutation-determinism.feature", got)
 	}
 }

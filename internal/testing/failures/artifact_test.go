@@ -28,19 +28,22 @@ func TestSaveAndLoadArtifactsRoundTrip(t *testing.T) {
 		Seed:       42,
 	}
 
-	path, saved, err := SaveArtifactToDir(dir, input)
+	result, err := SaveArtifactToDir(dir, input)
 	if err != nil {
 		t.Fatalf("SaveArtifactToDir() error = %v", err)
 	}
-	if !saved {
+	if !result.Saved {
 		t.Fatalf("SaveArtifactToDir() saved = false, want true")
 	}
-	if filepath.Ext(path) != ".json" {
-		t.Fatalf("artifact file extension = %q, want .json", filepath.Ext(path))
+	if filepath.Ext(result.Path) != ".json" {
+		t.Fatalf("artifact file extension = %q, want .json", filepath.Ext(result.Path))
 	}
-	base := filepath.Base(path)
+	base := filepath.Base(result.Path)
 	if !strings.HasPrefix(base, "001_no-panic_") {
 		t.Fatalf("artifact filename = %q, want prefix 001_no-panic_", base)
+	}
+	if result.Artifact.ID != 1 {
+		t.Fatalf("saved artifact ID = %d, want 1", result.Artifact.ID)
 	}
 
 	artifacts, err := LoadArtifactsFromDir(dir)
@@ -116,26 +119,32 @@ func TestSaveArtifactDeduplicatesByFingerprint(t *testing.T) {
 		Seed:                999,
 	}
 
-	firstPath, firstSaved, err := SaveArtifactToDir(dir, first)
+	firstResult, err := SaveArtifactToDir(dir, first)
 	if err != nil {
 		t.Fatalf("first SaveArtifactToDir() error = %v", err)
 	}
-	if !firstSaved {
+	if !firstResult.Saved {
 		t.Fatalf("first SaveArtifactToDir() saved = false, want true")
 	}
-	if firstPath == "" {
+	if firstResult.Path == "" {
 		t.Fatalf("first SaveArtifactToDir() path is empty")
 	}
+	if firstResult.Artifact.ID != 1 {
+		t.Fatalf("first saved artifact ID = %d, want 1", firstResult.Artifact.ID)
+	}
 
-	secondPath, secondSaved, err := SaveArtifactToDir(dir, second)
+	secondResult, err := SaveArtifactToDir(dir, second)
 	if err != nil {
 		t.Fatalf("second SaveArtifactToDir() error = %v", err)
 	}
-	if secondSaved {
+	if secondResult.Saved {
 		t.Fatalf("second SaveArtifactToDir() saved = true, want false due to dedup")
 	}
-	if secondPath != "" {
-		t.Fatalf("second SaveArtifactToDir() path = %q, want empty path for dedup skip", secondPath)
+	if secondResult.Path != "" {
+		t.Fatalf("second SaveArtifactToDir() path = %q, want empty path for dedup skip", secondResult.Path)
+	}
+	if secondResult.Artifact.ID != firstResult.Artifact.ID {
+		t.Fatalf("deduplicated artifact ID = %d, want existing ID %d", secondResult.Artifact.ID, firstResult.Artifact.ID)
 	}
 
 	artifacts, err := LoadArtifactsFromDir(dir)
