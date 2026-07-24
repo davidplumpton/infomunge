@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/values"
 	"sort"
 	"strconv"
 	"strings"
@@ -65,26 +66,26 @@ func decodeWorksheetRows(sheetName string, data []byte, sharedStrings []string, 
 		if idx == 0 {
 			continue
 		}
-		values, err := decodeRowValues(row, sharedStrings, options)
+		rowValues, err := decodeRowValues(row, sharedStrings, options)
 		if err != nil {
 			return nil, unifiederrors.ValidationErrorf("xlsx sheet %q: %v", sheetName, err)
 		}
-		if len(values) > len(headers) {
+		if len(rowValues) > len(headers) {
 			if options.strict {
-				return nil, unifiederrors.ValidationErrorf("xlsx sheet %q row has %d columns but header defines %d", sheetName, len(values), len(headers))
+				return nil, unifiederrors.ValidationErrorf("xlsx sheet %q row has %d columns but header defines %d", sheetName, len(rowValues), len(headers))
 			}
-			values = values[:len(headers)]
+			rowValues = rowValues[:len(headers)]
 		}
-		rowObj := Object{}
+		rowObj := values.NewObject(len(headers))
 		nonNil := false
 		for i, header := range headers {
-			if i < len(values) {
-				rowObj[header] = values[i]
-				if values[i] != nil {
+			if i < len(rowValues) {
+				values.SetObjectValue(rowObj, header, rowValues[i])
+				if rowValues[i] != nil {
 					nonNil = true
 				}
 			} else {
-				rowObj[header] = nil
+				values.SetObjectValue(rowObj, header, nil)
 			}
 		}
 		if nonNil {

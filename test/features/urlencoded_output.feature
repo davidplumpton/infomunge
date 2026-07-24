@@ -46,7 +46,7 @@ Feature: URL-encoded Output
     When I run the script
     Then the output should be:
       """
-      city=New+York&name=Alice
+      name=Alice&city=New+York
       """
 
   Scenario: Error when URL-encoded output is not an object

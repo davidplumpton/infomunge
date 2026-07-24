@@ -69,33 +69,173 @@ func TestRead_JSON_Invalid(t *testing.T) {
 
 func TestStructuredReadersPreserveObjectOrder(t *testing.T) {
 	tests := []struct {
-		name     string
-		content  string
-		mimeType string
+		name string
+		read func(*testing.T) Object
 	}{
-		{name: "json", content: `{"b":2,"a":1}`, mimeType: "application/json"},
-		{name: "yaml", content: "b: 2\na: 1\n", mimeType: "application/yaml"},
+		{
+			name: "json source fields",
+			read: func(t *testing.T) Object {
+				result, err := Read(`{"b":2,"a":1}`, "application/json")
+				if err != nil {
+					t.Fatalf("Read(json) error = %v", err)
+				}
+				return result.(Object)
+			},
+		},
+		{
+			name: "yaml source fields",
+			read: func(t *testing.T) Object {
+				result, err := Read("b: 2\na: 1\n", "application/yaml")
+				if err != nil {
+					t.Fatalf("Read(yaml) error = %v", err)
+				}
+				return result.(Object)
+			},
+		},
+		{
+			name: "csv headers",
+			read: func(t *testing.T) Object {
+				result, err := Read("b,a\n2,1", "application/csv")
+				if err != nil {
+					t.Fatalf("Read(csv) error = %v", err)
+				}
+				return result.(Array)[0].(Object)
+			},
+		},
+		{
+			name: "ndjson source fields",
+			read: func(t *testing.T) Object {
+				result, err := Read("{\"b\":2,\"a\":1}\n", "application/x-ndjson")
+				if err != nil {
+					t.Fatalf("Read(ndjson) error = %v", err)
+				}
+				return result.(Array)[0].(Object)
+			},
+		},
+		{
+			name: "xml child elements",
+			read: func(t *testing.T) Object {
+				result, err := Read("<root><b>2</b><a>1</a></root>", "application/xml")
+				if err != nil {
+					t.Fatalf("Read(xml) error = %v", err)
+				}
+				return result.(Object)["root"].(Object)
+			},
+		},
+		{
+			name: "properties source fields",
+			read: func(t *testing.T) Object {
+				result, err := Read("b=2\na=1", "text/x-java-properties")
+				if err != nil {
+					t.Fatalf("Read(properties) error = %v", err)
+				}
+				return result.(Object)
+			},
+		},
+		{
+			name: "urlencoded wire fields",
+			read: func(t *testing.T) Object {
+				result, err := Read("b=2&a=1", "application/x-www-form-urlencoded")
+				if err != nil {
+					t.Fatalf("Read(urlencoded) error = %v", err)
+				}
+				return result.(Object)
+			},
+		},
+		{
+			name: "multipart part names",
+			read: func(t *testing.T) Object {
+				content := strings.Join([]string{
+					"--order-boundary",
+					`Content-Disposition: form-data; name="b"`,
+					"",
+					"2",
+					"--order-boundary",
+					`Content-Disposition: form-data; name="a"`,
+					"",
+					"1",
+					"--order-boundary--",
+					"",
+				}, "\r\n")
+				result, err := Read(content, "multipart/form-data")
+				if err != nil {
+					t.Fatalf("Read(multipart) error = %v", err)
+				}
+				return result.(Object)
+			},
+		},
+		{
+			name: "java linked map source fields",
+			read: func(t *testing.T) Object {
+				content := `{"@class":"java.util.LinkedHashMap","value":{"b":2,"a":1}}`
+				result, err := ReadWithOptions(content, "application/java", Object{"structured": true})
+				if err != nil {
+					t.Fatalf("ReadWithOptions(java) error = %v", err)
+				}
+				return result.(Object)
+			},
+		},
+		{
+			name: "flatfile schema fields",
+			read: func(t *testing.T) Object {
+				options := Object{
+					"schema": Object{
+						"singleRecord": true,
+						"fields": Array{
+							Object{"name": "b", "length": 1},
+							Object{"name": "a", "length": 1},
+						},
+					},
+				}
+				result, err := ReadWithOptions("21", "application/flatfile", options)
+				if err != nil {
+					t.Fatalf("ReadWithOptions(flatfile) error = %v", err)
+				}
+				return result.(Object)
+			},
+		},
+		{
+			name: "xlsx headers",
+			read: func(t *testing.T) Object {
+				sheet := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>b</t></is></c><c r="B1" t="inlineStr"><is><t>a</t></is></c></row><row r="2"><c r="A2"><v>2</v></c><c r="B2"><v>1</v></c></row></sheetData></worksheet>`
+				archive, err := buildXLSXArchive([]xlsxEncodedSheet{{name: "Sheet1", xml: sheet}})
+				if err != nil {
+					t.Fatalf("buildXLSXArchive() error = %v", err)
+				}
+				result, err := ReadWithOptions(string(archive), "application/xlsx", Object{"structured": true})
+				if err != nil {
+					t.Fatalf("ReadWithOptions(xlsx) error = %v", err)
+				}
+				return result.(Object)["Sheet1"].(Array)[0].(Object)
+			},
+		},
+		{
+			name: "protobuf wire fields",
+			read: func(t *testing.T) Object {
+				options := Object{
+					"structured": true,
+					"schema": Object{
+						"fields": Array{
+							Object{"number": 1, "name": "a", "type": "int32"},
+							Object{"number": 2, "name": "b", "type": "int32"},
+						},
+					},
+				}
+				result, err := ReadWithOptions("\x10\x02\x08\x01", "application/protobuf", options)
+				if err != nil {
+					t.Fatalf("ReadWithOptions(protobuf) error = %v", err)
+				}
+				return result.(Object)
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := Read(tt.content, tt.mimeType)
-			if err != nil {
-				t.Fatalf("Read() error = %v", err)
-			}
-			object := result.(Object)
+			object := tt.read(t)
 			if got := strings.Join(values.ObjectKeys(object), ","); got != "b,a" {
 				t.Fatalf("object order = %q, want %q", got, "b,a")
 			}
 		})
-	}
-
-	csvResult, err := Read("b,a\n2,1", "application/csv")
-	if err != nil {
-		t.Fatalf("Read(csv) error = %v", err)
-	}
-	row := csvResult.(Array)[0].(Object)
-	if got := strings.Join(values.ObjectKeys(row), ","); got != "b,a" {
-		t.Fatalf("CSV object order = %q, want %q", got, "b,a")
 	}
 }
 

@@ -18,7 +18,7 @@ Feature: XML Reading
     When I run the script
     Then the output should be:
       """
-      {"user":{"age":"30","name":"Alice"}}
+      {"user":{"name":"Alice","age":"30"}}
       """
 
   Scenario: Read XML with declaration header

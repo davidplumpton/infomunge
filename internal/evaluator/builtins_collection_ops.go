@@ -105,7 +105,7 @@ func callBuiltinFilterSelector(e *ast.CallExpr, scope *Scope, depth int) (Value,
 			return nil, newPosError(fmt.Sprintf("selector filter lambda must return a boolean, got %T", condVal), e.Args[1].Pos())
 		}
 		if condBool {
-			result[key] = val
+			values.SetObjectValue(result, key, val)
 		}
 	}
 
@@ -145,10 +145,10 @@ func callBuiltinMetadata(args []Value, e *ast.CallExpr) (Value, error) {
 		if !ok {
 			return nil, nil
 		}
-		attrs := make(Object)
-		for k, v := range obj {
+		attrs := values.NewObject(0)
+		for _, k := range values.ObjectKeys(obj) {
 			if strings.HasPrefix(k, "@") && k != "@xmlns" {
-				attrs[k] = v
+				values.SetObjectValue(attrs, k, obj[k])
 			}
 		}
 		return attrs, nil

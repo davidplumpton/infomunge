@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/values"
 )
 
 // callBuiltinUpdateExpr implements the __updateExpr(value, casesString) function.
@@ -221,11 +222,8 @@ func updateArrayElement(arr Array, index int, newValue Value) (Array, error) {
 
 // updateObjectField updates a field in an object.
 func updateObjectField(obj Object, fieldName string, newValue Value) Object {
-	newObj := make(Object)
-	for k, v := range obj {
-		newObj[k] = v
-	}
-	newObj[fieldName] = newValue
+	newObj := values.CloneObject(obj)
+	values.SetObjectValue(newObj, fieldName, newValue)
 	return newObj
 }
 
@@ -281,9 +279,9 @@ func setValueAtPath(value Value, path []selectorSegment, newValue Value, depth i
 func deepCopy(value Value) Value {
 	switch v := value.(type) {
 	case Object:
-		newMap := make(Object)
-		for k, val := range v {
-			newMap[k] = deepCopy(val)
+		newMap := values.NewObject(len(v))
+		for _, key := range values.ObjectKeys(v) {
+			values.SetObjectValue(newMap, key, deepCopy(v[key]))
 		}
 		return newMap
 	case Array:

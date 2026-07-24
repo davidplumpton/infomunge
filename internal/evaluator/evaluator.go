@@ -13,6 +13,7 @@ import (
 
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/sourcemap"
+	"infomunge/pkg/values"
 )
 
 // ControlFlowSignal is used to signal break or continue in loops
@@ -367,12 +368,8 @@ func sub(left, right Value) (Value, error) {
 	// Special case: object key removal (object - "key" → object without that key)
 	if obj, ok := left.(Object); ok {
 		if key, ok := right.(string); ok {
-			result := make(Object, len(obj))
-			for k, v := range obj {
-				if k != key {
-					result[k] = v
-				}
-			}
+			result := values.CloneObject(obj)
+			delete(result, key)
 			return result, nil
 		}
 	}

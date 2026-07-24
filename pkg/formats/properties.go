@@ -1,6 +1,7 @@
 package formats
 
 import (
+	"infomunge/pkg/values"
 	"strings"
 )
 
@@ -15,7 +16,7 @@ func init() {
 // - escapes: \\, \=, \:, \t, \n, \r, \f
 // - continuations: trailing unescaped '\' joins with the next line
 func readProperties(content string) (interface{}, error) {
-	result := make(Object)
+	result := values.NewObject(0)
 	lines := strings.Split(content, "\n")
 	var logicalLine strings.Builder
 
@@ -45,7 +46,7 @@ func readProperties(content string) (interface{}, error) {
 		keyPart, valuePart := splitPropertyLine(logical)
 		key := unescapePropertyToken(strings.TrimSpace(keyPart))
 		value := unescapePropertyToken(strings.TrimSpace(valuePart))
-		result[key] = value
+		values.SetObjectValue(result, key, value)
 	}
 
 	if logicalLine.Len() > 0 {
@@ -54,7 +55,7 @@ func readProperties(content string) (interface{}, error) {
 			keyPart, valuePart := splitPropertyLine(logical)
 			key := unescapePropertyToken(strings.TrimSpace(keyPart))
 			value := unescapePropertyToken(strings.TrimSpace(valuePart))
-			result[key] = value
+			values.SetObjectValue(result, key, value)
 		}
 	}
 

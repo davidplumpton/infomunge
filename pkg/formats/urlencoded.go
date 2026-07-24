@@ -19,22 +19,37 @@ func init() {
 func readURLEncoded(content string) (interface{}, error) {
 	content = strings.TrimSpace(content)
 	if content == "" {
-		return make(Object), nil
+		return values.NewObject(0), nil
 	}
-	values, err := url.ParseQuery(content)
+	parsedValues, err := url.ParseQuery(content)
 	if err != nil {
 		return nil, unifiederrors.WrapValidationf(err, "urlencoded parse error: %v", err)
 	}
-	result := make(Object)
-	for key, vals := range values {
+	result := values.NewObject(len(parsedValues))
+	for _, rawPart := range strings.Split(content, "&") {
+		if rawPart == "" {
+			continue
+		}
+		rawKey, _, _ := strings.Cut(rawPart, "=")
+		key, err := url.QueryUnescape(rawKey)
+		if err != nil {
+			return nil, unifiederrors.WrapValidationf(err, "urlencoded parse error: %v", err)
+		}
+		if _, exists := result[key]; exists {
+			continue
+		}
+		vals, exists := parsedValues[key]
+		if !exists {
+			continue
+		}
 		if len(vals) == 1 {
-			result[key] = vals[0]
+			values.SetObjectValue(result, key, vals[0])
 		} else {
 			arr := make(Array, len(vals))
 			for i, v := range vals {
 				arr[i] = v
 			}
-			result[key] = arr
+			values.SetObjectValue(result, key, arr)
 		}
 	}
 	return result, nil

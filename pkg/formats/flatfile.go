@@ -3,6 +3,7 @@ package formats
 import (
 	"fmt"
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/values"
 	"math"
 	"strconv"
 	"strings"
@@ -58,7 +59,7 @@ func readFlatfileWithOptions(content string, options Object) (interface{}, error
 			)
 		}
 
-		record := make(Object, len(schema.fields))
+		record := values.NewObject(len(schema.fields))
 		offset := 0
 		for _, field := range schema.fields {
 			segment := line[offset : offset+field.length]
@@ -74,7 +75,7 @@ func readFlatfileWithOptions(content string, options Object) (interface{}, error
 					err,
 				)
 			}
-			record[field.name] = value
+			values.SetObjectValue(record, field.name, value)
 		}
 		records = append(records, record)
 	}

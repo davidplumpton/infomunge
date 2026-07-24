@@ -117,10 +117,10 @@ func evalObjectStringIndex(obj Object, key string, pos token.Pos) (Value, error)
 		return extractNamespaceValue(obj), nil
 	}
 	if key == "@" {
-		attrs := make(Object)
-		for k, val := range obj {
+		attrs := values.NewObject(0)
+		for _, k := range values.ObjectKeys(obj) {
 			if strings.HasPrefix(k, "@") {
-				attrs[k] = val
+				values.SetObjectValue(attrs, k, obj[k])
 			}
 		}
 		return attrs, nil

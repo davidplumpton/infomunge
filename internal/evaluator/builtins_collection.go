@@ -286,7 +286,7 @@ func callBuiltinMerge(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError("merge requires at least 1 argument", e.Pos())
 	}
 
-	result := values.NewObject(0)
+	objects := make([]Object, 0, len(args))
 
 	// Merge all objects in order
 	for _, arg := range args {
@@ -297,13 +297,10 @@ func callBuiltinMerge(args []Value, e *ast.CallExpr) (Value, error) {
 		if !ok {
 			return nil, newPosError(fmt.Sprintf("merge expects objects, got %T", arg), e.Pos())
 		}
-
-		for _, key := range values.ObjectKeys(obj) {
-			values.SetObjectValue(result, key, obj[key])
-		}
+		objects = append(objects, obj)
 	}
 
-	return result, nil
+	return values.MergeObjects(objects...), nil
 }
 
 // callBuiltinWithAttrs implements the __with_attrs(value, attrs) function.
@@ -327,26 +324,22 @@ func callBuiltinWithAttrs(args []Value, e *ast.CallExpr) (Value, error) {
 	var result Object
 
 	if obj, ok := value.(Object); ok {
-		// Copy original object
-		result = make(Object, len(obj)+len(attrs))
-		for k, v := range obj {
-			result[k] = v
-		}
+		result = values.CloneObject(obj)
 	} else {
 		// Wrap non-object value in #text
-		result = make(Object, 1+len(attrs))
+		result = values.NewObject(1 + len(attrs))
 		if value != nil {
-			result["#text"] = value
+			values.SetObjectValue(result, "#text", value)
 		}
 	}
 
 	// Merge attributes, ensuring @ prefix
-	for k, v := range attrs {
+	for _, k := range values.ObjectKeys(attrs) {
 		attrKey := k
 		if !strings.HasPrefix(k, "@") {
 			attrKey = "@" + k
 		}
-		result[attrKey] = v
+		values.SetObjectValue(result, attrKey, attrs[k])
 	}
 
 	return result, nil
@@ -368,19 +361,7 @@ func callBuiltinUpdate(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("update operator (~) expects an object on the right, got %T", args[1]), e.Pos())
 	}
 
-	result := make(Object)
-
-	// Copy left object
-	for k, v := range left {
-		result[k] = v
-	}
-
-	// Merge right object (overwrites left values)
-	for k, v := range right {
-		result[k] = v
-	}
-
-	return result, nil
+	return values.MergeObjects(left, right), nil
 }
 
 // callBuiltinTypeOf implements the typeOf(value) function.

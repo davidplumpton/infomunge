@@ -57,7 +57,7 @@ Feature: I/O Functions
     When I run the script
     Then the output should be:
       """
-      {"root":{"age":"30","name":"Alice"}}
+      {"root":{"name":"Alice","age":"30"}}
       """
 
   Scenario: read binary octet-stream content
@@ -127,7 +127,7 @@ Feature: I/O Functions
     When I run the script
     Then the output should be:
       """
-      [{"age":30,"id":1,"name":"ALICE","state":"NY"},{"age":25,"id":2,"name":"BOB","state":"CA"}]
+      [{"id":1,"name":"ALICE","age":30,"state":"NY"},{"id":2,"name":"BOB","age":25,"state":"CA"}]
       """
 
   Scenario: read java content
@@ -207,7 +207,7 @@ Feature: I/O Functions
     When I run the script
     Then the output should be:
       """
-      {"active":true,"age":30,"name":"Alice"}
+      {"name":"Alice","age":30,"active":true}
       """
 
   Scenario: read structured protobuf payload with unknown field fails
@@ -231,7 +231,7 @@ Feature: I/O Functions
     When I run the script
     Then the output should be:
       """
-      {"lucky_numbers":[1,150],"name":"Bob"}
+      {"name":"Bob","lucky_numbers":[1,150]}
       """
 
   Scenario: read and write structured protobuf map payload with descriptor set

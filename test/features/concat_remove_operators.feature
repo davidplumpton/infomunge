@@ -233,6 +233,20 @@ Feature: Concatenation and Remove Operators
     Then the output should contain "age"
     And the output should contain "30"
 
+  Scenario: object copy merge and removal operations preserve insertion order
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [keysOf({b: 2, a: 1} - "missing"), keysOf({c: 3, b: 2, a: 1} - "b"), keysOf({b: 2, a: 1} -- []), keysOf({c: 3, b: 2, a: 1} -- ["b"]), keysOf(({b: 2, a: 1} update {case x at .b -> x + 1})), keysOf({b: 2, a: 1} ~ {b: 20, c: 3}), keysOf({b: 2, a: 1} ++ {b: 20, c: 3})]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [["b","a"],["c","a"],["b","a"],["c","a"],["b","a"],["b","a","c"],["b","a","c"]]
+      """
+
   # -- Operator (remove) - Basic usage
   Scenario: remove single element from array
     Given the following input content:

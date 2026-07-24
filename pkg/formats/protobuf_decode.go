@@ -3,11 +3,12 @@ package formats
 import (
 	"encoding/binary"
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/values"
 	"math"
 )
 
 func decodeProtobufMessage(content []byte, schema protobufSchema, strict bool) (Object, error) {
-	out := make(Object)
+	out := values.NewObject(len(schema.byName))
 	offset := 0
 	seen := make(map[int]bool)
 
@@ -48,21 +49,21 @@ func decodeProtobufMessage(content []byte, schema protobufSchema, strict bool) (
 			if !ok {
 				return nil, unifiederrors.ValidationErrorf("protobuf map field %q decode produced unexpected type %T", field.name, value)
 			}
-			existing, _ := out[field.name].(map[string]interface{})
+			existing, _ := out[field.name].(Object)
 			if existing == nil {
-				existing = make(map[string]interface{})
+				existing = values.NewObject(0)
 			}
-			existing[entry.key] = entry.value
-			out[field.name] = existing
+			values.SetObjectValue(existing, entry.key, entry.value)
+			values.SetObjectValue(out, field.name, existing)
 			continue
 		}
 
 		if field.repeated {
 			existing, _ := out[field.name].([]interface{})
 			if packedValues, ok := value.([]interface{}); ok {
-				out[field.name] = append(existing, packedValues...)
+				values.SetObjectValue(out, field.name, append(existing, packedValues...))
 			} else {
-				out[field.name] = append(existing, value)
+				values.SetObjectValue(out, field.name, append(existing, value))
 			}
 			continue
 		}
@@ -70,7 +71,7 @@ func decodeProtobufMessage(content []byte, schema protobufSchema, strict bool) (
 		if seen[field.number] && strict {
 			return nil, unifiederrors.ValidationErrorf("protobuf payload repeats non-repeated field %q", field.name)
 		}
-		out[field.name] = value
+		values.SetObjectValue(out, field.name, value)
 		seen[field.number] = true
 	}
 

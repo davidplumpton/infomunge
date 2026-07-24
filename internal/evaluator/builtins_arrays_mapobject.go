@@ -19,7 +19,9 @@ func extractMapObjectResult(mapResult Value, pos token.Pos) (Object, bool, error
 		if !ok {
 			return nil, false, newPosError(fmt.Sprintf("mapObject lambda key must be a string, got %T", result[0]), pos)
 		}
-		return Object{key: result[1]}, false, nil
+		entry := values.NewObject(1)
+		values.SetObjectValue(entry, key, result[1])
+		return entry, false, nil
 
 	case Object:
 		if len(result) == 0 {

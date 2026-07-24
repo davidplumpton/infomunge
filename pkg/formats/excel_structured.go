@@ -3,6 +3,7 @@ package formats
 import (
 	"archive/zip"
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/values"
 	"sort"
 	"strings"
 )
@@ -96,7 +97,7 @@ func decodeStructuredXLSX(content string, options xlsxFormatOptions) (interface{
 		return nil, err
 	}
 
-	result := Object{}
+	result := values.NewObject(len(meta.sheets))
 	for _, sheet := range meta.sheets {
 		sheetXML, ok := files[sheet.path]
 		if !ok {
@@ -106,7 +107,7 @@ func decodeStructuredXLSX(content string, options xlsxFormatOptions) (interface{
 		if err != nil {
 			return nil, err
 		}
-		result[sheet.name] = rows
+		values.SetObjectValue(result, sheet.name, rows)
 	}
 
 	return result, nil

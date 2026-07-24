@@ -24,6 +24,51 @@ func TestObjectKeysSortsUntrackedObjectsForCompatibility(t *testing.T) {
 	}
 }
 
+func TestCloneObjectPreservesOrderAndDoesNotAliasTopLevelMap(t *testing.T) {
+	object := NewObject(2)
+	SetObjectValue(object, "b", 2)
+	SetObjectValue(object, "a", 1)
+
+	clone := CloneObject(object)
+	SetObjectValue(clone, "b", 3)
+	SetObjectValue(clone, "c", 4)
+
+	if got, want := ObjectKeys(clone), []string{"b", "a", "c"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("clone keys = %v, want %v", got, want)
+	}
+	if got := object["b"]; got != 2 {
+		t.Fatalf("source b = %v, want 2", got)
+	}
+	if _, exists := object["c"]; exists {
+		t.Fatal("source unexpectedly contains clone-only key c")
+	}
+}
+
+func TestCloneObjectPreservesAlphabeticalFallbackOrder(t *testing.T) {
+	clone := CloneObject(Object{"b": 2, "a": 1})
+	if got, want := ObjectKeys(clone), []string{"a", "b"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("clone keys = %v, want %v", got, want)
+	}
+}
+
+func TestMergeObjectsKeepsExistingPositionsAndAppendsNewKeys(t *testing.T) {
+	left := NewObject(2)
+	SetObjectValue(left, "b", 2)
+	SetObjectValue(left, "a", 1)
+	right := NewObject(2)
+	SetObjectValue(right, "b", 20)
+	SetObjectValue(right, "c", 3)
+
+	merged := MergeObjects(left, right)
+
+	if got, want := ObjectKeys(merged), []string{"b", "a", "c"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("merged keys = %v, want %v", got, want)
+	}
+	if got := merged["b"]; got != 20 {
+		t.Fatalf("merged b = %v, want 20", got)
+	}
+}
+
 func TestObjectOrderIdentityExpiresWithObject(t *testing.T) {
 	identity := unreachableObjectOrderIdentity()
 

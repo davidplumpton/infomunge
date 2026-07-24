@@ -39,7 +39,7 @@ func readMultipart(content string) (interface{}, error) {
 	}
 
 	reader := multipart.NewReader(strings.NewReader(content), boundary)
-	result := make(Object)
+	result := values.NewObject(0)
 	partCount := 0
 
 	for {
@@ -105,14 +105,13 @@ func multipartPartValue(part *multipart.Part, content string) interface{} {
 		return content
 	}
 
-	result := Object{
-		"content": content,
+	result := values.NewObject(3)
+	values.SetObjectValue(result, "content", content)
+	if contentType != "" {
+		values.SetObjectValue(result, "contentType", contentType)
 	}
 	if filename != "" {
-		result["filename"] = filename
-	}
-	if contentType != "" {
-		result["contentType"] = contentType
+		values.SetObjectValue(result, "filename", filename)
 	}
 	return result
 }
@@ -120,16 +119,16 @@ func multipartPartValue(part *multipart.Part, content string) interface{} {
 func addMultipartValue(target Object, key string, value interface{}) {
 	current, exists := target[key]
 	if !exists {
-		target[key] = value
+		values.SetObjectValue(target, key, value)
 		return
 	}
 
 	if arr, ok := current.(Array); ok {
-		target[key] = append(arr, value)
+		values.SetObjectValue(target, key, append(arr, value))
 		return
 	}
 
-	target[key] = Array{current, value}
+	values.SetObjectValue(target, key, Array{current, value})
 }
 
 func formatMultipart(result interface{}) (string, error) {

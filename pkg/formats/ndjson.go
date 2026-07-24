@@ -1,7 +1,6 @@
 package formats
 
 import (
-	"encoding/json"
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
@@ -24,8 +23,8 @@ func readNDJSON(content string) (interface{}, error) {
 		if line == "" {
 			continue
 		}
-		var val interface{}
-		if err := json.Unmarshal([]byte(line), &val); err != nil {
+		val, err := readJSON(line)
+		if err != nil {
 			return nil, unifiederrors.WrapValidationf(err, "NDJSON parse error on line %d: %v", i+1, err)
 		}
 		result = append(result, val)
@@ -43,7 +42,7 @@ func formatNDJSON(result interface{}) (string, error) {
 	}
 	lines := make([]string, 0, len(items))
 	for _, item := range items {
-		b, err := json.Marshal(item)
+		b, err := marshalOrderedJSON(item)
 		if err != nil {
 			return "", unifiederrors.WrapValidationf(err, "NDJSON marshal error: %v", err)
 		}

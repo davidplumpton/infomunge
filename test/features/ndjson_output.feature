@@ -17,8 +17,8 @@ Feature: NDJSON Output
     When I run the script
     Then the output should be:
       """
-      {"age":30,"name":"Alice"}
-      {"age":25,"name":"Bob"}
+      {"name":"Alice","age":30}
+      {"name":"Bob","age":25}
       """
 
   Scenario: Output single-element array as NDJSON
@@ -70,8 +70,8 @@ Feature: NDJSON Output
     When I run the script
     Then the output should be:
       """
-      {"age":30,"name":"Alice"}
-      {"age":25,"name":"Bob"}
+      {"name":"Alice","age":30}
+      {"name":"Bob","age":25}
       """
 
   Scenario: Error when NDJSON output is not an array

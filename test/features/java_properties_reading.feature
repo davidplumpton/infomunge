@@ -19,7 +19,7 @@ Feature: Java Properties Reading
     When I run the script
     Then the output should be:
       """
-      {"age":"30","name":"Alice"}
+      {"name":"Alice","age":"30"}
       """
 
   Scenario: Read properties with escapes continuation and empty key
@@ -40,5 +40,5 @@ Feature: Java Properties Reading
     When I run the script
     Then the output should be:
       """
-      {"":"blank","multiline":"helloworld","path=name:id":"value=1:2"}
+      {"path=name:id":"value=1:2","multiline":"helloworld","":"blank"}
       """

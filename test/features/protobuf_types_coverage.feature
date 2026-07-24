@@ -219,7 +219,7 @@ Feature: Protobuf structured field type coverage
     When I run the script
     Then the output should be:
       """
-      {"person":{"age":25,"name":"Bob"}}
+      {"person":{"name":"Bob","age":25}}
       """
 
   # --- non-strict mode ---

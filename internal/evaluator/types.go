@@ -286,27 +286,7 @@ func mergeProperties(parent, child Object) Object {
 		return nil
 	}
 
-	parentLen := 0
-	if parent != nil {
-		parentLen = len(parent)
-	}
-	childLen := 0
-	if child != nil {
-		childLen = len(child)
-	}
-
-	out := make(Object, parentLen+childLen)
-	if parent != nil {
-		for k, v := range parent {
-			out[k] = v
-		}
-	}
-	if child != nil {
-		for k, v := range child {
-			out[k] = v
-		}
-	}
-	return out
+	return values.MergeObjects(parent, child)
 }
 
 // coerceToString converts any value to a string.

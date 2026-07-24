@@ -69,7 +69,8 @@ func readXML(content string) (interface{}, error) {
 			if len(stack) > 0 {
 				addChildToParent(stack[len(stack)-1], elemName, newNode)
 			} else {
-				result = Object{elemName: newNode}
+				result = values.NewObject(1)
+				values.SetObjectValue(result, elemName, newNode)
 			}
 			stack = append(stack, newNode)
 			textSizes = append(textSizes, 0)
@@ -137,7 +138,7 @@ func formatXMLWithOptions(result interface{}, opts XMLOutputOptions) (string, er
 
 // handleXMLStartElement processes a start element, extracting namespaces and attributes.
 func handleXMLStartElement(elem xml.StartElement, nsCtx *xmlNamespaceContext) (Object, string) {
-	newNode := make(Object)
+	newNode := values.NewObject(len(elem.Attr))
 
 	// Collect namespace declarations from attributes
 	nsDecls := namespaceDeclsFromAttrs(elem.Attr)
@@ -150,14 +151,14 @@ func handleXMLStartElement(elem xml.StartElement, nsCtx *xmlNamespaceContext) (O
 
 	// Store namespace declarations in the node
 	if len(nsDecls) > 0 {
-		newNode[XMLNamespaceKey] = nsDecls.toNodeObject()
+		values.SetObjectValue(newNode, XMLNamespaceKey, namespaceDeclsNodeFromAttrs(elem.Attr))
 	}
 
 	// Store non-namespace attributes
 	for _, attr := range elem.Attr {
 		if attr.Name.Space != "xmlns" && !(attr.Name.Local == "xmlns" && attr.Name.Space == "") {
 			attrName := XMLAttrPrefix + nsCtx.ResolveElementName(attr.Name)
-			newNode[attrName] = attr.Value
+			values.SetObjectValue(newNode, attrName, attr.Value)
 		}
 	}
 
@@ -185,7 +186,8 @@ func namespaceDeclsFromAttrs(attrs []xml.Attr) xmlNamespaceDecls {
 
 func namespaceDeclsFromNodeObject(nsMap Object) xmlNamespaceDecls {
 	nsDecls := newXMLNamespaceDecls()
-	for prefix, uri := range nsMap {
+	for _, prefix := range values.ObjectKeys(nsMap) {
+		uri := nsMap[prefix]
 		p := prefix
 		if p == "#default" {
 			p = ""
@@ -193,6 +195,19 @@ func namespaceDeclsFromNodeObject(nsMap Object) xmlNamespaceDecls {
 		nsDecls[p] = fmt.Sprintf("%v", uri)
 	}
 	return nsDecls
+}
+
+func namespaceDeclsNodeFromAttrs(attrs []xml.Attr) Object {
+	node := values.NewObject(len(attrs))
+	for _, attr := range attrs {
+		switch {
+		case attr.Name.Space == "xmlns":
+			values.SetObjectValue(node, attr.Name.Local, attr.Value)
+		case attr.Name.Local == "xmlns" && attr.Name.Space == "":
+			values.SetObjectValue(node, "#default", attr.Value)
+		}
+	}
+	return node
 }
 
 func namespaceDeclsFromStringMap(nsMap map[string]string) xmlNamespaceDecls {
@@ -204,13 +219,19 @@ func namespaceDeclsFromStringMap(nsMap map[string]string) xmlNamespaceDecls {
 }
 
 func (nsDecls xmlNamespaceDecls) toNodeObject() Object {
-	node := make(Object)
-	for prefix, uri := range nsDecls {
+	node := values.NewObject(len(nsDecls))
+	prefixes := make([]string, 0, len(nsDecls))
+	for prefix := range nsDecls {
+		prefixes = append(prefixes, prefix)
+	}
+	sort.Strings(prefixes)
+	for _, prefix := range prefixes {
+		uri := nsDecls[prefix]
 		if prefix == "" {
-			node["#default"] = uri
+			values.SetObjectValue(node, "#default", uri)
 			continue
 		}
-		node[prefix] = uri
+		values.SetObjectValue(node, prefix, uri)
 	}
 	return node
 }
@@ -272,17 +293,17 @@ func addChildToParent(parent Object, elemName string, child Object) {
 	if existing, ok := parent[elemName]; ok {
 		switch v := existing.(type) {
 		case XMLMultiValue:
-			parent[elemName] = append(v, child)
+			values.SetObjectValue(parent, elemName, append(v, child))
 		case Array:
 			// If it's already a plain Array, it might have come from JSON or elsewhere,
 			// but if we're in XML parser, we should probably treat it as MultiValue
 			// if it's being added to.
-			parent[elemName] = append(XMLMultiValue(v), child)
+			values.SetObjectValue(parent, elemName, append(XMLMultiValue(v), child))
 		default:
-			parent[elemName] = XMLMultiValue{existing, child}
+			values.SetObjectValue(parent, elemName, XMLMultiValue{existing, child})
 		}
 	} else {
-		parent[elemName] = child
+		values.SetObjectValue(parent, elemName, child)
 	}
 }
 
@@ -296,10 +317,10 @@ func appendTextContent(node Object, text string) {
 			builder.WriteString(existingStr)
 			builder.WriteString(" ")
 			builder.WriteString(text)
-			node[XMLTextKey] = builder.String()
+			values.SetObjectValue(node, XMLTextKey, builder.String())
 		}
 	} else {
-		node[XMLTextKey] = text
+		values.SetObjectValue(node, XMLTextKey, text)
 	}
 }
 
@@ -342,8 +363,8 @@ func simplifyXMLObject(node Object) interface{} {
 	if shouldSimplifyNode(node) {
 		return node[XMLTextKey]
 	}
-	for k, val := range node {
-		node[k] = simplifyXML(val)
+	for _, key := range values.ObjectKeys(node) {
+		values.SetObjectValue(node, key, simplifyXML(node[key]))
 	}
 	return node
 }

@@ -105,6 +105,34 @@ func SetObjectValue(object Object, key string, value Value) {
 	record.mu.Unlock()
 }
 
+// CloneObject creates a shallow ordered copy of object.
+func CloneObject(object Object) Object {
+	if object == nil {
+		return nil
+	}
+	clone := NewObject(len(object))
+	for _, key := range ObjectKeys(object) {
+		SetObjectValue(clone, key, object[key])
+	}
+	return clone
+}
+
+// MergeObjects creates an ordered shallow merge. Existing keys keep their
+// original positions, while keys first seen in later objects are appended.
+func MergeObjects(objects ...Object) Object {
+	capacity := 0
+	for _, object := range objects {
+		capacity += len(object)
+	}
+	result := NewObject(capacity)
+	for _, object := range objects {
+		for _, key := range ObjectKeys(object) {
+			SetObjectValue(result, key, object[key])
+		}
+	}
+	return result
+}
+
 // ObjectKeys returns tracked insertion order. Objects created outside the
 // ordered constructors retain the previous deterministic alphabetical fallback.
 func ObjectKeys(object Object) []string {

@@ -25,10 +25,7 @@ func callBuiltinObjectToArray(args []Value, e *ast.CallExpr) (Value, error) {
 
 	result := make(Array, len(keys))
 	for i, k := range keys {
-		result[i] = Object{
-			"key":   k,
-			"value": obj[k],
-		}
+		result[i] = newObjectEntry(k, obj[k])
 	}
 
 	return result, nil
@@ -97,20 +94,21 @@ func callBuiltinEntriesOf(args []Value, e *ast.CallExpr) (Value, error) {
 		val := obj[k]
 		if multi, ok := val.(XMLMultiValue); ok {
 			for _, v := range multi {
-				result = append(result, Object{
-					"key":   k,
-					"value": v,
-				})
+				result = append(result, newObjectEntry(k, v))
 			}
 		} else {
-			result = append(result, Object{
-				"key":   k,
-				"value": val,
-			})
+			result = append(result, newObjectEntry(k, val))
 		}
 	}
 
 	return result, nil
+}
+
+func newObjectEntry(key string, value Value) Object {
+	entry := values.NewObject(2)
+	values.SetObjectValue(entry, "key", key)
+	values.SetObjectValue(entry, "value", value)
+	return entry
 }
 
 // callBuiltinKeysOf implements the keysOf(object) function.
@@ -338,17 +336,15 @@ func callBuiltinConcat(args []Value, e *ast.CallExpr) (Value, error) {
 	}
 
 	if allObjects {
-		result := values.NewObject(0)
+		objects := make([]Object, 0, len(args))
 		for _, arg := range args {
 			obj, ok := arg.(Object)
 			if !ok {
 				return nil, newPosError("cannot concatenate mixed types", e.Pos())
 			}
-			for _, key := range values.ObjectKeys(obj) {
-				values.SetObjectValue(result, key, obj[key])
-			}
+			objects = append(objects, obj)
 		}
-		return result, nil
+		return values.MergeObjects(objects...), nil
 	}
 
 	return nil, newPosError("cannot concatenate mixed types", e.Pos())
@@ -378,12 +374,9 @@ func callBuiltinRemove(args []Value, e *ast.CallExpr) (Value, error) {
 			}
 		}
 
-		// Create result object without the specified keys
-		result := make(Object, len(obj))
-		for k, v := range obj {
-			if !removeSet[k] {
-				result[k] = v
-			}
+		result := values.CloneObject(obj)
+		for key := range removeSet {
+			delete(result, key)
 		}
 		return result, nil
 	}
@@ -428,7 +421,7 @@ func callBuiltinXsiType(args []Value, e *ast.CallExpr) (Value, error) {
 	}
 
 	// Return an object with xsi:type property
-	result := make(Object)
-	result["xsi:type"] = typeName
+	result := values.NewObject(1)
+	values.SetObjectValue(result, "xsi:type", typeName)
 	return result, nil
 }

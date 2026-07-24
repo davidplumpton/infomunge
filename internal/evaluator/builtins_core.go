@@ -145,7 +145,7 @@ func parseDefaultValue(s string) (Value, error) {
 
 	// Check for empty object
 	if s == "{}" {
-		return Object{}, nil
+		return values.NewObject(0), nil
 	}
 
 	// Object literal: {key: value, ...}
@@ -177,10 +177,10 @@ func parseDefaultValue(s string) (Value, error) {
 func parseDefaultObjectLiteral(s string) (Object, error) {
 	inner := strings.TrimSpace(s[1 : len(s)-1])
 	if inner == "" {
-		return Object{}, nil
+		return values.NewObject(0), nil
 	}
 
-	result := make(Object)
+	result := values.NewObject(0)
 	pairs := splitRespectingDepth(inner, ',')
 
 	for _, pair := range pairs {
@@ -199,7 +199,7 @@ func parseDefaultObjectLiteral(s string) (Object, error) {
 		if err != nil {
 			return nil, err
 		}
-		result[key] = val
+		values.SetObjectValue(result, key, val)
 	}
 
 	return result, nil
@@ -237,10 +237,10 @@ func parseGoSyntaxObjectLiteral(s string, prefix string) (Object, error) {
 	inner = strings.TrimSuffix(strings.TrimSpace(inner), ",")
 	inner = strings.TrimSpace(inner)
 	if inner == "" {
-		return Object{}, nil
+		return values.NewObject(0), nil
 	}
 
-	result := make(Object)
+	result := values.NewObject(0)
 	pairs := splitRespectingDepth(inner, ',')
 
 	for _, pair := range pairs {
@@ -264,7 +264,7 @@ func parseGoSyntaxObjectLiteral(s string, prefix string) (Object, error) {
 		if err != nil {
 			return nil, err
 		}
-		result[keyStr] = val
+		values.SetObjectValue(result, keyStr, val)
 	}
 
 	return result, nil
