@@ -84,13 +84,14 @@ func evalArrayAssertSelector(arr Array, key string, pos token.Pos) (Array, error
 func evalStringIndex(s string, idx Value, pos token.Pos) (Value, error) {
 	switch i := idx.(type) {
 	case int:
+		runes := []rune(s)
 		if i < 0 {
-			i += len(s)
+			i += len(runes)
 		}
-		if i < 0 || i >= len(s) {
+		if i < 0 || i >= len(runes) {
 			return nil, newPosError(fmt.Sprintf("string index out of bounds: %d", i), pos)
 		}
-		return s[i : i+1], nil
+		return string(runes[i]), nil
 	default:
 		return nil, newPosError(fmt.Sprintf("string index must be an integer, got %T", idx), pos)
 	}

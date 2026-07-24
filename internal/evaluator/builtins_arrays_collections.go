@@ -89,22 +89,23 @@ func callBuiltinSlice(args []Value, e *ast.CallExpr) (Value, error) {
 		}
 		return arrayVal[start:end], nil
 	} else if strVal, ok := args[0].(string); ok {
+		runes := []rune(strVal)
 		if start < 0 {
-			start = len(strVal) + start
+			start = len(runes) + start
 		}
 		if end < 0 {
-			end = len(strVal) + end
+			end = len(runes) + end
 		}
 		if start < 0 {
 			start = 0
 		}
-		if end > len(strVal) {
-			end = len(strVal)
+		if end > len(runes) {
+			end = len(runes)
 		}
 		if start > end {
 			return "", nil
 		}
-		return strVal[start:end], nil
+		return string(runes[start:end]), nil
 	}
 
 	return nil, newPosError("slice first argument must be an array or string", e.Args[0].Pos())
