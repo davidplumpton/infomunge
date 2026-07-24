@@ -44,7 +44,7 @@
 
 [21] **Patch Discipline** - Use the dedicated `apply_patch` tool for manual edits, including temporary helper source; do not create files through shell redirection or invoke patching through shell commands. Keep broad refactors in small hunks and reopen edited regions before testing. Reflection-based Go AST rewrite helpers must track visited pointers (or explicitly skip object/scope links) because identifier resolution metadata makes the AST graph cyclic.
 
-[22] **Search Discipline** - Use `rg` first for searches. Put all flags, including `-g`, before paths; put `--` before the pattern when the pattern may begin with `-`. Use `rg -U` only when true multiline matching is needed.
+[22] **Search Discipline** - Use `rg` first for searches. Put all flags, including `-g`, before paths; put `--` before the pattern when the pattern may begin with `-`. Use `rg -U` only when true multiline matching is needed. Use `--no-filename`, not `-h`, when suppressing filenames because this `rg` treats `-h` as help. When `rg -r` is used as an extractor, match the entire input line or unmatched suffix text will remain in the replacement output.
 
 [23] **Stateful Command Discipline** - Do not parallelize beads mutations with reads (`br update`/`br close` then `br show`), and do not parallelize any JJ operations, including read-only help/status/diff discovery commands. Run state-changing and state-inspecting VCS/beads commands sequentially. When a long-running command yields, preserve its session or cell ID and poll that same process through completion; do not discard the handle or infer success from partial output. Prefer a direct command call for long gates unless the orchestration explicitly returns every yielded process handle for later polling.
 
