@@ -257,6 +257,54 @@ func TestEvaluate_LogicalOperations(t *testing.T) {
 	}
 }
 
+func TestEvaluate_LogicalOperationsShortCircuit(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected Value
+	}{
+		{"false AND skips right operand", "false && (1 / 0 == 0)", false},
+		{"true OR skips right operand", "true || (1 / 0 == 0)", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(tt.expr, Context{}, nil, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != tt.expected {
+				t.Fatalf("expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestEvaluate_LogicalOperationsEvaluateRequiredOperands(t *testing.T) {
+	tests := []struct {
+		name        string
+		expr        string
+		errorSubstr string
+	}{
+		{"true AND evaluates right operand", "true && (1 / 0 == 0)", "division by zero"},
+		{"false OR evaluates right operand", "false || (1 / 0 == 0)", "division by zero"},
+		{"AND validates evaluated left operand", "1 && missing", "logical AND requires booleans"},
+		{"OR validates evaluated right operand", "false || 1", "logical OR requires booleans"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Evaluate(tt.expr, Context{}, nil, 0, tt.expr)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.errorSubstr) {
+				t.Fatalf("expected error containing %q, got %v", tt.errorSubstr, err)
+			}
+		})
+	}
+}
+
 func TestEvaluate_StringConcatWithLambdaIsDeterministic(t *testing.T) {
 	ctx := make(Context)
 	tests := []struct {

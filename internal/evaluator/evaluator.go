@@ -417,6 +417,37 @@ func lor(left, right Value) (Value, error) {
 	return nil, unifiederrors.EvalErrorf("logical OR requires booleans, got %T and %T", left, right)
 }
 
+// evalLogicalShortCircuit validates the left operand of a logical expression
+// and reports whether it determines the result without evaluating the right.
+func evalLogicalShortCircuit(left Value, op token.Token) (Value, bool, error) {
+	var operation string
+	switch op {
+	case token.LAND:
+		operation = "AND"
+	case token.LOR:
+		operation = "OR"
+	default:
+		return nil, false, nil
+	}
+
+	leftBool, ok := left.(bool)
+	if !ok {
+		return nil, false, unifiederrors.EvalErrorf(
+			"logical %s requires booleans, got %T for left operand",
+			operation,
+			left,
+		)
+	}
+
+	if op == token.LAND && !leftBool {
+		return false, true, nil
+	}
+	if op == token.LOR && leftBool {
+		return true, true, nil
+	}
+	return nil, false, nil
+}
+
 // lss performs < comparison
 func lss(left, right Value) (Value, error) {
 	return numericCompare(left, right, func(cmp int) bool { return cmp < 0 }, "<")

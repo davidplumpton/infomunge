@@ -241,6 +241,48 @@ Feature: Basic Operators
       false
       """
 
+  Scenario: Logical AND skips a failing right operand when false
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      false and (1 / 0 == 0)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      false
+      """
+
+  Scenario: Logical OR skips a failing right operand when true
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      true or (1 / 0 == 0)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      true
+      """
+
+  Scenario: Logical short-circuit skips an invalid nondeterministic builtin call
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      false and (randomInt(0) == 0)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      false
+      """
+
   Scenario: Array contains operator
     Given the following input content:
       """

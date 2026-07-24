@@ -91,14 +91,19 @@ func (v *DefaultVisitor) VisitIdent(expr *ast.Ident) (Value, error) {
 	return evalIdent(expr, v.scope.Vars)
 }
 
-// VisitBinaryExpr evaluates a binary expression by evaluating both operands
-// and applying the operator.
+// VisitBinaryExpr evaluates a binary expression and applies the operator.
+// Logical AND and OR evaluate their right operand only when the left operand
+// does not determine the result.
 func (v *DefaultVisitor) VisitBinaryExpr(expr *ast.BinaryExpr) (Value, error) {
 	childVisitor := NewDefaultVisitorForScope(v.scope, v.depth+1)
 
 	left, err := childVisitor.Visit(expr.X)
 	if err != nil {
 		return nil, err
+	}
+
+	if result, decided, err := evalLogicalShortCircuit(left, expr.Op); decided || err != nil {
+		return result, err
 	}
 
 	right, err := childVisitor.Visit(expr.Y)
