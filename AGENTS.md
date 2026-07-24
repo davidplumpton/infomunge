@@ -2,6 +2,11 @@
 
 # Agent Instructions
 
+This file is the authoritative source for repository-wide agent instructions.
+`GEMINI.md` imports it using Gemini CLI's context-file import syntax. Make shared
+policy changes here only; keep `GEMINI.md` as the tool-specific entry file
+instead of copying these instructions into it.
+
 This project uses **br** (beads rust) for issue tracking.
 
 ## Quick Reference

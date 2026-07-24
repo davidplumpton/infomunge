@@ -28,7 +28,7 @@
 
 [13] **Landing The Plane** - Before handoff: file follow-up issues, run quality gates when code changed, close/update beads, run `br sync --flush-only`, clean up temporary artifacts, verify `jj status`, then `jj commit -m <description>`.
 
-[14] **Agent Constraints** - Prefer Go for implementation and runtime logic, while editing repository-owned HTML, JavaScript, Markdown, Makefiles, and shell-facing configuration when required. Do not introduce another runtime language, dependency, or new software without approval. Stay inside the infomunge directory, put temp files under `tmp`, and track durable mistakes and user preferences here compactly.
+[14] **Agent Constraints** - `AGENTS.md` is the authoritative shared instruction source; `GEMINI.md` is a tool-specific entry file that imports it, so shared policy changes belong only in `AGENTS.md`. Prefer Go for implementation and runtime logic, while editing repository-owned HTML, JavaScript, Markdown, Makefiles, and shell-facing configuration when required. Do not introduce another runtime language, dependency, or new software without approval. Stay inside the infomunge directory, put temp files under `tmp`, and track durable mistakes and user preferences here compactly.
 
 [15] **Docs** - See `docs/ARCHITECTURE.md`, `docs/EXTENDING.md`, and `docs/TESTING.md` for deeper implementation and testing details.
 
