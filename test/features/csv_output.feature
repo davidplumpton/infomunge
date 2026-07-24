@@ -17,9 +17,9 @@ Feature: CSV Output
     When I run the application with this content
     Then the output should be:
       """
-      age,name
-      30,Alice
-      25,Bob
+      name,age
+      Alice,30
+      Bob,25
       """
 
   Scenario: Output heterogeneous objects with different keys
@@ -36,9 +36,9 @@ Feature: CSV Output
     When I run the application with this content
     Then the output should be:
       """
-      age,city,name
-      30,,Alice
-      ,NYC,Bob
+      name,age,city
+      Alice,30,
+      Bob,,NYC
       """
 
   Scenario: Output objects with missing values
@@ -55,9 +55,9 @@ Feature: CSV Output
     When I run the application with this content
     Then the output should be:
       """
-      age,city,name
-      30,LA,Alice
-      25,,Bob
+      name,age,city
+      Alice,30,LA
+      Bob,25,
       """
 
   Scenario: Output empty array

@@ -154,7 +154,7 @@ Feature: Import Directive
     When I run the application with this content
     Then the output should be:
       """
-      {"module":35,"script":35}
+      {"script":35,"module":35}
       """
 
   Scenario: Shared declaration parsing binds script and module declarations
@@ -179,7 +179,7 @@ Feature: Import Directive
     When I run the application with this content
     Then the output should be:
       """
-      {"module":"module:ok","script":"script:ok"}
+      {"script":"script:ok","module":"module:ok"}
       """
 
   Scenario: Shared declaration parsing preserves type property literals
@@ -201,7 +201,7 @@ Feature: Import Directive
     When I run the application with this content
     Then the output should be:
       """
-      {"module":"7.50","script":"7.50"}
+      {"script":"7.50","module":"7.50"}
       """
 
   Scenario: Import module variable with star
@@ -248,7 +248,7 @@ Feature: Import Directive
     When I run the application with this content
     Then the output should be:
       """
-      {"greeting":"Hello, World","math":10}
+      {"math":10,"greeting":"Hello, World"}
       """
 
   Scenario: Import with star and call directly
@@ -294,7 +294,7 @@ Feature: Import Directive
     When I run the application with this content
     Then the output should be:
       """
-      {"joined":"x:y","keys":["a","b"]}
+      {"keys":["b","a"],"joined":"x:y"}
       """
 
   Scenario: Reject module import path traversal

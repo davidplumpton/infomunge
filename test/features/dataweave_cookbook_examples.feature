@@ -90,7 +90,7 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
       """
     Then the output should be:
       """
-      [{"author":"Giada De Laurentiis","id":0,"title":"Everyday Italian"},{"author":"J K. Rowling","id":1,"title":"Harry Potter"}]
+      [{"title":"Everyday Italian","author":"Giada De Laurentiis","id":0},{"title":"Harry Potter","author":"J K. Rowling","id":1}]
       """
 
   # Example 4: FlatMap (Map and Flatten)
@@ -139,7 +139,7 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
       """
     Then the output should be:
       """
-      [{"price":30,"title":"Book One","year":2005},{"price":29.99,"title":"Book Two","year":2006}]
+      [{"title":"Book One","price":30,"year":2005},{"title":"Book Two","price":29.99,"year":2006}]
       """
 
   # Example 6: Filter Array
@@ -248,7 +248,7 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
       """
     Then the output should be:
       """
-      {"AGE":30,"EMAIL":"alice@example.com","NAME":"Alice"}
+      {"NAME":"Alice","AGE":30,"EMAIL":"alice@example.com"}
       """
 
   # Example 11: FilterObject
@@ -286,7 +286,7 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
       """
     Then the output should be:
       """
-      ["age","email","name"]
+      ["name","age","email"]
       """
 
   # Example 13: ValuesOf
@@ -374,7 +374,7 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
       """
     Then the output should be:
       """
-      {"city":"New York","name":"Alice"}
+      {"name":"Alice","city":"New York"}
       """
 
   # Example 17: String Concatenation

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"sort"
+	"infomunge/pkg/values"
 )
 
 // extractMapObjectResult extracts key-value pairs from the lambda result.
@@ -75,7 +75,7 @@ func applyMapObject(obj Object, lambda *Lambda, scope *Scope, depth int, pos tok
 	param0, param1 := lambda.ParamName(0), lambda.ParamName(1)
 	dwOrder := !shouldUseLegacyObjectLambdaOrder(lambda)
 	keys := sortedKeys(obj)
-	result := make(Object)
+	result := values.NewObject(len(obj))
 
 	for _, key := range keys {
 		value := obj[key]
@@ -113,16 +113,17 @@ func applyAndMerge(value Value, key string, result Object, lambda *Lambda, scope
 	if skip {
 		return nil
 	}
-	for entryKey, entryValue := range entries {
+	for _, entryKey := range values.ObjectKeys(entries) {
+		entryValue := entries[entryKey]
 		if existing, ok := result[entryKey]; ok {
 			switch v := existing.(type) {
 			case XMLMultiValue:
-				result[entryKey] = append(v, entryValue)
+				values.SetObjectValue(result, entryKey, append(v, entryValue))
 			default:
-				result[entryKey] = XMLMultiValue{existing, entryValue}
+				values.SetObjectValue(result, entryKey, XMLMultiValue{existing, entryValue})
 			}
 		} else {
-			result[entryKey] = entryValue
+			values.SetObjectValue(result, entryKey, entryValue)
 		}
 	}
 	return nil
@@ -158,12 +159,7 @@ func callBuiltinMapObject(e *ast.CallExpr, scope *Scope, depth int) (Value, erro
 	return applyMapObject(obj, lambda, scope, depth, e.Args[1].Pos())
 }
 
-// sortedKeys returns the keys of the map in sorted order.
+// sortedKeys returns keys in stable object order.
 func sortedKeys(m Object) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
+	return values.ObjectKeys(m)
 }

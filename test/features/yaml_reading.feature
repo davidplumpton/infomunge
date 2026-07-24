@@ -19,7 +19,7 @@ Feature: YAML Reading
     When I run the script
     Then the output should be:
       """
-      {"age":30,"name":"Alice"}
+      {"name":"Alice","age":30}
       """
 
   # Basic Types

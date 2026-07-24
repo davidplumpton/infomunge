@@ -252,7 +252,7 @@ Feature: In-process coverage for date, URL, and core builtins
     When I run the script
     Then the output should be:
       """
-      {"count":2,"sum":30}
+      {"sum":30,"count":2}
       """
 
   Scenario: reduce with array literal default accumulator

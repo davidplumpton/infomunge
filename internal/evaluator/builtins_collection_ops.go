@@ -3,6 +3,7 @@ package evaluator
 import (
 	"fmt"
 	"go/ast"
+	"infomunge/pkg/values"
 	"sort"
 	"strings"
 )
@@ -85,13 +86,9 @@ func callBuiltinFilterSelector(e *ast.CallExpr, scope *Scope, depth int) (Value,
 		return nil, nil
 	}
 
-	keys := make([]string, 0, len(obj))
-	for k := range obj {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := values.ObjectKeys(obj)
 
-	result := make(Object)
+	result := values.NewObject(len(obj))
 	for idx, key := range keys {
 		val := obj[key]
 		condVal, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
@@ -405,19 +402,14 @@ func callBuiltinFilterObject(e *ast.CallExpr, scope *Scope, depth int) (Value, e
 		return nil, newPosError(fmt.Sprintf("filterObject lambda must have 2 or 3 parameters, got %d", lambda.ParamCount()), e.Args[1].Pos())
 	}
 
-	result := make(Object)
+	result := values.NewObject(len(obj))
 	index := 0
 
 	// Default to DataWeave order (value, key) unless lambda explicitly uses
 	// legacy names (key, value) or (k, v).
 	isDataWeaveOrder := !shouldUseLegacyObjectLambdaOrder(lambda)
 
-	// Create a deterministic order by sorting keys
-	keys := make([]string, 0, len(obj))
-	for k := range obj {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := values.ObjectKeys(obj)
 
 	for _, key := range keys {
 		value := obj[key]
@@ -479,12 +471,12 @@ func mergeIntoResult(result Object, key string, value Value) {
 	if existing, ok := result[key]; ok {
 		switch v := existing.(type) {
 		case XMLMultiValue:
-			result[key] = append(v, value)
+			values.SetObjectValue(result, key, append(v, value))
 		default:
-			result[key] = XMLMultiValue{existing, value}
+			values.SetObjectValue(result, key, XMLMultiValue{existing, value})
 		}
 	} else {
-		result[key] = value
+		values.SetObjectValue(result, key, value)
 	}
 }
 
@@ -495,7 +487,7 @@ func callBuiltinGroupBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 		return nil, err
 	}
 
-	result := make(Object)
+	result := values.NewObject(0)
 
 	err = executeLambdaOnArrayElements(array, lambda, scope, depth, func(elem Value, _ int, key Value) error {
 		// Convert key to string for use as object key
@@ -503,7 +495,7 @@ func callBuiltinGroupBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 
 		// Get or create the group for this key
 		if _, exists := result[keyStr]; !exists {
-			result[keyStr] = make(Array, 0)
+			values.SetObjectValue(result, keyStr, make(Array, 0))
 		}
 
 		// Append element to the group with proper type checking
@@ -511,7 +503,7 @@ func callBuiltinGroupBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 		if !ok {
 			return newPosError("groupBy: internal error - unexpected type for group", e.Fun.Pos())
 		}
-		result[keyStr] = append(groupVal, elem)
+		values.SetObjectValue(result, keyStr, append(groupVal, elem))
 		return nil
 	})
 	return result, err
@@ -563,11 +555,7 @@ func pluckObject(obj Object, lambda *Lambda, scope *Scope, depth int, e *ast.Cal
 	// legacy names (key, value) or (k, v).
 	isDataWeaveOrder := !shouldUseLegacyObjectLambdaOrder(lambda)
 
-	keys := make([]string, 0, len(obj))
-	for k := range obj {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := values.ObjectKeys(obj)
 
 	result := make(Array, 0, len(obj))
 	index := 0

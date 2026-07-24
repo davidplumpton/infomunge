@@ -3,10 +3,10 @@ package formats
 import (
 	"bytes"
 	"fmt"
+	"infomunge/pkg/values"
 	"io"
 	"mime/multipart"
 	"net/textproto"
-	"sort"
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
@@ -144,11 +144,7 @@ func formatMultipart(result interface{}) (string, error) {
 		return "", unifiederrors.WrapValidationf(err, "multipart boundary error: %v", err)
 	}
 
-	keys := make([]string, 0, len(obj))
-	for key := range obj {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := values.ObjectKeys(obj)
 
 	for _, key := range keys {
 		if err := writeMultipartValue(writer, key, obj[key]); err != nil {

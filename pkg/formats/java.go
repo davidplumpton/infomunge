@@ -2,6 +2,7 @@ package formats
 
 import (
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/values"
 	"math"
 	"strings"
 )
@@ -151,13 +152,14 @@ func decodeJavaStructured(value interface{}, strict bool) (interface{}, error) {
 			return decodeJavaStructured(rawValue, strict)
 		}
 
-		out := make(Object, len(v))
-		for key, item := range v {
+		out := values.NewObject(len(v))
+		for _, key := range values.ObjectKeys(v) {
+			item := v[key]
 			decoded, err := decodeJavaStructured(item, strict)
 			if err != nil {
 				return nil, err
 			}
-			out[key] = decoded
+			values.SetObjectValue(out, key, decoded)
 		}
 		return out, nil
 	case []interface{}:

@@ -37,7 +37,7 @@ Feature: Core evaluator runner coverage
     When I run the script
     Then the output should be:
       """
-      {"count":2,"values":[2,3]}
+      {"values":[2,3],"count":2}
       """
 
   # --- Logical OR operator (lor) ---
@@ -418,7 +418,7 @@ Feature: Core evaluator runner coverage
     When I run the script
     Then the output should be:
       """
-      [{"doubled":20,"index":0},{"doubled":40,"index":1},{"doubled":60,"index":2}]
+      [{"index":0,"doubled":20},{"index":1,"doubled":40},{"index":2,"doubled":60}]
       """
 
   # --- callUserDefinedFunction via try/orElse builtins ---

@@ -321,7 +321,7 @@ Feature: Core Collection Functions
     When I run the application with this content
     Then the output should be:
       """
-      ["age","name"]
+      ["name","age"]
       """
 
   Scenario: keys with single key
@@ -338,7 +338,7 @@ Feature: Core Collection Functions
       ["id"]
       """
 
-  Scenario: keys returns sorted keys
+  Scenario: keys returns keys in insertion order
     Given the following input content:
       """
       %im 0.1
@@ -349,7 +349,7 @@ Feature: Core Collection Functions
     When I run the application with this content
     Then the output should be:
       """
-      ["a","b","m","z"]
+      ["z","a","m","b"]
       """
 
   Scenario: keys with empty object
@@ -403,7 +403,7 @@ Feature: Core Collection Functions
       [1,2,3]
       """
 
-  Scenario: values returns values in sorted key order
+  Scenario: values returns values in insertion order
     Given the following input content:
       """
       %im 0.1
@@ -414,7 +414,7 @@ Feature: Core Collection Functions
     When I run the application with this content
     Then the output should be:
       """
-      ["first","middle","last"]
+      ["last","first","middle"]
       """
 
   Scenario: values with mixed types
@@ -507,5 +507,5 @@ Feature: Core Collection Functions
     When I run the application with this content
     Then the output should be:
       """
-      {"keys":["a","b","c"],"values":[1,2,3]}
+      {"keys":["b","a","c"],"values":[2,1,3]}
       """

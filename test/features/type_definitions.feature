@@ -47,7 +47,7 @@ Feature: Type Definitions
     When I run the application with this content
     Then the output should be:
       """
-      {"active":true,"age":30,"name":"Alice"}
+      {"name":"Alice","age":30,"active":true}
       """
 
   Scenario: Type declaration with format property

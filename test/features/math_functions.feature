@@ -593,7 +593,7 @@ Feature: Math Functions
     When I run the application with this content
     Then the output should be:
       """
-      {"average":20,"total":60}
+      {"total":60,"average":20}
       """
 
   Scenario: pow and sqrt inverse relationship

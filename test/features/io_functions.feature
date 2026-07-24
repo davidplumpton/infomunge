@@ -15,7 +15,7 @@ Feature: I/O Functions
     When I run the script
     Then the output should be:
       """
-      {"age":30,"name":"Alice"}
+      {"name":"Alice","age":30}
       """
 
   Scenario: read CSV content
@@ -29,7 +29,7 @@ Feature: I/O Functions
     When I run the script
     Then the output should be:
       """
-      [{"age":"30","name":"Alice"},{"age":"25","name":"Bob"}]
+      [{"name":"Alice","age":"30"},{"name":"Bob","age":"25"}]
       """
 
   Scenario: read YAML content
@@ -43,7 +43,7 @@ Feature: I/O Functions
     When I run the script
     Then the output should be:
       """
-      {"age":30,"name":"Alice"}
+      {"name":"Alice","age":30}
       """
 
   Scenario: read XML content
@@ -155,7 +155,7 @@ Feature: I/O Functions
     When I run the script
     Then the output should be:
       """
-      {"age":30,"name":"Alice"}
+      {"name":"Alice","age":30}
       """
 
   Scenario: read structured java envelope with unsupported class fails
@@ -464,7 +464,7 @@ Feature: I/O Functions
       write([{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}], "application/csv")
       """
     When I run the script
-    Then the output should contain "age,name"
+    Then the output should contain "name,age"
     And the output should contain "Alice"
     And the output should contain "Bob"
 
@@ -596,7 +596,7 @@ Feature: I/O Functions
     When I run the script
     Then the output should be:
       """
-      "{\"@class\":\"java.util.LinkedHashMap\",\"value\":{\"age\":30,\"name\":\"Alice\"}}"
+      "{\"@class\":\"java.util.LinkedHashMap\",\"value\":{\"name\":\"Alice\",\"age\":30}}"
       """
 
   Scenario: write structured java envelope class mismatch fails
@@ -968,5 +968,5 @@ Feature: I/O Functions
     When I run the script
     Then the output should be:
       """
-      {"active":true,"name":"Alice","scores":[1,2,3]}
+      {"name":"Alice","scores":[1,2,3],"active":true}
       """

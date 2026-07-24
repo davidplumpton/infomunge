@@ -30,10 +30,10 @@ Feature: Objects Module
     When I run the application with this content
     Then the output should be:
       """
-      ["a","m","z"]
+      ["z","a","m"]
       """
 
-  Scenario: valueSet returns object values by sorted key
+  Scenario: valueSet returns object values by insertion order
     Given the following input content:
       """
       %im 0.1
@@ -45,7 +45,7 @@ Feature: Objects Module
     When I run the application with this content
     Then the output should be:
       """
-      ["first","middle","last"]
+      ["last","first","middle"]
       """
 
   Scenario: mergeWith merges objects using right precedence
@@ -74,5 +74,5 @@ Feature: Objects Module
     When I run the application with this content
     Then the output should be:
       """
-      ["a","b"]
+      ["b","a"]
       """

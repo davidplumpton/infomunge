@@ -3,7 +3,7 @@ package evaluator
 import (
 	"fmt"
 	"go/token"
-	"sort"
+	"infomunge/pkg/values"
 	"strings"
 )
 
@@ -142,13 +142,9 @@ func evalObjectStringIndex(obj Object, key string, pos token.Pos) (Value, error)
 	return val, nil
 }
 
-// evalObjectOrdinalIndex accesses an object by sorted key position.
+// evalObjectOrdinalIndex accesses an object by insertion position.
 func evalObjectOrdinalIndex(obj Object, i int, pos token.Pos) (Value, error) {
-	keys := make([]string, 0, len(obj))
-	for k := range obj {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := values.ObjectKeys(obj)
 	if i < 0 || i >= len(keys) {
 		return nil, newPosError(fmt.Sprintf("object index out of bounds: %d (object has %d keys)", i, len(keys)), pos)
 	}

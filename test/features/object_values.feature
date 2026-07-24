@@ -33,7 +33,7 @@ Feature: Object Values
     When I run the application with this content
     Then the output should be:
       """
-      {"bool":true,"expression":20,"num":42,"str":"hello"}
+      {"str":"hello","num":42,"bool":true,"expression":20}
       """
 
   Scenario: Nested objects with expressions
@@ -83,7 +83,7 @@ Feature: Object Values
      When I run the application with this content
      Then the output should be:
        """
-       {"addition":15,"concat":"ab","nested":{"inner":"xy"}}
+       {"concat":"ab","addition":15,"nested":{"inner":"xy"}}
        """
 
    Scenario: Multi-value selector on object (DataWeave .* syntax)
@@ -97,7 +97,7 @@ Feature: Object Values
      When I run the application with this content
      Then the output should be:
        """
-       [30,"NYC","Alice"]
+       ["Alice",30,"NYC"]
        """
 
    Scenario: Multi-value selector on array returns the array
@@ -227,7 +227,7 @@ Feature: Object Values
      When I run the application with this content
      Then the output should be:
        """
-       {"array_vals":[1,2,3],"empty_object":[],"object_vals":[10,20,30]}
+       {"object_vals":[10,20,30],"array_vals":[1,2,3],"empty_object":[]}
        """
 
   Scenario: Object merging with single object expression
@@ -244,7 +244,7 @@ Feature: Object Values
     When I run the application with this content
     Then the output should be:
       """
-      {"merged":"value","start":"ok"}
+      {"start":"ok","merged":"value"}
       """
 
   Scenario: Object merging with array of objects
@@ -261,5 +261,5 @@ Feature: Object Values
     When I run the application with this content
     Then the output should be:
       """
-      {"a":1,"b":2,"base":0}
+      {"base":0,"a":1,"b":2}
       """

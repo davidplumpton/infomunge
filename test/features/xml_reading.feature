@@ -114,7 +114,7 @@ Feature: XML Reading
     When I run the script
     Then the output should be:
       """
-      {"attr":"value","version":"1.0"}
+      {"version":"1.0","attr":"value"}
       """
 
   Scenario: Access nested XML attributes
@@ -137,7 +137,7 @@ Feature: XML Reading
     When I run the script
     Then the output should be:
       """
-      {"customerId":"456","orderId":"123"}
+      {"orderId":"123","customerId":"456"}
       """
 
   # Basic Structure

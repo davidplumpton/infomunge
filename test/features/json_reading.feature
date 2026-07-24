@@ -18,7 +18,7 @@ Feature: JSON Reading
     When I run the script
     Then the output should be:
       """
-      {"age":30,"name":"Alice"}
+      {"name":"Alice","age":30}
       """
 
   # Basic Types - JSON primitives and simple structures
@@ -200,7 +200,7 @@ Feature: JSON Reading
     When I run the script
     Then the output should be:
       """
-      {"empty_arr":[],"empty_obj":{}}
+      {"empty_obj":{},"empty_arr":[]}
       """
 
   # Edge Cases
@@ -255,7 +255,7 @@ Feature: JSON Reading
     When I run the script
     Then the output should be:
       """
-      {"decimal":0.1,"large_int":9007199254740991,"negative":-42.5}
+      {"large_int":9007199254740991,"decimal":0.1,"negative":-42.5}
       """
 
   # Error Handling

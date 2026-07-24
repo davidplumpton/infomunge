@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/csv"
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/values"
 	"io"
-	"sort"
 	"strings"
 )
 
@@ -64,9 +64,9 @@ func readCSV(content string) (interface{}, error) {
 			return nil, unifiederrors.ValidationErrorf("CSV row %d has %d columns, expected %d (matching header)", rowNum, len(record), headerLen)
 		}
 
-		obj := make(Object)
+		obj := values.NewObject(headerLen)
 		for i, val := range record {
-			obj[header[i]] = val
+			values.SetObjectValue(obj, header[i], val)
 		}
 		result = append(result, obj)
 	}
@@ -85,25 +85,23 @@ func formatCSV(result interface{}) (string, error) {
 
 	// Collect headers from ALL items to handle heterogeneous data
 	headerSet := make(map[string]struct{})
+	headers := make([]string, 0)
 	for i, item := range items {
 		m, ok := item.(Object)
 		if !ok {
 			return "", unifiederrors.ValidationErrorf("CSV output expects array elements to be objects, item %d is %T", i+1, item)
 		}
-		for k := range m {
-			headerSet[k] = struct{}{}
+		for _, key := range values.ObjectKeys(m) {
+			if _, exists := headerSet[key]; !exists {
+				headerSet[key] = struct{}{}
+				headers = append(headers, key)
+			}
 		}
 	}
 
 	if len(headerSet) == 0 {
 		return "", unifiederrors.ValidationError("CSV output expects at least one object with fields")
 	}
-
-	headers := make([]string, 0, len(headerSet))
-	for k := range headerSet {
-		headers = append(headers, k)
-	}
-	sort.Strings(headers)
 
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)

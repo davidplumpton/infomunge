@@ -3,6 +3,7 @@ package formats
 import (
 	"encoding/xml"
 	"fmt"
+	"infomunge/pkg/values"
 	"reflect"
 	"strings"
 	"testing"
@@ -63,6 +64,38 @@ func TestRead_JSON_Invalid(t *testing.T) {
 	_, err := Read("{invalid", "application/json")
 	if err == nil {
 		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestStructuredReadersPreserveObjectOrder(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		mimeType string
+	}{
+		{name: "json", content: `{"b":2,"a":1}`, mimeType: "application/json"},
+		{name: "yaml", content: "b: 2\na: 1\n", mimeType: "application/yaml"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Read(tt.content, tt.mimeType)
+			if err != nil {
+				t.Fatalf("Read() error = %v", err)
+			}
+			object := result.(Object)
+			if got := strings.Join(values.ObjectKeys(object), ","); got != "b,a" {
+				t.Fatalf("object order = %q, want %q", got, "b,a")
+			}
+		})
+	}
+
+	csvResult, err := Read("b,a\n2,1", "application/csv")
+	if err != nil {
+		t.Fatalf("Read(csv) error = %v", err)
+	}
+	row := csvResult.(Array)[0].(Object)
+	if got := strings.Join(values.ObjectKeys(row), ","); got != "b,a" {
+		t.Fatalf("CSV object order = %q, want %q", got, "b,a")
 	}
 }
 

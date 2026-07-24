@@ -70,7 +70,7 @@ Feature: Optional Types
     When I run the application with this content
     Then the output should be:
       """
-      {"age":null,"name":"Alice"}
+      {"name":"Alice","age":null}
       """
 
   Scenario: Custom type with optional base type

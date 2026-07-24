@@ -149,7 +149,7 @@ Feature: Object Functions
     When I run the application with this content
     Then the output should be:
       """
-      ["age","name"]
+      ["name","age"]
       """
 
   Scenario: keysOf with single key
@@ -177,7 +177,39 @@ Feature: Object Functions
     When I run the application with this content
     Then the output should be:
       """
-      ["a","b","m","z"]
+      ["z","a","m","b"]
+      """
+
+  Scenario: object ordinal selectors and pluck preserve literal insertion order
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{b: 2, a: 1}[0], {b: 2, a: 1} pluck (v, k) -> k]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [2,["b","a"]]
+      """
+
+  Scenario: object operations preserve parsed JSON input order
+    Given the following input content:
+      """
+      %im 0.1
+      input application/json
+      output application/json
+      ---
+      [payload[0], keysOf(payload), valuesOf(payload), payload pluck (v, k) -> k]
+      """
+    When I run the application with this JSON input:
+      """
+      {"b":2,"a":1}
+      """
+    Then the output should be:
+      """
+      [2,["b","a"],[2,1],["b","a"]]
       """
 
   Scenario: keysOf with empty object
@@ -218,7 +250,7 @@ Feature: Object Functions
     Then the output should contain "30"
     And the output should contain "\"Alice\""
 
-  Scenario: valuesOf maintains key order
+  Scenario: valuesOf maintains insertion order
     Given the following input content:
       """
       %im 0.1
@@ -229,7 +261,7 @@ Feature: Object Functions
     When I run the application with this content
     Then the output should be:
       """
-      ["first","middle","last"]
+      ["last","first","middle"]
       """
 
   Scenario: valuesOf with mixed types
@@ -294,7 +326,7 @@ Feature: Object Functions
     When I run the application with this content
     Then the output should be:
       """
-      ["1","2","3"]
+      ["2","1","3"]
       """
 
   Scenario: namesOf on non-object fails

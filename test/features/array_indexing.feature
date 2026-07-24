@@ -79,7 +79,7 @@ Feature: Array Indexing
     When I run the application with this content
     Then the output should be:
       """
-      {"ages":[30,25],"names":["Alice","Bob"]}
+      {"names":["Alice","Bob"],"ages":[30,25]}
       """
 
   Scenario: Extract field from mixed array elements (with nulls for missing fields)
@@ -114,7 +114,7 @@ Feature: Array Indexing
     When I run the application with this content
     Then the output should be:
       """
-      {"descent":["A","B"],"dot":["A","B"]}
+      {"dot":["A","B"],"descent":["A","B"]}
       """
 
   Scenario: Slice array with range index

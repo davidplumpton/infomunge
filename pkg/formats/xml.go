@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/values"
 	"io"
 	"sort"
 	"strings"
@@ -383,13 +384,12 @@ func toXMLWithOptionsRecursive(v interface{}, name string, opts xmlRenderOptions
 		if name == "" {
 			// Root level wrapper - find the first non-special key
 			keys := make([]string, 0, len(val))
-			for k := range val {
+			for _, k := range values.ObjectKeys(val) {
 				if !strings.HasPrefix(k, XMLAttrPrefix) && k != XMLTextKey {
 					keys = append(keys, k)
 				}
 			}
 			if len(keys) > 0 {
-				sort.Strings(keys)
 				k := keys[0]
 				return buildXMLElement(k, val[k], opts, false)
 			}
@@ -511,12 +511,11 @@ func buildXMLAttributesWithOptions(val Object, elementName string, opts xmlRende
 // extractAndSortAttributeKeys extracts keys that represent XML attributes and namespaces.
 func extractAndSortAttributeKeys(val Object) []string {
 	keys := make([]string, 0, len(val))
-	for k := range val {
+	for _, k := range values.ObjectKeys(val) {
 		if k == XMLNamespaceKey || strings.HasPrefix(k, XMLAttrPrefix) {
 			keys = append(keys, k)
 		}
 	}
-	sort.Strings(keys)
 	return keys
 }
 
@@ -568,13 +567,12 @@ func buildXMLChildrenWithOptions(val Object, opts xmlRenderOptions) []string {
 // extractAndSortChildKeys extracts keys that represent child elements (skip special keys).
 func extractAndSortChildKeys(val Object) []string {
 	keys := make([]string, 0, len(val))
-	for k := range val {
+	for _, k := range values.ObjectKeys(val) {
 		// Skip special keys: namespaces (@xmlns), attributes (@...), and text (#text)
 		if k != XMLNamespaceKey && !strings.HasPrefix(k, XMLAttrPrefix) && k != XMLTextKey {
 			keys = append(keys, k)
 		}
 	}
-	sort.Strings(keys)
 	return keys
 }
 

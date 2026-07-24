@@ -76,5 +76,5 @@ Feature: Header Variable Declarations
     When I run the script
     Then the output should be:
       """
-      {"amount":5,"message":"output application/xml is just text"}
+      {"message":"output application/xml is just text","amount":5}
       """

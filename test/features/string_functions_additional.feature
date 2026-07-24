@@ -961,5 +961,5 @@ Feature: Additional String Functions
     When I run the application with this content
     Then the output should be:
       """
-      {"endsWorld":true,"startsHello":true}
+      {"startsHello":true,"endsWorld":true}
       """

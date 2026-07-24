@@ -42,7 +42,7 @@
 
 [20] **Memory Hygiene** - Keep this file compact. Merge repeated pitfalls into category nodes, preserve prevention steps that materially change future behavior, and avoid growing a dated entry for every recurrence unless the recurrence reveals a new prevention rule.
 
-[21] **Patch Discipline** - Use the dedicated `apply_patch` tool for manual edits, including temporary helper source; do not create files through shell redirection or invoke patching through shell commands. Keep broad refactors in small hunks and reopen edited regions before testing.
+[21] **Patch Discipline** - Use the dedicated `apply_patch` tool for manual edits, including temporary helper source; do not create files through shell redirection or invoke patching through shell commands. Keep broad refactors in small hunks and reopen edited regions before testing. Reflection-based Go AST rewrite helpers must track visited pointers (or explicitly skip object/scope links) because identifier resolution metadata makes the AST graph cyclic.
 
 [22] **Search Discipline** - Use `rg` first for searches. Put all flags, including `-g`, before paths; put `--` before the pattern when the pattern may begin with `-`. Use `rg -U` only when true multiline matching is needed.
 
@@ -63,3 +63,5 @@
 [30] **Context Refactor Discipline** - Preserve existing public/internal call signatures where practical by adding context-aware variants first, then migrate call sites incrementally to reduce compile fallout.
 
 [31] **Server Exposure Safety** - HTTP server mode defaults to `127.0.0.1:8080`. Unauthenticated server mode accepts only loopback listen hosts; configuring a non-loopback or wildcard address requires `--api-key` because `/run` evaluates caller-supplied scripts.
+
+[32] **Object Order** - `Object` remains a map alias for API compatibility. Order-aware construction uses `values.NewObject` plus `values.SetObjectValue`; observable iteration uses `values.ObjectKeys`, which preserves tracked insertion order and alphabetically sorts legacy untracked maps. Structured readers and object-producing evaluator paths must propagate this metadata, while structural equality remains order-insensitive. Registry lifecycle follow-up is tracked by `bd-1efx`.

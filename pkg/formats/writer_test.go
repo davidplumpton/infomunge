@@ -1,6 +1,7 @@
 package formats
 
 import (
+	"infomunge/pkg/values"
 	"reflect"
 	"strings"
 	"testing"
@@ -10,6 +11,33 @@ func TestFormat_EmptyMimeType(t *testing.T) {
 	_, err := Format("content", "")
 	if err == nil {
 		t.Error("expected error for empty mimeType")
+	}
+}
+
+func TestStructuredWritersPreserveObjectOrder(t *testing.T) {
+	object := values.NewObject(2)
+	values.SetObjectValue(object, "b", 2)
+	values.SetObjectValue(object, "a", 1)
+
+	tests := []struct {
+		mimeType string
+		value    interface{}
+		want     string
+	}{
+		{mimeType: "application/json", value: object, want: `{"b":2,"a":1}`},
+		{mimeType: "application/yaml", value: object, want: "b: 2\na: 1\n"},
+		{mimeType: "application/csv", value: Array{object}, want: "b,a\n2,1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.mimeType, func(t *testing.T) {
+			got, err := Format(tt.value, tt.mimeType)
+			if err != nil {
+				t.Fatalf("Format() error = %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("Format() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

@@ -93,10 +93,10 @@ Feature: YAML Output Formatting
       [{name: "Alice", age: 30}, {name: "Bob", age: 25}]
       """
     When I run the application with this content
-    Then the output should contain "- age: 30"
-    And the output should contain "name: Alice"
-    And the output should contain "- age: 25"
-    And the output should contain "name: Bob"
+    Then the output should contain "- name: Alice"
+    And the output should contain "age: 30"
+    And the output should contain "- name: Bob"
+    And the output should contain "age: 25"
 
   # Primitive values
   Scenario: Output boolean true as YAML

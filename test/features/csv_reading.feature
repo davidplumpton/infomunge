@@ -20,7 +20,7 @@ Feature: CSV Reading
     When I run the script
     Then the output should be:
       """
-      [{"age":"30","name":"Alice"},{"age":"25","name":"Bob"}]
+      [{"name":"Alice","age":"30"},{"name":"Bob","age":"25"}]
       """
 
   Scenario: Error on empty header column name
@@ -87,7 +87,7 @@ Feature: CSV Reading
     When I run the script
     Then the output should be:
       """
-      [{"age":"30","name":"Alice"}]
+      [{"name":"Alice","age":"30"}]
       """
 
   Scenario: Read CSV with header only

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"infomunge/pkg/values"
 	"sort"
 	"strings"
 )
@@ -257,13 +258,7 @@ func callBuiltinKeys(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("keys: expected object, got %T", args[0]), e.Pos())
 	}
 
-	keys := make([]string, 0, len(obj))
-	for k := range obj {
-		keys = append(keys, k)
-	}
-
-	// Sort keys alphabetically for deterministic output
-	sort.Strings(keys)
+	keys := values.ObjectKeys(obj)
 
 	result := make(Array, len(keys))
 	for i, k := range keys {
@@ -287,12 +282,7 @@ func callBuiltinValues(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("values: expected object, got %T", args[0]), e.Pos())
 	}
 
-	// To maintain order, first get sorted keys
-	keys := make([]string, 0, len(obj))
-	for k := range obj {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := values.ObjectKeys(obj)
 
 	result := make(Array, len(keys))
 	for i, k := range keys {
@@ -308,7 +298,7 @@ func callBuiltinMerge(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError("merge requires at least 1 argument", e.Pos())
 	}
 
-	result := make(Object)
+	result := values.NewObject(0)
 
 	// Merge all objects in order
 	for _, arg := range args {
@@ -320,8 +310,8 @@ func callBuiltinMerge(args []Value, e *ast.CallExpr) (Value, error) {
 			return nil, newPosError(fmt.Sprintf("merge expects objects, got %T", arg), e.Pos())
 		}
 
-		for k, v := range obj {
-			result[k] = v
+		for _, key := range values.ObjectKeys(obj) {
+			values.SetObjectValue(result, key, obj[key])
 		}
 	}
 
@@ -510,12 +500,7 @@ func callBuiltinObjectValues(args []Value, e *ast.CallExpr) (Value, error) {
 	case Object:
 		// Return all values from the object
 		result := make(Array, 0, len(v))
-		// Use sorted keys for deterministic ordering
-		keys := make([]string, 0, len(v))
-		for k := range v {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
+		keys := values.ObjectKeys(v)
 		for _, k := range keys {
 			result = append(result, v[k])
 		}

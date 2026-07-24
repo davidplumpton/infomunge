@@ -3,6 +3,7 @@ package evaluator
 import (
 	"fmt"
 	"go/ast"
+	"infomunge/pkg/values"
 )
 
 // ASTVisitor defines the visitor interface for evaluating AST nodes.
@@ -132,7 +133,7 @@ func (v *DefaultVisitor) VisitCompositeLit(expr *ast.CompositeLit) (Value, error
 
 	switch expr.Type.(type) {
 	case *ast.MapType:
-		res := make(Object)
+		res := values.NewObject(len(expr.Elts))
 		for _, elt := range expr.Elts {
 			switch node := elt.(type) {
 			case *ast.KeyValueExpr:
@@ -157,12 +158,12 @@ func (v *DefaultVisitor) VisitCompositeLit(expr *ast.CompositeLit) (Value, error
 				if existing, exists := res[keyStr]; exists {
 					switch v := existing.(type) {
 					case XMLMultiValue:
-						res[keyStr] = append(v, val)
+						values.SetObjectValue(res, keyStr, append(v, val))
 					default:
-						res[keyStr] = XMLMultiValue{existing, val}
+						values.SetObjectValue(res, keyStr, XMLMultiValue{existing, val})
 					}
 				} else {
-					res[keyStr] = val
+					values.SetObjectValue(res, keyStr, val)
 				}
 			default:
 				// Handle dynamic object merging: {(payload)} or similar expressions
@@ -173,33 +174,35 @@ func (v *DefaultVisitor) VisitCompositeLit(expr *ast.CompositeLit) (Value, error
 				}
 
 				if obj, ok := val.(Object); ok {
-					for k, v := range obj {
+					for _, k := range values.ObjectKeys(obj) {
+						itemValue := obj[k]
 						if existing, exists := res[k]; exists {
 							// Handle duplicate keys by converting to an array of values
 							switch ex := existing.(type) {
 							case XMLMultiValue:
-								res[k] = append(ex, v)
+								values.SetObjectValue(res, k, append(ex, itemValue))
 							default:
-								res[k] = XMLMultiValue{existing, v}
+								values.SetObjectValue(res, k, XMLMultiValue{existing, itemValue})
 							}
 						} else {
-							res[k] = v
+							values.SetObjectValue(res, k, itemValue)
 						}
 					}
 				} else if arr, ok := val.(Array); ok {
 					for _, item := range arr {
 						if itemObj, ok := item.(Object); ok {
-							for k, v := range itemObj {
+							for _, k := range values.ObjectKeys(itemObj) {
+								itemValue := itemObj[k]
 								if existing, exists := res[k]; exists {
 									// Handle duplicate keys by converting to an array of values
 									switch ex := existing.(type) {
 									case XMLMultiValue:
-										res[k] = append(ex, v)
+										values.SetObjectValue(res, k, append(ex, itemValue))
 									default:
-										res[k] = XMLMultiValue{existing, v}
+										values.SetObjectValue(res, k, XMLMultiValue{existing, itemValue})
 									}
 								} else {
-									res[k] = v
+									values.SetObjectValue(res, k, itemValue)
 								}
 							}
 						}

@@ -2,9 +2,9 @@ package formats
 
 import (
 	"fmt"
+	"infomunge/pkg/values"
 	"math"
 	"net/url"
-	"sort"
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
@@ -45,11 +45,7 @@ func formatURLEncoded(result interface{}) (string, error) {
 	if !ok {
 		return "", unifiederrors.ValidationErrorf("urlencoded output expects an object, got %T", result)
 	}
-	keys := make([]string, 0, len(obj))
-	for k := range obj {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := values.ObjectKeys(obj)
 	parts := make([]string, 0, len(keys))
 	for _, k := range keys {
 		v := obj[k]

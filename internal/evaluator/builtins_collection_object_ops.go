@@ -3,7 +3,7 @@ package evaluator
 import (
 	"fmt"
 	"go/ast"
-	"sort"
+	"infomunge/pkg/values"
 	"strings"
 )
 
@@ -21,11 +21,7 @@ func callBuiltinObjectToArray(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("objectToArray: expected object, got %T", args[0]), e.Pos())
 	}
 
-	keys := make([]string, 0, len(obj))
-	for k := range obj {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := values.ObjectKeys(obj)
 
 	result := make(Array, len(keys))
 	for i, k := range keys {
@@ -52,7 +48,7 @@ func callBuiltinArrayToObject(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("arrayToObject: expected array, got %T", args[0]), e.Pos())
 	}
 
-	result := make(Object, len(arr))
+	result := values.NewObject(len(arr))
 	for i, item := range arr {
 		entry, ok := item.(Object)
 		if !ok {
@@ -73,7 +69,7 @@ func callBuiltinArrayToObject(args []Value, e *ast.CallExpr) (Value, error) {
 			return nil, newPosError(fmt.Sprintf("arrayToObject: missing value at index %d", i), e.Pos())
 		}
 
-		result[key] = value
+		values.SetObjectValue(result, key, value)
 	}
 
 	return result, nil
@@ -93,12 +89,7 @@ func callBuiltinEntriesOf(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("entriesOf: expected object, got %T", args[0]), e.Pos())
 	}
 
-	// Create a sorted list of unique keys for deterministic output
-	uniqueKeys := make([]string, 0, len(obj))
-	for k := range obj {
-		uniqueKeys = append(uniqueKeys, k)
-	}
-	sort.Strings(uniqueKeys)
+	uniqueKeys := values.ObjectKeys(obj)
 
 	// Create result array of {key, value} pairs, expanding XMLMultiValue
 	result := make(Array, 0)
@@ -136,12 +127,7 @@ func callBuiltinKeysOf(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("keysOf: expected object, got %T", args[0]), e.Pos())
 	}
 
-	// Create a sorted list of unique keys for deterministic output
-	uniqueKeys := make([]string, 0, len(obj))
-	for k := range obj {
-		uniqueKeys = append(uniqueKeys, k)
-	}
-	sort.Strings(uniqueKeys)
+	uniqueKeys := values.ObjectKeys(obj)
 
 	// Convert to interface array, expanding XMLMultiValue
 	result := make(Array, 0)
@@ -173,12 +159,7 @@ func callBuiltinValuesOf(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("valuesOf: expected object, got %T", args[0]), e.Pos())
 	}
 
-	// Create a sorted list of unique keys for deterministic output
-	uniqueKeys := make([]string, 0, len(obj))
-	for k := range obj {
-		uniqueKeys = append(uniqueKeys, k)
-	}
-	sort.Strings(uniqueKeys)
+	uniqueKeys := values.ObjectKeys(obj)
 
 	// Create result array with values in key order, expanding XMLMultiValue
 	result := make(Array, 0)
@@ -357,14 +338,14 @@ func callBuiltinConcat(args []Value, e *ast.CallExpr) (Value, error) {
 	}
 
 	if allObjects {
-		result := make(Object)
+		result := values.NewObject(0)
 		for _, arg := range args {
 			obj, ok := arg.(Object)
 			if !ok {
 				return nil, newPosError("cannot concatenate mixed types", e.Pos())
 			}
-			for k, v := range obj {
-				result[k] = v
+			for _, key := range values.ObjectKeys(obj) {
+				values.SetObjectValue(result, key, obj[key])
 			}
 		}
 		return result, nil

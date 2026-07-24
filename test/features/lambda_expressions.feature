@@ -346,7 +346,7 @@ Feature: Lambda Expression Support
     When I run the application with this content
     Then the output should be:
       """
-      [{"age":0,"name":"alice"},{"age":1,"name":"bob"}]
+      [{"name":"alice","age":0},{"name":"bob","age":1}]
       """
 
   Scenario: Lambda with array literal

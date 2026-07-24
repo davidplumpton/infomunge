@@ -342,7 +342,7 @@ Feature: Runner header declaration paths (in-process coverage)
     When I run the script
     Then the output should be:
       """
-      {"age":30,"name":"Alice"}
+      {"name":"Alice","age":30}
       """
 
   # --- Namespace declarations ---
@@ -544,7 +544,7 @@ Feature: Runner header declaration paths (in-process coverage)
     When I run the script
     Then the output should be:
       """
-      {"amount":5,"message":"output application/xml is just text"}
+      {"message":"output application/xml is just text","amount":5}
       """
 
   Scenario: Single-line header with function definition via in-process runner

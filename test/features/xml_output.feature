@@ -15,7 +15,7 @@ Feature: XML Output
     Then the output should be:
       """
       <?xml version='1.0' encoding='UTF-8'?>
-      <user><age>30</age><name>Alice</name></user>
+      <user><name>Alice</name><age>30</age></user>
       """
 
   Scenario: Escape XML text and attribute values

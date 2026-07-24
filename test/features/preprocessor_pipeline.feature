@@ -17,5 +17,5 @@ Feature: Preprocessor pipeline
     When I run the script
     Then the output should be:
       """
-      {"matched":true,"name":"missing"}
+      {"name":"missing","matched":true}
       """

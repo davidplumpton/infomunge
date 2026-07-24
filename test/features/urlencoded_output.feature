@@ -14,7 +14,7 @@ Feature: URL-encoded Output
     When I run the script
     Then the output should be:
       """
-      age=30&name=Alice
+      name=Alice&age=30
       """
 
   Scenario: Output object with special characters

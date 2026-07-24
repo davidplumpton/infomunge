@@ -75,7 +75,7 @@ Feature: Function Definitions
     When I run the application with this content
     Then the output should be:
       """
-      {"age":30,"name":"Bob"}
+      {"name":"Bob","age":30}
       """
 
   Scenario: Function called multiple times
@@ -331,7 +331,7 @@ Feature: Function Definitions
     When I run the application with this content
     Then the output should be:
       """
-      {"count":4,"sum":10}
+      {"sum":10,"count":4}
       """
 
   Scenario: Comments in body expression are stripped
