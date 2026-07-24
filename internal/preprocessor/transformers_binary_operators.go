@@ -98,7 +98,19 @@ var binaryOperatorConfigs = map[string]stringutils.BinaryOperatorConfig{
 	binaryOpMod: {
 		Operator:     " mod ",
 		FuncName:     "mod",
-		RightStopOps: []string{"==", "!=", "<", ">", "<=", ">=", " matches "},
+		RightStopOps: []string{" mod ", " repeat ", "==", "!=", "<", ">", "<=", ">=", " matches "},
+	},
+}
+
+type binaryOperatorScanOverrides struct {
+	leftOperandStart   func([]byte) int
+	rightStopPredicate func(string, int, int) bool
+}
+
+var binaryOperatorScanOverridesByKey = map[string]binaryOperatorScanOverrides{
+	binaryOpMod: {
+		leftOperandStart:   findMultiplicativeLeftOperandStartBytes,
+		rightStopPredicate: shouldStopMultiplicativeRightOperand,
 	},
 }
 
@@ -124,6 +136,7 @@ func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, [
 	if config.UseMinimalStops {
 		stopBytes = minimalStopBytes()
 	}
+	scanOverrides := binaryOperatorScanOverridesByKey[key]
 
 	for i < len(s) {
 		if s[i] == '"' && !stringutils.IsEscapedAt(s, i) {
@@ -135,6 +148,9 @@ func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, [
 
 		if !inString && i+opLen <= len(s) && s[i:i+opLen] == config.Operator {
 			leftStart := findLeftOperandStartBytesWithStops(buf.bytes, stopBytes)
+			if scanOverrides.leftOperandStart != nil {
+				leftStart = scanOverrides.leftOperandStart(buf.bytes)
+			}
 			if leftStart >= buf.Len() {
 				buf.AppendOriginal(s, i, i+opLen)
 				i += opLen
@@ -153,7 +169,8 @@ func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, [
 
 			rightStart := i + opLen
 			rightTrimStart, rightTrimEnd, rightEnd, ok := scanRightOperandBounds(s, rightStart, rightOperandScanConfig{
-				StopOps: config.RightStopOps,
+				StopOps:       config.RightStopOps,
+				StopPredicate: scanOverrides.rightStopPredicate,
 			})
 			if !ok {
 				buf.AppendBytes(leftBytes, leftMapping)

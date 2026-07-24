@@ -355,6 +355,20 @@ Feature: Operator transformer rewrite coverage
     When I run the script
     Then the output should be true
 
+  Scenario: Infix mod preserves multiplicative associativity and parentheses
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [8 / 4 mod 3, 8 * 4 mod 3, 20 % 6 mod 4, 20 mod 6 mod 4, 20 mod 6 * 4, 20 mod 6 / 4, 20 mod 6 % 4, (8 / 4) mod 3, 8 / (4 mod 3)]
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [2,2,2,2,8,0.5,2,2,8]
+      """
+
   # --- Infix repeat operator ---
 
   Scenario: Infix repeat operator basic

@@ -654,6 +654,36 @@ func TestReplaceContainsOperator(t *testing.T) {
 	}
 }
 
+func TestReplaceModOperatorPreservesMultiplicativeAssociativity(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"division before mod", "8 / 4 mod 3", "mod(8 / 4, 3)"},
+		{"multiplication before mod", "8 * 4 mod 3", "mod(8 * 4, 3)"},
+		{"percent before mod", "20 % 6 mod 4", "mod(20 % 6, 4)"},
+		{"multiplication after mod", "20 mod 6 * 4", "mod(20, 6)* 4"},
+		{"division after mod", "20 mod 6 / 4", "mod(20, 6)/ 4"},
+		{"percent after mod", "20 mod 6 % 4", "mod(20, 6)% 4"},
+		{"repeated mod", "20 mod 6 mod 4", "mod(mod(20, 6), 4)"},
+		{"additive boundary", "2 + 8 * 4 mod 3", "2 +mod(8 * 4, 3)"},
+		{"unary sign in chain", "8 * -4 mod 3", "mod(8 * -4, 3)"},
+		{"unary sign on right", "8 mod -3 * 2", "mod(8, -3)* 2"},
+		{"grouped left operand", "(8 / 4) mod 3", "mod((8 / 4), 3)"},
+		{"grouped right operand", "8 / (4 mod 3)", "8 / (mod(4, 3))"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := replaceModOperator(tt.input)
+			if got != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, got)
+			}
+		})
+	}
+}
+
 func TestReplaceConfiguredBinaryOperator_MissingConfigReturnsError(t *testing.T) {
 	input := "x default 0"
 	result, err := replaceConfiguredBinaryOperator(input, "missing-config-key")

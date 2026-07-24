@@ -101,6 +101,97 @@ func findTypedOperatorLeftOperandStartBytes(result []byte) int {
 	return leftStart
 }
 
+// findMultiplicativeLeftOperandStartBytes includes earlier multiplicative
+// operators in the left operand while stopping at lower-precedence operators.
+// Unary signs remain part of the multiplicative chain.
+func findMultiplicativeLeftOperandStartBytes(result []byte) int {
+	pos := len(result) - 1
+	for pos >= 0 && isWhitespace(result[pos]) {
+		pos--
+	}
+	if pos < 0 {
+		return 0
+	}
+
+	depth := 0
+	for pos >= 0 {
+		ch := result[pos]
+
+		if ch == '"' {
+			pos--
+			for pos >= 0 {
+				if result[pos] == '"' && !stringutils.IsEscapedAt(string(result), pos) {
+					break
+				}
+				pos--
+			}
+			pos--
+			continue
+		}
+
+		if depth == 0 && isMultiplicativeLeftBoundary(result, pos) {
+			return pos + 1
+		}
+
+		switch ch {
+		case ')', ']', '}':
+			depth++
+		case '(', '[', '{':
+			depth--
+			if depth < 0 {
+				return 0
+			}
+		}
+		pos--
+	}
+
+	return 0
+}
+
+func isMultiplicativeLeftBoundary(input []byte, pos int) bool {
+	switch input[pos] {
+	case '+', '-':
+		return !isUnarySignBytes(input, pos, 0)
+	case '=', '<', '>', '!', '&', '|', ',', ';', ':', '(', '[', '{':
+		return true
+	default:
+		return false
+	}
+}
+
+func isUnarySignBytes(input []byte, pos, operandStart int) bool {
+	previous := pos - 1
+	for previous >= operandStart && isWhitespace(input[previous]) {
+		previous--
+	}
+	if previous < operandStart {
+		return true
+	}
+
+	switch input[previous] {
+	case '+', '-', '*', '/', '%', '=', '<', '>', '!', '&', '|', ',', ';', ':', '(', '[', '{':
+		return true
+	default:
+		return false
+	}
+}
+
+func shouldStopMultiplicativeRightOperand(input string, pos, operandStart int) bool {
+	switch input[pos] {
+	case '+', '-':
+		return !isUnarySignBytes([]byte(input), pos, operandStart)
+	case '*':
+		// Exponentiation binds more tightly. It is normally rewritten before
+		// this scanner runs, but retaining it here keeps the boundary correct
+		// when the helper is exercised directly.
+		return !((pos > 0 && input[pos-1] == '*') || (pos+1 < len(input) && input[pos+1] == '*'))
+	case '/', '%', '=', '<', '>', '!', '&', '|', ';', ':':
+		return true
+	default:
+		return false
+	}
+}
+
 func scanRightOperandBounds(input string, start int, cfg rightOperandScanConfig) (int, int, int, bool) {
 	end := start
 	var state ScanState
