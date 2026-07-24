@@ -52,7 +52,7 @@
 
 [25] **Cucumber Harness Pitfalls** - CLI failure scenarios usually need `Given the following input content`, while in-process runner scenarios use `Given the following script`. For multiline fixture files, use docstring-backed steps so real newlines are written. Check `test/godog_test.go` before introducing assertion wording: the harness registers `the error should contain` and `the output should not contain`, but not `the error should not contain`.
 
-[26] **Script Formatting Pitfalls** - Keep complex function calls in cucumber scripts on a single expression line unless multiline parser coverage exists. Documentation snippets intended to run as standalone CLI scripts need a header and `---` separator. JSON output expectations are exact text comparisons, so match compact serialized output; Go's JSON encoder renders `<`, `>`, and `&` in strings as `\u003c`, `\u003e`, and `\u0026`.
+[26] **Script Formatting Pitfalls** - Keep complex function calls in cucumber scripts on a single expression line unless multiline parser coverage exists. Parenthesize repeated unary minus (for example, `-(-1)`) because adjacent `--` is not parsed as two negations. Documentation snippets intended to run as standalone CLI scripts need a header and `---` separator. JSON output expectations are exact text comparisons, so match compact serialized output; Go's JSON encoder renders `<`, `>`, and `&` in strings as `\u003c`, `\u003e`, and `\u0026`.
 
 [27] **Parser Fragility Notes** - Inline `if` expressions inside object literals and dense object-value expressions have repeatedly hit brace/branch scanning bugs. For unrelated coverage, use simpler objects, arrays, defaults, or isolate conditionals in parser-specific tests.
 

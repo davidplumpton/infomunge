@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -36,6 +37,56 @@ func TestEvaluate_BasicLiterals(t *testing.T) {
 			}
 			if result != tt.expected {
 				t.Errorf("expected %v (%T), got %v (%T)", tt.expected, tt.expected, result, result)
+			}
+		})
+	}
+}
+
+func TestEvaluate_MinimumSignedIntegerLiteral(t *testing.T) {
+	if strconv.IntSize != 64 {
+		t.Skip("acceptance value is specific to 64-bit int builds")
+	}
+
+	const expr = "-9223372036854775808"
+	result, err := Evaluate(expr, Context{}, nil, 0, expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != minInt() {
+		t.Fatalf("expected %d (%T), got %v (%T)", minInt(), minInt(), result, result)
+	}
+}
+
+func TestEvaluate_MinimumSignedIntegerLiteralRangeSafety(t *testing.T) {
+	if strconv.IntSize != 64 {
+		t.Skip("acceptance values are specific to 64-bit int builds")
+	}
+
+	tests := []struct {
+		name string
+		expr string
+		want string
+	}{
+		{
+			name: "positive magnitude remains invalid",
+			expr: "9223372036854775808",
+			want: "invalid integer literal",
+		},
+		{
+			name: "double negation remains overflow",
+			expr: "-(-9223372036854775808)",
+			want: "integer overflow during negation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Evaluate(tt.expr, Context{}, nil, 0, tt.expr)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("expected error containing %q, got %v", tt.want, err)
 			}
 		})
 	}

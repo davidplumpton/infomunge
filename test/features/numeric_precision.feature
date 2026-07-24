@@ -26,6 +26,20 @@ Feature: Exact numeric behavior
     When I run the application and it fails
     Then the error should contain "integer overflow during addition"
 
+  Scenario: Minimum signed integer literal is accepted
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      -9223372036854775808
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      -9223372036854775808
+      """
+
   Scenario: Equality preserves integers above float precision
     Given the following input content:
       """

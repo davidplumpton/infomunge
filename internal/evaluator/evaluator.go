@@ -311,6 +311,28 @@ func evalBasicLit(e *ast.BasicLit) (Value, error) {
 	}
 }
 
+// evalMinIntLiteral handles the one signed integer value whose positive
+// magnitude cannot be represented as an int. The Go parser represents a
+// negative literal as unary minus applied to a positive BasicLit, so evaluating
+// the child first would reject minInt's magnitude before negation can apply.
+func evalMinIntLiteral(expr *ast.UnaryExpr) (Value, bool) {
+	if expr.Op != token.SUB {
+		return nil, false
+	}
+
+	literal, ok := expr.X.(*ast.BasicLit)
+	if !ok || literal.Kind != token.INT {
+		return nil, false
+	}
+
+	magnitude, err := strconv.ParseUint(literal.Value, 10, strconv.IntSize)
+	if err != nil || magnitude != uint64(^uint(0)>>1)+1 {
+		return nil, false
+	}
+
+	return minInt(), true
+}
+
 // evalIdent evaluates identifiers (variables, constants)
 func evalIdent(e *ast.Ident, context Context) (Value, error) {
 	switch e.Name {

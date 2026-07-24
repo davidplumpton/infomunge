@@ -120,6 +120,10 @@ func (v *DefaultVisitor) VisitBinaryExpr(expr *ast.BinaryExpr) (Value, error) {
 
 // VisitUnaryExpr evaluates a unary expression (e.g., -x, !x).
 func (v *DefaultVisitor) VisitUnaryExpr(expr *ast.UnaryExpr) (Value, error) {
+	if value, ok := evalMinIntLiteral(expr); ok {
+		return value, nil
+	}
+
 	childVisitor := NewDefaultVisitorForScope(v.scope, v.depth+1)
 
 	val, err := childVisitor.Visit(expr.X)

@@ -24,7 +24,7 @@ func formatFloat(f float64) string {
 // emitted as "-N" which the parser handles as a unary minus expression.
 func IntLiteral() *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
-		strategy := rapid.IntRange(0, 4).Draw(t, "strategy")
+		strategy := rapid.IntRange(0, 5).Draw(t, "strategy")
 		switch strategy {
 		case 0: // zero
 			return "0"
@@ -34,7 +34,9 @@ func IntLiteral() *rapid.Generator[string] {
 			return strconv.Itoa(-rapid.IntRange(1, 100).Draw(t, "n"))
 		case 3: // medium range
 			return strconv.Itoa(rapid.IntRange(-1_000_000, 1_000_000).Draw(t, "n"))
-		default: // large (exclude math.MinInt which overflows strconv.Atoi as a positive literal)
+		case 4: // minimum signed integer exercises unary literal handling
+			return strconv.Itoa(math.MinInt)
+		default: // large
 			n := rapid.IntRange(math.MinInt+1, math.MaxInt).Draw(t, "n")
 			return strconv.Itoa(n)
 		}
