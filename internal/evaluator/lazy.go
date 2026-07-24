@@ -170,11 +170,6 @@ func LazyFilterInScope(input *LazyValue, lambda *Lambda, scope *Scope) *LazyValu
 	}, scope.GoContext())
 }
 
-// LazyReduce aggregates a lazy stream using a lambda function and an initial value.
-func LazyReduce(input *LazyValue, lambda *Lambda, initial Value, evalCtx Context) *LazyValue {
-	return LazyReduceInScope(input, lambda, initial, NewScope(evalCtx))
-}
-
 // LazyReduceInScope aggregates a lazy stream using an explicit evaluation scope.
 func LazyReduceInScope(input *LazyValue, lambda *Lambda, initial Value, scope *Scope) *LazyValue {
 	if scope == nil {

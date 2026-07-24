@@ -91,19 +91,6 @@ func WriteCandidateScenarioToDir(dir string, a Artifact) (string, bool, error) {
 	return path, true, nil
 }
 
-// GenerateAllCandidates creates candidate scenarios for artifacts that do not
-// already have matching candidate files.
-func GenerateAllCandidates() ([]string, error) {
-	root, err := teststore.Root()
-	if err != nil {
-		return nil, fmt.Errorf("resolve intensive-testing dir: %w", err)
-	}
-	return GenerateAllCandidatesFromDirs(
-		filepath.Join(root, "failures"),
-		filepath.Join(root, "candidates"),
-	)
-}
-
 // GenerateAllCandidatesFromDirs is the directory-configurable variant used by tests.
 func GenerateAllCandidatesFromDirs(failuresDir, candidatesDir string) ([]string, error) {
 	artifacts, err := LoadArtifactsFromDir(failuresDir)

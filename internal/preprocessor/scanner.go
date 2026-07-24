@@ -1,12 +1,5 @@
 package preprocessor
 
-// IsOperatorChar returns true if ch is an operator character.
-func IsOperatorChar(ch byte) bool {
-	return ch == '+' || ch == '-' || ch == '*' || ch == '/' ||
-		ch == '=' || ch == '<' || ch == '>' || ch == '!' ||
-		ch == '(' || ch == '[' || ch == '{' || ch == ','
-}
-
 // IsClosingBracket returns true if ch is a closing bracket.
 func IsClosingBracket(ch byte) bool {
 	return ch == ')' || ch == ']' || ch == '}'

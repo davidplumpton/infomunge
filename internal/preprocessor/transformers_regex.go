@@ -182,11 +182,6 @@ func replaceRegexLiteralsWithMapping(s string) (string, []int) {
 	return buf.String(), buf.mapping
 }
 
-// IsRegexContext exposes regex context detection for comment stripping.
-func IsRegexContext(s string, i int) bool {
-	return isRegexContext(s, i)
-}
-
 // isRegexContext determines if a slash at position i should be interpreted as
 // the start of a regex literal based on the preceding context.
 func isRegexContext(s string, i int) bool {
@@ -195,11 +190,6 @@ func isRegexContext(s string, i int) bool {
 	}
 	lastKind := scanRegexPrefixKind(s, i)
 	return canStartRegexAfter(lastKind)
-}
-
-// ParseRegexLiteral exposes regex literal parsing for comment stripping.
-func ParseRegexLiteral(s string, start int) (end int, pattern string, flags string) {
-	return parseRegexLiteral(s, start)
 }
 
 // parseRegexLiteral parses a regex literal starting at position i.

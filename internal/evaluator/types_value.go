@@ -265,18 +265,6 @@ func AsLambda(v Value) (*Lambda, bool) {
 	return l, ok
 }
 
-// AsTypeDef extracts a TypeDef from a Value, returning false if not a typedef.
-func AsTypeDef(v Value) (*TypeDef, bool) {
-	t, ok := v.(*TypeDef)
-	return t, ok
-}
-
-// AsRegex extracts a Regex from a Value, returning false if not a regex.
-func AsRegex(v Value) (*Regex, bool) {
-	r, ok := v.(*Regex)
-	return r, ok
-}
-
 // IsNil returns true if the Value is nil.
 func IsNil(v Value) bool {
 	return v == nil

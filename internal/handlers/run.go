@@ -8,7 +8,6 @@ import (
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
 	inputio "infomunge/internal/io"
-	"infomunge/internal/output"
 	"infomunge/pkg/formats"
 )
 
@@ -112,9 +111,4 @@ func BuildRunContext(inputs []RunInput) (evaluator.Context, error) {
 		context[name] = value
 	}
 	return context, nil
-}
-
-// FormatRunResult formats the evaluation result into the appropriate output string.
-func FormatRunResult(result evaluator.Value, mimeType string, evalCtx evaluator.Context) (string, error) {
-	return output.FormatResult(result, mimeType, evalCtx)
 }

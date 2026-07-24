@@ -41,11 +41,6 @@ type DefaultVisitor struct {
 	depth int
 }
 
-// NewDefaultVisitor creates a new DefaultVisitor with the given context and depth.
-func NewDefaultVisitor(context Context, depth int) *DefaultVisitor {
-	return NewDefaultVisitorForScope(NewScope(context), depth)
-}
-
 // NewDefaultVisitorForScope creates a visitor with explicit runtime scope.
 func NewDefaultVisitorForScope(scope *Scope, depth int) *DefaultVisitor {
 	if scope == nil {

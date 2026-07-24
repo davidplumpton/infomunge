@@ -49,11 +49,6 @@ func FormatResultWithMetadata(result evaluator.Value, mimeType string, evalCtx e
 	return formats.Format(result, mimeType)
 }
 
-// XMLOptionsFromContext builds XML output options from centralized metadata.
-func XMLOptionsFromContext(evalCtx evaluator.Context) (formats.XMLOutputOptions, error) {
-	return XMLOptions(evalCtx, Metadata{})
-}
-
 // XMLOptions builds XML output options from explicit metadata and namespace vars.
 func XMLOptions(evalCtx evaluator.Context, metadata Metadata) (formats.XMLOutputOptions, error) {
 	opts := formats.XMLOutputOptions{

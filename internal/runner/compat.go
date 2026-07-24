@@ -37,28 +37,12 @@ func RunWithConfig(filePath string, opts RunnerOptions) error {
 	return executeAndPrintString(context.Background(), content, nil, opts)
 }
 
-// RunFromString executes an infomunge script from a string and prints formatted output.
-//
-// Deprecated: use ExecuteString and FormatExecutionResult in the caller-owned
-// adapter instead.
-func RunFromString(raw string) error {
-	return RunFromStringWithContext(raw, nil)
-}
-
 // RunFromStringWithContext executes an infomunge script with additional context variables.
 //
 // Deprecated: use ExecuteString and FormatExecutionResult in the caller-owned
 // adapter instead.
 func RunFromStringWithContext(raw string, additionalContext evaluator.Context) error {
 	return RunFromStringWithContextAndOptionsAndGoContext(context.Background(), raw, additionalContext, RunnerOptions{})
-}
-
-// RunFromStringWithContextAndOptions executes an infomunge script with additional context variables and options.
-//
-// Deprecated: use ExecuteString and FormatExecutionResult in the caller-owned
-// adapter instead.
-func RunFromStringWithContextAndOptions(raw string, additionalContext evaluator.Context, opts RunnerOptions) error {
-	return RunFromStringWithContextAndOptionsAndGoContext(context.Background(), raw, additionalContext, opts)
 }
 
 // RunFromStringWithContextAndOptionsAndGoContext executes an infomunge script with additional context variables, options, and Go context.

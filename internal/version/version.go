@@ -11,8 +11,3 @@ var (
 func String() string {
 	return Version
 }
-
-// FullString returns detailed version information
-func FullString() string {
-	return Version + " (commit: " + Commit + ", built: " + BuildDate + ")"
-}

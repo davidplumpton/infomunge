@@ -91,11 +91,6 @@ func configuredBinaryOperatorTransform(name string, phase TransformPhase, order 
 	}
 }
 
-// CreateCommentProcessingStage creates pipeline for source-preserving comment stripping.
-func CreateCommentProcessingStage() PipelineStage {
-	return createCommentProcessingStage(nil)
-}
-
 func createCommentProcessingStage(trace TransformTraceFunc) PipelineStage {
 	return newContractStage("Comment Processing", TransformPhaseComment, trace, []TransformContract{
 		exactTransform("stripLineComments", TransformPhaseComment, 10, TransformLoopOnce, stripLineCommentsWithMapping),
@@ -107,21 +102,10 @@ func stripLineCommentsWithMapping(input string) (string, []int) {
 	return result, identityMapping(len(result))
 }
 
-// CreateRegexLiteralStage creates pipeline for regex literal transformations.
-// This must run before other stages that might misinterpret slashes.
-func CreateRegexLiteralStage() PipelineStage {
-	return createRegexLiteralStage(nil)
-}
-
 func createRegexLiteralStage(trace TransformTraceFunc) PipelineStage {
 	return newContractStage("Regex Literal Processing", TransformPhaseRegex, trace, []TransformContract{
 		exactTransform("replaceRegexLiteralsWithMapping", TransformPhaseRegex, 10, TransformLoopOnce, replaceRegexLiteralsWithMapping),
 	})
-}
-
-// CreateWrapperProcessingStage creates pipeline for object-literal wrapper transformations.
-func CreateWrapperProcessingStage() PipelineStage {
-	return createWrapperProcessingStage(nil)
 }
 
 func createWrapperProcessingStage(trace TransformTraceFunc) PipelineStage {
@@ -155,11 +139,6 @@ func wrapTopLevelObjectLiteralWithMapping(input string) (string, []int) {
 	return result, wrapperPositions
 }
 
-// CreateCoreRewriterStage creates pipeline for the recursive byte-walking rewriter.
-func CreateCoreRewriterStage(opts Options) PipelineStage {
-	return createCoreRewriterStage(opts)
-}
-
 func createCoreRewriterStage(opts Options) PipelineStage {
 	return newContractStage("Core Rewriter", TransformPhaseRewrite, opts.TraceTransforms, []TransformContract{
 		exactErrorTransform("rewriteCoreSyntax", TransformPhaseRewrite, 10, TransformLoopOnce, func(input string) (string, []int, error) {
@@ -168,21 +147,11 @@ func createCoreRewriterStage(opts Options) PipelineStage {
 	})
 }
 
-// CreateStringProcessingStage creates pipeline for string-related transformations.
-func CreateStringProcessingStage() PipelineStage {
-	return createStringProcessingStage(nil)
-}
-
 func createStringProcessingStage(trace TransformTraceFunc) PipelineStage {
 	return newContractStage("String Processing", TransformPhaseString, trace, []TransformContract{
 		inferredTransform("replaceStringInterpolation", TransformPhaseString, 10, TransformLoopOnce, replaceStringInterpolation),
 		inferredTransform("replaceArrayRangeIndexing", TransformPhaseString, 20, TransformLoopOnce, replaceArrayRangeIndexing),
 	})
-}
-
-// CreateOperatorProcessingStage creates pipeline for low-precedence operator transformations.
-func CreateOperatorProcessingStage() PipelineStage {
-	return createOperatorProcessingStage(nil)
 }
 
 func createOperatorProcessingStage(trace TransformTraceFunc) PipelineStage {
@@ -196,11 +165,6 @@ func operatorProcessingContracts() []TransformContract {
 		configuredBinaryOperatorTransform("replaceThenOperator", TransformPhaseOperator, 30, binaryOpThen, TransformPrecedenceNullChain, TransformAssociativityLeft),
 		configuredBinaryOperatorTransform("replaceToOperator", TransformPhaseOperator, 40, binaryOpTo, TransformPrecedenceRange, TransformAssociativityLeft),
 	}
-}
-
-// CreateFunctionalProcessingStage creates pipeline for functional transformations.
-func CreateFunctionalProcessingStage() PipelineStage {
-	return createFunctionalProcessingStage(nil)
 }
 
 func createFunctionalProcessingStage(trace TransformTraceFunc) PipelineStage {
@@ -253,12 +217,6 @@ func functionalProcessingContracts() []TransformContract {
 	}
 }
 
-// CreateSelectorProcessingStage creates pipeline for selector transformations (.* and ..).
-// This must run before functional processing so selectors bind tightly.
-func CreateSelectorProcessingStage() PipelineStage {
-	return createSelectorProcessingStage(nil)
-}
-
 func createSelectorProcessingStage(trace TransformTraceFunc) PipelineStage {
 	return newContractStage("Selector Processing", TransformPhaseSelector, trace, []TransformContract{
 		inferredTransform("replaceFilterSelectors", TransformPhaseSelector, 10, TransformLoopOnce, replaceFilterSelectors),
@@ -267,22 +225,12 @@ func createSelectorProcessingStage(trace TransformTraceFunc) PipelineStage {
 	})
 }
 
-// CreateSyntaxProcessingStage creates pipeline for syntax transformations.
-func CreateSyntaxProcessingStage() PipelineStage {
-	return createSyntaxProcessingStage(nil)
-}
-
 func createSyntaxProcessingStage(trace TransformTraceFunc) PipelineStage {
 	return newContractStage("Syntax Processing", TransformPhaseSyntax, trace, []TransformContract{
 		exactTransform("replaceDotNotationWithMapping", TransformPhaseSyntax, 10, TransformLoopOnce, replaceDotNotationWithMapping),
 		inferredTransform("replaceKeyAttributes", TransformPhaseSyntax, 20, TransformLoopOnce, replaceKeyAttributes),
 		inferredTransform("replaceMultiStatementSequences", TransformPhaseSyntax, 30, TransformLoopOnce, replaceMultiStatementSequences),
 	})
-}
-
-// CreateFullPreprocessingPipeline builds the full PrepareForParsing transform pipeline.
-func CreateFullPreprocessingPipeline() *ModularPipeline {
-	return CreateFullPreprocessingPipelineWithOptions(Options{})
 }
 
 // CreateFullPreprocessingPipelineWithOptions builds the complete preprocessing
@@ -299,11 +247,6 @@ func CreateFullPreprocessingPipelineWithOptions(opts Options) *ModularPipeline {
 	stages = append(stages, postProcessingStages(opts)...)
 
 	return NewModularPipeline(stages)
-}
-
-// CreateModularPostProcessingPipeline builds the default post-rewriter pipeline.
-func CreateModularPostProcessingPipeline() *ModularPipeline {
-	return CreateModularPostProcessingPipelineWithOptions(Options{})
 }
 
 // CreateModularPostProcessingPipelineWithOptions builds the post-rewriter
