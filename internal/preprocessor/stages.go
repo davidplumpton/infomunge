@@ -64,6 +64,7 @@ func configuredBinaryOperatorTransform(name string, phase TransformPhase, order 
 		Associativity: associativity,
 		Mapping:       TransformMappingExact,
 		Loop:          TransformLoopFixpoint,
+		binaryOpKey:   key,
 		Handler: func(input string) (string, []int, error) {
 			return replaceConfiguredBinaryOperatorWithMapping(input, key)
 		},

@@ -65,6 +65,103 @@ func TestFunctionalContractsUseExactTypedOperatorMappings(t *testing.T) {
 	}
 }
 
+func TestConfiguredBinaryOperatorsPreserveMixedLeftAssociativity(t *testing.T) {
+	tests := []struct {
+		name     string
+		stage    PipelineStage
+		input    string
+		expected string
+	}{
+		{
+			name:     "onNull before then",
+			stage:    createOperatorProcessingStage(nil),
+			input:    "a onNull b then c",
+			expected: "then(onNull(a, b), c)",
+		},
+		{
+			name:     "then before onNull",
+			stage:    createOperatorProcessingStage(nil),
+			input:    "a then b onNull c",
+			expected: "onNull(then(a, b), c)",
+		},
+		{
+			name:     "splitBy before joinBy",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a splitBy b joinBy c",
+			expected: "joinBy(splitBy(a, b), c)",
+		},
+		{
+			name:     "joinBy before splitBy",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a joinBy b splitBy c",
+			expected: "splitBy(joinBy(a, b), c)",
+		},
+		{
+			name:     "all collection operators",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a ~ b find c splitBy d joinBy e",
+			expected: "joinBy(splitBy(find(__update(a, b), c), d), e)",
+		},
+		{
+			name:     "concatenate before remove",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a ++ b -- c",
+			expected: "__remove(__concat(a, b), c)",
+		},
+		{
+			name:     "remove before concatenate",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a -- b ++ c",
+			expected: "__concat(__remove(a, b), c)",
+		},
+		{
+			name:     "contains before matches",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a contains b matches c",
+			expected: "matches(contains(a, b), c)",
+		},
+		{
+			name:     "matches before contains",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a matches b contains c",
+			expected: "contains(matches(a, b), c)",
+		},
+		{
+			name:     "all comparison operators",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a contains b match c matches d",
+			expected: "matches(match(contains(a, b), c), d)",
+		},
+		{
+			name:     "mod before repeat",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a mod b repeat c",
+			expected: "repeat(mod(a, b), c)",
+		},
+		{
+			name:     "repeat before mod",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a repeat b mod c",
+			expected: "mod(repeat(a, b), c)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, mapping, err := tt.stage.Execute(tt.input, identityMapping(len(tt.input)))
+			if err != nil {
+				t.Fatalf("stage.Execute() error = %v", err)
+			}
+			if got != tt.expected {
+				t.Fatalf("stage.Execute() = %q, want %q", got, tt.expected)
+			}
+			if len(mapping) != len(got) {
+				t.Fatalf("mapping length = %d, want %d", len(mapping), len(got))
+			}
+		})
+	}
+}
+
 func TestFullPreprocessingPipelineUsesStandalonePostProcessingSuffix(t *testing.T) {
 	fullNames := CreateFullPreprocessingPipelineWithOptions(Options{}).GetStageNames()
 	postNames := CreateModularPostProcessingPipelineWithOptions(Options{}).GetStageNames()

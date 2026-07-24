@@ -351,8 +351,9 @@ func callBuiltinConcat(args []Value, e *ast.CallExpr) (Value, error) {
 }
 
 // callBuiltinRemove implements the __remove function (-- operator).
-// Supports: array -- value (remove value from array)
+// Supports: array -- array (remove the right-hand values)
 //
+//	array -- value (remove a single value, InfoMunge extension)
 //	object -- [keys] (remove keys from object)
 func callBuiltinRemove(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
@@ -381,17 +382,27 @@ func callBuiltinRemove(args []Value, e *ast.CallExpr) (Value, error) {
 		return result, nil
 	}
 
-	// Case 2: array -- value (remove value from array)
+	// Case 2: array -- array/value
 	array, ok := AsArray(args[0])
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("-- operator expects first argument to be an array or object, got %T", args[0]), e.Pos())
 	}
 
-	valueToRemove := args[1]
+	valuesToRemove, removeMany := AsArray(args[1])
+	if !removeMany {
+		valuesToRemove = Array{args[1]}
+	}
 	result := make(Array, 0, len(array))
 
 	for _, item := range array {
-		if !isEqual(item, valueToRemove) {
+		remove := false
+		for _, valueToRemove := range valuesToRemove {
+			if isEqual(item, valueToRemove) {
+				remove = true
+				break
+			}
+		}
+		if !remove {
 			result = append(result, item)
 		}
 	}

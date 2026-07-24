@@ -475,6 +475,34 @@ Feature: Concatenation and Remove Operators
       [1,3]
       """
 
+  Scenario: mixed concatenate and remove associate from the left
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] ++ [3] -- [1]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [2,3]
+      """
+
+  Scenario: remove before concatenate associates from the left
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] -- [2] ++ [3]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,3]
+      """
+
   Scenario: build string with concatenation
     Given the following input content:
       """

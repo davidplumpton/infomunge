@@ -95,6 +95,7 @@ type TransformContract struct {
 	Mapping       TransformMappingMode
 	Loop          TransformLoopMode
 	Handler       mappedErrorAwareHandler
+	binaryOpKey   string
 }
 
 type contractStage struct {
@@ -109,12 +110,42 @@ func newContractStage(name string, phase TransformPhase, trace TransformTraceFun
 	sort.SliceStable(ordered, func(i, j int) bool {
 		return ordered[i].Order < ordered[j].Order
 	})
+	configureBinaryOperatorAssociativity(ordered)
 
 	return &contractStage{
 		name:       name,
 		phase:      phase,
 		trace:      trace,
 		transforms: ordered,
+	}
+}
+
+func configureBinaryOperatorAssociativity(contracts []TransformContract) {
+	for i := range contracts {
+		contract := &contracts[i]
+		if contract.binaryOpKey == "" ||
+			contract.Precedence == TransformPrecedenceNone ||
+			contract.Associativity != TransformAssociativityLeft {
+			continue
+		}
+
+		peerOps := make([]string, 0)
+		for _, peer := range contracts {
+			if peer.binaryOpKey == "" ||
+				peer.Precedence != contract.Precedence ||
+				peer.Associativity != contract.Associativity {
+				continue
+			}
+			config, ok := binaryOperatorConfigs[peer.binaryOpKey]
+			if ok {
+				peerOps = append(peerOps, config.Operator)
+			}
+		}
+
+		key := contract.binaryOpKey
+		contract.Handler = func(input string) (string, []int, error) {
+			return replaceConfiguredBinaryOperatorWithMappingAndPeers(input, key, peerOps)
+		}
 	}
 }
 

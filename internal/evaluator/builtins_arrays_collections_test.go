@@ -1,6 +1,9 @@
 package evaluator
 
-import "testing"
+import (
+	"go/ast"
+	"testing"
+)
 
 func TestDistinctValuesUsesStructuralLanguageEquality(t *testing.T) {
 	values := Array{
@@ -46,6 +49,40 @@ func TestDistinctValuesTreatsExactlyEquivalentNumericTypesAsEqual(t *testing.T) 
 	}
 	if _, ok := result[0].(int); !ok {
 		t.Fatalf("distinctValues() did not preserve the first numeric representation: %#v", result[0])
+	}
+}
+
+func TestBuiltinRemoveSupportsArrayAndScalarRightOperands(t *testing.T) {
+	tests := []struct {
+		name     string
+		right    Value
+		expected Array
+	}{
+		{
+			name:     "array removes every listed value",
+			right:    Array{1, 3},
+			expected: Array{2, 2},
+		},
+		{
+			name:     "scalar removes every matching value",
+			right:    2,
+			expected: Array{1, 3},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := callBuiltinRemove(
+				[]Value{Array{1, 2, 3, 2}, tt.right},
+				&ast.CallExpr{},
+			)
+			if err != nil {
+				t.Fatalf("callBuiltinRemove() error = %v", err)
+			}
+			if !numericEquals(got, tt.expected) {
+				t.Fatalf("callBuiltinRemove() = %#v, want %#v", got, tt.expected)
+			}
+		})
 	}
 }
 

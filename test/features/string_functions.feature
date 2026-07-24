@@ -101,6 +101,20 @@ Feature: String Functions
       ""
       """
 
+  Scenario: splitBy followed by joinBy associates from the left
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "a,b" splitBy "," joinBy "-"
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      "a-b"
+      """
+
   Scenario: toLower and toUpper aliases
     Given the following input content:
       """

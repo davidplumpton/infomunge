@@ -55,6 +55,10 @@ func (mb *mappedBuffer) String() string {
 }
 
 func findLeftOperandStartBytesWithStops(result []byte, stops []byte) int {
+	return findLeftOperandStartBytesWithIgnoredOperators(result, stops, nil)
+}
+
+func findLeftOperandStartBytesWithIgnoredOperators(result []byte, stops []byte, ignoredOps []string) int {
 	pos := len(result) - 1
 
 	for pos >= 0 && isWhitespace(result[pos]) {
@@ -81,6 +85,10 @@ func findLeftOperandStartBytesWithStops(result []byte, stops []byte) int {
 		}
 
 		if depth == 0 {
+			if operatorStart, ok := ignoredOperatorEndingAt(result, pos, ignoredOps); ok {
+				pos = operatorStart - 1
+				continue
+			}
 			for _, stop := range stops {
 				if ch == stop {
 					return pos + 1
@@ -101,6 +109,32 @@ func findLeftOperandStartBytesWithStops(result []byte, stops []byte) int {
 	}
 
 	return 0
+}
+
+func ignoredOperatorEndingAt(result []byte, pos int, operators []string) (int, bool) {
+	for _, operator := range operators {
+		tokenStart := 0
+		for tokenStart < len(operator) && isWhitespace(operator[tokenStart]) {
+			tokenStart++
+		}
+		tokenEnd := len(operator)
+		for tokenEnd > tokenStart && isWhitespace(operator[tokenEnd-1]) {
+			tokenEnd--
+		}
+		token := operator[tokenStart:tokenEnd]
+		start := pos - len(token) + 1
+		if token == "" || start < 0 || string(result[start:pos+1]) != token {
+			continue
+		}
+		if tokenStart > 0 && (start == 0 || !isWhitespace(result[start-1])) {
+			continue
+		}
+		if tokenEnd < len(operator) && (pos+1 >= len(result) || !isWhitespace(result[pos+1])) {
+			continue
+		}
+		return start, true
+	}
+	return 0, false
 }
 
 func defaultStopBytes(extraStops []rune) []byte {

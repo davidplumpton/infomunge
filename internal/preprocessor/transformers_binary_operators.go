@@ -115,10 +115,15 @@ var binaryOperatorScanOverridesByKey = map[string]binaryOperatorScanOverrides{
 }
 
 func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, []int, error) {
+	return replaceConfiguredBinaryOperatorWithMappingAndPeers(s, key, nil)
+}
+
+func replaceConfiguredBinaryOperatorWithMappingAndPeers(s string, key string, peerOps []string) (string, []int, error) {
 	config, ok := binaryOperatorConfigs[key]
 	if !ok {
 		return s, identityMapping(len(s)), unifiederrors.ParseErrorf("missing binary operator config: %s", key)
 	}
+	rightStopOps := mergeOperatorStops(config.RightStopOps, peerOps)
 
 	buf := newMappedBuffer(len(s) + len(config.FuncName) + 4)
 	inString := false
@@ -139,7 +144,7 @@ func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, [
 		}
 
 		if !inString && i+opLen <= len(s) && s[i:i+opLen] == config.Operator {
-			leftStart := findLeftOperandStartBytesWithStops(buf.bytes, stopBytes)
+			leftStart := findLeftOperandStartBytesWithIgnoredOperators(buf.bytes, stopBytes, peerOps)
 			if scanOverrides.leftOperandStart != nil {
 				leftStart = scanOverrides.leftOperandStart(buf.bytes)
 			}
@@ -161,7 +166,7 @@ func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, [
 
 			rightStart := i + opLen
 			rightTrimStart, rightTrimEnd, rightEnd, ok := scanRightOperandBounds(s, rightStart, rightOperandScanConfig{
-				StopOps:       config.RightStopOps,
+				StopOps:       rightStopOps,
 				StopPredicate: scanOverrides.rightStopPredicate,
 			})
 			if !ok {
@@ -185,4 +190,19 @@ func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, [
 	}
 
 	return buf.String(), buf.mapping, nil
+}
+
+func mergeOperatorStops(existing, peers []string) []string {
+	merged := make([]string, 0, len(existing)+len(peers))
+	seen := make(map[string]struct{}, len(existing)+len(peers))
+	for _, stops := range [][]string{existing, peers} {
+		for _, stop := range stops {
+			if _, ok := seen[stop]; ok {
+				continue
+			}
+			seen[stop] = struct{}{}
+			merged = append(merged, stop)
+		}
+	}
+	return merged
 }
