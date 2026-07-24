@@ -195,6 +195,9 @@ go test -v ./test -run TestFeatures -count=1 -timeout 5m \
 go tool cover -func=tmp/cucumber.cover | tail -n 1
 ```
 
+See [docs/TESTING.md](docs/TESTING.md) for the authoritative test and coverage
+workflows, including the package-level coverage summary.
+
 ### Version Control
 
 This project uses `jj` for version control.

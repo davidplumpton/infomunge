@@ -76,6 +76,7 @@ Formula/bd.rb
 # Test coverage
 /coverage/
 *.coverprofile
+/coverage.html
 
 tmp/**
 !tmp/go.mod

@@ -57,8 +57,8 @@ if (pkg!="") { total[pkg]+=n; if (c>0) covered[pkg]+=n; } }
 END { for (p in total) printf "%s %.1f%% (%d/%d)\n", p, (covered[p]/total[p])*100, covered[p], total[p]; }' tmp/cucumber.cover | sort
 ```
 
-Baseline from the full Godog suite on **2026-02-14**:
-- `internal/evaluator`: `35.5%` (`1734/4882`)
-- `internal/preprocessor`: `74.3%` (`1798/2419`)
-- `internal/runner`: `36.7%` (`327/892`)
-- `pkg/formats`: `62.8%` (`1635/2605`)
+Baseline from the full Godog suite on **2026-07-24**:
+- `internal/evaluator`: `58.4%` (`2923/5005`)
+- `internal/preprocessor`: `78.5%` (`2082/2653`)
+- `internal/runner`: `73.3%` (`519/708`)
+- `pkg/formats`: `70.0%` (`1809/2585`)
