@@ -3,11 +3,44 @@ package test
 import (
 	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/cucumber/godog"
 	messages "github.com/cucumber/messages/go/v21"
 )
+
+func TestGodogHarnessFailsOnUndefinedStep(t *testing.T) {
+	t.Setenv("GODOG_FORMAT", failuresFormatName)
+	t.Setenv("GODOG_CONCURRENCY", "1")
+
+	featurePath := filepath.Join(t.TempDir(), "undefined.feature")
+	feature := []byte(`Feature: Strict step enforcement
+  Scenario: Undefined steps fail the suite
+    Given this step has deliberately not been registered
+`)
+	if err := os.WriteFile(featurePath, feature, 0o600); err != nil {
+		t.Fatalf("write test feature: %v", err)
+	}
+
+	var out bytes.Buffer
+	opts := newGodogOptions([]string{featurePath}, &out)
+	suite := godog.TestSuite{
+		ScenarioInitializer: func(*godog.ScenarioContext) {},
+		Options:             opts,
+	}
+
+	if status := suite.Run(); status == 0 {
+		t.Fatalf("strict Godog suite returned status 0 for an undefined step:\n%s", out.String())
+	}
+	assertContainsAll(t, out.String(),
+		"Non-passing steps:",
+		"undefined: Undefined steps fail the suite",
+		"this step has deliberately not been registered",
+	)
+}
 
 func TestFailuresFormatterReportsUndefinedStep(t *testing.T) {
 	var out bytes.Buffer

@@ -84,12 +84,7 @@ func TestFeatures(t *testing.T) {
 		}
 	}
 
-	opts := &godog.Options{
-		Format:      resolveGodogFormat(),
-		Paths:       paths,
-		Output:      os.Stdout, // Direct output to stdout for immediate feedback
-		Concurrency: resolveGodogConcurrency(),
-	}
+	opts := newGodogOptions(paths, os.Stdout)
 
 	if tags := os.Getenv("GODOG_TAGS"); tags != "" {
 		opts.Tags = tags
@@ -102,6 +97,16 @@ func TestFeatures(t *testing.T) {
 
 	if suite.Run() != 0 {
 		t.Fatal("non-zero status returned, failed to run feature tests")
+	}
+}
+
+func newGodogOptions(paths []string, output io.Writer) *godog.Options {
+	return &godog.Options{
+		Format:      resolveGodogFormat(),
+		Paths:       paths,
+		Output:      output,
+		Concurrency: resolveGodogConcurrency(),
+		Strict:      true,
 	}
 }
 
