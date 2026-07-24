@@ -33,6 +33,32 @@ Feature: Arrays Module
       2
       """
 
+  Scenario: Module function rejects a missing argument
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      import dw::core::Arrays
+      ---
+      Arrays::countBy([1, 2, 3])
+      """
+    When I run the application and it fails
+    Then the error should contain "function expects 2 arguments, got 1"
+    And the error should contain "5:1:"
+
+  Scenario: Module function rejects an extra argument
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      import dw::core::Arrays
+      ---
+      Arrays::countBy([1, 2, 3], (x) -> x > 1, "ignored")
+      """
+    When I run the application and it fails
+    Then the error should contain "function expects 2 arguments, got 3"
+    And the error should contain "5:1:"
+
   Scenario: divideBy splits arrays into chunks
     Given the following input content:
       """

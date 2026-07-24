@@ -227,6 +227,20 @@ func evalLambdaWithBindingsAtDepth(lambda *Lambda, caller *Scope, depth int, bin
 	return evalASTInScopeWithDepth(lambda.BodyAST, lambdaScope, depth)
 }
 
+// invokeUserLambda invokes a user-defined lambda or function with exact arity
+// and its captured lexical environment.
+func invokeUserLambda(lambda *Lambda, args []Value, callPos token.Pos, caller *Scope, depth int) (Value, error) {
+	if len(args) != lambda.ParamCount() {
+		return nil, newPosError(fmt.Sprintf("function expects %d arguments, got %d", lambda.ParamCount(), len(args)), callPos)
+	}
+
+	return evalLambdaWithBindingsAtDepth(lambda, caller, depth+1, func(bindings Context) {
+		for i, param := range lambda.Params {
+			bindings[param.Name] = args[i]
+		}
+	})
+}
+
 // copyContext creates a shallow copy of a context map for scope isolation.
 //
 // This function is essential for maintaining proper variable scoping during:
@@ -829,18 +843,4 @@ func extractNamespaceValue(obj Object) Value {
 		}
 	}
 	return nil
-}
-
-// callUserDefinedFunction calls a user-defined function (Lambda) with the provided arguments
-func callUserDefinedFunction(lambda *Lambda, args []Value, e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	if len(args) != lambda.ParamCount() {
-		return nil, newPosError(fmt.Sprintf("function expects %d arguments, got %d", lambda.ParamCount(), len(args)), e.Pos())
-	}
-
-	fnScope := scope.Copy()
-	for i, param := range lambda.Params {
-		fnScope.Vars[param.Name] = args[i]
-	}
-
-	return evalASTInScopeWithDepth(lambda.BodyAST, fnScope, depth+1)
 }

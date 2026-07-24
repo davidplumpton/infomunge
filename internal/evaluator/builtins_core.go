@@ -397,18 +397,7 @@ func callBuiltinModCall(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 		args = append(args, v)
 	}
 
-	return callUserLambda(l, args, scope, depth+1)
-}
-
-// callUserLambda invokes a user-defined Lambda with the given arguments.
-func callUserLambda(l *Lambda, args []Value, caller *Scope, depth int) (Value, error) {
-	return evalLambdaWithBindingsAtDepth(l, caller, depth, func(base Context) {
-		for i, param := range l.Params {
-			if i < len(args) {
-				base[param.Name] = args[i]
-			}
-		}
-	})
+	return invokeUserLambda(l, args, e.Pos(), scope, depth)
 }
 
 func callBuiltinCoerce(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {

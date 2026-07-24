@@ -207,7 +207,7 @@ func callBuiltinTry(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 
 	// If result is a zero-argument lambda, invoke it
 	if lambda, ok := result.(*Lambda); ok && lambda.ParamCount() == 0 {
-		result, err = callUserDefinedFunction(lambda, Array{}, e, scope, depth)
+		result, err = invokeUserLambda(lambda, nil, e.Pos(), scope, depth)
 		if err != nil {
 			errorObj := buildErrorObject(err)
 			return Object{
@@ -258,7 +258,7 @@ func callBuiltinOrElse(e *ast.CallExpr, scope *Scope, depth int) (Value, error) 
 
 	// If orElse is a zero-argument lambda, invoke it
 	if lambda, ok := orElseVal.(*Lambda); ok && lambda.ParamCount() == 0 {
-		return callUserDefinedFunction(lambda, Array{}, e, scope, depth)
+		return invokeUserLambda(lambda, nil, e.Pos(), scope, depth)
 	}
 
 	return orElseVal, nil
@@ -304,7 +304,7 @@ func callBuiltinOrElseTry(e *ast.CallExpr, scope *Scope, depth int) (Value, erro
 
 	// If orElse is a zero-argument lambda, invoke it
 	if lambda, ok := orElseVal.(*Lambda); ok && lambda.ParamCount() == 0 {
-		result, err := callUserDefinedFunction(lambda, Array{}, e, scope, depth)
+		result, err := invokeUserLambda(lambda, nil, e.Pos(), scope, depth)
 		if err != nil {
 			errorObj := buildErrorObject(err)
 			return Object{

@@ -262,7 +262,7 @@ Feature: Core evaluator runner coverage
 
   # --- User-defined function wrong arity (callUserDefinedFunction error) ---
 
-  Scenario: User-defined function wrong arity fails
+  Scenario: User-defined function rejects an extra argument
     Given the following script:
       """
       %im 0.1
@@ -271,7 +271,20 @@ Feature: Core evaluator runner coverage
       ---
       greet("Alice", "Bob")
       """
-    Then running the script should fail with error containing "expects"
+    Then running the script should fail with error containing "function expects 1 arguments, got 2"
+    And running the script should fail with error containing "5:1:"
+
+  Scenario: User-defined function rejects a missing argument
+    Given the following script:
+      """
+      %im 0.1
+      fun greet(name) = "Hi " ++ name
+      output application/json
+      ---
+      greet()
+      """
+    Then running the script should fail with error containing "function expects 1 arguments, got 0"
+    And running the script should fail with error containing "5:1:"
 
   # --- Error formatting (FormatParseError, FormatEvalError, offsetToLineCol) ---
 

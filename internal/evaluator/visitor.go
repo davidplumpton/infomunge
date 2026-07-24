@@ -295,22 +295,9 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 			if err != nil {
 				return nil, err
 			}
-			return callUserDefinedFunctionWithVisitor(lambda, args, e, visitor.scope, visitor.depth)
+			return invokeUserLambda(lambda, args, e.Pos(), visitor.scope, visitor.depth)
 		}
 	}
 
 	return nil, newPosError(fmt.Sprintf("undefined function: %s", fun.Name), fun.Pos())
-}
-
-// callUserDefinedFunctionWithVisitor calls a user-defined function using lexical scope.
-func callUserDefinedFunctionWithVisitor(lambda *Lambda, args []Value, e *ast.CallExpr, caller *Scope, depth int) (Value, error) {
-	if len(args) != lambda.ParamCount() {
-		return nil, newPosError(fmt.Sprintf("function expects %d arguments, got %d", lambda.ParamCount(), len(args)), e.Pos())
-	}
-
-	fnScope := newLambdaInvocationScope(lambda, caller)
-	for i, param := range lambda.Params {
-		fnScope.Vars[param.Name] = args[i]
-	}
-	return evalASTInScopeWithDepth(lambda.BodyAST, fnScope, depth+1)
 }

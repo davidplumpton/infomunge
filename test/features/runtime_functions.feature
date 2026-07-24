@@ -163,6 +163,29 @@ Feature: Runtime Functions
       {"result":[2,4,6],"success":true}
       """
 
+  Scenario: try-family lambdas use their captured lexical scope
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      do {
+        var offset = 5
+        var captured = () -> offset
+        ---
+        do {
+          var offset = 100
+          ---
+          [try(captured).result, orElse(try(() -> fail("first")), captured), orElseTry(try(() -> fail("second")), captured).result]
+        }
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [5,5,5]
+      """
+
   Scenario: try requires exactly one argument
     Given the following input content:
       """
