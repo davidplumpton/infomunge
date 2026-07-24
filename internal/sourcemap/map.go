@@ -133,8 +133,14 @@ func (m Map) FormatParseError(err error) error {
 
 // FormatEvalError converts evaluator positional errors back to original-source coordinates.
 func (m Map) FormatEvalError(err error) error {
-	if unifiedErr, ok := err.(*unifiederrors.Error); ok && unifiedErr.Position != nil {
-		return fmt.Errorf("%s:%d:%d: %s", unifiedErr.Position.Filename, unifiedErr.Position.Line, unifiedErr.Position.Column, unifiedErr.Message)
+	if unifiedErr, ok := err.(*unifiederrors.Error); ok {
+		if unifiedErr.Position != nil {
+			return fmt.Errorf("%s:%d:%d: %s", unifiedErr.Position.Filename, unifiedErr.Position.Line, unifiedErr.Position.Column, unifiedErr.Message)
+		}
+		if generatedPos, ok := unifiedErr.GeneratedPosition(); ok {
+			pos := m.PositionForGeneratedOffset(int(generatedPos) - 1)
+			return fmt.Errorf("%d:%d: %s", pos.Line, pos.Column, unifiedErr.Message)
+		}
 	}
 
 	var pe interface{ Pos() token.Pos }

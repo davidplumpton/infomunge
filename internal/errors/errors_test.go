@@ -47,6 +47,31 @@ func TestEvalPositionalUsesFileSetPosition(t *testing.T) {
 	}
 }
 
+func TestEvalPositionalPreservesGeneratedPositionWithoutFileSet(t *testing.T) {
+	err := EvalPositional("unknown variable", token.Pos(7), nil)
+
+	if err.Position != nil {
+		t.Fatalf("Position = %#v, want nil until source-map resolution", err.Position)
+	}
+	if got, ok := err.GeneratedPosition(); !ok || got != token.Pos(7) {
+		t.Fatalf("GeneratedPosition() = (%d, %t), want (7, true)", got, ok)
+	}
+	if got, want := err.Error(), "EvalError: unknown variable"; got != want {
+		t.Fatalf("Error() = %q, want %q", got, want)
+	}
+}
+
+func TestEvalPositionalDoesNotAttachInvalidFileSetPosition(t *testing.T) {
+	err := EvalPositional("unknown variable", token.Pos(7), token.NewFileSet())
+
+	if err.Position != nil {
+		t.Fatalf("Position = %#v, want nil for an unresolved file-set position", err.Position)
+	}
+	if got, ok := err.GeneratedPosition(); !ok || got != token.Pos(7) {
+		t.Fatalf("GeneratedPosition() = (%d, %t), want (7, true)", got, ok)
+	}
+}
+
 func TestWrapPreservesCauseAndMatchesType(t *testing.T) {
 	cause := stderrors.New("decode failed")
 	err := WrapValidationf(cause, "invalid %s", "payload")

@@ -72,6 +72,17 @@ Feature: Error Reporting
     When I run the application and it fails
     Then the error should contain "3:1:"
 
+  Scenario: Builtin runtime errors report their source position
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+        sqrt(-1)
+      """
+    When I run the application and it fails
+    Then the error should contain "4:3: sqrt: cannot take square root of negative number -1"
+
   Scenario: Syntax error after a line comment preserves line numbers
     Given the following input content:
       """

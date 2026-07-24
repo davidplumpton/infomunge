@@ -3,6 +3,8 @@ package evaluator
 import (
 	"strings"
 	"testing"
+
+	unifiederrors "infomunge/internal/errors"
 )
 
 func TestEvaluate_BasicLiterals(t *testing.T) {
@@ -138,6 +140,34 @@ func TestEvaluate_IdentifierResolution(t *testing.T) {
 				t.Fatalf("expected positional error, got: %v", err)
 			}
 		})
+	}
+}
+
+func TestEvaluate_BuiltinErrorUsesMappedGeneratedPosition(t *testing.T) {
+	expr := "\n  sqrt(-1)"
+	mapping := make([]int, len(expr))
+	for i := range mapping {
+		mapping[i] = i
+	}
+
+	_, err := Evaluate(expr, nil, mapping, 0, expr)
+	if err == nil {
+		t.Fatal("expected sqrt error")
+	}
+	if got, want := err.Error(), "2:3: sqrt: cannot take square root of negative number -1"; got != want {
+		t.Fatalf("error = %q, want %q", got, want)
+	}
+
+	rawErr := newPosError("representative builtin failure", 4)
+	typedErr, ok := rawErr.(*unifiederrors.Error)
+	if !ok {
+		t.Fatalf("newPosError() type = %T, want *errors.Error", rawErr)
+	}
+	if typedErr.Type != unifiederrors.TypeEval {
+		t.Fatalf("newPosError().Type = %q, want %q", typedErr.Type, unifiederrors.TypeEval)
+	}
+	if typedErr.Message != "representative builtin failure" {
+		t.Fatalf("newPosError().Message = %q, want %q", typedErr.Message, "representative builtin failure")
 	}
 }
 

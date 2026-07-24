@@ -26,10 +26,11 @@ type Position struct {
 
 // Error represents a unified error with position and cause information.
 type Error struct {
-	Type     ErrorType
-	Message  string
-	Position *Position
-	Cause    error
+	Type         ErrorType
+	Message      string
+	Position     *Position
+	Cause        error
+	generatedPos token.Pos
 }
 
 func (e *Error) Error() string {
@@ -92,14 +93,23 @@ func (e *Error) WithPosition(pos token.Position) *Error {
 	return e
 }
 
+// GeneratedPosition returns the unresolved parser position carried by an error.
+// Callers with a source map can use it when an absolute Position is unavailable.
+func (e *Error) GeneratedPosition() (token.Pos, bool) {
+	return e.generatedPos, e.generatedPos.IsValid()
+}
+
 func (e *Error) withPos(pos token.Pos, fset *token.FileSet) *Error {
+	e.generatedPos = pos
 	if fset != nil {
 		position := fset.Position(pos)
-		e.Position = &Position{
-			Filename: position.Filename,
-			Offset:   position.Offset,
-			Line:     position.Line,
-			Column:   position.Column,
+		if position.IsValid() {
+			e.Position = &Position{
+				Filename: position.Filename,
+				Offset:   position.Offset,
+				Line:     position.Line,
+				Column:   position.Column,
+			}
 		}
 	}
 	return e

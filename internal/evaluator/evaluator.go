@@ -115,7 +115,7 @@ func (e *posError) Pos() token.Pos {
 
 // newPosError creates a new positional error
 func newPosError(msg string, pos token.Pos) error {
-	return unifiederrors.EvalPositional(msg, pos, token.NewFileSet())
+	return unifiederrors.EvalPositional(msg, pos, nil)
 }
 
 // Evaluate parses and evaluates the expression.

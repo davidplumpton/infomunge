@@ -101,6 +101,18 @@ func TestExecuteStringResolvedValue(t *testing.T) {
 	}
 }
 
+func TestExecuteStringRemapsBuiltinErrorPosition(t *testing.T) {
+	script := "%im 0.1\noutput application/json\n---\n  sqrt(-1)"
+
+	_, err := ExecuteString(t.Context(), script, nil, RunnerOptions{})
+	if err == nil {
+		t.Fatal("expected sqrt error")
+	}
+	if got, want := err.Error(), "4:3: sqrt: cannot take square root of negative number -1"; got != want {
+		t.Fatalf("ExecuteString() error = %q, want %q", got, want)
+	}
+}
+
 func TestUnquoteOptionValue(t *testing.T) {
 	tests := []struct {
 		name       string
