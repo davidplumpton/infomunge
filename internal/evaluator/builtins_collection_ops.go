@@ -351,7 +351,11 @@ func callBuiltinSome(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 
 	found := false
 	err = executeLambdaOnArrayElements(array, lambda, scope, depth, func(_ Value, _ int, result Value) error {
-		if boolResult, ok := result.(bool); ok && boolResult {
+		boolResult, ok := result.(bool)
+		if !ok {
+			return newLambdaWrongReturnError("some", "a boolean", result, e.Args[1].Pos())
+		}
+		if boolResult {
 			found = true
 		}
 		return nil
@@ -371,7 +375,11 @@ func callBuiltinEvery(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 
 	allTrue := true
 	err = executeLambdaOnArrayElements(array, lambda, scope, depth, func(_ Value, _ int, result Value) error {
-		if boolResult, ok := result.(bool); ok && !boolResult {
+		boolResult, ok := result.(bool)
+		if !ok {
+			return newLambdaWrongReturnError("every", "a boolean", result, e.Args[1].Pos())
+		}
+		if !boolResult {
 			allTrue = false
 		}
 		return nil

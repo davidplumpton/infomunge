@@ -56,7 +56,7 @@
 
 [27] **Parser Fragility Notes** - Inline `if` expressions inside object literals and dense object-value expressions have repeatedly hit brace/branch scanning bugs. For unrelated coverage, use simpler objects, arrays, defaults, or isolate conditionals in parser-specific tests.
 
-[28] **Generated Test Data Pitfalls** - Property-generated source literals should avoid scientific notation and parser-active string sequences such as interpolation-looking `$(` unless explicitly testing those paths.
+[28] **Generated Test Data Pitfalls** - Property-generated source literals should avoid scientific notation and parser-active string sequences such as interpolation-looking `$(` unless explicitly testing those paths. Do not assume numeric source literals evaluate as `float64`; assert the runtime representation when an error test exposes Go types (whole-number literals can be `int`).
 
 [29] **Error Context Discipline** - When changing wrapped error messages or unified error plumbing, verify final rendered CLI stderr/output and preserve essential context such as filenames. Evaluator errors that must flow through source-map remapping currently need a `posError` carrying the generated AST position; `newPosError` eagerly attaches a position through an empty file set and can render as `0:0` (tracked for a repository-wide fix).
 

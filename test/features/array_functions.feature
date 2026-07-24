@@ -904,6 +904,26 @@ Feature: Array Functions
      When I run the application with this content
      Then the output should be true
 
+   Scenario Outline: <builtin> rejects a <result_type> predicate result
+     Given the following input content:
+       """
+       %im 0.1
+       output application/json
+       ---
+       <builtin>([1], (x) -> <predicate_result>)
+       """
+     When I run the application and it fails
+     Then the output should contain "<builtin> lambda must return a boolean, got <go_type>"
+
+     Examples:
+       | builtin | result_type | predicate_result | go_type |
+       | some    | number      | 1                | int     |
+       | some    | string      | "yes"            | string  |
+       | some    | null        | null             | <nil>   |
+       | every   | number      | 1                | int     |
+       | every   | string      | "yes"            | string  |
+       | every   | null        | null             | <nil>   |
+
    Scenario: some requires lambda
      Given the following input content:
        """
