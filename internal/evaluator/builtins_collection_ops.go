@@ -287,15 +287,31 @@ func callBuiltinOrderBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 		}
 	}
 
-	// Sort the elements by their keys
-	sort.Slice(elements, func(i, j int) bool {
+	// Sort the elements by their keys. sort callbacks cannot return errors, so
+	// retain the first comparison failure and report it after sorting stops.
+	var comparisonErr error
+	sort.SliceStable(elements, func(i, j int) bool {
+		if comparisonErr != nil {
+			return false
+		}
 		cmp, err := compareValues(elements[i].key, elements[j].key)
 		if err != nil {
-			// If there's an error comparing, maintain order
-			return elements[i].index < elements[j].index
+			comparisonErr = fmt.Errorf(
+				"cannot compare keys at indexes %d and %d: %w",
+				elements[i].index,
+				elements[j].index,
+				err,
+			)
+			return false
 		}
 		return cmp < 0
 	})
+	if comparisonErr != nil {
+		return nil, &posError{
+			msg: fmt.Sprintf("orderBy: %s", comparisonErr),
+			pos: e.Args[0].Pos(),
+		}
+	}
 
 	// Extract sorted elements
 	result := make(Array, len(elements))

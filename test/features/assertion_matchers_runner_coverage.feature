@@ -24,6 +24,20 @@ Feature: Assertion matchers runner coverage
       """
     Then running the script should fail with error containing "cannot compare values"
 
+  Scenario: Comparison matchers preserve large integer precision
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      must(9007199254740993, beGreaterThan(9007199254740992))
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"Success":true,"Message":""}
+      """
+
   Scenario: must rejects non-matcher input
     Given the following script:
       """

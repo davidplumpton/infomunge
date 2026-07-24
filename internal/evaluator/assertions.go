@@ -381,17 +381,13 @@ func isEqual(a, b Value) bool {
 }
 
 func compareValues(a, b Value) (int, error) {
-	// Try numeric comparison first
-	aNum, aIsNum := ToFloat(a)
-	bNum, bIsNum := ToFloat(b)
+	// Compare the exact numeric values represented by ints and float64s. This
+	// must stay aligned with relational operators so adjacent integers above
+	// 2^53 do not collapse when an int is converted to float64.
+	aNum, aIsNum := exactNumericRat(a)
+	bNum, bIsNum := exactNumericRat(b)
 	if aIsNum && bIsNum {
-		if aNum < bNum {
-			return -1, nil
-		}
-		if aNum > bNum {
-			return 1, nil
-		}
-		return 0, nil
+		return aNum.Cmp(bNum), nil
 	}
 
 	// Try string comparison

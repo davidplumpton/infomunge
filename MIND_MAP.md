@@ -58,10 +58,12 @@
 
 [28] **Generated Test Data Pitfalls** - Property-generated source literals should avoid scientific notation and parser-active string sequences such as interpolation-looking `$(` unless explicitly testing those paths.
 
-[29] **Error Context Discipline** - When changing wrapped error messages or unified error plumbing, verify final rendered CLI stderr/output and preserve essential context such as filenames.
+[29] **Error Context Discipline** - When changing wrapped error messages or unified error plumbing, verify final rendered CLI stderr/output and preserve essential context such as filenames. Evaluator errors that must flow through source-map remapping currently need a `posError` carrying the generated AST position; `newPosError` eagerly attaches a position through an empty file set and can render as `0:0` (tracked for a repository-wide fix).
 
 [30] **Context Refactor Discipline** - Preserve existing public/internal call signatures where practical by adding context-aware variants first, then migrate call sites incrementally to reduce compile fallout.
 
 [31] **Server Exposure Safety** - HTTP server mode defaults to `127.0.0.1:8080`. Unauthenticated server mode accepts only loopback listen hosts; configuring a non-loopback or wildcard address requires `--api-key` because `/run` evaluates caller-supplied scripts.
 
 [32] **Object Order** - `Object` remains a map alias for API compatibility. Order-aware construction uses `values.NewObject` plus `values.SetObjectValue`; observable iteration uses `values.ObjectKeys`, which preserves tracked insertion order and alphabetically sorts legacy untracked maps. Structured readers and object-producing evaluator paths must propagate this metadata, while structural equality remains order-insensitive. The metadata registry uses allocation-aware weak map identities, runtime cleanup callbacks, and opportunistic dead-entry sweeps so it does not retain maps, accumulate reclaimed entries, or confuse a recycled address with its prior allocation.
+
+[33] **Assertion Result Semantics** - `must(value, matcher)` returns the successful `MatcherResult` object (`{"Success":true,"Message":""}`), while `assert` and `assertThat` return the asserted value. Cucumber output expectations must reflect the chosen assertion API.

@@ -371,6 +371,61 @@ Feature: Aggregation Functions
       [{"priority":2},{"priority":5},{"priority":8}]
       """
 
+  Scenario: sort distinguishes adjacent integers above the exact float range
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      sort([9007199254740993, 9007199254740992])
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [9007199254740992,9007199254740993]
+      """
+
+  Scenario: orderBy distinguishes adjacent integers above the exact float range
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [9007199254740993, 9007199254740992] orderBy $
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [9007199254740992,9007199254740993]
+      """
+
+  Scenario: minBy and maxBy distinguish adjacent integers above the exact float range
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [[9007199254740993, 9007199254740992] minBy $, [9007199254740992, 9007199254740993] maxBy $]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [9007199254740992,9007199254740993]
+      """
+
+  Scenario: orderBy reports incomparable key positions
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, "2", 0] orderBy $
+      """
+    When I run the application and it fails
+    Then the error should contain "orderBy: cannot compare keys at indexes"
+    And the error should contain "cannot compare values"
+    And the error should contain "4:1:"
+
   Scenario: sum with strings converted to numbers
     Given the following input content:
       """

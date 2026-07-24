@@ -179,35 +179,24 @@ func callBuiltinSort(args []Value, e *ast.CallExpr) (Value, error) {
 		}
 	}
 
-	if allNumbers {
-		sort.Slice(result, func(i, j int) bool {
-			var af float64
-			switch v := result[i].(type) {
-			case int:
-				af = float64(v)
-			case float64:
-				af = v
-			}
+	if !allNumbers && !allStrings {
+		return nil, newPosError("sort only supports arrays of numbers or strings; element types cannot be mixed", e.Pos())
+	}
 
-			var bf float64
-			switch v := result[j].(type) {
-			case int:
-				bf = float64(v)
-			case float64:
-				bf = v
-			}
-
-			return af < bf
-		})
-	} else if allStrings {
-		sort.Slice(result, func(i, j int) bool {
-			as, okA := result[i].(string)
-			bs, okB := result[j].(string)
-			if !okA || !okB {
-				return false
-			}
-			return as < bs
-		})
+	var comparisonErr error
+	sort.SliceStable(result, func(i, j int) bool {
+		if comparisonErr != nil {
+			return false
+		}
+		cmp, err := compareValues(result[i], result[j])
+		if err != nil {
+			comparisonErr = err
+			return false
+		}
+		return cmp < 0
+	})
+	if comparisonErr != nil {
+		return nil, newPosError(fmt.Sprintf("sort: %s", comparisonErr), e.Pos())
 	}
 
 	return result, nil
