@@ -522,6 +522,114 @@ Feature: Operator transformer rewrite coverage
     When I run the script
     Then the output should be true
 
+  # --- Higher-precedence additive left operands ---
+
+  Scenario: Concatenated arrays feed joinBy
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ["a"] ++ ["b"] joinBy "-"
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "a-b"
+      """
+
+  Scenario: Concatenated arrays feed contains
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1] ++ [2] contains 2
+      """
+    When I run the script
+    Then the output should be true
+
+  Scenario: Concatenated strings feed matches as one left operand
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "a" ++ "b" matches /ab/
+      """
+    When I run the script
+    Then the output should be true
+
+  Scenario: Concatenated strings feed match as one left operand
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "a" ++ "b" match /(ab)/
+      """
+    When I run the script
+    Then the output should be:
+      """
+      ["ab","ab"]
+      """
+
+  Scenario: Concatenated strings feed scan as one left operand
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "a" ++ "1" scan /([0-9])/
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [["1","1"]]
+      """
+
+  Scenario: Concatenated arrays feed find
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ["a"] ++ ["b"] find "b"
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [1]
+      """
+
+  Scenario: Split and concatenated arrays feed joinBy
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "a,b" splitBy "," ++ ["c"] joinBy "-"
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "a-b-c"
+      """
+
+  Scenario: Removed range values feed joinBy
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      1 to 3 -- [2] joinBy "-"
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "1-3"
+      """
+
   # --- Infix default and onNull operators ---
 
   Scenario: Infix default operator with null

@@ -124,15 +124,23 @@ var binaryOperatorScanOverridesByKey = map[string]binaryOperatorScanOverrides{
 }
 
 func replaceConfiguredBinaryOperatorWithMapping(s string, key string) (string, []int, error) {
-	return replaceConfiguredBinaryOperatorWithMappingAndPeers(s, key, nil)
+	return replaceConfiguredBinaryOperatorWithMappingAndPrecedence(s, key, nil, nil, nil)
 }
 
-func replaceConfiguredBinaryOperatorWithMappingAndPeers(s string, key string, peerOps []string) (string, []int, error) {
+func replaceConfiguredBinaryOperatorWithMappingAndPrecedence(
+	s string,
+	key string,
+	peerOps []string,
+	higherPrecedenceOps []string,
+	lowerPrecedenceOps []string,
+) (string, []int, error) {
 	config, ok := binaryOperatorConfigs[key]
 	if !ok {
 		return s, identityMapping(len(s)), unifiederrors.ParseErrorf("missing binary operator config: %s", key)
 	}
 	rightStopOps := mergeOperatorStops(config.RightStopOps, peerOps)
+	rightStopOps = mergeOperatorStops(rightStopOps, lowerPrecedenceOps)
+	leftIgnoredOps := mergeOperatorStops(peerOps, higherPrecedenceOps)
 
 	buf := newMappedBuffer(len(s) + len(config.FuncName) + 4)
 	inString := false
@@ -153,7 +161,7 @@ func replaceConfiguredBinaryOperatorWithMappingAndPeers(s string, key string, pe
 		}
 
 		if !inString && i+opLen <= len(s) && s[i:i+opLen] == config.Operator {
-			leftStart := findLeftOperandStartBytesWithIgnoredOperators(buf.bytes, stopBytes, peerOps)
+			leftStart := findLeftOperandStartBytesWithIgnoredOperators(buf.bytes, stopBytes, leftIgnoredOps)
 			if scanOverrides.leftOperandStart != nil {
 				leftStart = scanOverrides.leftOperandStart(buf.bytes)
 			}

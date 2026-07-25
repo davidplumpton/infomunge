@@ -113,7 +113,7 @@ func newContractStage(name string, phase TransformPhase, trace TransformTraceFun
 	sort.SliceStable(ordered, func(i, j int) bool {
 		return ordered[i].Order < ordered[j].Order
 	})
-	configureBinaryOperatorAssociativity(ordered)
+	configureBinaryOperatorPrecedence(ordered)
 
 	return &contractStage{
 		name:       name,
@@ -123,7 +123,12 @@ func newContractStage(name string, phase TransformPhase, trace TransformTraceFun
 	}
 }
 
-func configureBinaryOperatorAssociativity(contracts []TransformContract) {
+// configureBinaryOperatorPrecedence derives operand scan boundaries from each
+// configured operator's declared precedence. A left-associative operator
+// crosses same-precedence peers on its left and stops before them on its right.
+// Higher-precedence operators remain inside either operand, while
+// lower-precedence operators bound the right operand.
+func configureBinaryOperatorPrecedence(contracts []TransformContract) {
 	for i := range contracts {
 		contract := &contracts[i]
 		if contract.binaryOpKey == "" ||
@@ -133,21 +138,37 @@ func configureBinaryOperatorAssociativity(contracts []TransformContract) {
 		}
 
 		peerOps := make([]string, 0)
+		higherPrecedenceOps := make([]string, 0)
+		lowerPrecedenceOps := make([]string, 0)
 		for _, peer := range contracts {
-			if peer.binaryOpKey == "" ||
-				peer.Precedence != contract.Precedence ||
-				peer.Associativity != contract.Associativity {
+			if peer.binaryOpKey == "" || peer.Precedence == TransformPrecedenceNone {
 				continue
 			}
 			config, ok := binaryOperatorConfigs[peer.binaryOpKey]
-			if ok {
+			if !ok {
+				continue
+			}
+			if peer.Precedence == contract.Precedence &&
+				peer.Associativity == contract.Associativity {
 				peerOps = append(peerOps, config.Operator)
+			}
+			if peer.Precedence > contract.Precedence {
+				higherPrecedenceOps = append(higherPrecedenceOps, config.Operator)
+			}
+			if peer.Precedence < contract.Precedence {
+				lowerPrecedenceOps = append(lowerPrecedenceOps, config.Operator)
 			}
 		}
 
 		key := contract.binaryOpKey
 		contract.Handler = func(input string) (string, []int, error) {
-			return replaceConfiguredBinaryOperatorWithMappingAndPeers(input, key, peerOps)
+			return replaceConfiguredBinaryOperatorWithMappingAndPrecedence(
+				input,
+				key,
+				peerOps,
+				higherPrecedenceOps,
+				lowerPrecedenceOps,
+			)
 		}
 	}
 }
