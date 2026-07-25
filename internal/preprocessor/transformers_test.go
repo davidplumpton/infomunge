@@ -27,6 +27,13 @@ func TestReplaceImplicitLambdas(t *testing.T) {
 		{"map interpolates index string", `payload map "$$"`, `payload map (__arg, __idx) -> ("" + (__idx))`},
 		{"filter interpolates dollar string", `payload filter ("$" == "1")`, `payload filter (__arg) -> (("" + (__arg)) == "1")`},
 		{"regex payload preserves anchor", `payload map ($ matches regex("a$", ""))`, `payload map (__arg) -> (__arg matches regex("a$", ""))`},
+		{"grouped map stops before concatenate", `payload map ($ + 1) ++ [9]`, `payload map ((__arg) -> (__arg + 1)) ++ [9]`},
+		{"grouped map stops before joinBy", `payload map ($ + 1) joinBy "-"`, `payload map ((__arg) -> (__arg + 1)) joinBy "-"`},
+		{"grouped map stops before contains", `payload map ($ + 1) contains 2`, `payload map ((__arg) -> (__arg + 1)) contains 2`},
+		{"grouped map stops before matches", `payload map ($) matches regex("a", "")`, `payload map ((__arg) -> (__arg)) matches regex("a", "")`},
+		{"grouped map stops before mod", `payload map ($ + 1) mod 2`, `payload map ((__arg) -> (__arg + 1)) mod 2`},
+		{"grouped map keeps comparison in body", `payload map ($ + 1) > 2`, `payload map (__arg) -> (__arg + 1) > 2`},
+		{"grouped map keeps coercion in body", `payload map ($) as String`, `payload map (__arg) -> (__arg) as String`},
 	}
 
 	for _, tt := range tests {
@@ -342,6 +349,12 @@ func TestReplaceCollectionOperator(t *testing.T) {
 		{"mapObject includes object merge source", `{a: 1} ++ {b: 2} mapObject __lambda("v, k", v)`, `mapObject({a: 1} ++ {b: 2}, __lambda("v, k", v))`, replaceMapObjectOperator},
 		{"map includes string concatenation source", `"a" ++ "b" map __lambda("x", x)`, `__map("a" ++ "b", __lambda("x", x))`, replaceMapOperator},
 		{"map stops before next collection operator", `arr map __lambda("x", (x + 1)) filter __lambda("x", x > 1)`, `__map(arr, __lambda("x", (x + 1))) filter __lambda("x", x > 1)`, replaceMapOperator},
+		{"map stops before downstream concatenate", `arr map __lambda("x", x + 1) ++ [9]`, `__map(arr, __lambda("x", x + 1)) ++ [9]`, replaceMapOperator},
+		{"map stops before downstream remove", `arr map __lambda("x", x + 1) -- [2]`, `__map(arr, __lambda("x", x + 1)) -- [2]`, replaceMapOperator},
+		{"map stops before downstream joinBy", `arr map __lambda("x", x + 1) joinBy "-"`, `__map(arr, __lambda("x", x + 1)) joinBy "-"`, replaceMapOperator},
+		{"map stops before downstream contains", `arr map __lambda("x", x + 1) contains 2`, `__map(arr, __lambda("x", x + 1)) contains 2`, replaceMapOperator},
+		{"map stops before downstream matches", `arr map __lambda("x", x) matches pattern`, `__map(arr, __lambda("x", x)) matches pattern`, replaceMapOperator},
+		{"map stops before downstream mod", `arr map __lambda("x", x + 1) mod 2`, `__map(arr, __lambda("x", x + 1)) mod 2`, replaceMapOperator},
 	}
 
 	for _, tt := range tests {
@@ -369,6 +382,50 @@ func TestIsCollectionOperatorHelpers(t *testing.T) {
 	}
 	if isCollectionOperatorAt(input, 0) {
 		t.Fatalf("did not expect collection operator at leading space")
+	}
+}
+
+func TestCollectionLambdaResultOperatorBoundaries(t *testing.T) {
+	const lambda = `__lambda("x", x + 1)`
+
+	for name, config := range binaryOperatorConfigs {
+		t.Run(name, func(t *testing.T) {
+			input := lambda + " " + strings.TrimSpace(config.Operator) + " rhs"
+			runes := []rune(input)
+			end := scanCollectionLambdaBody(runes, 0)
+			if got := strings.TrimSpace(string(runes[:end])); got != lambda {
+				t.Fatalf("expected lambda to end before %q, got %q", config.Operator, got)
+			}
+		})
+	}
+
+	t.Run("replace", func(t *testing.T) {
+		input := lambda + ` replace "x" with "y"`
+		runes := []rune(input)
+		end := scanCollectionLambdaBody(runes, 0)
+		if got := strings.TrimSpace(string(runes[:end])); got != lambda {
+			t.Fatalf("expected lambda to end before replace, got %q", got)
+		}
+	})
+}
+
+func TestCollectionLambdaKeepsDataWeaveBodyOperators(t *testing.T) {
+	tests := []string{
+		`(__arg + 1) > 2`,
+		`(__arg) as String`,
+		`(__arg) is Number`,
+		`(__arg) and true`,
+		`(__arg) + 1`,
+	}
+
+	for _, input := range tests {
+		t.Run(input, func(t *testing.T) {
+			runes := []rune(input)
+			end, _ := scanLambdaBodyWithOptions(runes, 0, false)
+			if end != len(runes) {
+				t.Fatalf("expected complete lambda body, stopped at %q", string(runes[:end]))
+			}
+		})
 	}
 }
 

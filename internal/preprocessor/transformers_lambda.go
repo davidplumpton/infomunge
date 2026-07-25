@@ -149,7 +149,17 @@ func replaceImplicitLambdaForOp(s string, op string) string {
 			params = "__arg, __idx"
 		}
 
+		groupGeneratedLambda := isNonCollectionLambdaResultOperatorAtRunes(
+			runes,
+			skipLambdaWhitespace(runes, bodyEnd),
+		)
+		if groupGeneratedLambda {
+			result = append(result, '(')
+		}
 		result = append(result, []rune("("+params+") -> "+newBody)...)
+		if groupGeneratedLambda {
+			result = append(result, ')')
+		}
 		i = bodyEnd - 1
 	}
 

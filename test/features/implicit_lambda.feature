@@ -407,3 +407,101 @@ Feature: Implicit Lambda Parameters ($ and $$)
       """
       [[1,"a"],[2,"b"]]
       """
+
+  Scenario: Grouped implicit map completes before array concatenation
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] map ($ + 1) ++ [9]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [2,3,9]
+      """
+
+  Scenario: Grouped implicit map completes before joinBy
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] map ($ + 1) joinBy "-"
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      "2-3"
+      """
+
+  Scenario: Grouped implicit filter completes before joinBy
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2, 3] filter ($ > 1) joinBy "-"
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      "2-3"
+      """
+
+  Scenario: Grouped explicit map completes before joinBy
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] map ((x) -> x + 1) joinBy "-"
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      "2-3"
+      """
+
+  Scenario: Grouped implicit map completes before contains
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] map ($ + 1) contains 2
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      true
+      """
+
+  Scenario: Grouped implicit map keeps a comparison in its lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] map ($ + 1) > 2
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [false,true]
+      """
+
+  Scenario: Grouped implicit map keeps a coercion in its lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] map ($) as String
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["1","2"]
+      """
