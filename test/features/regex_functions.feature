@@ -9,10 +9,11 @@ Feature: Regex Functions
       %im 0.1
       output application/json
       ---
-      match("foo123bar", "([a-z]+)([0-9]+)")
+      match("foo123", "([a-z]+)([0-9]+)")
       """
     When I run the application with this content
-    Then the output should be valid JSON with array length of 2
+    Then the output should be valid JSON with array length of 3
+    And the output should contain "foo123"
     And the output should contain "foo"
     And the output should contain "123"
 
@@ -36,12 +37,15 @@ Feature: Regex Functions
       %im 0.1
       output application/json
       ---
-      match("Hello World", "([a-z]+)", "i")
+      match("Hello", "([a-z]+)", "i")
       """
     When I run the application with this content
-    Then the output should be valid JSON with array length of 1
+    Then the output should be:
+      """
+      ["Hello","Hello"]
+      """
 
-  Scenario: match no match returns null
+  Scenario: match no match returns an empty array
     Given the following input content:
       """
       %im 0.1
@@ -52,7 +56,7 @@ Feature: Regex Functions
     When I run the application with this content
     Then the output should be:
       """
-      null
+      []
       """
 
   Scenario: match with optional group
@@ -64,9 +68,9 @@ Feature: Regex Functions
       match("test123", "([a-z]+)(\\d*)")
       """
     When I run the application with this content
-    Then the output should be valid JSON with array length of 2
+    Then the output should be valid JSON with array length of 3
 
-  Scenario: matches basic usage
+  Scenario: matches rejects a substring match
     Given the following input content:
       """
       %im 0.1
@@ -75,7 +79,7 @@ Feature: Regex Functions
       matches("hello world", "l")
       """
     When I run the application with this content
-    Then the output should be true
+    Then the output should be false
 
   Scenario: matches returns false
     Given the following input content:
@@ -91,7 +95,7 @@ Feature: Regex Functions
       false
       """
 
-  Scenario: matches with pattern at start
+  Scenario: matches rejects a start-anchored prefix
     Given the following input content:
       """
       %im 0.1
@@ -100,7 +104,7 @@ Feature: Regex Functions
       matches("hello", "^h")
       """
     When I run the application with this content
-    Then the output should be true
+    Then the output should be false
 
   Scenario: matches case insensitive
     Given the following input content:
@@ -133,7 +137,10 @@ Feature: Regex Functions
       scan("hello world hello", "hello")
       """
     When I run the application with this content
-    Then the output should be valid JSON with array length of 2
+    Then the output should be:
+      """
+      [["hello"],["hello"]]
+      """
 
   Scenario: scan with capture groups
     Given the following input content:
@@ -144,7 +151,10 @@ Feature: Regex Functions
       scan("foo1 bar2 baz3", "([a-z]+)([0-9])")
       """
     When I run the application with this content
-    Then the output should be valid JSON with array length of 3
+    Then the output should be:
+      """
+      [["foo1","foo","1"],["bar2","bar","2"],["baz3","baz","3"]]
+      """
 
   Scenario: scan no matches
     Given the following input content:
@@ -169,8 +179,10 @@ Feature: Regex Functions
       scan("abc123def", "[0-9]+")
       """
     When I run the application with this content
-    Then the output should be valid JSON with array length of 1
-    And the output should contain "123"
+    Then the output should be:
+      """
+      [["123"]]
+      """
 
   Scenario: scan overlapping patterns
     Given the following input content:
@@ -181,7 +193,10 @@ Feature: Regex Functions
       scan("aaaa", "a+")
       """
     When I run the application with this content
-    Then the output should contain "aaaa"
+    Then the output should be:
+      """
+      [["aaaa"]]
+      """
 
   Scenario: match with non-string input
     Given the following input content:
@@ -225,10 +240,12 @@ Feature: Regex Functions
       match("test@example.com", "([a-z]+)@([a-z]+)\\.([a-z]+)")
       """
     When I run the application with this content
-    Then the output should be valid JSON with array length of 3
-    And the output should contain "test"
+    Then the output should be:
+      """
+      ["test@example.com","test","example","com"]
+      """
 
-  Scenario: matches word boundary
+  Scenario: matches rejects a word-boundary prefix
     Given the following input content:
       """
       %im 0.1
@@ -237,7 +254,7 @@ Feature: Regex Functions
       matches("hello world", "\\bhello\\b")
       """
     When I run the application with this content
-    Then the output should be true
+    Then the output should be false
 
    Scenario: scan digits
      Given the following input content:
@@ -250,7 +267,7 @@ Feature: Regex Functions
      When I run the application with this content
      Then the output should be valid JSON with array length of 4
 
-   Scenario: matches operator basic usage
+   Scenario: matches operator rejects a substring match
      Given the following input content:
        """
        %im 0.1
@@ -259,7 +276,7 @@ Feature: Regex Functions
        "hello world" matches "l"
        """
      When I run the application with this content
-     Then the output should be true
+     Then the output should be false
 
    Scenario: matches operator returns false
      Given the following input content:
@@ -272,7 +289,7 @@ Feature: Regex Functions
      When I run the application with this content
      Then the output should be false
 
-   Scenario: matches operator with pattern at start
+   Scenario: matches operator rejects a start-anchored prefix
      Given the following input content:
        """
        %im 0.1
@@ -281,6 +298,5 @@ Feature: Regex Functions
        "hello" matches "^h"
        """
      When I run the application with this content
-     Then the output should be true
-
+     Then the output should be false
 

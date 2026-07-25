@@ -14,7 +14,7 @@ Feature: Regex Literals
     When I run the script
     Then the output should be:
       """
-      ["hello","123"]
+      ["hello 123","hello","123"]
       """
 
   Scenario: Regex literal with matches function
@@ -42,7 +42,7 @@ Feature: Regex Literals
     When I run the script
     Then the output should be:
       """
-      [["foo","1"],["bar","2"]]
+      [["foo1","foo","1"],["bar2","bar","2"]]
       """
 
   Scenario: Regex literal with find function
@@ -252,7 +252,7 @@ Feature: Regex Literals
     When I run the script
     Then the output should be:
       """
-      ["hello"]
+      ["hello","hello"]
       """
 
   Scenario: Infix matches operator with regex literal
@@ -267,6 +267,20 @@ Feature: Regex Literals
     Then the output should be:
       """
       true
+      """
+
+  Scenario: Infix scan operator with regex literal
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "abc123def" scan /[0-9]+/
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [["123"]]
       """
 
   Scenario: Infix matches operator with regex literal and flags

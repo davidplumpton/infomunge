@@ -492,10 +492,13 @@ Feature: Operator transformer rewrite coverage
       %im 0.1
       output application/json
       ---
-      "hello123" match /(\d+)/
+      "hello123" match /([a-z]+)(\d+)/
       """
     When I run the script
-    Then the output should contain "123"
+    Then the output should be:
+      """
+      ["hello123","hello","123"]
+      """
 
   Scenario: Infix contains operator with string
     Given the following script:

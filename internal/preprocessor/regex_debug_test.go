@@ -15,6 +15,9 @@ func TestRegexPreprocessing(t *testing.T) {
 		{`"test" match(/[a-z]+/)`, `match("test", regex("[a-z]+"))`},
 		// matches operator converts to matches function call
 		{`"test" matches(/[a-z]+/)`, `matches("test", regex("[a-z]+"))`},
+		// scan supports both infix and method-call syntax
+		{`"test1" scan /[0-9]+/`, `scan("test1", regex("[0-9]+"))`},
+		{`"test1" scan(/[0-9]+/)`, `scan("test1", regex("[0-9]+"))`},
 		// contains with method call syntax
 		{`"test" contains(/e/)`, `contains("test", regex("e"))`},
 		// Emoji handling

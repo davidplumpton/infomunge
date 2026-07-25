@@ -61,6 +61,20 @@ func getCompiledRegex(arg Value, explicitFlags string, pos token.Pos) (*regexp.R
 	}
 }
 
+// fullStringSubmatch applies a compiled expression to the whole input. Wrapping
+// the expression is important: checking the bounds of FindStringSubmatch would
+// incorrectly reject a full-match alternative when an earlier alternative can
+// match only a prefix (for example, "a|abc" against "abc").
+func fullStringSubmatch(re *regexp.Regexp, text string) []string {
+	anchored, err := regexp.Compile(`\A(?:` + re.String() + `)\z`)
+	if err != nil {
+		// re is already compiled, and wrapping it in a non-capturing group with
+		// absolute anchors cannot make it invalid.
+		return nil
+	}
+	return anchored.FindStringSubmatch(text)
+}
+
 // callBuiltinStartsWith implements the startsWith(string, prefix) function.
 func callBuiltinStartsWith(args []Value, e *ast.CallExpr) (Value, error) {
 	strs, err := assertStringArgs(args, 2, "startsWith", e)
@@ -167,16 +181,14 @@ func callBuiltinMatch(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	// Find the first match
-	matches := re.FindStringSubmatch(text)
+	matches := fullStringSubmatch(re, text)
 	if matches == nil {
-		return nil, nil
+		return make(Array, 0), nil
 	}
 
-	// Return the capture groups (excluding the full match at index 0)
-	result := make(Array, len(matches)-1)
-	for i := 1; i < len(matches); i++ {
-		result[i-1] = matches[i]
+	result := make(Array, len(matches))
+	for i, match := range matches {
+		result[i] = match
 	}
 	return result, nil
 }
@@ -206,8 +218,7 @@ func callBuiltinMatches(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	// Check if the entire string matches
-	return re.MatchString(text), nil
+	return fullStringSubmatch(re, text) != nil, nil
 }
 
 // callBuiltinScan implements the scan(string, regex) function.
@@ -244,17 +255,11 @@ func callBuiltinScan(args []Value, e *ast.CallExpr) (Value, error) {
 	// Convert matches to result
 	result := make(Array, len(matches))
 	for i, match := range matches {
-		if len(match) == 1 {
-			// Single match, return the string directly
-			result[i] = match[0]
-		} else {
-			// Multiple capture groups, return as array
-			groups := make(Array, len(match)-1)
-			for j := 1; j < len(match); j++ {
-				groups[j-1] = match[j]
-			}
-			result[i] = groups
+		groups := make(Array, len(match))
+		for j, group := range match {
+			groups[j] = group
 		}
+		result[i] = groups
 	}
 
 	return result, nil

@@ -19,6 +19,7 @@ const (
 	binaryOpMatch       = "match"
 	binaryOpContains    = "contains"
 	binaryOpMatches     = "matches"
+	binaryOpScan        = "scan"
 	binaryOpRepeat      = "repeat"
 	binaryOpMod         = "mod"
 )
@@ -89,6 +90,11 @@ var binaryOperatorConfigs = map[string]stringutils.BinaryOperatorConfig{
 		Operator:     " matches ",
 		FuncName:     "matches",
 		RightStopOps: []string{" matches "},
+	},
+	binaryOpScan: {
+		Operator:     " scan ",
+		FuncName:     "scan",
+		RightStopOps: []string{" scan "},
 	},
 	binaryOpRepeat: {
 		Operator:     " repeat ",

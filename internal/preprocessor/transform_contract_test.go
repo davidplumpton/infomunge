@@ -151,8 +151,8 @@ func TestConfiguredBinaryOperatorsPreserveMixedLeftAssociativity(t *testing.T) {
 		{
 			name:     "all comparison operators",
 			stage:    createFunctionalProcessingStage(nil),
-			input:    "a contains b match c matches d",
-			expected: "matches(match(contains(a, b), c), d)",
+			input:    "a contains b match c matches d scan e",
+			expected: "scan(matches(match(contains(a, b), c), d), e)",
 		},
 		{
 			name:     "mod before repeat",

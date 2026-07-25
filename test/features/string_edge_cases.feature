@@ -259,7 +259,7 @@ Feature: String Functions - Unicode and Special Character Edge Cases
       true
       """
 
-  Scenario: Regex with character class
+  Scenario: Regex character class rejects a trailing non-match
     Given the following script:
       """
       %im 0.1
@@ -270,10 +270,10 @@ Feature: String Functions - Unicode and Special Character Edge Cases
     When I run the script
     Then the output should be:
       """
-      true
+      false
       """
 
-  Scenario: Regex with negated character class
+  Scenario: Negated regex character class rejects a trailing non-match
     Given the following script:
       """
       %im 0.1
@@ -284,7 +284,7 @@ Feature: String Functions - Unicode and Special Character Edge Cases
     When I run the script
     Then the output should be:
       """
-      true
+      false
       """
 
   # String with Whitespace Variations
