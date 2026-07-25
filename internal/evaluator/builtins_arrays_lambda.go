@@ -5,15 +5,71 @@ import (
 	"go/ast"
 )
 
+type collectionNullPolicy bool
+
+const (
+	rejectNullCollectionSource    collectionNullPolicy = false
+	propagateNullCollectionSource collectionNullPolicy = true
+)
+
+// evalCollectionSource evaluates the source argument and applies the operation's
+// explicit null policy. The handled result tells null-propagating callers to
+// return language null without evaluating their selector lambda.
+func evalCollectionSource(e *ast.CallExpr, scope *Scope, depth int, nullPolicy collectionNullPolicy) (Value, bool, error) {
+	source, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
+	if err != nil {
+		return nil, false, err
+	}
+	if source == nil && nullPolicy == propagateNullCollectionSource {
+		return nil, true, nil
+	}
+	return source, false, nil
+}
+
 // evalArrayAndLambda is a helper that extracts and validates an array and lambda
 func evalArrayAndLambda(funcName string, e *ast.CallExpr, scope *Scope, depth int, minParams, maxParams int) (Array, *Lambda, error) {
+	array, lambda, _, err := evalArrayAndLambdaWithNullPolicy(
+		funcName,
+		e,
+		scope,
+		depth,
+		minParams,
+		maxParams,
+		rejectNullCollectionSource,
+	)
+	return array, lambda, err
+}
+
+func evalNullPropagatingArrayAndLambda(funcName string, e *ast.CallExpr, scope *Scope, depth int, minParams, maxParams int) (Array, *Lambda, bool, error) {
+	return evalArrayAndLambdaWithNullPolicy(
+		funcName,
+		e,
+		scope,
+		depth,
+		minParams,
+		maxParams,
+		propagateNullCollectionSource,
+	)
+}
+
+func evalArrayAndLambdaWithNullPolicy(
+	funcName string,
+	e *ast.CallExpr,
+	scope *Scope,
+	depth int,
+	minParams, maxParams int,
+	nullPolicy collectionNullPolicy,
+) (Array, *Lambda, bool, error) {
 	if len(e.Args) != 2 {
-		return nil, nil, newPosError(fmt.Sprintf("%s requires exactly 2 arguments: array, lambda", funcName), e.Pos())
+		return nil, nil, false, newPosError(fmt.Sprintf("%s requires exactly 2 arguments: array, lambda", funcName), e.Pos())
 	}
 
-	arrayVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
+	arrayVal, nullHandled, err := evalCollectionSource(e, scope, depth, nullPolicy)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
+	}
+	if nullHandled {
+		return nil, nil, true, nil
 	}
 
 	array, ok := arrayVal.(Array)
@@ -29,33 +85,36 @@ func evalArrayAndLambda(funcName string, e *ast.CallExpr, scope *Scope, depth in
 			default:
 				suggestion = ". To iterate over object values, try 'values(object)'."
 			}
-			return nil, nil, newPosError(fmt.Sprintf("%s expects an array, got object%s", funcName, suggestion), e.Args[0].Pos())
+			return nil, nil, false, newPosError(fmt.Sprintf("%s expects an array, got object%s", funcName, suggestion), e.Args[0].Pos())
 		}
-		return nil, nil, newPosError(fmt.Sprintf("%s expects an array, got %T", funcName, arrayVal), e.Args[0].Pos())
+		return nil, nil, false, newPosError(fmt.Sprintf("%s expects an array, got %T", funcName, arrayVal), e.Args[0].Pos())
 	}
 
 	lambdaVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 
 	lambda, ok := lambdaVal.(*Lambda)
 	if !ok {
-		return nil, nil, newPosError(fmt.Sprintf("%s expects a lambda function, got %T", funcName, lambdaVal), e.Args[1].Pos())
+		return nil, nil, false, newPosError(fmt.Sprintf("%s expects a lambda function, got %T", funcName, lambdaVal), e.Args[1].Pos())
 	}
 
 	if lambda.ParamCount() < minParams || lambda.ParamCount() > maxParams {
-		return nil, nil, newPosError(fmt.Sprintf("%s lambda must have %d or %d parameters, got %d", funcName, minParams, maxParams, lambda.ParamCount()), e.Args[1].Pos())
+		return nil, nil, false, newPosError(fmt.Sprintf("%s lambda must have %d or %d parameters, got %d", funcName, minParams, maxParams, lambda.ParamCount()), e.Args[1].Pos())
 	}
 
-	return array, lambda, nil
+	return array, lambda, false, nil
 }
 
 // callBuiltinFilter implements the __filter(array, lambda) function.
 func callBuiltinFilter(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("filter", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("filter", e, scope, depth, 1, 2)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return nil, nil
 	}
 
 	result := make(Array, 0, len(array))
@@ -141,9 +200,12 @@ func callBuiltinDropWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, erro
 
 // callBuiltinMap implements the __map(array, lambda) function.
 func callBuiltinMap(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("map", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("map", e, scope, depth, 1, 2)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return nil, nil
 	}
 
 	result := make(Array, 0, len(array))
@@ -156,9 +218,12 @@ func callBuiltinMap(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 
 // callBuiltinFlatMap implements the __flatMap(array, lambda) function.
 func callBuiltinFlatMap(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("flatMap", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("flatMap", e, scope, depth, 1, 2)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return nil, nil
 	}
 
 	result := make(Array, 0)

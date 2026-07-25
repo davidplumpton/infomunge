@@ -132,7 +132,7 @@ Feature: Size Of Function
       2
       """
 
-  Scenario: Get size of nil value
+  Scenario: Get size of nil value as null
     Given the following input content:
       """
       %im 0.1
@@ -144,7 +144,7 @@ Feature: Size Of Function
     When I run the application with this content
     Then the output should be:
       """
-      0
+      null
       """
 
   Scenario: Use sizeOf in an arithmetic expression

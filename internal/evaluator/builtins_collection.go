@@ -35,7 +35,7 @@ func callBuiltinSizeOf(args []Value, e *ast.CallExpr) (Value, error) {
 	case Object:
 		return len(v), nil
 	case nil:
-		return 0, nil
+		return nil, nil
 	default:
 		return nil, newUnsupportedTypeError("sizeOf", args[0], e.Pos())
 	}
@@ -45,6 +45,9 @@ func callBuiltinSizeOf(args []Value, e *ast.CallExpr) (Value, error) {
 func callBuiltinFlatten(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 1, "flatten", e.Pos()); err != nil {
 		return nil, err
+	}
+	if args[0] == nil {
+		return nil, nil
 	}
 
 	if err := assertArg(args[0], beArray(), 1, "flatten", e); err != nil {

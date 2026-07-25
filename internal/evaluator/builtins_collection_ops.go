@@ -279,9 +279,12 @@ func callBuiltinMinBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 
 // callBuiltinOrderBy implements the __orderBy(array, lambda) function.
 func callBuiltinOrderBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("orderBy", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("orderBy", e, scope, depth, 1, 2)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return nil, nil
 	}
 
 	type elementWithKey struct {
@@ -346,9 +349,12 @@ func callBuiltinOrderBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 
 // callBuiltinDistinctBy implements the __distinctBy(array, lambda) function.
 func callBuiltinDistinctBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("distinctBy", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("distinctBy", e, scope, depth, 1, 2)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return nil, nil
 	}
 
 	seenValues := make(Array, 0, len(array))
@@ -419,9 +425,12 @@ func callBuiltinFilterObject(e *ast.CallExpr, scope *Scope, depth int) (Value, e
 	}
 
 	// Evaluate the object argument
-	objVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
+	objVal, nullHandled, err := evalCollectionSource(e, scope, depth, propagateNullCollectionSource)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return nil, nil
 	}
 
 	// Check that the first argument is an object
@@ -526,9 +535,12 @@ func mergeIntoResult(result Object, key string, value Value) {
 
 // callBuiltinGroupBy implements the __groupBy(array, lambda) function.
 func callBuiltinGroupBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("groupBy", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("groupBy", e, scope, depth, 1, 2)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return nil, nil
 	}
 
 	result := values.NewObject(0)
@@ -560,9 +572,12 @@ func callBuiltinPluck(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 		return nil, newPosError("pluck requires exactly 2 arguments: source, selector", e.Pos())
 	}
 
-	sourceVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
+	sourceVal, nullHandled, err := evalCollectionSource(e, scope, depth, propagateNullCollectionSource)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return nil, nil
 	}
 
 	selectorVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)

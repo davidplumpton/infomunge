@@ -34,33 +34,36 @@ func extractMapObjectResult(mapResult Value, pos token.Pos) (Object, bool, error
 	}
 }
 
-func evalMapObjectInputs(e *ast.CallExpr, scope *Scope, depth int) (Object, *Lambda, error) {
+func evalMapObjectInputs(e *ast.CallExpr, scope *Scope, depth int) (Object, *Lambda, bool, error) {
 	if len(e.Args) != 2 {
-		return nil, nil, newPosError("mapObject requires exactly 2 arguments: object, lambda", e.Pos())
+		return nil, nil, false, newPosError("mapObject requires exactly 2 arguments: object, lambda", e.Pos())
 	}
 
-	objVal, err := evalASTInScopeWithDepth(e.Args[0], scope, depth)
+	objVal, nullHandled, err := evalCollectionSource(e, scope, depth, propagateNullCollectionSource)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
+	}
+	if nullHandled {
+		return nil, nil, true, nil
 	}
 	obj, ok := objVal.(Object)
 	if !ok {
-		return nil, nil, newPosError(fmt.Sprintf("mapObject expects an object, got %T", objVal), e.Args[0].Pos())
+		return nil, nil, false, newPosError(fmt.Sprintf("mapObject expects an object, got %T", objVal), e.Args[0].Pos())
 	}
 
 	lambdaVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	lambda, ok := lambdaVal.(*Lambda)
 	if !ok {
-		return nil, nil, newPosError(fmt.Sprintf("mapObject expects a lambda function, got %T", lambdaVal), e.Args[1].Pos())
+		return nil, nil, false, newPosError(fmt.Sprintf("mapObject expects a lambda function, got %T", lambdaVal), e.Args[1].Pos())
 	}
 	if lambda.ParamCount() != 2 {
-		return nil, nil, newPosError(fmt.Sprintf("mapObject lambda must have exactly 2 parameters, got %d", lambda.ParamCount()), e.Args[1].Pos())
+		return nil, nil, false, newPosError(fmt.Sprintf("mapObject lambda must have exactly 2 parameters, got %d", lambda.ParamCount()), e.Args[1].Pos())
 	}
 
-	return obj, lambda, nil
+	return obj, lambda, false, nil
 }
 
 func mapObjectLambdaContext(param0, param1 string, key string, value Value, dwOrder bool) Object {
@@ -153,9 +156,12 @@ func applyAndMerge(value Value, key string, result Object, lambda *Lambda, scope
 //	{"a": 1, "b": 2} mapObject (value, key) -> {(upper(key)): value * 2}
 //	// Returns: {"A": 2, "B": 4}
 func callBuiltinMapObject(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	obj, lambda, err := evalMapObjectInputs(e, scope, depth)
+	obj, lambda, nullHandled, err := evalMapObjectInputs(e, scope, depth)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return nil, nil
 	}
 
 	return applyMapObject(obj, lambda, scope, depth, e.Args[1].Pos())
