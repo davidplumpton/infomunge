@@ -3,8 +3,10 @@ package evaluator
 import (
 	"fmt"
 	"go/ast"
-	"infomunge/pkg/values"
+	"math"
 	"strings"
+
+	"infomunge/pkg/values"
 )
 
 // callBuiltinObjectToArray implements the objectToArray(object) function.
@@ -248,26 +250,46 @@ func callBuiltinRange(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError("range requires exactly 1 argument: end", e.Pos())
 	}
 
-	var end int64
-	switch v := args[0].(type) {
-	case float64:
-		end = int64(v)
-	case int:
-		end = int64(v)
-	default:
-		return nil, newPosError(fmt.Sprintf("range expects a number, got %T", args[0]), e.Pos())
+	end, err := exactRangeEnd(args[0], e)
+	if err != nil {
+		return nil, err
 	}
-
 	if end < 0 {
 		return nil, newPosError("range end must be non-negative", e.Pos())
 	}
 
 	result := make(Array, end)
-	for i := int64(0); i < end; i++ {
-		result[i] = float64(i)
+	for i := 0; i < end; i++ {
+		result[i] = i
 	}
 
 	return result, nil
+}
+
+func exactRangeEnd(value Value, e *ast.CallExpr) (int, error) {
+	if number, ok := value.(float64); ok {
+		if math.IsNaN(number) || math.IsInf(number, 0) {
+			return 0, newPosError("range end must be a finite number", e.Pos())
+		}
+	}
+
+	number, ok := exactNumericRat(value)
+	if !ok {
+		return 0, newPosError(fmt.Sprintf("range expects a number, got %T", value), e.Pos())
+	}
+	if !number.IsInt() {
+		return 0, newPosError("range end causes numeric precision loss: expected an integer", e.Pos())
+	}
+	if !number.Num().IsInt64() {
+		return 0, newPosError("range end is outside the supported integer range", e.Pos())
+	}
+
+	end64 := number.Num().Int64()
+	end := int(end64)
+	if int64(end) != end64 {
+		return 0, newPosError("range end is outside the supported integer range", e.Pos())
+	}
+	return end, nil
 }
 
 // callBuiltinConcat implements the __concat(value1, value2, ...) function (++ operator).

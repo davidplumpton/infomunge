@@ -68,6 +68,36 @@ Feature: Range and Zip Functions
       """
     Then running the script should fail with error containing "range end must be non-negative"
 
+  Scenario: range preserves an exact bound immediately above 2^53 before validation
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      range(-9007199254740993)
+      """
+    Then running the script should fail with error containing "range end must be non-negative"
+
+  Scenario: range rejects fractional bounds instead of rounding
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      range(3.5)
+      """
+    Then running the script should fail with error containing "numeric precision loss"
+
+  Scenario: range rejects a float beyond the int64 boundary
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      range(9223372036854775808.0)
+      """
+    Then running the script should fail with error containing "outside the supported integer range"
+
   Scenario: range requires numeric argument
     Given the following script:
       """
