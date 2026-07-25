@@ -229,7 +229,7 @@ func callBuiltinJoin(args []Value, e *ast.CallExpr) (Value, error) {
 
 	parts := make([]string, len(arr))
 	for i, item := range arr {
-		parts[i] = fmt.Sprintf("%v", item)
+		parts[i] = coerceToString(item)
 	}
 
 	return strings.Join(parts, sep), nil

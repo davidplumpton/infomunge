@@ -535,8 +535,9 @@ func callBuiltinGroupBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 	result := values.NewObject(0)
 
 	err = executeLambdaOnArrayElements(array, lambda, scope, depth, func(elem Value, _ int, key Value) error {
-		// Convert key to string for use as object key
-		keyStr := fmt.Sprintf("%v", key)
+		// Convert key with the same language-level policy used by string
+		// coercion, so null and functions never expose Go representations.
+		keyStr := coerceToString(key)
 
 		// Get or create the group for this key
 		if _, exists := result[keyStr]; !exists {

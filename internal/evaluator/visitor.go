@@ -161,7 +161,7 @@ func (v *DefaultVisitor) VisitCompositeLit(expr *ast.CompositeLit) (Value, error
 				if err != nil {
 					return nil, err
 				}
-				keyStr := fmt.Sprintf("%v", key)
+				keyStr := coerceToString(key)
 				if existing, exists := res[keyStr]; exists {
 					switch v := existing.(type) {
 					case XMLMultiValue:

@@ -271,10 +271,10 @@ func composeQuery(parts Object, e *ast.CallExpr) (string, error) {
 		switch v := raw.(type) {
 		case Array:
 			for _, item := range v {
-				values.Add(key, fmt.Sprintf("%v", item))
+				values.Add(key, coerceToString(item))
 			}
 		default:
-			values.Add(key, fmt.Sprintf("%v", v))
+			values.Add(key, coerceToString(v))
 		}
 	}
 

@@ -2,9 +2,9 @@ package evaluator
 
 import (
 	"context"
-	"fmt"
-	"infomunge/pkg/values"
 	"sync"
+
+	"infomunge/pkg/values"
 )
 
 // Value is a generic value type that represents any value that can be evaluated in expressions.
@@ -127,7 +127,7 @@ func (lv *LazyValue) String() string {
 		if _, _, ok := streamFromValue(val); ok {
 			return "LazyValue(stream)"
 		}
-		return fmt.Sprintf("%v", val)
+		return coerceToString(val)
 	}
 	return "LazyValue"
 }

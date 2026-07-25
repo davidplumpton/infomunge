@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -300,13 +301,50 @@ func mergeProperties(parent, child Object) Object {
 
 // coerceToString converts any value to a string.
 func coerceToString(value Value) string {
+	return coerceToStringValue(value, true)
+}
+
+func coerceToStringValue(value Value, topLevel bool) string {
 	if value == nil {
 		return "null"
 	}
-	if _, ok := value.(*Lambda); ok {
-		return "<function>"
+
+	switch typed := value.(type) {
+	case *Lambda:
+		if topLevel {
+			return "<function>"
+		}
+	case Array:
+		return coerceStringSequence([]Value(typed))
+	case XMLMultiValue:
+		return coerceStringSequence([]Value(typed))
+	case Object:
+		return coerceStringObject(typed)
 	}
+
 	return fmt.Sprintf("%v", value)
+}
+
+func coerceStringSequence(sequence []Value) string {
+	parts := make([]string, len(sequence))
+	for i, item := range sequence {
+		parts[i] = coerceToStringValue(item, false)
+	}
+	return "[" + strings.Join(parts, " ") + "]"
+}
+
+func coerceStringObject(object Object) string {
+	keys := make([]string, 0, len(object))
+	for key := range object {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	parts := make([]string, len(keys))
+	for i, key := range keys {
+		parts[i] = key + ":" + coerceToStringValue(object[key], false)
+	}
+	return "map[" + strings.Join(parts, " ") + "]"
 }
 
 // coerceToStringWithProps converts a value to a string, applying format properties.

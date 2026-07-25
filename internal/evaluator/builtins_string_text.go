@@ -50,10 +50,10 @@ func callBuiltinJoinBy(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("joinBy: expected string separator, got %T", args[1]), e.Pos())
 	}
 
-	// Convert each element to string
+	// Convert each element with the language's string coercion policy.
 	strElements := make([]string, len(arr))
 	for i, elem := range arr {
-		strElements[i] = fmt.Sprintf("%v", elem)
+		strElements[i] = coerceToString(elem)
 	}
 
 	return strings.Join(strElements, separator), nil

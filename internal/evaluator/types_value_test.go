@@ -96,6 +96,19 @@ func TestLazyValueStringDoesNotDrainStream(t *testing.T) {
 	}
 }
 
+func TestLazyValueStringUsesLanguageNullSpelling(t *testing.T) {
+	lv := &LazyValue{
+		Eval: func(ctx context.Context) (Value, error) {
+			return nil, nil
+		},
+		ctx: context.Background(),
+	}
+
+	if got := lv.String(); got != "null" {
+		t.Errorf("String() = %q, want %q", got, "null")
+	}
+}
+
 func TestResolveValue(t *testing.T) {
 	// Test immediate value
 	val, err := ResolveValue(10)

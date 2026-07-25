@@ -84,3 +84,42 @@ func TestCoerceToTypeRejectsMismatchedStructuralValuesAsKnownTypes(t *testing.T)
 		})
 	}
 }
+
+func TestCoerceToStringUsesLanguageNullSpellingRecursively(t *testing.T) {
+	tests := []struct {
+		name  string
+		value Value
+		want  string
+	}{
+		{
+			name:  "array",
+			value: Array{nil, Array{nil}},
+			want:  "[null [null]]",
+		},
+		{
+			name:  "XML multi-value",
+			value: XMLMultiValue{nil},
+			want:  "[null]",
+		},
+		{
+			name: "object",
+			value: Object{
+				"value":  nil,
+				"nested": Array{nil},
+			},
+			want: "map[nested:[null] value:null]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := coerceToString(tt.value)
+			if got != tt.want {
+				t.Fatalf("coerceToString() = %q, want %q", got, tt.want)
+			}
+			if strings.Contains(got, "<nil>") {
+				t.Fatalf("coerceToString() leaked Go null spelling in %q", got)
+			}
+		})
+	}
+}
