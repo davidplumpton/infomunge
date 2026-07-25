@@ -136,3 +136,31 @@ Feature: Default Operator
       """
       {"value":"fallback"}
       """
+
+  Scenario: Default to an array feeds a collection pipeline
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      (null default [1, 2]) map $ * 2
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [2,4]
+      """
+
+  Scenario: Default to an array inside a lambda body
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [null] map ($ default [[1], [2, 3]])
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [[[1],[2,3]]]
+      """

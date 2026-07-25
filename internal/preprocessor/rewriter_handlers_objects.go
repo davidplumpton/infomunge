@@ -190,10 +190,20 @@ func (r *rewriter) isIndexer() bool {
 	if r.followsImplicitLambdaOperator(j) {
 		return false
 	}
+	if r.followsDefaultOperator(j) {
+		return false
+	}
 	last := r.result[j]
 	// Implicit lambda parameters are rewritten after the core syntax pass, so
 	// their selectors must already be classified as indexing here.
 	return unicode.IsLetter(rune(last)) || unicode.IsDigit(rune(last)) || last == '}' || last == ']' || last == ')' || last == '"' || last == '\'' || last == '$'
+}
+
+func (r *rewriter) followsDefaultOperator(end int) bool {
+	// The default operator is rewritten after array literals. Preserve the
+	// leading space in this suffix so identifiers ending in "default" still
+	// treat a following bracket as an index selector.
+	return strings.HasSuffix(string(r.result[:end+1]), " default")
 }
 
 func (r *rewriter) followsImplicitLambdaOperator(end int) bool {

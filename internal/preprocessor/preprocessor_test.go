@@ -92,6 +92,68 @@ func TestPrepareForParsing_Arrays(t *testing.T) {
 	}
 }
 
+func TestPrepareForParsing_DefaultArrayFallbacks(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "empty array",
+			input:    "null default []",
+			expected: "__default(null, []interface{}{})",
+		},
+		{
+			name:     "single element array",
+			input:    "null default [1]",
+			expected: "__default(null, []interface{}{1,})",
+		},
+		{
+			name:     "multiple element array",
+			input:    "null default [1, 2]",
+			expected: "__default(null, []interface{}{1, 2,})",
+		},
+		{
+			name:     "nested array",
+			input:    "null default [[1], [2, 3]]",
+			expected: "__default(null, []interface{}{[]interface{}{1,}, []interface{}{2, 3,},})",
+		},
+		{
+			name:     "grouped default",
+			input:    "(null default [1, 2])",
+			expected: "(__default(null, []interface{}{1, 2,}))",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, mapping, err := PrepareForParsing(tt.input, Options{})
+			if err != nil {
+				t.Fatalf("PrepareForParsing returned error: %v", err)
+			}
+			if result != tt.expected {
+				t.Fatalf("expected %q, got %q", tt.expected, result)
+			}
+			if len(mapping) != len(result) {
+				t.Fatalf("mapping length = %d, want %d", len(mapping), len(result))
+			}
+		})
+	}
+}
+
+func TestPrepareForParsing_DefaultArrayFallbackInsideLambda(t *testing.T) {
+	result, mapping, err := PrepareForParsing(`[null] map ($ default [1, 2])`, Options{})
+	if err != nil {
+		t.Fatalf("PrepareForParsing returned error: %v", err)
+	}
+	if !strings.Contains(result, `__default(__arg, []interface{}{1, 2,})`) {
+		t.Fatalf("expected rewritten array fallback inside lambda, got %q", result)
+	}
+	if len(mapping) != len(result) {
+		t.Fatalf("mapping length = %d, want %d", len(mapping), len(result))
+	}
+}
+
 func TestPrepareForParsing_IndexAccess(t *testing.T) {
 	tests := []struct {
 		name     string
