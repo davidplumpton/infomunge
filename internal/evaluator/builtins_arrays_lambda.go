@@ -101,7 +101,13 @@ func evalArrayAndLambdaWithNullPolicy(
 	}
 
 	if lambda.ParamCount() < minParams || lambda.ParamCount() > maxParams {
-		return nil, nil, false, newPosError(fmt.Sprintf("%s lambda must have %d or %d parameters, got %d", funcName, minParams, maxParams, lambda.ParamCount()), e.Args[1].Pos())
+		var requirement string
+		if maxParams == minParams+1 {
+			requirement = fmt.Sprintf("%d or %d", minParams, maxParams)
+		} else {
+			requirement = fmt.Sprintf("between %d and %d", minParams, maxParams)
+		}
+		return nil, nil, false, newPosError(fmt.Sprintf("%s lambda must have %s parameters, got %d", funcName, requirement, lambda.ParamCount()), e.Args[1].Pos())
 	}
 
 	return array, lambda, false, nil
@@ -109,7 +115,7 @@ func evalArrayAndLambdaWithNullPolicy(
 
 // callBuiltinFilter implements the __filter(array, lambda) function.
 func callBuiltinFilter(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("filter", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("filter", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +142,7 @@ func callBuiltinFilter(e *ast.CallExpr, scope *Scope, depth int) (Value, error) 
 
 // callBuiltinTakeWhile implements the takeWhile(array, lambda) function.
 func callBuiltinTakeWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("takeWhile", e, scope, depth, 1, 2)
+	array, lambda, err := evalArrayAndLambda("takeWhile", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -144,10 +150,7 @@ func callBuiltinTakeWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, erro
 	result := make(Array, 0, len(array))
 	for i, elem := range array {
 		condVal, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
-			lambdaContext[lambda.ParamName(0)] = elem
-			if lambda.ParamCount() > 1 {
-				lambdaContext[lambda.ParamName(1)] = i
-			}
+			bindArrayLambdaParameters(lambdaContext, lambda, elem, i)
 		})
 		if err != nil {
 			return nil, err
@@ -167,7 +170,7 @@ func callBuiltinTakeWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, erro
 
 // callBuiltinDropWhile implements the dropWhile(array, lambda) function.
 func callBuiltinDropWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("dropWhile", e, scope, depth, 1, 2)
+	array, lambda, err := evalArrayAndLambda("dropWhile", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -176,10 +179,7 @@ func callBuiltinDropWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, erro
 	skip := true
 	for i, elem := range array {
 		condVal, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
-			lambdaContext[lambda.ParamName(0)] = elem
-			if lambda.ParamCount() > 1 {
-				lambdaContext[lambda.ParamName(1)] = i
-			}
+			bindArrayLambdaParameters(lambdaContext, lambda, elem, i)
 		})
 		if err != nil {
 			return nil, err
@@ -200,7 +200,7 @@ func callBuiltinDropWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, erro
 
 // callBuiltinMap implements the __map(array, lambda) function.
 func callBuiltinMap(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("map", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("map", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func callBuiltinMap(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 
 // callBuiltinFlatMap implements the __flatMap(array, lambda) function.
 func callBuiltinFlatMap(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("flatMap", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("flatMap", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}

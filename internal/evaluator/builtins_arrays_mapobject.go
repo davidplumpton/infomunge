@@ -59,53 +59,43 @@ func evalMapObjectInputs(e *ast.CallExpr, scope *Scope, depth int) (Object, *Lam
 	if !ok {
 		return nil, nil, false, newPosError(fmt.Sprintf("mapObject expects a lambda function, got %T", lambdaVal), e.Args[1].Pos())
 	}
-	if lambda.ParamCount() != 2 {
-		return nil, nil, false, newPosError(fmt.Sprintf("mapObject lambda must have exactly 2 parameters, got %d", lambda.ParamCount()), e.Args[1].Pos())
+	if lambda.ParamCount() > 3 {
+		return nil, nil, false, newPosError(fmt.Sprintf("mapObject lambda must have between 0 and 3 parameters, got %d", lambda.ParamCount()), e.Args[1].Pos())
 	}
 
 	return obj, lambda, false, nil
 }
 
-func mapObjectLambdaContext(param0, param1 string, key string, value Value, dwOrder bool) Object {
-	lambdaContext := make(Context)
-	if dwOrder {
-		lambdaContext[param0], lambdaContext[param1] = value, key
-	} else {
-		lambdaContext[param0], lambdaContext[param1] = key, value
-	}
-	return lambdaContext
-}
-
 func applyMapObject(obj Object, lambda *Lambda, scope *Scope, depth int, pos token.Pos) (Object, error) {
-	param0, param1 := lambda.ParamName(0), lambda.ParamName(1)
 	dwOrder := !shouldUseLegacyObjectLambdaOrder(lambda)
 	keys := sortedKeys(obj)
 	result := values.NewObject(len(obj))
+	index := 0
 
 	for _, key := range keys {
 		value := obj[key]
 
 		if multi, ok := value.(XMLMultiValue); ok {
 			for _, v := range multi {
-				if err := applyAndMerge(v, key, result, lambda, scope, param0, param1, dwOrder, depth, pos); err != nil {
+				if err := applyAndMerge(v, key, index, result, lambda, scope, dwOrder, depth, pos); err != nil {
 					return nil, err
 				}
+				index++
 			}
 		} else {
-			if err := applyAndMerge(value, key, result, lambda, scope, param0, param1, dwOrder, depth, pos); err != nil {
+			if err := applyAndMerge(value, key, index, result, lambda, scope, dwOrder, depth, pos); err != nil {
 				return nil, err
 			}
+			index++
 		}
 	}
 
 	return result, nil
 }
 
-func applyAndMerge(value Value, key string, result Object, lambda *Lambda, scope *Scope, param0, param1 string, dwOrder bool, depth int, pos token.Pos) error {
+func applyAndMerge(value Value, key string, index int, result Object, lambda *Lambda, scope *Scope, dwOrder bool, depth int, pos token.Pos) error {
 	mapResult, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
-		for k, v := range mapObjectLambdaContext(param0, param1, key, value, dwOrder) {
-			lambdaContext[k] = v
-		}
+		bindObjectLambdaParameters(lambdaContext, lambda, key, value, index, dwOrder)
 	})
 	if err != nil {
 		return err
@@ -140,7 +130,7 @@ func applyAndMerge(value Value, key string, result Object, lambda *Lambda, scope
 //
 // Arguments:
 //   - object: The object to transform
-//   - lambda: A function with exactly 2 parameters
+//   - lambda: A function with up to 3 parameters
 //
 // Lambda parameter order detection:
 //   - Legacy InfoMunge style (key, value): only for params named "key"/"value" or "k"/"v"

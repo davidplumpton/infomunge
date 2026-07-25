@@ -30,6 +30,15 @@ func executeLambdaOnArrayElements(
 // when true.
 type lambdaElementUntilCallback func(elem Value, index int, value Value) (bool, error)
 
+func bindArrayLambdaParameters(lambdaContext Context, lambda *Lambda, elem Value, index int) {
+	if lambda.ParamCount() > 0 {
+		lambdaContext[lambda.ParamName(0)] = elem
+	}
+	if lambda.ParamCount() > 1 {
+		lambdaContext[lambda.ParamName(1)] = index
+	}
+}
+
 func executeLambdaOnArrayElementsUntil(
 	array Array,
 	lambda *Lambda,
@@ -39,10 +48,7 @@ func executeLambdaOnArrayElementsUntil(
 ) error {
 	for i, elem := range array {
 		value, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
-			lambdaContext[lambda.ParamName(0)] = elem
-			if lambda.ParamCount() > 1 {
-				lambdaContext[lambda.ParamName(1)] = i
-			}
+			bindArrayLambdaParameters(lambdaContext, lambda, elem, i)
 		})
 		if err != nil {
 			return err
@@ -212,10 +218,7 @@ func findExtremumByLambda(
 
 	for i, elem := range array {
 		value, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
-			lambdaContext[lambda.ParamName(0)] = elem
-			if lambda.ParamCount() > 1 {
-				lambdaContext[lambda.ParamName(1)] = i
-			}
+			bindArrayLambdaParameters(lambdaContext, lambda, elem, i)
 		})
 		if err != nil {
 			return nil, err
@@ -241,7 +244,7 @@ func findExtremumByLambda(
 
 // callBuiltinMaxBy implements the __maxBy(array, lambda) function.
 func callBuiltinMaxBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("maxBy", e, scope, depth, 1, 2)
+	array, lambda, err := evalArrayAndLambda("maxBy", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +263,7 @@ func callBuiltinMaxBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 
 // callBuiltinMinBy implements the __minBy(array, lambda) function.
 func callBuiltinMinBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("minBy", e, scope, depth, 1, 2)
+	array, lambda, err := evalArrayAndLambda("minBy", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +282,7 @@ func callBuiltinMinBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 
 // callBuiltinOrderBy implements the __orderBy(array, lambda) function.
 func callBuiltinOrderBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("orderBy", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("orderBy", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -296,10 +299,7 @@ func callBuiltinOrderBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 	elements := make([]elementWithKey, len(array))
 	for i, elem := range array {
 		key, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
-			lambdaContext[lambda.ParamName(0)] = elem
-			if lambda.ParamCount() > 1 {
-				lambdaContext[lambda.ParamName(1)] = i
-			}
+			bindArrayLambdaParameters(lambdaContext, lambda, elem, i)
 		})
 		if err != nil {
 			return nil, err
@@ -349,7 +349,7 @@ func callBuiltinOrderBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 
 // callBuiltinDistinctBy implements the __distinctBy(array, lambda) function.
 func callBuiltinDistinctBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("distinctBy", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("distinctBy", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +372,7 @@ func callBuiltinDistinctBy(e *ast.CallExpr, scope *Scope, depth int) (Value, err
 
 // callBuiltinSome implements the some(array, lambda) function.
 func callBuiltinSome(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("some", e, scope, depth, 1, 2)
+	array, lambda, err := evalArrayAndLambda("some", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +396,7 @@ func callBuiltinSome(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 
 // callBuiltinEvery implements the every(array, lambda) function.
 func callBuiltinEvery(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("every", e, scope, depth, 1, 2)
+	array, lambda, err := evalArrayAndLambda("every", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -450,9 +450,8 @@ func callBuiltinFilterObject(e *ast.CallExpr, scope *Scope, depth int) (Value, e
 		return nil, newPosError(fmt.Sprintf("filterObject expects a lambda function, got %T", lambdaVal), e.Args[1].Pos())
 	}
 
-	// The lambda should have 2 parameters (key, value) or 3 (key, value, index)
-	if lambda.ParamCount() < 2 || lambda.ParamCount() > 3 {
-		return nil, newPosError(fmt.Sprintf("filterObject lambda must have 2 or 3 parameters, got %d", lambda.ParamCount()), e.Args[1].Pos())
+	if lambda.ParamCount() > 3 {
+		return nil, newPosError(fmt.Sprintf("filterObject lambda must have between 0 and 3 parameters, got %d", lambda.ParamCount()), e.Args[1].Pos())
 	}
 
 	result := values.NewObject(len(obj))
@@ -494,19 +493,7 @@ func callBuiltinFilterObject(e *ast.CallExpr, scope *Scope, depth int) (Value, e
 
 func evaluateFilterObjectCond(key string, value Value, index int, isDataWeaveOrder bool, lambda *Lambda, scope *Scope, depth int, e *ast.CallExpr) (bool, error) {
 	condVal, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
-		if isDataWeaveOrder {
-			lambdaContext[lambda.ParamName(0)] = value
-			lambdaContext[lambda.ParamName(1)] = key
-			if lambda.ParamCount() > 2 {
-				lambdaContext[lambda.ParamName(2)] = index
-			}
-			return
-		}
-		lambdaContext[lambda.ParamName(0)] = key
-		lambdaContext[lambda.ParamName(1)] = value
-		if lambda.ParamCount() > 2 {
-			lambdaContext[lambda.ParamName(2)] = index
-		}
+		bindObjectLambdaParameters(lambdaContext, lambda, key, value, index, isDataWeaveOrder)
 	})
 	if err != nil {
 		return false, err
@@ -535,7 +522,7 @@ func mergeIntoResult(result Object, key string, value Value) {
 
 // callBuiltinGroupBy implements the __groupBy(array, lambda) function.
 func callBuiltinGroupBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("groupBy", e, scope, depth, 1, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("groupBy", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -588,6 +575,9 @@ func callBuiltinPluck(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	// Case 1: Source is an Object
 	if obj, ok := sourceVal.(Object); ok {
 		if lambda, ok := selectorVal.(*Lambda); ok {
+			if lambda.ParamCount() > 3 {
+				return nil, newPosError(fmt.Sprintf("pluck lambda must have between 0 and 3 parameters, got %d", lambda.ParamCount()), e.Args[1].Pos())
+			}
 			// Object + Lambda (DataWeave style pluck)
 			return pluckObject(obj, lambda, scope, depth, e)
 		}
@@ -601,6 +591,9 @@ func callBuiltinPluck(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 			return pluckArray(arr, keyStr, e)
 		}
 		if lambda, ok := selectorVal.(*Lambda); ok {
+			if lambda.ParamCount() > 2 {
+				return nil, newPosError(fmt.Sprintf("pluck lambda must have between 0 and 2 parameters for an array, got %d", lambda.ParamCount()), e.Args[1].Pos())
+			}
 			// Pluck on array with lambda acts like map
 			return callBuiltinMapInternal(arr, lambda, scope, depth)
 		}
@@ -644,24 +637,26 @@ func pluckObject(obj Object, lambda *Lambda, scope *Scope, depth int, e *ast.Cal
 
 func evaluatePluckLambda(key string, value Value, index int, isDataWeaveOrder bool, lambda *Lambda, scope *Scope, depth int) (Value, error) {
 	return evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
-		if isDataWeaveOrder {
-			lambdaContext[lambda.ParamName(0)] = value
-			if lambda.ParamCount() > 1 {
-				lambdaContext[lambda.ParamName(1)] = key
-			}
-			if lambda.ParamCount() > 2 {
-				lambdaContext[lambda.ParamName(2)] = index
-			}
-			return
-		}
-		lambdaContext[lambda.ParamName(0)] = key
-		if lambda.ParamCount() > 1 {
-			lambdaContext[lambda.ParamName(1)] = value
-		}
-		if lambda.ParamCount() > 2 {
-			lambdaContext[lambda.ParamName(2)] = index
-		}
+		bindObjectLambdaParameters(lambdaContext, lambda, key, value, index, isDataWeaveOrder)
 	})
+}
+
+func bindObjectLambdaParameters(lambdaContext Context, lambda *Lambda, key string, value Value, index int, isDataWeaveOrder bool) {
+	if lambda.ParamCount() == 0 {
+		return
+	}
+
+	first, second := Value(value), Value(key)
+	if !isDataWeaveOrder {
+		first, second = key, value
+	}
+	lambdaContext[lambda.ParamName(0)] = first
+	if lambda.ParamCount() > 1 {
+		lambdaContext[lambda.ParamName(1)] = second
+	}
+	if lambda.ParamCount() > 2 {
+		lambdaContext[lambda.ParamName(2)] = index
+	}
 }
 
 // pluckArray extracts nested properties from array elements using dot notation
