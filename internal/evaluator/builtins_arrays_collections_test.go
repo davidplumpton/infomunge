@@ -86,6 +86,37 @@ func TestBuiltinRemoveSupportsArrayAndScalarRightOperands(t *testing.T) {
 	}
 }
 
+func TestSomeAndEveryShortCircuitBeforeLaterPredicateErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected bool
+	}{
+		{
+			name:     "some stops after true",
+			expr:     `some([]interface{}{1, 0}, __lambda("x", x > 0 || 1 / x > 0))`,
+			expected: true,
+		},
+		{
+			name:     "every stops after false",
+			expr:     `every([]interface{}{0, 1}, __lambda("x", x > 0 && 1 / (1 - x) > 0))`,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(tt.expr, Context{}, nil, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("Evaluate() error = %v", err)
+			}
+			if result != tt.expected {
+				t.Fatalf("Evaluate() = %#v, want %t", result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestInclusiveRangeBounds(t *testing.T) {
 	tests := []struct {
 		name          string

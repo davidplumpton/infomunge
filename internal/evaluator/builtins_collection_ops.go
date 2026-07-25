@@ -9,9 +9,8 @@ import (
 	"unicode/utf8"
 )
 
-// executeLambdaOnArrayElements iterates over an array, evaluates a lambda on each element,
+// executeLambdaOnArrayElements iterates over every array element, evaluates a lambda,
 // and calls a callback with the element, index, and evaluated value.
-// The callback receives (element, index, evaluatedValue) and should return an error or nil.
 type lambdaElementCallback func(elem Value, index int, value Value) error
 
 func executeLambdaOnArrayElements(
@@ -20,6 +19,23 @@ func executeLambdaOnArrayElements(
 	scope *Scope,
 	depth int,
 	callback lambdaElementCallback,
+) error {
+	return executeLambdaOnArrayElementsUntil(array, lambda, scope, depth, func(elem Value, index int, value Value) (bool, error) {
+		return false, callback(elem, index, value)
+	})
+}
+
+// executeLambdaOnArrayElementsUntil is the short-circuiting variant of
+// executeLambdaOnArrayElements. The callback's boolean result stops iteration
+// when true.
+type lambdaElementUntilCallback func(elem Value, index int, value Value) (bool, error)
+
+func executeLambdaOnArrayElementsUntil(
+	array Array,
+	lambda *Lambda,
+	scope *Scope,
+	depth int,
+	callback lambdaElementUntilCallback,
 ) error {
 	for i, elem := range array {
 		value, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
@@ -32,8 +48,12 @@ func executeLambdaOnArrayElements(
 			return err
 		}
 
-		if err := callback(elem, i, value); err != nil {
+		stop, err := callback(elem, i, value)
+		if err != nil {
 			return err
+		}
+		if stop {
+			return nil
 		}
 	}
 	return nil
@@ -353,15 +373,15 @@ func callBuiltinSome(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	}
 
 	found := false
-	err = executeLambdaOnArrayElements(array, lambda, scope, depth, func(_ Value, _ int, result Value) error {
+	err = executeLambdaOnArrayElementsUntil(array, lambda, scope, depth, func(_ Value, _ int, result Value) (bool, error) {
 		boolResult, ok := result.(bool)
 		if !ok {
-			return newLambdaWrongReturnError("some", "a boolean", result, e.Args[1].Pos())
+			return false, newLambdaWrongReturnError("some", "a boolean", result, e.Args[1].Pos())
 		}
 		if boolResult {
 			found = true
 		}
-		return nil
+		return boolResult, nil
 	})
 	if err != nil {
 		return nil, err
@@ -377,15 +397,15 @@ func callBuiltinEvery(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	}
 
 	allTrue := true
-	err = executeLambdaOnArrayElements(array, lambda, scope, depth, func(_ Value, _ int, result Value) error {
+	err = executeLambdaOnArrayElementsUntil(array, lambda, scope, depth, func(_ Value, _ int, result Value) (bool, error) {
 		boolResult, ok := result.(bool)
 		if !ok {
-			return newLambdaWrongReturnError("every", "a boolean", result, e.Args[1].Pos())
+			return false, newLambdaWrongReturnError("every", "a boolean", result, e.Args[1].Pos())
 		}
 		if !boolResult {
 			allTrue = false
 		}
-		return nil
+		return !boolResult, nil
 	})
 	if err != nil {
 		return nil, err

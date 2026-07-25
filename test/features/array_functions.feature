@@ -860,6 +860,17 @@ Feature: Array Functions
      When I run the application with this content
      Then the output should be true
 
+   Scenario: some skips an unreachable failing predicate
+     Given the following input content:
+       """
+       %im 0.1
+       output application/json
+       ---
+       some([1, 0], (x) -> x > 0 or 1 / x > 0)
+       """
+     When I run the application with this content
+     Then the output should be true
+
    Scenario: every basic usage true
      Given the following input content:
        """
@@ -903,6 +914,17 @@ Feature: Array Functions
        """
      When I run the application with this content
      Then the output should be true
+
+   Scenario: every skips an unreachable failing predicate
+     Given the following input content:
+       """
+       %im 0.1
+       output application/json
+       ---
+       every([0, 1], (x) -> x > 0 and 1 / (1 - x) > 0)
+       """
+     When I run the application with this content
+     Then the output should be false
 
    Scenario Outline: <builtin> rejects a <result_type> predicate result
      Given the following input content:
