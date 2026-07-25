@@ -109,6 +109,14 @@ Feature: Lazy Evaluation
       [30,40,50]
       """
 
+  Scenario: Documented lazy pipeline example is an executable standalone script
+    Given the lazy evaluation documentation example
+    When I execute the script
+    Then the output should be:
+      """
+      [16,25]
+      """
+
   Scenario: Lazy filter with empty result
     Given the script:
       """

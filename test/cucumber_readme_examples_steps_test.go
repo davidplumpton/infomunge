@@ -17,7 +17,22 @@ import (
 var (
 	readmeDataWeaveCommandPattern = regexp.MustCompile(`(?m)^dw run (-i=payload=payload\.json) "([^"]+)"$`)
 	readmeServerBodyPattern       = regexp.MustCompile(`(?m)^  -d '([^']+)'$`)
+	lazyEvaluationExamplePattern  = regexp.MustCompile(`(?s)## Examples\s+` + "```infomunge\n" + `(.*?)\n` + "```")
 )
+
+func (tc *testContext) theLazyEvaluationDocumentationExample() error {
+	documentation, err := os.ReadFile("../docs/lazy-evaluation.md")
+	if err != nil {
+		return fmt.Errorf("read lazy-evaluation documentation: %w", err)
+	}
+
+	match := lazyEvaluationExamplePattern.FindSubmatch(documentation)
+	if match == nil {
+		return errors.New("lazy-evaluation documentation should contain an infomunge example under the Examples heading")
+	}
+	tc.scriptContent = string(match[1])
+	return nil
+}
 
 func (tc *testContext) theREADMEDataWeaveExampleShouldUseANamedFileInputAndBeExecutable() error {
 	readme, err := os.ReadFile("../README.md")

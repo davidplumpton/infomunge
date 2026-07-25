@@ -56,17 +56,20 @@ infomunge --lazy -f script.im
 ## Examples
 
 ```infomunge
-// Create a lazy stream from an array
-stream = __toStream([1,2,3,4,5])
-
-// Apply lazy operations
-result = stream |> __lazyMap((x) -> x * x) |> __lazyFilter((x) -> x > 10)
-
-// Force evaluation
-output application/json --- force_eval(result)
+%im 0.1
+output application/json
+var stream = __toStream([1,2,3,4,5])
+var squaresOverTen = __lazyFilter(
+  __lazyMap(stream, (x) -> x * x),
+  (x) -> x > 10
+)
+---
+force_eval(squaresOverTen)
 ```
 
-This will output `[16,25]` without creating intermediate arrays.
+This outputs `[16,25]` without creating intermediate arrays. Lazy operations use
+ordinary function-call syntax, so compose them by nesting calls from the source
+outward.
 
 ## Current Semantics
 
