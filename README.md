@@ -38,6 +38,7 @@ Notes:
 - InfoMunge supports `%` as a modulo operator. DataWeave-compatible scripts should use the left-associative `mod` operator instead. Like DataWeave, infix `mod` binds less tightly than `+`, `-`, `*`, `/`, and `%`; use parentheses to override that precedence.
 - Range selectors such as `items[1 to 3]` are inclusive. If either bound is outside the collection after resolving negative indexes, the selector returns `null`; direct array and string indexes remain strict and return an out-of-bounds error.
 - Header `input` directives are accepted for DataWeave compatibility and documentation only. Input data is parsed before execution by the CLI `-i` flags, server `/run` inputs, or embedding test harness; header `input` lines do not reparse, rename, validate, or create inputs.
+- `reduce` callbacks follow DataWeave's `(item, accumulator)` parameter order. A default on the second parameter supplies the initial accumulator; without one, the first array item is the initial accumulator. In implicit callbacks, `$` is the current item and `$$` is the accumulator. InfoMunge additionally supports a third index parameter.
 
 ### Comparison with DataWeave
 

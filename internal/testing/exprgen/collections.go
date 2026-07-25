@@ -124,11 +124,7 @@ func collectionOpGenWithScope(depth int, features Feature, scope lambdaScope, cf
 }
 
 func (c exprConfig) collectionOps() []string {
-	ops := []string{"map", "filter", "flatMap"}
-	if !c.DWCompat {
-		ops = append(ops, "reduce")
-	}
-	return ops
+	return []string{"map", "filter", "flatMap", "reduce"}
 }
 
 func collectionInputExpr(t *rapid.T, depth int, features Feature, scope lambdaScope, cfg exprConfig) string {
@@ -176,13 +172,19 @@ func flatMapExpr(t *rapid.T, input string, bodyDepth int, features Feature, scop
 }
 
 func reduceExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope lambdaScope, cfg exprConfig) string {
-	withIndex := rapid.Bool().Draw(t, "reduceWithIndex")
+	withIndex := !cfg.DWCompat && rapid.Bool().Draw(t, "reduceWithIndex")
 	paramCount := 2
 	if withIndex {
 		paramCount = 3
 	}
 	params := uniqueLambdaParams(t, paramCount, scope)
 	lScope := scope.withNamed(params...)
+
+	if cfg.DWCompat {
+		// Returning the accumulator exercises the observable callback order
+		// without introducing operator/type mismatches in differential cases.
+		return fmt.Sprintf("%s reduce (%s) -> %s", input, strings.Join(params, ", "), params[1])
+	}
 
 	var body string
 	if withIndex {

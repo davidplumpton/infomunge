@@ -20,7 +20,7 @@ fun indexOf(array, value) =
     if (sizeOf(matches) == 0) -1 else matches[0]
 
 fun indexWhere(array, criteria) =
-  array reduce (acc = -1, item, idx) ->
+  array reduce (item, acc = -1, idx) ->
     if (acc != -1) acc else if (criteria(item)) idx else acc
 
 fun join(left, right, leftKey, rightKey) =

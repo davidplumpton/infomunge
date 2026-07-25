@@ -5,35 +5,15 @@ import (
 )
 
 type reduceSetup struct {
-	accParamIdx  int
-	elemParamIdx int
 	hasInitial   bool
 	initialValue Value
 }
 
 func determineReduceSetup(lambda *Lambda) reduceSetup {
-	setup := reduceSetup{
-		accParamIdx:  0,
-		elemParamIdx: 1,
-	}
-
-	if !lambda.HasDefaults() {
-		return setup
-	}
-
+	setup := reduceSetup{}
 	if defaultVal, ok := lambda.GetDefault(lambda.ParamName(1)); ok {
 		setup.hasInitial = true
 		setup.initialValue = defaultVal
-		setup.accParamIdx = 1
-		setup.elemParamIdx = 0
-		return setup
-	}
-
-	if defaultVal, ok := lambda.GetDefault(lambda.ParamName(0)); ok {
-		setup.hasInitial = true
-		setup.initialValue = defaultVal
-		setup.accParamIdx = 0
-		setup.elemParamIdx = 1
 	}
 
 	return setup
@@ -60,8 +40,8 @@ func runReduce(array Array, lambda *Lambda, scope *Scope, depth int, setup reduc
 	accumulator, startIdx := reduceInitialAccumulator(array, setup)
 	for i := startIdx; i < len(array); i++ {
 		result, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
-			lambdaContext[lambda.ParamName(setup.accParamIdx)] = accumulator
-			lambdaContext[lambda.ParamName(setup.elemParamIdx)] = array[i]
+			lambdaContext[lambda.ParamName(0)] = array[i]
+			lambdaContext[lambda.ParamName(1)] = accumulator
 			if lambda.ParamCount() > 2 {
 				lambdaContext[lambda.ParamName(2)] = i
 			}
@@ -84,17 +64,18 @@ func runReduce(array Array, lambda *Lambda, scope *Scope, depth int, setup reduc
 //   - lambda: A function with 2-3 parameters
 //
 // Lambda parameters (2-3 params):
-//   - accumulator: The accumulated result from previous iterations
 //   - element: The current array element
-//   - index (optional): The current element's index
+//   - accumulator: The accumulated result from previous iterations
+//   - index (optional InfoMunge extension): The current element's index
 //
 // Initial value handling (DataWeave style):
-//   - If the lambda has a default value on any parameter, that parameter becomes
-//     the accumulator and its default becomes the initial value.
+//   - A default value on the second (accumulator) parameter becomes the initial
+//     value.
 //   - Example: (item, acc = 0) -> acc + item  // acc starts at 0
-//   - Example: (acc = [], item) -> acc ++ [item]  // acc starts as empty array
-//   - Without defaults: first element is used as initial accumulator, iteration
-//     starts from second element.
+//   - A default on the first (element) parameter does not initialize the
+//     accumulator because every invocation supplies an element.
+//   - Without an accumulator default: first element is used as the initial
+//     accumulator, and iteration starts from the second element.
 //
 // Returns null if the array is empty and no initial value is provided.
 func callBuiltinReduce(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {

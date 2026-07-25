@@ -11,7 +11,7 @@ func TestEmptyAggregationOperationsReturnNull(t *testing.T) {
 		{"min", "min([]interface{}{})"},
 		{"maxBy", `maxBy([]interface{}{}, __lambda("x", x))`},
 		{"minBy", `minBy([]interface{}{}, __lambda("x", x))`},
-		{"reduce without initial value", `__reduce([]interface{}{}, __lambda("acc, x", acc + x))`},
+		{"reduce without initial value", `__reduce([]interface{}{}, __lambda("x, acc", acc + x))`},
 	}
 
 	for _, tt := range tests {

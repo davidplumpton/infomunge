@@ -50,7 +50,7 @@ Feature: Complex DataWeave Expressions
         groupBy (t) -> t.type
         mapObject (v, k) -> [k, {
           count: sizeOf(v),
-          total: (v map (item) -> item.amount) reduce (acc, x) -> acc + x
+          total: (v map (item) -> item.amount) reduce (x, acc) -> acc + x
         }]
       """
     When I run the application with this content
@@ -66,7 +66,7 @@ Feature: Complex DataWeave Expressions
       range(10000)
         filter (x) -> mod(x, 2) == 0
         map (x) -> x + 1
-        reduce (acc, x) -> acc + x
+        reduce (x, acc) -> acc + x
       """
     When I run the script
     Then the output should be valid JSON with number close to 25000000

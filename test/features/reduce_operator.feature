@@ -9,7 +9,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      [1, 2, 3, 4, 5] reduce (acc, x) -> acc + x
+      [1, 2, 3, 4, 5] reduce (x, acc) -> acc + x
       """
     When I run the application with this content
     Then the output should be:
@@ -23,7 +23,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      [1, 2, 3, 4, 5] reduce (acc, x) -> acc * x
+      [1, 2, 3, 4, 5] reduce (x, acc) -> acc * x
       """
     When I run the application with this content
     Then the output should be:
@@ -37,7 +37,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      ["hello", " ", "world"] reduce (acc, s) -> acc + s
+      ["hello", " ", "world"] reduce (s, acc) -> acc + s
       """
     When I run the application with this content
     Then the output should be:
@@ -51,7 +51,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      [42] reduce (acc, x) -> acc + x
+      [42] reduce (x, acc) -> acc + x
       """
     When I run the application with this content
     Then the output should be:
@@ -65,7 +65,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      [3, 1, 4, 1, 5, 9, 2, 6] reduce (max, x) -> if (x > max) x else max
+      [3, 1, 4, 1, 5, 9, 2, 6] reduce (x, max) -> if (x > max) x else max
       """
     When I run the application with this content
     Then the output should be:
@@ -79,7 +79,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      [3, 1, 4, 1, 5, 9, 2, 6] reduce (min, x) -> if (x < min) x else min
+      [3, 1, 4, 1, 5, 9, 2, 6] reduce (x, min) -> if (x < min) x else min
       """
     When I run the application with this content
     Then the output should be:
@@ -93,7 +93,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      [10, 20, 30] reduce (acc, x, idx) -> acc + idx
+      [10, 20, 30] reduce (x, acc, idx) -> acc + idx
       """
     When I run the application with this content
     Then the output should be:
@@ -107,7 +107,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      ([{"value": 10}, {"value": 20}, {"value": 30}] map (item) -> item.value) reduce (acc, x) -> acc + x
+      ([{"value": 10}, {"value": 20}, {"value": 30}] map (item) -> item.value) reduce (x, acc) -> acc + x
       """
     When I run the application with this content
     Then the output should be:
@@ -121,7 +121,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      ["a", "b", "c", "d"] reduce (acc, item) -> acc + "," + item
+      ["a", "b", "c", "d"] reduce (item, acc) -> acc + "," + item
       """
     When I run the application with this content
     Then the output should be:
@@ -135,7 +135,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      [5, 3, 8, 1, 9, 2] reduce (acc, x) -> if (x > 5) acc + x else acc
+      [5, 3, 8, 1, 9, 2] reduce (x, acc) -> if (x > 5) acc + x else acc
       """
     When I run the application with this content
     Then the output should be:
@@ -149,7 +149,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      [5, 3, 0, 2, 1] reduce (acc, x) -> acc * x
+      [5, 3, 0, 2, 1] reduce (x, acc) -> acc * x
       """
     When I run the application with this content
     Then the output should be:
@@ -163,7 +163,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] reduce (acc, x) -> acc + x
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] reduce (x, acc) -> acc + x
       """
     When I run the application with this content
     Then the output should be:
@@ -177,7 +177,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      ([1, 2, 3, 4, 5, 6] filter (x) -> x > 3) reduce (acc, x) -> acc + x
+      ([1, 2, 3, 4, 5, 6] filter (x) -> x > 3) reduce (x, acc) -> acc + x
       """
     When I run the application with this content
     Then the output should be:
@@ -191,7 +191,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      ([1, 2, 3] map (x) -> x * 2) reduce (acc, x) -> acc + x
+      ([1, 2, 3] map (x) -> x * 2) reduce (x, acc) -> acc + x
       """
     When I run the application with this content
     Then the output should be:
@@ -206,12 +206,26 @@ Feature: Reduce Operator
       output application/json
       var multiplier = 10
       ---
-      [1, 2, 3] reduce (acc, x) -> acc + x * multiplier
+      [1, 2, 3] reduce (x, acc) -> acc + x * multiplier
       """
     When I run the application with this content
     Then the output should be:
       """
       51
+      """
+
+  Scenario: Reduce without an initial value uses DataWeave item-first callback order
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [true, "", null, 0, 31] reduce (item, acc) -> acc
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      true
       """
 
   Scenario: Reduce with initial value (DataWeave style)
@@ -242,18 +256,18 @@ Feature: Reduce Operator
       16
       """
 
-  Scenario: Reduce with initial value on first parameter
+  Scenario: Reduce ignores an item parameter default when choosing the initial accumulator
     Given the following input content:
       """
       %im 0.1
       output application/json
       ---
-      [1, 2, 3] reduce (acc = 5, x) -> acc + x
+      [1, 2, 3] reduce (item = 5, acc) -> acc + item
       """
     When I run the application with this content
     Then the output should be:
       """
-      11
+      6
       """
 
   Scenario: Reduce empty array with initial value returns initial
@@ -331,7 +345,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      [] reduce (acc, x) -> acc + x
+      [] reduce (x, acc) -> acc + x
       """
     When I run the application with this content
     Then the output should be:
@@ -345,7 +359,7 @@ Feature: Reduce Operator
       %im 0.1
       output application/json
       ---
-      "not an array" reduce (acc, x) -> acc + x
+      "not an array" reduce (x, acc) -> acc + x
       """
     When I run the application and it fails
     Then the output should contain "reduce expects an array"
@@ -387,5 +401,5 @@ Feature: Reduce Operator
     When I run the application with this content
     Then the output should be:
       """
-      "c,a"
+      "a,c"
       """

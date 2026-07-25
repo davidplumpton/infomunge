@@ -72,8 +72,14 @@ func TestEvaluate_ObjectBuiltins(t *testing.T) {
 		},
 		{
 			"reduce sum",
-			`__reduce([]interface{}{1, 2, 3, 4}, __lambda("acc, v", acc + v))`,
+			`__reduce([]interface{}{1, 2, 3, 4}, __lambda("v, acc", acc + v))`,
 			10,
+			false,
+		},
+		{
+			"reduce uses item-first callback order",
+			`__reduce([]interface{}{true, "", nil, 0, 31}, __lambda("item, acc", acc))`,
+			true,
 			false,
 		},
 		{

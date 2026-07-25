@@ -407,7 +407,7 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
       input application/json
       output application/json
       ---
-      (payload map (item) -> item.value) reduce (acc, val) -> acc + val
+      (payload map (item) -> item.value) reduce (val, acc) -> acc + val
       """
     When I run the application with this JSON input:
       """

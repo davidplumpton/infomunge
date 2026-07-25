@@ -432,7 +432,7 @@ Feature: Range and Zip Functions
       %im 0.1
       output application/json
       ---
-      1 to 4 reduce (acc, x) -> acc + x
+      1 to 4 reduce (x, acc) -> acc + x
       """
     When I run the script
     Then the output should be:

@@ -38,10 +38,10 @@ items map (item) -> item.name  // Use map for transformation
 When chaining operations, wrap in parentheses if needed:
 ```im
 // ❌ May fail
-payload map (x) -> x.value reduce (acc, v) -> acc + v
+payload map (x) -> x.value reduce (v, acc) -> acc + v
 
 // ✅ Preferred
-(payload map (x) -> x.value) reduce (acc, v) -> acc + v
+(payload map (x) -> x.value) reduce (v, acc) -> acc + v
 ```
 
 ### 5. **Input Headers Are Compatibility Metadata**

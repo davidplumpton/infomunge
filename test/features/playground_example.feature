@@ -13,7 +13,7 @@ Feature: Playground example script
     And the following script:
       """
       %im 0.1
-      fun sum(nums) = nums reduce (acc, n) -> acc + n
+      fun sum(nums) = nums reduce (n, acc) -> acc + n
       output application/xml
       ---
       {

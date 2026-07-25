@@ -233,7 +233,7 @@ Feature: In-process coverage for date, URL, and core builtins
       %im 0.1
       output application/json
       ---
-      [1, 2, 3] reduce (acc = {count: 0}, x) -> {count: acc.count + x}
+      [1, 2, 3] reduce (x, acc = {count: 0}) -> {count: acc.count + x}
       """
     When I run the script
     Then the output should be:
@@ -247,7 +247,7 @@ Feature: In-process coverage for date, URL, and core builtins
       %im 0.1
       output application/json
       ---
-      [10, 20] reduce (acc = {sum: 0, count: 0}, x) -> {sum: acc.sum + x, count: acc.count + 1}
+      [10, 20] reduce (x, acc = {sum: 0, count: 0}) -> {sum: acc.sum + x, count: acc.count + 1}
       """
     When I run the script
     Then the output should be:
@@ -261,7 +261,7 @@ Feature: In-process coverage for date, URL, and core builtins
       %im 0.1
       output application/json
       ---
-      [1, 2, 3] reduce (acc = [0], x) -> acc ++ [x]
+      [1, 2, 3] reduce (x, acc = [0]) -> acc ++ [x]
       """
     When I run the script
     Then the output should be:
@@ -275,7 +275,7 @@ Feature: In-process coverage for date, URL, and core builtins
       %im 0.1
       output application/json
       ---
-      [1, 2, 3, 4] reduce (acc = 0, x) -> acc + x
+      [1, 2, 3, 4] reduce (x, acc = 0) -> acc + x
       """
     When I run the script
     Then the output should be:
