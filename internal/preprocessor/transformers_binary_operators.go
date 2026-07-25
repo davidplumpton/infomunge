@@ -63,12 +63,12 @@ var binaryOperatorConfigs = map[string]stringutils.BinaryOperatorConfig{
 	binaryOpSplitBy: {
 		Operator:     " splitBy ",
 		FuncName:     "splitBy",
-		RightStopOps: []string{" splitBy "},
+		RightStopOps: []string{" splitBy ", " ++ "},
 	},
 	binaryOpJoinBy: {
 		Operator:     " joinBy ",
 		FuncName:     "joinBy",
-		RightStopOps: []string{" joinBy "},
+		RightStopOps: []string{" joinBy ", " ++ "},
 	},
 	binaryOpTo: {
 		Operator:        " to ",

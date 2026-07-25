@@ -115,6 +115,34 @@ Feature: String Functions
       "a-b"
       """
 
+  Scenario: joinBy completes before following concatenation
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ["a", "b"] joinBy "-" ++ "c"
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      "a-bc"
+      """
+
+  Scenario: splitBy completes before following array concatenation
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "a,b" splitBy "," ++ ["c"]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["a","b","c"]
+      """
+
   Scenario: toLower and toUpper aliases
     Given the following input content:
       """
