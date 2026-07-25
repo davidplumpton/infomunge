@@ -134,6 +134,16 @@ Feature: Error Messages
     When I run the application and it fails
     Then the error should contain "object index out of bounds"
 
+  Scenario: Negative object index out of bounds
+    Given the following input content:
+      """
+      %im 0.1
+      ---
+      {a: 1, b: 2}[-3]
+      """
+    When I run the application and it fails
+    Then the error should contain "object index out of bounds: -3 (object has 2 keys)"
+
   Scenario: Map key with invalid type
     Given the following input content:
       """

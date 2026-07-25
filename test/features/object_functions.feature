@@ -186,12 +186,12 @@ Feature: Object Functions
       %im 0.1
       output application/json
       ---
-      [{b: 2, a: 1}[0], {b: 2, a: 1} pluck (v, k) -> k]
+      [{b: 2, a: 1}[-1], {b: 2, a: 1}[-2], {b: 2, a: 1} pluck (v, k) -> k]
       """
     When I run the application with this content
     Then the output should be:
       """
-      [2,["b","a"]]
+      [1,2,["b","a"]]
       """
 
   Scenario: object operations preserve parsed JSON input order
@@ -201,7 +201,7 @@ Feature: Object Functions
       input application/json
       output application/json
       ---
-      [payload[0], keysOf(payload), valuesOf(payload), payload pluck (v, k) -> k]
+      [payload[-1], payload[-2], keysOf(payload), valuesOf(payload), payload pluck (v, k) -> k]
       """
     When I run the application with this JSON input:
       """
@@ -209,7 +209,7 @@ Feature: Object Functions
       """
     Then the output should be:
       """
-      [2,["b","a"],[2,1],["b","a"]]
+      [1,2,["b","a"],[2,1],["b","a"]]
       """
 
   Scenario: keysOf with empty object

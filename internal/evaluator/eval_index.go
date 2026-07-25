@@ -145,8 +145,12 @@ func evalObjectStringIndex(obj Object, key string, pos token.Pos) (Value, error)
 // evalObjectOrdinalIndex accesses an object by insertion position.
 func evalObjectOrdinalIndex(obj Object, i int, pos token.Pos) (Value, error) {
 	keys := values.ObjectKeys(obj)
-	if i < 0 || i >= len(keys) {
+	ordinal := i
+	if ordinal < 0 {
+		ordinal += len(keys)
+	}
+	if ordinal < 0 || ordinal >= len(keys) {
 		return nil, newPosError(fmt.Sprintf("object index out of bounds: %d (object has %d keys)", i, len(keys)), pos)
 	}
-	return obj[keys[i]], nil
+	return obj[keys[ordinal]], nil
 }

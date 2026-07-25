@@ -86,7 +86,7 @@ Feature: XML Reading
       %im 0.1
       output application/json
       ---
-      { a: payload.root[0], b: payload.root[1], c: payload.root[2] }
+      { a: payload.root[-3], b: payload.root[-2], c: payload.root[-1] }
       """
     When I run the script
     Then the output should be:
