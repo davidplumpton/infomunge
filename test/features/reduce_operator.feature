@@ -325,7 +325,7 @@ Feature: Reduce Operator
     And the output should contain "invalid string literal"
     And the output should contain "4:11"
 
-  Scenario: Reduce empty array without initial value raises error
+  Scenario: Reduce empty array without initial value returns null
     Given the following input content:
       """
       %im 0.1
@@ -333,8 +333,11 @@ Feature: Reduce Operator
       ---
       [] reduce (acc, x) -> acc + x
       """
-    When I run the application and it fails
-    Then the output should contain "reduce cannot be applied to an empty array"
+    When I run the application with this content
+    Then the output should be:
+      """
+      null
+      """
 
   Scenario: Reduce non-array raises error
     Given the following input content:

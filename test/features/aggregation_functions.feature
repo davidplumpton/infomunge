@@ -224,8 +224,11 @@ Feature: Aggregation Functions
       ---
       [] maxBy (x) -> x
       """
-    When I run the application and it fails
-    Then the output should contain "empty"
+    When I run the application with this content
+    Then the output should be:
+      """
+      null
+      """
 
   Scenario: minBy basic usage
     Given the following input content:
@@ -284,8 +287,11 @@ Feature: Aggregation Functions
       ---
       [] minBy (x) -> x
       """
-    When I run the application and it fails
-    Then the output should contain "empty"
+    When I run the application with this content
+    Then the output should be:
+      """
+      null
+      """
 
   Scenario: orderBy basic usage
     Given the following input content:
@@ -518,7 +524,7 @@ Feature: Aggregation Functions
        42
        """
 
-   Scenario: max with empty array fails
+   Scenario: max with empty array returns null
      Given the following input content:
        """
        %im 0.1
@@ -526,8 +532,11 @@ Feature: Aggregation Functions
        ---
        max([])
        """
-     When I run the application and it fails
-     Then the output should contain "max function requires non-empty array"
+     When I run the application with this content
+     Then the output should be:
+       """
+       null
+       """
 
    Scenario: min with array
      Given the following input content:
@@ -571,7 +580,7 @@ Feature: Aggregation Functions
        42
        """
 
-   Scenario: min with empty array fails
+   Scenario: min with empty array returns null
      Given the following input content:
        """
        %im 0.1
@@ -579,8 +588,11 @@ Feature: Aggregation Functions
        ---
        min([])
        """
-     When I run the application and it fails
-     Then the output should contain "min function requires non-empty array"
+     When I run the application with this content
+     Then the output should be:
+       """
+       null
+       """
 
   Scenario: filter chained with maxBy
     Given the following input content:

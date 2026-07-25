@@ -404,7 +404,7 @@ Feature: Math Functions
       -8
       """
 
-  Scenario: min of empty array fails
+  Scenario: min of empty array returns null
     Given the following input content:
       """
       %im 0.1
@@ -412,8 +412,11 @@ Feature: Math Functions
       ---
       min([])
       """
-    When I run the application and it fails
-    Then the output should contain "min function requires non-empty array"
+    When I run the application with this content
+    Then the output should be:
+      """
+      null
+      """
 
   # max tests
   Scenario: max of multiple arguments
@@ -472,7 +475,7 @@ Feature: Math Functions
       -1
       """
 
-  Scenario: max of empty array fails
+  Scenario: max of empty array returns null
     Given the following input content:
       """
       %im 0.1
@@ -480,8 +483,11 @@ Feature: Math Functions
       ---
       max([])
       """
-    When I run the application and it fails
-    Then the output should contain "max function requires non-empty array"
+    When I run the application with this content
+    Then the output should be:
+      """
+      null
+      """
 
   # sum tests (basic usage in aggregation_functions.feature)
   Scenario: sum of empty array

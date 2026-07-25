@@ -196,7 +196,6 @@ func callBuiltinMetadata(args []Value, e *ast.CallExpr) (Value, error) {
 // that satisfies the comparison predicate. The predicate receives (newValue, currentValue)
 // and returns true if newValue should replace currentValue.
 func findExtremumByLambda(
-	funcName string,
 	array Array,
 	lambda *Lambda,
 	predicate func(new, current Value) (bool, error),
@@ -205,7 +204,7 @@ func findExtremumByLambda(
 	e *ast.CallExpr,
 ) (Value, error) {
 	if len(array) == 0 {
-		return nil, newPosError(fmt.Sprintf("%s: cannot find extremum of empty array", funcName), e.Args[0].Pos())
+		return nil, nil
 	}
 
 	var extremumElement Value = array[0]
@@ -256,7 +255,7 @@ func callBuiltinMaxBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 		return cmp > 0, nil
 	}
 
-	return findExtremumByLambda("maxBy", array, lambda, predicate, scope, depth, e)
+	return findExtremumByLambda(array, lambda, predicate, scope, depth, e)
 }
 
 // callBuiltinMinBy implements the __minBy(array, lambda) function.
@@ -275,7 +274,7 @@ func callBuiltinMinBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 		return cmp < 0, nil
 	}
 
-	return findExtremumByLambda("minBy", array, lambda, predicate, scope, depth, e)
+	return findExtremumByLambda(array, lambda, predicate, scope, depth, e)
 }
 
 // callBuiltinOrderBy implements the __orderBy(array, lambda) function.

@@ -119,7 +119,7 @@ func callBuiltinMax(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) == 1 {
 		if arr, ok := args[0].(Array); ok {
 			if len(arr) == 0 {
-				return nil, newPosError("max function requires non-empty array", e.Pos())
+				return nil, nil
 			}
 			return numericExtremum(arr, "max", true, e)
 		}
@@ -135,7 +135,7 @@ func callBuiltinMin(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) == 1 {
 		if arr, ok := args[0].(Array); ok {
 			if len(arr) == 0 {
-				return nil, newPosError("min function requires non-empty array", e.Pos())
+				return nil, nil
 			}
 			return numericExtremum(arr, "min", false, e)
 		}

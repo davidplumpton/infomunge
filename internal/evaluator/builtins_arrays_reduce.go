@@ -2,7 +2,6 @@ package evaluator
 
 import (
 	"go/ast"
-	"go/token"
 )
 
 type reduceSetup struct {
@@ -40,14 +39,14 @@ func determineReduceSetup(lambda *Lambda) reduceSetup {
 	return setup
 }
 
-func handleReduceEmptyArray(array Array, setup reduceSetup, pos token.Pos) (Value, bool, error) {
+func handleReduceEmptyArray(array Array, setup reduceSetup) (Value, bool, error) {
 	if len(array) != 0 {
 		return nil, false, nil
 	}
 	if setup.hasInitial {
 		return setup.initialValue, true, nil
 	}
-	return nil, true, newPosError("reduce cannot be applied to an empty array without an initial value", pos)
+	return nil, true, nil
 }
 
 func reduceInitialAccumulator(array Array, setup reduceSetup) (Value, int) {
@@ -97,7 +96,7 @@ func runReduce(array Array, lambda *Lambda, scope *Scope, depth int, setup reduc
 //   - Without defaults: first element is used as initial accumulator, iteration
 //     starts from second element.
 //
-// Returns an error if the array is empty and no initial value is provided.
+// Returns null if the array is empty and no initial value is provided.
 func callBuiltinReduce(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	array, lambda, err := evalArrayAndLambda("reduce", e, scope, depth, 2, 3)
 	if err != nil {
@@ -105,7 +104,7 @@ func callBuiltinReduce(e *ast.CallExpr, scope *Scope, depth int) (Value, error) 
 	}
 
 	setup := determineReduceSetup(lambda)
-	if result, handled, err := handleReduceEmptyArray(array, setup, e.Args[0].Pos()); handled {
+	if result, handled, err := handleReduceEmptyArray(array, setup); handled {
 		return result, err
 	}
 
