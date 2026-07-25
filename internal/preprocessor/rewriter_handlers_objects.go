@@ -193,6 +193,9 @@ func (r *rewriter) isIndexer() bool {
 	if r.followsDefaultOperator(j) {
 		return false
 	}
+	if r.followsConfiguredBinaryOperator(j) {
+		return false
+	}
 	last := r.result[j]
 	// Implicit lambda parameters are rewritten after the core syntax pass, so
 	// their selectors must already be classified as indexing here.
@@ -204,6 +207,17 @@ func (r *rewriter) followsDefaultOperator(end int) bool {
 	// leading space in this suffix so identifiers ending in "default" still
 	// treat a following bracket as an index selector.
 	return strings.HasSuffix(string(r.result[:end+1]), " default")
+}
+
+func (r *rewriter) followsConfiguredBinaryOperator(end int) bool {
+	prefix := string(r.result[:end+1])
+	for _, config := range binaryOperatorConfigs {
+		operator := strings.TrimSpace(config.Operator)
+		if strings.HasSuffix(prefix, " "+operator) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *rewriter) followsImplicitLambdaOperator(end int) bool {

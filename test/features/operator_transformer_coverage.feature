@@ -522,6 +522,69 @@ Feature: Operator transformer rewrite coverage
     When I run the script
     Then the output should be true
 
+  # --- Configured operator precedence across families ---
+
+  Scenario: Joined string feeds match
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ["a", "b"] joinBy "" match /(a)(b)/
+      """
+    When I run the script
+    Then the output should be:
+      """
+      ["ab","a","b"]
+      """
+
+  Scenario: Joined string feeds matches
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ["a", "b"] joinBy "" matches /ab/
+      """
+    When I run the script
+    Then the output should be true
+
+  Scenario: Joined string feeds scan
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ["a", "b"] joinBy "" scan /(a)(b)/
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [["ab","a","b"]]
+      """
+
+  Scenario: Find result feeds contains
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "abc" find "b" contains 1
+      """
+    When I run the script
+    Then the output should be true
+
+  Scenario: Scan result feeds contains
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "ab" scan /(a)/ contains ["a", "a"]
+      """
+    When I run the script
+    Then the output should be true
+
   # --- Higher-precedence additive left operands ---
 
   Scenario: Concatenated arrays feed joinBy

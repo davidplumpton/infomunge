@@ -61,9 +61,12 @@ const (
 	TransformPrecedenceDefault
 	TransformPrecedenceNullChain
 	TransformPrecedenceRange
+	TransformPrecedenceComparison
+	// Collection operators bind more tightly than comparison operators so
+	// downstream match, matches, scan, and contains operations receive the
+	// completed collection result.
 	TransformPrecedenceCollection
 	TransformPrecedenceType
-	TransformPrecedenceComparison
 	// TransformPrecedenceModulo matches DataWeave's infix mod operator:
 	// it binds less tightly than additive and multiplicative arithmetic.
 	TransformPrecedenceModulo

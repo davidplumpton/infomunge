@@ -87,6 +87,18 @@ func TestModContractDeclaresDataWeavePrecedence(t *testing.T) {
 	}
 }
 
+func TestCollectionOperatorsBindMoreTightlyThanComparisonOperators(t *testing.T) {
+	if !(TransformPrecedenceComparison < TransformPrecedenceCollection &&
+		TransformPrecedenceCollection < TransformPrecedenceAdditive) {
+		t.Fatalf(
+			"collection precedence %d should be between comparison %d and additive %d",
+			TransformPrecedenceCollection,
+			TransformPrecedenceComparison,
+			TransformPrecedenceAdditive,
+		)
+	}
+}
+
 func TestRangeOperatorStopsBeforeDownstreamOperators(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -260,6 +272,36 @@ func TestConfiguredBinaryOperatorsPreserveMixedLeftAssociativity(t *testing.T) {
 			stage:    createFunctionalProcessingStage(nil),
 			input:    "a ~ b find c splitBy d joinBy e",
 			expected: "joinBy(splitBy(find(__update(a, b), c), d), e)",
+		},
+		{
+			name:     "joinBy result feeds match",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a joinBy b match c",
+			expected: "match(joinBy(a, b), c)",
+		},
+		{
+			name:     "joinBy result feeds matches",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a joinBy b matches c",
+			expected: "matches(joinBy(a, b), c)",
+		},
+		{
+			name:     "joinBy result feeds scan",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a joinBy b scan c",
+			expected: "scan(joinBy(a, b), c)",
+		},
+		{
+			name:     "find result feeds contains",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a find b contains c",
+			expected: "contains(find(a, b), c)",
+		},
+		{
+			name:     "scan result feeds contains",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    "a scan b contains c",
+			expected: "contains(scan(a, b), c)",
 		},
 		{
 			name:     "splitBy before concatenate",
@@ -466,6 +508,42 @@ func TestConfiguredBinaryOperatorsPreserveMixedLeftAssociativity(t *testing.T) {
 			}
 			if len(mapping) != len(got) {
 				t.Fatalf("mapping length = %d, want %d", len(mapping), len(got))
+			}
+		})
+	}
+}
+
+func TestConfiguredBinaryOperatorsComposeAcrossPreprocessingPipeline(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "joinBy result feeds matches",
+			input:    `["a", "b"] joinBy "" matches /ab/`,
+			expected: `matches(joinBy([]interface{}{"a", "b",}, ""), regex("ab"))`,
+		},
+		{
+			name:     "find result feeds contains",
+			input:    `"abc" find "b" contains 1`,
+			expected: `contains(find("abc", "b"), 1)`,
+		},
+		{
+			name:     "scan result feeds contains array",
+			input:    `"ab" scan /(a)/ contains ["a", "a"]`,
+			expected: `contains(scan("ab", regex("(a)")), []interface{}{"a", "a",})`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, _, err := PrepareForParsing(tt.input, Options{})
+			if err != nil {
+				t.Fatalf("PrepareForParsing returned error: %v", err)
+			}
+			if result != tt.expected {
+				t.Fatalf("expected %q, got %q", tt.expected, result)
 			}
 		})
 	}
