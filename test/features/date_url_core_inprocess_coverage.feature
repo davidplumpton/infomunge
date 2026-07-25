@@ -148,7 +148,7 @@ Feature: In-process coverage for date, URL, and core builtins
       ---
       parseURI()
       """
-    Then running the script should fail with error containing "parseURI requires exactly 1 argument"
+    Then running the script should fail with error containing "function expects 1 arguments, got 0"
 
   Scenario: compose with port number
     Given the following script:
@@ -198,7 +198,7 @@ Feature: In-process coverage for date, URL, and core builtins
       ---
       compose()
       """
-    Then running the script should fail with error containing "compose requires exactly 1 argument"
+    Then running the script should fail with error containing "function expects 1 arguments, got 0"
 
   Scenario: encodeURIComponent requires exactly 1 argument
     Given the following script:
@@ -209,7 +209,7 @@ Feature: In-process coverage for date, URL, and core builtins
       ---
       encodeURIComponent()
       """
-    Then running the script should fail with error containing "encodeURIComponent requires exactly 1 argument"
+    Then running the script should fail with error containing "function expects 1 arguments, got 0"
 
   Scenario: decodeURIComponent requires exactly 1 argument
     Given the following script:
@@ -220,7 +220,7 @@ Feature: In-process coverage for date, URL, and core builtins
       ---
       decodeURIComponent()
       """
-    Then running the script should fail with error containing "decodeURIComponent requires exactly 1 argument"
+    Then running the script should fail with error containing "function expects 1 arguments, got 0"
 
   # --- Core: parseGoSyntaxObjectLiteral / parseGoSyntaxArrayLiteral via reduce defaults ---
   # The preprocessor converts object literals like {count: 0} to Go map syntax before

@@ -5,6 +5,7 @@ func coreBuiltinSpecs() []BuiltinSpec {
 		specialBuiltinSpec("__default", builtinCategoryCore, exactArity(2), callBuiltinDefault, "default operator"),
 		specialBuiltinSpec("__lambda", builtinCategoryCore, exactArity(2), callBuiltinLambdaAST, "lambda expression"),
 		specialBuiltinSpec("__modcall", builtinCategoryCore, exactArity(2), callBuiltinModCall, "module function call"),
+		specialBuiltinSpec("__native", builtinCategoryCore, variadicArity(1), callBuiltinNative, "explicit native builtin call"),
 		specialBuiltinSpec("__coerce", builtinCategoryCore, exactArity(2), callBuiltinCoerce, "type coercion"),
 		specialBuiltinSpec("__case", builtinCategoryCore, variadicArity(2), callBuiltinCase, "pattern matching case"),
 		specialBuiltinSpec("lazy_eval", builtinCategoryCore, exactArity(1), callBuiltinLazyEval, "lazy expression wrapper"),

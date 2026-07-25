@@ -1,8 +1,8 @@
 %dw 2.0
 
-fun parseURI(uri) = parseURI(uri)
-fun compose(parts) = compose(parts)
-fun encodeURI(uri) = encodeURI(uri)
-fun decodeURI(uri) = decodeURI(uri)
-fun encodeURIComponent(component) = encodeURIComponent(component)
-fun decodeURIComponent(component) = decodeURIComponent(component)
+fun parseURI(uri) = __native("parseURI", uri)
+fun compose(parts) = __native("compose", parts)
+fun encodeURI(uri) = __native("encodeURI", uri)
+fun decodeURI(uri) = __native("decodeURI", uri)
+fun encodeURIComponent(component) = __native("encodeURIComponent", component)
+fun decodeURIComponent(component) = __native("decodeURIComponent", component)

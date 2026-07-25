@@ -404,6 +404,49 @@ func callBuiltinModCall(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 	return invokeUserLambda(l, args, e.Pos(), scope, depth)
 }
 
+// callBuiltinNative explicitly invokes a builtin without lexical name
+// resolution. Embedded compatibility modules use this for wrappers whose
+// exported names intentionally match their native implementations.
+func callBuiltinNative(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+	if len(e.Args) < 1 {
+		return nil, newPosError("__native requires a builtin name", e.Pos())
+	}
+
+	nameValue, err := evalASTInScopeWithDepth(e.Args[0], scope, depth+1)
+	if err != nil {
+		return nil, err
+	}
+	name, ok := nameValue.(string)
+	if !ok {
+		return nil, newPosError("__native requires a string builtin name", e.Args[0].Pos())
+	}
+	if name == "__native" {
+		return nil, newPosError("__native cannot invoke itself", e.Args[0].Pos())
+	}
+
+	nativeCall := *e
+	nativeCall.Fun = &ast.Ident{NamePos: e.Fun.Pos(), Name: name}
+	nativeCall.Args = e.Args[1:]
+
+	if handler, exists := GetBuiltinSpecial(name); exists {
+		return handler(&nativeCall, scope, depth)
+	}
+	handler, exists := GetBuiltinFunction(name)
+	if !exists {
+		return nil, newPosError(fmt.Sprintf("native builtin not found: %s", name), e.Args[0].Pos())
+	}
+
+	args := make([]Value, 0, len(nativeCall.Args))
+	for _, argExpr := range nativeCall.Args {
+		arg, evalErr := evalASTInScopeWithDepth(argExpr, scope, depth+1)
+		if evalErr != nil {
+			return nil, evalErr
+		}
+		args = append(args, arg)
+	}
+	return handler(args, &nativeCall)
+}
+
 func callBuiltinCoerce(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 	if len(e.Args) < 2 || len(e.Args) > 3 {
 		return nil, newPosError("as operator requires 2 or 3 arguments: value, type[, config]", e.Pos())

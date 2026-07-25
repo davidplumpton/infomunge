@@ -268,11 +268,6 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 		return nil, newPosError("only simple function calls are supported", e.Fun.Pos())
 	}
 
-	// Handle special functions that need unevaluated arguments
-	if handler, ok := GetBuiltinSpecial(fun.Name); ok {
-		return handler(e, visitor.scope, visitor.depth)
-	}
-
 	// Helper to evaluate arguments using the visitor
 	evalArgs := func() ([]Value, error) {
 		args := make([]Value, 0, len(e.Args))
@@ -286,16 +281,8 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 		return args, nil
 	}
 
-	// Dispatch to specific function handler
-	if handler, ok := GetBuiltinFunction(fun.Name); ok {
-		args, err := evalArgs()
-		if err != nil {
-			return nil, err
-		}
-		return handler(args, e)
-	}
-
-	// Check if it's a user-defined function in the context
+	// Lexical function bindings take precedence over builtins. This keeps adding a
+	// builtin from silently changing the meaning of an existing user function.
 	if userFn, exists := visitor.scope.Vars[fun.Name]; exists {
 		if lambda, ok := userFn.(*Lambda); ok {
 			args, err := evalArgs()
@@ -304,6 +291,20 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 			}
 			return invokeUserLambda(lambda, args, e.Pos(), visitor.scope, visitor.depth)
 		}
+	}
+
+	// Handle special functions that need unevaluated arguments.
+	if handler, ok := GetBuiltinSpecial(fun.Name); ok {
+		return handler(e, visitor.scope, visitor.depth)
+	}
+
+	// Dispatch to a regular builtin after evaluating its arguments.
+	if handler, ok := GetBuiltinFunction(fun.Name); ok {
+		args, err := evalArgs()
+		if err != nil {
+			return nil, err
+		}
+		return handler(args, e)
 	}
 
 	return nil, newPosError(fmt.Sprintf("undefined function: %s", fun.Name), fun.Pos())

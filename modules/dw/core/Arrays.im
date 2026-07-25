@@ -8,9 +8,9 @@ fun divideBy(array, size) =
   else if (sizeOf(array) == 0) []
   else [take(array, size)] ++ divideBy(drop(array, size), size)
 
-fun drop(array, amount) = drop(array, amount)
-fun dropWhile(array, criteria) = dropWhile(array, criteria)
-fun every(array, criteria) = every(array, criteria)
+fun drop(array, amount) = __native("drop", array, amount)
+fun dropWhile(array, criteria) = __native("dropWhile", array, criteria)
+fun every(array, criteria) = __native("every", array, criteria)
 
 fun firstWith(array, criteria) =
   first(array filter (item) -> criteria(item))
@@ -47,8 +47,8 @@ fun partition(array, criteria) =
     failure: array filter (item) -> not criteria(item)
   }
 
-fun slice(array, start, end) = slice(array, start, end)
-fun some(array, criteria) = some(array, criteria)
+fun slice(array, start, end) = __native("slice", array, start, end)
+fun some(array, criteria) = __native("some", array, criteria)
 
 fun splitAt(array, index) =
   {
@@ -65,5 +65,5 @@ fun splitWhere(array, criteria) =
 fun sumBy(array, mapper) =
   sum(array map (item) -> mapper(item))
 
-fun take(array, amount) = take(array, amount)
-fun takeWhile(array, criteria) = takeWhile(array, criteria)
+fun take(array, amount) = __native("take", array, amount)
+fun takeWhile(array, criteria) = __native("takeWhile", array, criteria)
