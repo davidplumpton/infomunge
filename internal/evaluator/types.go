@@ -127,6 +127,15 @@ func coerceToTypeWithVisited(value Value, typeName string, context Context, pos 
 		return nil, newCoercionTypeError(value, "Null", pos)
 	case "Namespace":
 		return coerceToNamespace(value, pos)
+	case "Array", "Object", "Function", "Regex":
+		// These structural/runtime types have no conversion rules. Direct
+		// coercion therefore has the same exact-match semantics as a union:
+		// preserve an already matching value, otherwise report a coercion
+		// failure for the recognized built-in type.
+		if matchesTypeExactly(value, trimmed, context) {
+			return value, nil
+		}
+		return nil, newCoercionTypeError(value, trimmed, pos)
 	}
 
 	// Check for cycles in custom type definitions

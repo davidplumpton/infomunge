@@ -259,6 +259,62 @@ Feature: Type Coercion with as Operator
       """
     Then the application should fail with error containing "unknown type: UnknownType"
 
+  Scenario: Array identity coercion preserves the value
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2, 3] as Array
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,2,3]
+      """
+
+  Scenario: Object identity coercion preserves insertion order
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {second: 2, first: 1} as Object
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"second":2,"first":1}
+      """
+
+  Scenario: Function identity coercion preserves the value
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      typeOf(((value) -> value) as Function)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      "Function"
+      """
+
+  Scenario: Regex identity coercion preserves the value
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      typeOf(/abc/ as Regex)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      "Regex"
+      """
+
   Scenario: Coerce with whitespace in string
     Given the following input content:
       """
