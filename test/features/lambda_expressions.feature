@@ -439,3 +439,27 @@ Feature: Lambda Expression Support
       """
       [[2,2],[4,4]]
       """
+
+  Scenario Outline: Nested collection expressions remain inside outer lambda bodies
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      <expression>
+      """
+    When I execute the script
+    Then the output should be:
+      """
+      <output>
+      """
+
+    Examples:
+      | expression                                             | output            |
+      | [[1]] map ($ map 1)                                   | [[1]]             |
+      | [[1]] map ((x) -> x map (y) -> y)                     | [[1]]             |
+      | [[1]] map ((x) -> (x map (y) -> y))                   | [[1]]             |
+      | [[1, 2], [3]] map ((x) -> x filter ($ > 1))           | [[2],[3]]         |
+      | [[1], [2]] map ($ flatMap ((y) -> [y, y]))            | [[1,1],[2,2]]     |
+      | [[10, 20], [30]] map ($ map ($ + $$))                 | [[10,21],[30]]    |
+      | [[1], [2]] map ((x) -> x flatMap [$, $])              | [[1,1],[2,2]]     |

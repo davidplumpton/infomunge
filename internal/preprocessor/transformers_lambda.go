@@ -23,8 +23,12 @@ var implicitLambdaOperators = []string{
 
 // replaceImplicitLambdas converts implicit lambda syntax using $ and $$ to explicit arrow functions.
 func replaceImplicitLambdas(s string) string {
+	return replaceImplicitLambdasWithContext(s, false)
+}
+
+func replaceImplicitLambdasWithContext(s string, nested bool) string {
 	for _, op := range implicitLambdaOperators {
-		s = replaceImplicitLambdaForOp(s, op)
+		s = replaceImplicitLambdaForOp(s, op, nested)
 	}
 	return s
 }
@@ -81,7 +85,7 @@ func wrapImplicitObjectLiteralBodies(s string) string {
 // replaceImplicitLambdaForOp handles implicit lambda replacement for a specific operator.
 // Operator op should include trailing space (e.g., " reduce ") for matching with space,
 // but we also handle the case where the operator is followed directly by "(" (no space).
-func replaceImplicitLambdaForOp(s string, op string) string {
+func replaceImplicitLambdaForOp(s string, op string, nested bool) string {
 	var result []rune
 	runes := []rune(s)
 	// opNoTrailingSpace is the operator without the trailing space (e.g., " reduce")
@@ -132,16 +136,22 @@ func replaceImplicitLambdaForOp(s string, op string) string {
 
 		bodyEnd, hasArrow := scanLambdaBody(runes, i)
 		if hasArrow {
-			i--
+			bodyStr := replaceImplicitLambdasWithContext(string(runes[i:bodyEnd]), true)
+			result = append(result, []rune(bodyStr)...)
+			i = bodyEnd - 1
 			continue
 		}
 
-		bodyStr := string(runes[i:bodyEnd])
+		bodyStr := replaceImplicitLambdasWithContext(string(runes[i:bodyEnd]), true)
 		newBody, hasDollar, hasDoubleDollar := rewriteImplicitParams(bodyStr)
 
 		if !hasDollar && !hasDoubleDollar {
-			i--
-			continue
+			if !nested {
+				result = append(result, []rune(bodyStr)...)
+				i = bodyEnd - 1
+				continue
+			}
+			newBody = bodyStr
 		}
 
 		params := "__arg"
@@ -351,6 +361,7 @@ func replaceArrowFunctions(s string) string {
 						pos++
 					}
 					bodyStart := pos
+					allowUngroupedCollection := isGroupedArrowLambda(s, sc.Pos())
 					// Track depth fresh from the body start position
 					var bodyState ScanState
 					for pos < len(s) {
@@ -367,7 +378,9 @@ func replaceArrowFunctions(s string) string {
 								if pos+4 <= len(s) && s[pos:pos+4] == " or " {
 									break
 								}
-								if isCollectionOperatorWithSpacesAt(s, pos) {
+								if isCollectionOperatorWithSpacesAt(s, pos) &&
+									(!allowUngroupedCollection ||
+										isCompleteGroupedLambdaBody(s[bodyStart:pos])) {
 									break
 								}
 							}
@@ -396,4 +409,29 @@ func replaceArrowFunctions(s string) string {
 		result = append(result, sc.NextRune())
 	}
 	return string(result)
+}
+
+func isGroupedArrowLambda(s string, paramsStart int) bool {
+	for i := paramsStart - 1; i >= 0; i-- {
+		if unicode.IsSpace(rune(s[i])) {
+			continue
+		}
+		return s[i] == '('
+	}
+	return false
+}
+
+func isCompleteGroupedLambdaBody(body string) bool {
+	body = strings.TrimSpace(body)
+	if len(body) < 2 {
+		return false
+	}
+	switch body[0] {
+	case '(', '[', '{':
+	default:
+		return false
+	}
+
+	sc := stringutils.NewExpressionScanner(body)
+	return sc.FindMatchingCloseBracket(0) == len(body)-1
 }

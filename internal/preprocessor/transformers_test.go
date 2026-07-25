@@ -18,7 +18,8 @@ func TestReplaceImplicitLambdas(t *testing.T) {
 		{"map with $ and $$", "payload map $ + $$", "payload map (__arg, __idx) -> __arg + __idx"},
 		// Note: brace wrapping is done by wrapImplicitObjectLiteralBodies, not replaceImplicitLambdas
 		{"map with implicit object body", "payload map user: $.name", "payload map (__arg) -> user: __arg.name"},
-		{"nested map", "payload map ($ map $$)", "payload map (__arg, __idx) -> (__arg map __idx)"},
+		{"top-level constant remains an operand", "payload map 1", "payload map 1"},
+		{"nested map keeps implicit scopes distinct", "payload map ($ map $$)", "payload map (__arg) -> (__arg map (__arg, __idx) -> __idx)"},
 		{"already explicit", "payload map (item) -> item + 1", "payload map (item) -> item + 1"},
 		{"explicit map then implicit filter", "arr map (x) -> (x + 1) filter $ > 1", "arr map (x) -> (x + 1) filter (__arg) -> __arg > 1"},
 		{"reduce with paren no space", "data reduce($ + $$)", "data reduce (__arg, __idx) -> (__arg + __idx)"},
@@ -310,6 +311,8 @@ func TestReplaceArrowFunctions(t *testing.T) {
 		{"simple arrow", "(x) -> x + 1", `__lambda("x", x + 1)`},
 		{"multiple params", "(a, b) -> a + b", `__lambda("a, b", a + b)`},
 		{"nested parens in body", "(x) -> (x + 1) * 2", `__lambda("x", (x + 1) * 2)`},
+		{"ungrouped collection in body", `((x) -> x map (y) -> y)`, `(__lambda("x", x map (y) -> y))`},
+		{"grouped body ends before collection", `(x) -> (x + 1) filter (__arg) -> __arg > 2`, `__lambda("x", (x + 1)) filter __lambda("__arg", __arg > 2)`},
 		{"string in body", `(x) -> "hello"`, `__lambda("x", "hello")`},
 		{"no arrow function", "(a + b)", "(a + b)"},
 	}
