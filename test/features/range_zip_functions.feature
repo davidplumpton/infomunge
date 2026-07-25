@@ -412,6 +412,72 @@ Feature: Range and Zip Functions
       [6,7,8,9,10]
       """
 
+  Scenario: unparenthesized infix to feeds a map with negative fractional bounds
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      -1.5 to 1.5 map $ * 2
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [-3,-1,1,3]
+      """
+
+  Scenario: unparenthesized infix to feeds reduce
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      1 to 4 reduce (acc, x) -> acc + x
+      """
+    When I run the script
+    Then the output should be:
+      """
+      10
+      """
+
+  Scenario: unparenthesized infix to feeds joinBy
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      1 to 3 joinBy "-"
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "1-2-3"
+      """
+
+  Scenario: unparenthesized infix to feeds concatenation
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      1 to 2 ++ [3]
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [1,2,3]
+      """
+
+  Scenario: parentheses keep concatenation inside an infix to upper bound
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      1 to (2 ++ [3])
+      """
+    Then running the script should fail with error containing "cannot concatenate mixed types"
+
   Scenario: infix to with expressions
     Given the following script:
       """

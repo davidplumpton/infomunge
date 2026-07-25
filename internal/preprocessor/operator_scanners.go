@@ -151,6 +151,47 @@ func shouldStopModuloRightOperand(input string, pos, _ int) bool {
 	}
 }
 
+// shouldStopRangeRightOperand keeps lower-precedence collection operations
+// outside an infix range. Arithmetic, comparisons, and type operators remain
+// part of the upper bound, matching DataWeave's grouping, while a completed
+// range can become the source of an array pipeline.
+func shouldStopRangeRightOperand(input string, pos, operandStart int) bool {
+	if !isWhitespace(input[pos]) {
+		return false
+	}
+	trimStart, trimEnd := trimSpaceBounds(input, operandStart, pos)
+	if trimStart >= trimEnd {
+		return false
+	}
+
+	operatorStart := pos
+	for operatorStart < len(input) && isWhitespace(input[operatorStart]) {
+		operatorStart++
+	}
+
+	for _, operator := range CollectionOperators {
+		if isRangeDownstreamKeywordAt(input, operatorStart, operator) {
+			return true
+		}
+	}
+	for _, operator := range []string{"find", "contains", "joinBy"} {
+		if isRangeDownstreamKeywordAt(input, operatorStart, operator) {
+			return true
+		}
+	}
+
+	return strings.HasPrefix(input[operatorStart:], "++ ") ||
+		strings.HasPrefix(input[operatorStart:], "-- ")
+}
+
+func isRangeDownstreamKeywordAt(input string, start int, operator string) bool {
+	if start+len(operator) > len(input) || input[start:start+len(operator)] != operator {
+		return false
+	}
+	end := start + len(operator)
+	return end < len(input) && (isWhitespace(input[end]) || input[end] == '(')
+}
+
 func scanRightOperandBounds(input string, start int, cfg rightOperandScanConfig) (int, int, int, bool) {
 	end := start
 	var state ScanState

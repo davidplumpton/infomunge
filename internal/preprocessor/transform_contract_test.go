@@ -87,6 +87,143 @@ func TestModContractDeclaresDataWeavePrecedence(t *testing.T) {
 	}
 }
 
+func TestRangeOperatorStopsBeforeDownstreamOperators(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "map",
+			input:    `1 to 3 map __lambda("x", x * 2)`,
+			expected: `to(1, 3) map __lambda("x", x * 2)`,
+		},
+		{
+			name:     "filter",
+			input:    `1 to 3 filter __lambda("x", x > 1)`,
+			expected: `to(1, 3) filter __lambda("x", x > 1)`,
+		},
+		{
+			name:     "reduce",
+			input:    `1 to 4 reduce __lambda("acc, x", acc + x)`,
+			expected: `to(1, 4) reduce __lambda("acc, x", acc + x)`,
+		},
+		{
+			name:     "joinBy",
+			input:    `1 to 3 joinBy "-"`,
+			expected: `to(1, 3) joinBy "-"`,
+		},
+		{
+			name:     "concatenate",
+			input:    `1 to 2 ++ [3]`,
+			expected: `to(1, 2) ++ [3]`,
+		},
+		{
+			name:     "remove",
+			input:    `1 to 3 -- [2]`,
+			expected: `to(1, 3) -- [2]`,
+		},
+		{
+			name:     "find",
+			input:    `1 to 3 find 2`,
+			expected: `to(1, 3) find 2`,
+		},
+		{
+			name:     "contains",
+			input:    `1 to 3 contains 2`,
+			expected: `to(1, 3) contains 2`,
+		},
+		{
+			name:     "operator name can begin upper bound",
+			input:    `1 to map + 2`,
+			expected: `to(1, map + 2)`,
+		},
+	}
+
+	stage := createOperatorProcessingStage(nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, mapping, err := stage.Execute(tt.input, identityMapping(len(tt.input)))
+			if err != nil {
+				t.Fatalf("stage.Execute() error = %v", err)
+			}
+			if got != tt.expected {
+				t.Fatalf("stage.Execute() = %q, want %q", got, tt.expected)
+			}
+			if len(mapping) != len(got) {
+				t.Fatalf("mapping length = %d, want %d", len(mapping), len(got))
+			}
+		})
+	}
+	for _, operator := range CollectionOperators {
+		t.Run("canonical collection operator/"+operator, func(t *testing.T) {
+			input := `1 to 3 ` + operator + ` __lambda("x", x)`
+			expected := `to(1, 3) ` + operator + ` __lambda("x", x)`
+			got, _, err := stage.Execute(input, identityMapping(len(input)))
+			if err != nil {
+				t.Fatalf("stage.Execute() error = %v", err)
+			}
+			if got != expected {
+				t.Fatalf("stage.Execute() = %q, want %q", got, expected)
+			}
+		})
+	}
+}
+
+func TestRangeOperatorPreservesUpperBoundGroupingAndAssociativity(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "parentheses override downstream grouping",
+			input:    `1 to (2 ++ [3])`,
+			expected: `to(1, (2 ++ [3]))`,
+		},
+		{
+			name:     "negative fractional arithmetic bound feeds map",
+			input:    `-2.5 to 1.5 + 1 map __lambda("x", x)`,
+			expected: `to(-2.5, 1.5 + 1) map __lambda("x", x)`,
+		},
+		{
+			name:     "chained range remains left associative",
+			input:    `1 to 3 to 4 joinBy "-"`,
+			expected: `to(to(1, 3), 4) joinBy "-"`,
+		},
+		{
+			name:     "comparison remains in upper bound",
+			input:    `1 to 3 == [1, 2, 3]`,
+			expected: `to(1, 3 == [1, 2, 3])`,
+		},
+	}
+
+	stage := createOperatorProcessingStage(nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _, err := stage.Execute(tt.input, identityMapping(len(tt.input)))
+			if err != nil {
+				t.Fatalf("stage.Execute() error = %v", err)
+			}
+			if got != tt.expected {
+				t.Fatalf("stage.Execute() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRangeSelectorStillFeedsCollectionPipeline(t *testing.T) {
+	input := `[10, 20, 30][0 to 1] map $ * 2`
+	got, _, err := PrepareForParsing(input, Options{})
+	if err != nil {
+		t.Fatalf("PrepareForParsing() error = %v", err)
+	}
+	expected := `__map(__rangeIndex([]interface{}{10, 20, 30,}, 0, 1), __lambda("__arg", __arg * 2))`
+	if got != expected {
+		t.Fatalf("PrepareForParsing() = %q, want %q", got, expected)
+	}
+}
+
 func TestConfiguredBinaryOperatorsPreserveMixedLeftAssociativity(t *testing.T) {
 	tests := []struct {
 		name     string
