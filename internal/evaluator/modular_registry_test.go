@@ -3,6 +3,8 @@ package evaluator
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -175,6 +177,20 @@ func TestBuildBuiltinRegistriesDispatchesByEvaluationMode(t *testing.T) {
 		t.Fatalf("expected specialOnly spec to be special")
 	}
 
+	invalidCall := &ast.CallExpr{
+		Fun:  &ast.Ident{NamePos: token.Pos(9), Name: "invalid"},
+		Args: []ast.Expr{&ast.Ident{NamePos: token.Pos(10), Name: "arg"}},
+	}
+	if _, err := regular["regularOnly"]([]Value{nil}, invalidCall); err == nil {
+		t.Fatal("expected regular dispatch to reject an argument outside its declared arity")
+	}
+	if _, err := special["specialOnly"](invalidCall, nil, 0); err == nil {
+		t.Fatal("expected special dispatch to reject an argument outside its declared arity")
+	}
+	if regularCalled || specialCalled {
+		t.Fatal("arity validation must run before builtin handlers")
+	}
+
 	if got, err := regular["regularOnly"](nil, nil); err != nil || got != "regular" {
 		t.Fatalf("regular dispatch = %v, %v", got, err)
 	}
@@ -183,6 +199,121 @@ func TestBuildBuiltinRegistriesDispatchesByEvaluationMode(t *testing.T) {
 	}
 	if !regularCalled || !specialCalled {
 		t.Fatalf("expected both handlers to be called")
+	}
+}
+
+func TestBuildBuiltinRegistriesEnforcesAdvertisedArity(t *testing.T) {
+	special, regular, specs, err := buildBuiltinRegistries(defaultBuiltinSpecs())
+	if err != nil {
+		t.Fatalf("buildBuiltinRegistries() error = %v", err)
+	}
+
+	for name, spec := range specs {
+		t.Run(name, func(t *testing.T) {
+			if spec.Arity.Min > 0 {
+				assertBuiltinArityRejected(t, spec, special, regular, spec.Arity.Min-1)
+			}
+			if spec.Arity.Max != BuiltinArityVariadic {
+				assertBuiltinArityRejected(t, spec, special, regular, spec.Arity.Max+1)
+			}
+		})
+	}
+}
+
+func TestDefaultBuiltinSpecsMatchPublicArityContracts(t *testing.T) {
+	expected := map[string]BuiltinArity{
+		"__case":        exactArity(2),
+		"__coerce":      rangeArity(2, 3),
+		"__do":          exactArity(2),
+		"__lazyReduce":  exactArity(3),
+		"__modcall":     variadicArity(2),
+		"__multival":    exactArity(2),
+		"assert":        rangeArity(2, 3),
+		"beGreaterThan": rangeArity(1, 2),
+		"beLowerThan":   rangeArity(1, 2),
+		"date":          exactArity(3),
+		"dateTime":      rangeArity(6, 7),
+		"hash":          exactArity(2),
+		"leftPad":       exactArity(3),
+		"localDateTime": exactArity(6),
+		"localTime":     exactArity(3),
+		"log":           exactArity(1),
+		"logDebug":      exactArity(1),
+		"logError":      exactArity(1),
+		"logInfo":       exactArity(1),
+		"logWarn":       exactArity(1),
+		"match":         rangeArity(2, 3),
+		"matches":       rangeArity(2, 3),
+		"rightPad":      exactArity(3),
+		"scan":          rangeArity(2, 3),
+		"time":          rangeArity(3, 4),
+	}
+
+	_, _, specs, err := buildBuiltinRegistries(defaultBuiltinSpecs())
+	if err != nil {
+		t.Fatalf("buildBuiltinRegistries() error = %v", err)
+	}
+	for name, want := range expected {
+		spec, ok := specs[name]
+		if !ok {
+			t.Errorf("missing builtin spec %q", name)
+			continue
+		}
+		if spec.Arity != want {
+			t.Errorf("%s arity = %+v, want %+v", name, spec.Arity, want)
+		}
+	}
+}
+
+func assertBuiltinArityRejected(
+	t *testing.T,
+	spec BuiltinSpec,
+	special map[string]SpecialBuiltinFunc,
+	regular map[string]RegularBuiltinFunc,
+	count int,
+) {
+	t.Helper()
+
+	const callPos = token.Pos(17)
+	call := &ast.CallExpr{
+		Fun:  &ast.Ident{NamePos: callPos, Name: spec.Name},
+		Args: make([]ast.Expr, count),
+	}
+	for i := range call.Args {
+		call.Args[i] = &ast.Ident{NamePos: callPos + token.Pos(i+1), Name: "arg"}
+	}
+
+	var err error
+	switch spec.Mode {
+	case BuiltinEvaluationSpecial:
+		_, err = special[spec.Name](call, nil, 0)
+	case BuiltinEvaluationEager:
+		_, err = regular[spec.Name](make([]Value, count), call)
+	default:
+		t.Fatalf("unexpected evaluation mode %q", spec.Mode)
+	}
+	if err == nil {
+		t.Fatalf("%s accepted %d arguments outside advertised range %+v", spec.Name, count, spec.Arity)
+	}
+	expectedMessage := spec.Name
+	if count < spec.Arity.Min && spec.tooFewArgumentsMessage != "" {
+		expectedMessage = spec.tooFewArgumentsMessage
+	}
+	if count > spec.Arity.Max && spec.tooManyArgumentsMessage != "" {
+		expectedMessage = spec.tooManyArgumentsMessage
+	}
+	if !strings.Contains(err.Error(), expectedMessage) {
+		t.Errorf("arity error %q does not contain %q", err, expectedMessage)
+	}
+
+	positioned, ok := err.(interface {
+		GeneratedPosition() (token.Pos, bool)
+	})
+	if !ok {
+		t.Fatalf("arity error %T does not expose its generated position", err)
+	}
+	if got, ok := positioned.GeneratedPosition(); !ok || got != callPos {
+		t.Errorf("arity error position = (%d, %t), want (%d, true)", got, ok, callPos)
 	}
 }
 

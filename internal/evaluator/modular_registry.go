@@ -3,6 +3,7 @@ package evaluator
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 	"sort"
 	"sync"
 )
@@ -50,6 +51,9 @@ type BuiltinSpec struct {
 	Regular  RegularBuiltinFunc
 	Special  SpecialBuiltinFunc
 	Summary  string
+
+	tooFewArgumentsMessage  string
+	tooManyArgumentsMessage string
 }
 
 // builtinSpecialRegistry maps special builtin function names to their handlers.
@@ -120,6 +124,10 @@ func (a BuiltinArity) valid() bool {
 	return a.Max == BuiltinArityVariadic || a.Max >= a.Min
 }
 
+func (a BuiltinArity) accepts(count int) bool {
+	return count >= a.Min && (a.Max == BuiltinArityVariadic || count <= a.Max)
+}
+
 func regularBuiltinSpec(name, category string, arity BuiltinArity, fn RegularBuiltinFunc, summary string) BuiltinSpec {
 	return BuiltinSpec{
 		Name:     name,
@@ -142,6 +150,12 @@ func specialBuiltinSpec(name, category string, arity BuiltinArity, fn SpecialBui
 		Special:  fn,
 		Summary:  builtinSummary(name, summary),
 	}
+}
+
+func withArityMessages(spec BuiltinSpec, tooFew, tooMany string) BuiltinSpec {
+	spec.tooFewArgumentsMessage = tooFew
+	spec.tooManyArgumentsMessage = tooMany
+	return spec
 }
 
 func builtinSummary(name, summary string) string {
@@ -188,16 +202,84 @@ func buildBuiltinRegistries(specs []BuiltinSpec) (
 			return nil, nil, nil, fmt.Errorf("duplicate builtin %q", spec.Name)
 		}
 
+		registeredSpec := spec
 		switch spec.Mode {
 		case BuiltinEvaluationSpecial:
-			special[spec.Name] = spec.Special
+			registeredSpec.Special = enforceSpecialBuiltinArity(spec)
+			special[spec.Name] = registeredSpec.Special
 		case BuiltinEvaluationEager:
-			regular[spec.Name] = spec.Regular
+			registeredSpec.Regular = enforceRegularBuiltinArity(spec)
+			regular[spec.Name] = registeredSpec.Regular
 		}
-		byName[spec.Name] = spec
+		byName[spec.Name] = registeredSpec
 	}
 
 	return special, regular, byName, nil
+}
+
+func enforceRegularBuiltinArity(spec BuiltinSpec) RegularBuiltinFunc {
+	return func(args []Value, e *ast.CallExpr) (Value, error) {
+		if !spec.Arity.accepts(len(args)) {
+			return nil, builtinArityError(spec, len(args), callExprPos(e))
+		}
+		return spec.Regular(args, e)
+	}
+}
+
+func enforceSpecialBuiltinArity(spec BuiltinSpec) SpecialBuiltinFunc {
+	return func(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
+		count := 0
+		if e != nil {
+			count = len(e.Args)
+		}
+		if !spec.Arity.accepts(count) {
+			return nil, builtinArityError(spec, count, callExprPos(e))
+		}
+		return spec.Special(e, scope, depth)
+	}
+}
+
+func builtinArityError(spec BuiltinSpec, count int, pos token.Pos) error {
+	if count < spec.Arity.Min && spec.tooFewArgumentsMessage != "" {
+		return newPosError(spec.tooFewArgumentsMessage, pos)
+	}
+	if count > spec.Arity.Max && spec.Arity.Max != BuiltinArityVariadic && spec.tooManyArgumentsMessage != "" {
+		return newPosError(spec.tooManyArgumentsMessage, pos)
+	}
+
+	name := spec.Name
+	if spec.Category == builtinCategoryAssertions {
+		name += "()"
+	}
+
+	var message string
+	switch {
+	case spec.Arity.Min == 0 && spec.Arity.Max == 0:
+		message = fmt.Sprintf("%s takes no arguments", name)
+	case spec.Arity.Min == spec.Arity.Max:
+		message = fmt.Sprintf("%s requires exactly %d %s", name, spec.Arity.Min, argumentWord(spec.Arity.Min))
+	case spec.Arity.Min == 0:
+		message = fmt.Sprintf("%s accepts at most %d %s", name, spec.Arity.Max, argumentWord(spec.Arity.Max))
+	case spec.Arity.Max == BuiltinArityVariadic:
+		message = fmt.Sprintf("%s requires at least %d %s", name, spec.Arity.Min, argumentWord(spec.Arity.Min))
+	default:
+		message = fmt.Sprintf("%s requires %d or %d arguments", name, spec.Arity.Min, spec.Arity.Max)
+	}
+	return newPosError(message, pos)
+}
+
+func argumentWord(count int) string {
+	if count == 1 {
+		return "argument"
+	}
+	return "arguments"
+}
+
+func callExprPos(e *ast.CallExpr) token.Pos {
+	if e == nil {
+		return token.NoPos
+	}
+	return e.Pos()
 }
 
 func validateBuiltinSpec(spec BuiltinSpec) error {

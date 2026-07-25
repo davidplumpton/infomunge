@@ -2,7 +2,11 @@ package evaluator
 
 func numberBuiltinSpecs() []BuiltinSpec {
 	return []BuiltinSpec{
-		regularBuiltinSpec("ceil", builtinCategoryNumbers, exactArity(1), callBuiltinCeil, "ceiling"),
+		withArityMessages(
+			regularBuiltinSpec("ceil", builtinCategoryNumbers, exactArity(1), callBuiltinCeil, "ceiling"),
+			"ceil function requires exactly 1 argument",
+			"ceil function requires exactly 1 argument",
+		),
 		regularBuiltinSpec("floor", builtinCategoryNumbers, exactArity(1), callBuiltinFloor, "floor"),
 		regularBuiltinSpec("round", builtinCategoryNumbers, exactArity(1), callBuiltinRound, "round"),
 		regularBuiltinSpec("sqrt", builtinCategoryNumbers, exactArity(1), callBuiltinSqrt, "square root"),

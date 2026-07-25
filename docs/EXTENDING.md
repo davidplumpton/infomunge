@@ -55,7 +55,9 @@ position after the transform.
    `regularBuiltinSpec` or `specialBuiltinSpec`. The spec is the source of
    dispatch and metadata, so declare the name, category/module, arity,
    evaluation mode, handler, and summary there rather than editing registry
-   maps directly.
+   maps directly. Registry construction enforces the declared arity before
+   invoking the handler, so optional arguments and variadic bounds must be
+   represented accurately in the spec.
 3. If introducing a new spec group, add that group to `defaultBuiltinSpecs` in
    `internal/evaluator/modular_registry.go`. Existing groups need no additional
    central registration.
