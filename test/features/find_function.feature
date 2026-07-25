@@ -10,9 +10,17 @@ Feature: Find Function
     When I evaluate "'abbbc' find 'b'"
     Then the output should be "[1,2,3]"
 
+  Scenario: Find Unicode substrings at character offsets
+    When I evaluate "'éaé🙂é' find 'é'"
+    Then the output should be "[0,2,4]"
+
   Scenario: Find explicit regex matches in a string
     When I evaluate "'123-456-7890' find /[0-9]+/"
     Then the output should be "[[0,3],[4,7],[8,12]]"
+
+  Scenario: Find Unicode regex matches as character spans
+    When I evaluate "'éa🙂é' find /é|🙂/"
+    Then the output should be "[[0,1],[2,3],[3,4]]"
 
   Scenario: Find regex matches with flags
     When I evaluate "find('Hello World', 'hello', 'i')"

@@ -558,12 +558,18 @@ func findRegexInString(s, pattern, flags string) (Array, bool) {
 	if err != nil {
 		return nil, false
 	}
-	matches := re.FindAllStringIndex(s, -1)
+	return findMatchSpansInString(s, re.FindAllStringIndex(s, -1)), true
+}
+
+func findMatchSpansInString(s string, matches [][]int) Array {
 	result := make(Array, len(matches))
 	for i, match := range matches {
-		result[i] = Array{float64(match[0]), float64(match[1])}
+		result[i] = Array{
+			float64(runeIndexFromByteOffset(s, match[0])),
+			float64(runeIndexFromByteOffset(s, match[1])),
+		}
 	}
-	return result, true
+	return result
 }
 
 // findSubstringInString finds all occurrences of a substring and returns their positions.
@@ -578,8 +584,10 @@ func findSubstringInString(s, searchStr string) Array {
 		if idx == -1 {
 			break
 		}
-		result = append(result, float64(start+idx))
-		start += idx + 1
+		byteOffset := start + idx
+		result = append(result, float64(runeIndexFromByteOffset(s, byteOffset)))
+		_, width := utf8.DecodeRuneInString(s[byteOffset:])
+		start = byteOffset + width
 	}
 	return result
 }
@@ -606,12 +614,7 @@ func callBuiltinFind(args []Value, e *ast.CallExpr) (Value, error) {
 	case string:
 		// Handle Regex object
 		if r, ok := searchValue.(*Regex); ok {
-			matches := r.Re.FindAllStringIndex(s, -1)
-			result := make(Array, len(matches))
-			for i, match := range matches {
-				result[i] = Array{float64(match[0]), float64(match[1])}
-			}
-			return result, nil
+			return findMatchSpansInString(s, r.Re.FindAllStringIndex(s, -1)), nil
 		}
 
 		searchStr, ok := searchValue.(string)
