@@ -26,7 +26,9 @@ func evalArrayIndex(arr Array, idx Value, pos token.Pos) (Value, error) {
 }
 
 // evalArrayStringIndex handles string-based indexing into arrays, including
-// presence (?) and assert (!) selectors and field extraction.
+// presence (?) and assert (!) selectors and field extraction. DataWeave array
+// selectors collect matching keys from immediate object elements, skip
+// non-matching elements, and return null when no key matches.
 func evalArrayStringIndex(arr Array, key string, pos token.Pos) (Value, error) {
 	if strings.HasSuffix(key, "?") {
 		return evalArrayPresenceSelector(arr, strings.TrimSuffix(key, "?")), nil
@@ -34,48 +36,50 @@ func evalArrayStringIndex(arr Array, key string, pos token.Pos) (Value, error) {
 	if strings.HasSuffix(key, "!") {
 		return evalArrayAssertSelector(arr, strings.TrimSuffix(key, "!"), pos)
 	}
-	// DataWeave compatibility: applying a string index to an array extracts that field from all elements
 	result := make(Array, 0, len(arr))
 	for _, item := range arr {
 		if itemMap, ok := item.(Object); ok {
-			val, _ := getObjectValue(itemMap, key)
-			result = append(result, val)
-		} else {
-			result = append(result, nil)
+			if val, exists := getObjectValue(itemMap, key); exists {
+				result = append(result, val)
+			}
 		}
+	}
+	if len(result) == 0 {
+		return nil, nil
 	}
 	return result, nil
 }
 
-// evalArrayPresenceSelector returns a boolean for each array item indicating
-// whether the given key exists.
-func evalArrayPresenceSelector(arr Array, key string) Array {
-	result := make(Array, 0, len(arr))
+// evalArrayPresenceSelector reports whether any immediate object element has
+// the given key.
+func evalArrayPresenceSelector(arr Array, key string) bool {
 	for _, item := range arr {
 		if itemMap, ok := item.(Object); ok {
 			_, exists := getObjectValue(itemMap, key)
-			result = append(result, exists)
-		} else {
-			result = append(result, false)
+			if exists {
+				return true
+			}
 		}
 	}
-	return result
+	return false
 }
 
 // evalArrayAssertSelector extracts the given key from each array item,
-// returning an error if any item is not an object or is missing the key.
-func evalArrayAssertSelector(arr Array, key string, pos token.Pos) (Array, error) {
+// returning an error when no immediate object element has the key.
+func evalArrayAssertSelector(arr Array, key string, pos token.Pos) (Value, error) {
 	result := make(Array, 0, len(arr))
-	for idx, item := range arr {
+	for _, item := range arr {
 		itemMap, ok := item.(Object)
 		if !ok {
-			return nil, newPosError(fmt.Sprintf("assert selector failed: expected object at index %d", idx), pos)
+			continue
 		}
 		val, exists := getObjectValue(itemMap, key)
-		if !exists {
-			return nil, newPosError(fmt.Sprintf("assert selector failed: missing key %q at index %d", key, idx), pos)
+		if exists {
+			result = append(result, val)
 		}
-		result = append(result, val)
+	}
+	if len(result) == 0 {
+		return nil, newPosError(fmt.Sprintf("assert selector failed: missing key %q", key), pos)
 	}
 	return result, nil
 }

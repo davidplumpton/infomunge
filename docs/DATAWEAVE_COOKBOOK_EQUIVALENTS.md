@@ -15,16 +15,19 @@ Before reviewing the examples, be aware of these key InfoMunge syntax requiremen
 { label: (value1 ++ value2) }
 ```
 
-### 2. **Array Field Selection Uses Recursive Descent (..)**
-DataWeave allows direct field selection on arrays, but InfoMunge requires `..` syntax:
+### 2. **Array Field Selection and Recursive Descent**
+Like DataWeave, InfoMunge supports direct field selection on arrays:
 ```im
-// ❌ WRONG (DataWeave style)
 items.name
+items["name"]
+```
 
-// ✅ CORRECT (InfoMunge)
-items..name   // Uses recursive descent
-// OR
-items map (item) -> item.name  // Use map for transformation
+These selectors collect the field from immediate object elements, skip elements
+without the field, and return `null` when no element matches. Use recursive
+descent when matching objects may be nested:
+
+```im
+items..name
 ```
 
 ### 3. **mapObject Parameter Order is Reversed**
@@ -99,8 +102,6 @@ output application/json
 
 ### InfoMunge Equivalent
 
-**Note:** InfoMunge does not support direct field selection on arrays like DataWeave. Use `..` (recursive descent) instead.
-
 ```im
 %im 0.1
 var myObject = { "myKey": "1234", "name": "somebody" }
@@ -109,7 +110,7 @@ output application/json
 ---
 {
   selectingValueUsingKeyInObject: myObject.name,
-  selectingValueUsingKeyOfObjectInArray: myArray..name
+  selectingValueUsingKeyOfObjectInArray: myArray.name
 }
 ```
 

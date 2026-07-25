@@ -82,7 +82,7 @@ Feature: Array Indexing
       {"names":["Alice","Bob"],"ages":[30,25]}
       """
 
-  Scenario: Extract field from mixed array elements (with nulls for missing fields)
+  Scenario: Extract field from mixed array elements skips elements without the field
     Given the following input content:
       """
       %im 0.1
@@ -97,24 +97,94 @@ Feature: Array Indexing
     When I run the application with this content
     Then the output should be:
       """
-      ["Alice",null,"Charlie"]
+      ["Alice","Charlie"]
       """
 
-  Scenario: Dot notation on arrays is equivalent to recursive descent
+  Scenario: Keyed selector on an array of scalars returns null
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [-80.45]["score"]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      null
+      """
+
+  Scenario: Keyed selector preserves explicit null values
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{score: null}, {other: 2}]["score"]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [null]
+      """
+
+  Scenario: Array field presence reports whether any element has the field
     Given the following input content:
       """
       %im 0.1
       output application/json
       ---
       {
-        "dot": [{"name": "A"}, {"name": "B"}].name,
-        "descent": [{"name": "A"}, {"name": "B"}]..name
+        "present": [{score: 1}, 2].score?,
+        "missing": [{other: 1}, 2].score?
       }
       """
     When I run the application with this content
     Then the output should be:
       """
-      {"dot":["A","B"],"descent":["A","B"]}
+      {"present":true,"missing":false}
+      """
+
+  Scenario: Array field assertion skips elements without the field
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{score: 1}, {other: 2}, 3, {score: 4}].score!
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,4]
+      """
+
+  Scenario: Array field assertion fails when no element has the field
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{other: 2}, 3].score!
+      """
+    When I run the application and it fails
+    Then the error should contain "assert selector failed"
+
+  Scenario: Dot notation and keyed notation select immediate array fields
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {
+        "dot": [{"name": "A"}, {"child": {"name": "nested"}}, {"name": "B"}].name,
+        "keyed": [{"name": "A"}, {"child": {"name": "nested"}}, {"name": "B"}]["name"]
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"dot":["A","B"],"keyed":["A","B"]}
       """
 
   Scenario: Slice array with range index

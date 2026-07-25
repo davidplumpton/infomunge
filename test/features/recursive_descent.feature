@@ -57,7 +57,7 @@ Feature: Recursive Descent Operator
       ["top","a","b"]
       """
 
-  Scenario: No matches returns empty array
+  Scenario: No matches returns null
     Given the following input content:
       """
       %im 0.1
@@ -72,7 +72,28 @@ Feature: Recursive Descent Operator
       """
     Then the output should be:
       """
-      []
+      null
+      """
+
+  Scenario: Recursive search through arrays differs from immediate keyed selection
+    Given the following input content:
+      """
+      %im 0.1
+      input application/json
+      output application/json
+      ---
+      {
+        "keyed": payload.items["name"],
+        "recursive": payload.items..name
+      }
+      """
+    When I run the application with this JSON input:
+      """
+      {"items": [{"name": "top"}, {"child": {"name": "nested"}}, 3]}
+      """
+    Then the output should be:
+      """
+      {"keyed":["top"],"recursive":["top","nested"]}
       """
 
   Scenario: Recursive descent with dot notation prefix

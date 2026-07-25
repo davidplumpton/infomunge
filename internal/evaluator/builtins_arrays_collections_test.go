@@ -5,6 +5,40 @@ import (
 	"testing"
 )
 
+func TestBuiltinDeepReturnsNullWithoutMatches(t *testing.T) {
+	got, err := callBuiltinDeep(
+		[]Value{Array{Object{"other": 1}, 2}, "score"},
+		&ast.CallExpr{Fun: &ast.Ident{Name: "__deep"}},
+	)
+	if err != nil {
+		t.Fatalf("callBuiltinDeep() error = %v", err)
+	}
+	if got != nil {
+		t.Fatalf("callBuiltinDeep() = %#v, want nil", got)
+	}
+}
+
+func TestBuiltinDeepTraversesNestedArraysAndObjectsInOrder(t *testing.T) {
+	got, err := callBuiltinDeep(
+		[]Value{
+			Array{
+				Object{"score": 1},
+				Object{"child": Object{"score": 2}},
+				Array{Object{"score": 3}},
+			},
+			"score",
+		},
+		&ast.CallExpr{Fun: &ast.Ident{Name: "__deep"}},
+	)
+	if err != nil {
+		t.Fatalf("callBuiltinDeep() error = %v", err)
+	}
+	want := Array{1, 2, 3}
+	if !numericEquals(got, want) {
+		t.Fatalf("callBuiltinDeep() = %#v, want %#v", got, want)
+	}
+}
+
 func TestDistinctValuesUsesStructuralLanguageEquality(t *testing.T) {
 	values := Array{
 		1,

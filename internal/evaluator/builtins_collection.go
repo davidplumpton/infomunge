@@ -424,6 +424,9 @@ func callBuiltinDeep(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := deepCollect(args[0], fieldName, &result, 0, e.Pos()); err != nil {
 		return nil, err
 	}
+	if len(result) == 0 {
+		return nil, nil
+	}
 	return result, nil
 }
 
@@ -440,7 +443,8 @@ func deepCollect(node Value, field string, out *Array, depth int, pos token.Pos)
 			*out = append(*out, val)
 		}
 		// Recurse into all values
-		for _, child := range v {
+		for _, key := range values.ObjectKeys(v) {
+			child := v[key]
 			if err := deepCollect(child, field, out, depth+1, pos); err != nil {
 				return err
 			}
