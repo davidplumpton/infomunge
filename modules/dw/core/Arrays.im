@@ -1,10 +1,12 @@
 %dw 2.0
 
 fun countBy(array, criteria) =
-  sizeOf(array filter (item) -> criteria(item))
+  if (array == null) null
+  else sizeOf(array filter (item) -> criteria(item))
 
 fun divideBy(array, size) =
-  if (size <= 0) []
+  if (array == null) null
+  else if (size <= 0) []
   else if (sizeOf(array) == 0) []
   else [take(array, size)] ++ divideBy(drop(array, size), size)
 
@@ -13,15 +15,18 @@ fun dropWhile(array, criteria) = __native("dropWhile", array, criteria)
 fun every(array, criteria) = __native("every", array, criteria)
 
 fun firstWith(array, criteria) =
-  first(array filter (item) -> criteria(item))
+  if (array == null) null
+  else first(array filter (item) -> criteria(item))
 
 fun indexOf(array, value) =
   using (matches = find(array, value))
     if (sizeOf(matches) == 0) -1 else matches[0]
 
 fun indexWhere(array, criteria) =
-  array reduce (acc = -1, item, idx) ->
-    if (acc != -1) acc else if (criteria(item)) idx else acc
+  if (array == null) null
+  else
+    array reduce (acc = -1, item, idx) ->
+      if (acc != -1) acc else if (criteria(item)) idx else acc
 
 fun join(left, right, leftKey, rightKey) =
   flatten(
@@ -42,28 +47,35 @@ fun leftJoin(left, right, leftKey, rightKey) =
 fun outerJoin(left, right, leftKey, rightKey) = leftJoin(left, right, leftKey, rightKey) ++ ((right filter (r) -> sizeOf(left filter (l) -> leftKey(l) == rightKey(r)) == 0) map (r) -> { l: null, r: r })
 
 fun partition(array, criteria) =
-  {
-    success: array filter (item) -> criteria(item),
-    failure: array filter (item) -> not criteria(item)
-  }
+  if (array == null) null
+  else
+    {
+      success: array filter (item) -> criteria(item),
+      failure: array filter (item) -> not criteria(item)
+    }
 
 fun slice(array, start, end) = __native("slice", array, start, end)
 fun some(array, criteria) = __native("some", array, criteria)
 
 fun splitAt(array, index) =
-  {
-    l: take(array, index),
-    r: drop(array, index)
-  }
+  if (array == null) null
+  else
+    {
+      l: take(array, index),
+      r: drop(array, index)
+    }
 
 fun splitWhere(array, criteria) =
-  {
-    l: takeWhile(array, (item) -> not criteria(item)),
-    r: dropWhile(array, (item) -> not criteria(item))
-  }
+  if (array == null) null
+  else
+    {
+      l: takeWhile(array, (item) -> not criteria(item)),
+      r: dropWhile(array, (item) -> not criteria(item))
+    }
 
 fun sumBy(array, mapper) =
-  sum(array map (item) -> mapper(item))
+  if (array == null) null
+  else sum(array map (item) -> mapper(item))
 
 fun take(array, amount) = __native("take", array, amount)
 fun takeWhile(array, criteria) = __native("takeWhile", array, criteria)

@@ -117,6 +117,51 @@ func TestSomeAndEveryShortCircuitBeforeLaterPredicateErrors(t *testing.T) {
 	}
 }
 
+func TestNullArrayHelpersMatchDataWeaveIdentitiesWithoutEvaluatingCallbacks(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected Value
+	}{
+		{name: "takeWhile propagates null", expr: `takeWhile(nil, 1 / 0)`, expected: nil},
+		{name: "dropWhile propagates null", expr: `dropWhile(nil, 1 / 0)`, expected: nil},
+		{name: "some uses false identity", expr: `some(nil, 1 / 0)`, expected: false},
+		{name: "every uses true identity", expr: `every(nil, 1 / 0)`, expected: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(tt.expr, Context{}, nil, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("Evaluate() error = %v", err)
+			}
+			if result != tt.expected {
+				t.Fatalf("Evaluate() = %#v, want %#v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNullArrayValueHelpersPropagateNull(t *testing.T) {
+	tests := []string{
+		`slice(nil, 0, 1)`,
+		`take(nil, 1)`,
+		`drop(nil, 1)`,
+	}
+
+	for _, expr := range tests {
+		t.Run(expr, func(t *testing.T) {
+			result, err := Evaluate(expr, Context{}, nil, 0, expr)
+			if err != nil {
+				t.Fatalf("Evaluate() error = %v", err)
+			}
+			if result != nil {
+				t.Fatalf("Evaluate() = %#v, want nil", result)
+			}
+		})
+	}
+}
+
 func TestInclusiveRangeBounds(t *testing.T) {
 	tests := []struct {
 		name          string

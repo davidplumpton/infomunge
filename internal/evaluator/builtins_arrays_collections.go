@@ -52,6 +52,9 @@ func callBuiltinSlice(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 3 {
 		return nil, newPosError("slice requires exactly 3 arguments: array or string, start, end", e.Pos())
 	}
+	if args[0] == nil {
+		return nil, nil
+	}
 
 	var start int
 	if startInt, ok := args[1].(int); ok {
@@ -280,6 +283,9 @@ func callBuiltinTake(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 2, "take", e.Pos()); err != nil {
 		return nil, err
 	}
+	if args[0] == nil {
+		return nil, nil
+	}
 
 	if err := assertArg(args[0], beArray(), 1, "take", e); err != nil {
 		return nil, err
@@ -308,6 +314,9 @@ func callBuiltinTake(args []Value, e *ast.CallExpr) (Value, error) {
 func callBuiltinDrop(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := validateArgCount(args, 2, "drop", e.Pos()); err != nil {
 		return nil, err
+	}
+	if args[0] == nil {
+		return nil, nil
 	}
 
 	if err := assertArg(args[0], beArray(), 1, "drop", e); err != nil {

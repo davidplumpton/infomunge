@@ -142,9 +142,12 @@ func callBuiltinFilter(e *ast.CallExpr, scope *Scope, depth int) (Value, error) 
 
 // callBuiltinTakeWhile implements the takeWhile(array, lambda) function.
 func callBuiltinTakeWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("takeWhile", e, scope, depth, 0, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("takeWhile", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return nil, nil
 	}
 
 	result := make(Array, 0, len(array))
@@ -170,9 +173,12 @@ func callBuiltinTakeWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, erro
 
 // callBuiltinDropWhile implements the dropWhile(array, lambda) function.
 func callBuiltinDropWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("dropWhile", e, scope, depth, 0, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("dropWhile", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return nil, nil
 	}
 
 	result := make(Array, 0, len(array))

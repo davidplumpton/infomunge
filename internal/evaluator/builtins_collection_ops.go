@@ -372,9 +372,12 @@ func callBuiltinDistinctBy(e *ast.CallExpr, scope *Scope, depth int) (Value, err
 
 // callBuiltinSome implements the some(array, lambda) function.
 func callBuiltinSome(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("some", e, scope, depth, 0, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("some", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return false, nil
 	}
 
 	found := false
@@ -396,9 +399,12 @@ func callBuiltinSome(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 
 // callBuiltinEvery implements the every(array, lambda) function.
 func callBuiltinEvery(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, err := evalArrayAndLambda("every", e, scope, depth, 0, 2)
+	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("every", e, scope, depth, 0, 2)
 	if err != nil {
 		return nil, err
+	}
+	if nullHandled {
+		return true, nil
 	}
 
 	allTrue := true

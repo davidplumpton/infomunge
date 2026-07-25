@@ -341,3 +341,36 @@ Feature: Arrays Module
       """
       [1,2]
       """
+
+  Scenario Outline: Arrays null-helper overloads match DataWeave without evaluating callbacks
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      import * from dw::core::Arrays
+      ---
+      <expression>
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      <expected>
+      """
+
+    Examples:
+      | expression                            | expected |
+      | countBy(null, (x) -> 1 / 0)           | null     |
+      | divideBy(null, 0)                     | null     |
+      | drop(null, 1)                         | null     |
+      | dropWhile(null, (x) -> 1 / 0)         | null     |
+      | every(null, (x) -> 1 / 0)             | true     |
+      | firstWith(null, (x) -> 1 / 0)         | null     |
+      | indexWhere(null, (x) -> 1 / 0)        | null     |
+      | partition(null, (x) -> 1 / 0)         | null     |
+      | slice(null, 0, 1)                     | null     |
+      | some(null, (x) -> 1 / 0)              | false    |
+      | splitAt(null, 1)                      | null     |
+      | splitWhere(null, (x) -> 1 / 0)        | null     |
+      | sumBy(null, (x) -> 1 / 0)             | null     |
+      | take(null, 1)                         | null     |
+      | takeWhile(null, (x) -> 1 / 0)         | null     |
