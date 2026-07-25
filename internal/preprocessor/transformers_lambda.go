@@ -6,10 +6,24 @@ import (
 	"unicode"
 )
 
+var implicitLambdaOperators = []string{
+	" map ",
+	" filter ",
+	" reduce ",
+	" groupBy ",
+	" sort ",
+	" maxBy ",
+	" minBy ",
+	" orderBy ",
+	" distinctBy ",
+	" filterObject ",
+	" flatMap ",
+	" pluck ",
+}
+
 // replaceImplicitLambdas converts implicit lambda syntax using $ and $$ to explicit arrow functions.
 func replaceImplicitLambdas(s string) string {
-	for _, op := range []string{" map ", " filter ", " reduce ", " groupBy ", " sort ",
-		" maxBy ", " minBy ", " orderBy ", " distinctBy ", " filterObject ", " flatMap ", " pluck "} {
+	for _, op := range implicitLambdaOperators {
 		s = replaceImplicitLambdaForOp(s, op)
 	}
 	return s

@@ -101,6 +101,9 @@ func TestPrepareForParsing_IndexAccess(t *testing.T) {
 		{"array index", "arr[0]", "arr[0]"},
 		{"map index", `obj["key"]`, `obj["key"]`},
 		{"chained index", "arr[0][1]", "arr[0][1]"},
+		{"implicit value index", "$[0]", "$[0]"},
+		{"implicit index parameter index", "$$[0]", "$$[0]"},
+		{"chained implicit value index", "$[0][1]", "$[0][1]"},
 	}
 
 	for _, tt := range tests {
@@ -110,6 +113,62 @@ func TestPrepareForParsing_IndexAccess(t *testing.T) {
 				t.Errorf("expected %q, got %q", tt.expected, result)
 			}
 		})
+	}
+}
+
+func TestRewriteCore_ImplicitLambdaIndexPreservesArrayLiterals(t *testing.T) {
+	input := `[$[0], [$[1], 2]]`
+	expected := `[]interface{}{$[0], []interface{}{$[1], 2,},}`
+
+	result, _, err := newRewriter(input, Options{}).RewriteCoreWithDepth(0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != expected {
+		t.Fatalf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestPrepareForParsing_ImplicitLambdaIndexAcrossCollectionOperators(t *testing.T) {
+	operators := []string{
+		"map",
+		"filter",
+		"reduce",
+		"groupBy",
+		"sort",
+		"maxBy",
+		"minBy",
+		"orderBy",
+		"distinctBy",
+		"filterObject",
+		"flatMap",
+		"pluck",
+	}
+
+	for _, operator := range operators {
+		t.Run(operator, func(t *testing.T) {
+			input := "items " + operator + " $[0][1]"
+			result, _, err := PrepareForParsing(input, Options{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(result, "__arg[0][1]") {
+				t.Fatalf("expected implicit selector in transformed output, got %q", result)
+			}
+			if strings.Contains(result, "$[]interface{}") {
+				t.Fatalf("implicit selector was rewritten as an array literal: %q", result)
+			}
+		})
+	}
+}
+
+func TestPrepareForParsing_ImplicitLambdaIndexAlongsideArrayLiteral(t *testing.T) {
+	result, _, err := PrepareForParsing(`items flatMap [$[0]]`, Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(result, "[]interface{}{__arg[0],}") {
+		t.Fatalf("expected array literal containing implicit selector, got %q", result)
 	}
 }
 

@@ -323,3 +323,87 @@ Feature: Implicit Lambda Parameters ($ and $$)
       """
       ["a"]
       """
+
+  Scenario: Map indexes tuple values with an implicit lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [[1, 2], [3, 4]] map $[0]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,3]
+      """
+
+  Scenario: Zip composition indexes both tuple values with an implicit lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      zip(1 to 2, 3 to 4) map ($[0] + $[1])
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [4,6]
+      """
+
+  Scenario: Scan result rows can be indexed with an implicit lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ("abc" scan /./) map $[0]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["a","b","c"]
+      """
+
+  Scenario: Filter indexes tuple values with an implicit lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [[1, "keep"], [0, "drop"]] filter $[0] > 0
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [[1,"keep"]]
+      """
+
+  Scenario: FlatMap preserves an array literal around an indexed implicit value
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [[1, 2], [3, 4]] flatMap [$[0]]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,3]
+      """
+
+  Scenario: OrderBy indexes tuple values with an implicit lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [[2, "b"], [1, "a"]] orderBy $[0]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [[1,"a"],[2,"b"]]
+      """

@@ -187,8 +187,23 @@ func (r *rewriter) isIndexer() bool {
 	if j < 0 {
 		return false
 	}
+	if r.followsImplicitLambdaOperator(j) {
+		return false
+	}
 	last := r.result[j]
-	return unicode.IsLetter(rune(last)) || unicode.IsDigit(rune(last)) || last == '}' || last == ']' || last == ')' || last == '"' || last == '\''
+	// Implicit lambda parameters are rewritten after the core syntax pass, so
+	// their selectors must already be classified as indexing here.
+	return unicode.IsLetter(rune(last)) || unicode.IsDigit(rune(last)) || last == '}' || last == ']' || last == ')' || last == '"' || last == '\'' || last == '$'
+}
+
+func (r *rewriter) followsImplicitLambdaOperator(end int) bool {
+	prefix := string(r.result[:end+1])
+	for _, operator := range implicitLambdaOperators {
+		if strings.HasSuffix(prefix, strings.TrimSuffix(operator, " ")) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *rewriter) handleCloseBrace(char byte) bool {
