@@ -87,3 +87,28 @@ func TestRandomIntReturnsAnExactRuntimeInteger(t *testing.T) {
 		t.Fatalf("randomInt result %d is outside the requested bound", integer)
 	}
 }
+
+func TestToPreservesFractionalBounds(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected Array
+	}{
+		{"ascending", "to(1.9, 3.1)", Array{1.9, 2.9}},
+		{"descending", "to(3.1, 1.9)", Array{3.1, 2.1}},
+		{"ascending exact endpoint", "to(1.1, 3.1)", Array{1.1, 2.1, 3.1}},
+		{"descending exact endpoint", "to(3.1, 1.1)", Array{3.1, 2.1, 1.1}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(tt.expr, Context{}, nil, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Fatalf("expected %#v, got %#v", tt.expected, result)
+			}
+		})
+	}
+}

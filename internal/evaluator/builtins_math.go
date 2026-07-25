@@ -510,41 +510,66 @@ func callBuiltinTo(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	start, err := truncatedRuntimeInt(args[0], "to", "start", e)
+	start, startRat, err := rangeBound(args[0], "start", e)
 	if err != nil {
 		return nil, err
 	}
-	end, err := truncatedRuntimeInt(args[1], "to", "end", e)
+	_, endRat, err := rangeBound(args[1], "end", e)
 	if err != nil {
 		return nil, err
 	}
 
-	distance := new(big.Int).Sub(big.NewInt(int64(end)), big.NewInt(int64(start)))
+	distance := new(big.Rat).Sub(endRat, startRat)
 	distance.Abs(distance)
-	length := distance.Add(distance, big.NewInt(1))
+	steps := new(big.Int).Quo(distance.Num(), distance.Denom())
+	length := new(big.Int).Add(steps, big.NewInt(1))
 	if !length.IsInt64() || int64(int(length.Int64())) != length.Int64() {
 		return nil, newPosError("to range length exceeds supported integer range", e.Pos())
 	}
 
-	// Build the range
-	result := make(Array, 0, int(length.Int64()))
-	if start <= end {
-		for current := start; ; current++ {
-			result = append(result, current)
-			if current == end {
-				break
+	rangeLength := int(length.Int64())
+	result := make(Array, 0, rangeLength)
+	ascending := startRat.Cmp(endRat) <= 0
+	switch typedStart := start.(type) {
+	case int:
+		for offset := 0; offset < rangeLength; offset++ {
+			if ascending {
+				result = append(result, typedStart+offset)
+			} else {
+				result = append(result, typedStart-offset)
 			}
 		}
-	} else {
-		for current := start; ; current-- {
-			result = append(result, current)
-			if current == end {
-				break
+	case float64:
+		for offset := 0; offset < rangeLength; offset++ {
+			current := new(big.Rat).Set(startRat)
+			if ascending {
+				current.Add(current, new(big.Rat).SetInt64(int64(offset)))
+			} else {
+				current.Sub(current, new(big.Rat).SetInt64(int64(offset)))
 			}
+			value, _ := current.Float64()
+			result = append(result, value)
 		}
 	}
 
 	return result, nil
+}
+
+func rangeBound(value Value, argumentName string, e *ast.CallExpr) (Value, *big.Rat, error) {
+	if number, ok := value.(float64); ok && (math.IsNaN(number) || math.IsInf(number, 0)) {
+		return nil, nil, newPosError(fmt.Sprintf("to %s must be a finite number", argumentName), e.Pos())
+	}
+
+	number, ok := exactNumericRat(value)
+	if !ok {
+		return nil, nil, newPosError(fmt.Sprintf("to expects %s to be a number, got %T", argumentName, value), e.Pos())
+	}
+	minimum := new(big.Rat).SetInt64(int64(minInt()))
+	maximum := new(big.Rat).SetInt64(int64(math.MaxInt))
+	if number.Cmp(minimum) < 0 || number.Cmp(maximum) > 0 {
+		return nil, nil, newPosError(fmt.Sprintf("to %s is outside the supported integer range", argumentName), e.Pos())
+	}
+	return value, number, nil
 }
 
 func truncatedRuntimeInt(value Value, funcName, argumentName string, e *ast.CallExpr) (int, error) {
@@ -566,9 +591,6 @@ func truncatedRuntimeInt(value Value, funcName, argumentName string, e *ast.Call
 		}
 		return int(asInt64), nil
 	default:
-		if funcName == "to" {
-			return 0, newPosError(fmt.Sprintf("to expects %s to be a number, got %T", argumentName, value), e.Pos())
-		}
 		return 0, newPosError(fmt.Sprintf("%s expects a number, got %T", funcName, value), e.Pos())
 	}
 }

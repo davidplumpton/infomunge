@@ -155,6 +155,34 @@ Feature: Range and Zip Functions
       [5,4,3,2,1]
       """
 
+  Scenario: to preserves fractional bounds ascending
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      to(1.9, 3.1)
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [1.9,2.9]
+      """
+
+  Scenario: to preserves fractional bounds descending
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      to(3.1, 1.9)
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [3.1,2.1]
+      """
+
   Scenario: to with negative numbers
     Given the following script:
       """
@@ -282,6 +310,34 @@ Feature: Range and Zip Functions
     Then the output should be:
       """
       [5,4,3,2,1]
+      """
+
+  Scenario: infix to preserves fractional bounds ascending
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      1.9 to 3.1
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [1.9,2.9]
+      """
+
+  Scenario: infix to preserves fractional bounds descending
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      3.1 to 1.9
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [3.1,2.1]
       """
 
   Scenario: infix to with negative numbers
