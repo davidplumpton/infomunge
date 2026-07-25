@@ -206,10 +206,10 @@ Feature: Lazy Evaluation
   Scenario: Lazy reduce with three parameter lambda
     Given the script:
       """
-      __lazyReduce(__toStream([10,20,30]), (acc, x, idx) -> acc + x, 0)
+      __lazyReduce(__toStream([10,20,30]), (acc, x, idx) -> acc + x + idx, 0)
       """
     When I execute the script
-    Then the result should be 60
+    Then the result should be 63
 
   Scenario: Lazy evaluation with string transformation
     Given the script:

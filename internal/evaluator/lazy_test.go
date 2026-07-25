@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"context"
+	"errors"
 	"go/parser"
 	"testing"
 )
@@ -99,6 +100,65 @@ func TestLazyFilterPropagatesErrors(t *testing.T) {
 	}
 	if err := streamResult.WaitError(); err == nil {
 		t.Fatal("expected error from lazy filter")
+	}
+}
+
+func TestLazyReduceBindsZeroBasedIndex(t *testing.T) {
+	streamLazy := NewLazyValue(func(ctx context.Context) (Value, error) {
+		stream := make(chan Value, 3)
+		stream <- 10
+		stream <- 20
+		stream <- 30
+		close(stream)
+		return stream, nil
+	}, context.Background())
+
+	expr, err := parser.ParseExpr("acc + idx")
+	if err != nil {
+		t.Fatalf("ParseExpr error: %v", err)
+	}
+	lambda := &Lambda{
+		Params:  []ParamDef{{Name: "acc"}, {Name: "value"}, {Name: "idx"}},
+		Body:    "acc + idx",
+		BodyAST: expr,
+	}
+
+	result := LazyReduceInScope(streamLazy, lambda, 0, NewScope(nil))
+	got, err := result.GetValue()
+	if err != nil {
+		t.Fatalf("GetValue error: %v", err)
+	}
+	if got != 3 {
+		t.Errorf("expected zero-based indexes to sum to 3, got %v", got)
+	}
+}
+
+func TestLazyReducePropagatesStreamError(t *testing.T) {
+	wantErr := errors.New("stream failed")
+	streamLazy := NewLazyValue(func(ctx context.Context) (Value, error) {
+		stream := make(chan Value, 1)
+		errCh := make(chan error, 1)
+		stream <- 10
+		close(stream)
+		errCh <- wantErr
+		close(errCh)
+		return &StreamWithError{Stream: stream, Err: errCh}, nil
+	}, context.Background())
+
+	expr, err := parser.ParseExpr("acc + value")
+	if err != nil {
+		t.Fatalf("ParseExpr error: %v", err)
+	}
+	lambda := &Lambda{
+		Params:  []ParamDef{{Name: "acc"}, {Name: "value"}},
+		Body:    "acc + value",
+		BodyAST: expr,
+	}
+
+	result := LazyReduceInScope(streamLazy, lambda, 0, NewScope(nil))
+	_, err = result.GetValue()
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected stream error %v, got %v", wantErr, err)
 	}
 }
 

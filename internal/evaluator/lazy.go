@@ -186,13 +186,15 @@ func LazyReduceInScope(input *LazyValue, lambda *Lambda, initial Value, scope *S
 		}
 
 		acc := initial
+		index := 0
 		for val := range inputStream {
-			// Apply lambda(acc, val)
-			result, err := applyLambdaReduce(lambda, acc, val, scope, 0)
+			// Apply lambda(acc, val, index)
+			result, err := applyLambdaReduce(lambda, acc, val, index, scope, 0)
 			if err != nil {
 				return nil, err
 			}
 			acc = result
+			index++
 		}
 		if inputErr != nil {
 			for err := range inputErr {
@@ -212,10 +214,13 @@ func applyLambda(lambda *Lambda, arg Value, scope *Scope, depth int) (Value, err
 	})
 }
 
-// applyLambdaReduce applies a lambda to accumulator and current value for reduce.
-func applyLambdaReduce(lambda *Lambda, acc Value, val Value, scope *Scope, depth int) (Value, error) {
+// applyLambdaReduce applies a lambda to accumulator, current value, and optional index for reduce.
+func applyLambdaReduce(lambda *Lambda, acc Value, val Value, index int, scope *Scope, depth int) (Value, error) {
 	return evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 		lambdaContext[lambda.ParamName(0)] = acc
 		lambdaContext[lambda.ParamName(1)] = val
+		if lambda.ParamCount() > 2 {
+			lambdaContext[lambda.ParamName(2)] = index
+		}
 	})
 }
