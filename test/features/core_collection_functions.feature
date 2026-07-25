@@ -1,7 +1,7 @@
 Feature: Core Collection Functions
   In order to work with collections and objects
   As a developer
-  I want to use the core collection functions: isEmpty, unique, reverse, keys, values
+  I want to use the core collection functions: isEmpty, flatten, unique, reverse, keys, values
 
   # isEmpty tests
   Scenario: isEmpty with empty string
@@ -102,6 +102,21 @@ Feature: Core Collection Functions
       """
     When I run the application with this content
     Then the output should be false
+
+  # flatten tests
+  Scenario: flatten removes exactly one array nesting level
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      sizeOf(flatten([[1, [2, 3]], [4]]))
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      3
+      """
 
   # unique tests
   Scenario: unique basic usage with numbers

@@ -58,19 +58,14 @@ func callBuiltinFlatten(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("flatten: expected array, got %T", args[0]), e.Pos())
 	}
 
-	result := make(Array, 0)
-	var flattenHelper func(Array)
-	flattenHelper = func(items Array) {
-		for _, item := range items {
-			if nested, ok := AsArray(item); ok {
-				flattenHelper(nested)
-			} else {
-				result = append(result, item)
-			}
+	result := make(Array, 0, len(arr))
+	for _, item := range arr {
+		if nested, ok := AsArray(item); ok {
+			result = append(result, nested...)
+		} else {
+			result = append(result, item)
 		}
 	}
-
-	flattenHelper(arr)
 	return result, nil
 }
 

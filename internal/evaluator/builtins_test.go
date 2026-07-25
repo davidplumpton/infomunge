@@ -1,9 +1,41 @@
 package evaluator
 
 import (
+	"go/ast"
 	"reflect"
 	"testing"
 )
+
+func TestCallBuiltinFlatten_RemovesOneNestingLevel(t *testing.T) {
+	call := &ast.CallExpr{Fun: &ast.Ident{Name: "flatten"}}
+	input := Array{Array{1, Array{2, 3}}, Array{4}}
+
+	once, err := callBuiltinFlatten([]Value{input}, call)
+	if err != nil {
+		t.Fatalf("flatten once: unexpected error: %v", err)
+	}
+	expectedOnce := Array{1, Array{2, 3}, 4}
+	if !reflect.DeepEqual(once, expectedOnce) {
+		t.Fatalf("flatten once: got %#v, want %#v", once, expectedOnce)
+	}
+
+	twice, err := callBuiltinFlatten([]Value{once}, call)
+	if err != nil {
+		t.Fatalf("flatten twice: unexpected error: %v", err)
+	}
+	expectedTwice := Array{1, 2, 3, 4}
+	if !reflect.DeepEqual(twice, expectedTwice) {
+		t.Fatalf("flatten twice: got %#v, want %#v", twice, expectedTwice)
+	}
+
+	nullResult, err := callBuiltinFlatten([]Value{nil}, call)
+	if err != nil {
+		t.Fatalf("flatten null: unexpected error: %v", err)
+	}
+	if nullResult != nil {
+		t.Fatalf("flatten null: got %#v, want nil", nullResult)
+	}
+}
 
 func TestEvaluate_ObjectBuiltins(t *testing.T) {
 	ctx := Object{
