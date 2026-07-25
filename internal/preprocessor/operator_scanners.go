@@ -72,12 +72,18 @@ func findTypedOperatorLeftOperandStartBytes(result []byte) int {
 	}
 
 	leftOp := string(result[leftStart:])
-	lastBoundary := -1
-	for _, op := range typedOperatorLeftBoundaryOps {
-		pos := strings.LastIndex(leftOp, op)
-		if pos > lastBoundary {
-			lastBoundary = pos + len(op)
+	var state ScanState
+	lastBoundary := 0
+	for pos := 0; pos < len(leftOp); pos++ {
+		if state.AtTopLevel() {
+			for _, op := range typedOperatorLeftBoundaryOps {
+				if strings.HasPrefix(leftOp[pos:], op) {
+					lastBoundary = pos + len(op)
+					break
+				}
+			}
 		}
+		state.Advance(leftOp[pos])
 	}
 	if lastBoundary > 0 {
 		return leftStart + lastBoundary

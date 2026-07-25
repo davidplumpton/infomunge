@@ -211,6 +211,34 @@ Feature: Operator transformer rewrite coverage
       1
       """
 
+  Scenario: As operator preserves a grouped mod operand
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      (5 mod 2) as String
+      """
+    When I run the script
+    Then the output should be:
+      """
+      "1"
+      """
+
+  Scenario: As operator preserves grouped infix operands in collection callbacks
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1,2,3,4] groupBy ((x,i) -> (x mod 2) as String)
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"1":[1,3],"0":[2,4]}
+      """
+
   Scenario: As operator preserves following contains operator
     Given the following script:
       """
