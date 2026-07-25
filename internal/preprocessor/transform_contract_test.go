@@ -155,6 +155,36 @@ func TestConfiguredBinaryOperatorsPreserveMixedLeftAssociativity(t *testing.T) {
 			expected: "__concat(joinBy(joinBy(a, b), c), d)",
 		},
 		{
+			name:     "map receives complete additive source",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    `a + b map __lambda("x", x + 1)`,
+			expected: `__map(a + b, __lambda("x", x + 1))`,
+		},
+		{
+			name:     "map receives complete concatenated source",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    `a ++ b map __lambda("x", x + 1)`,
+			expected: `__map(__concat(a, b), __lambda("x", x + 1))`,
+		},
+		{
+			name:     "map receives complete removal source",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    `a -- b map __lambda("x", x + 1)`,
+			expected: `__map(__remove(a, b), __lambda("x", x + 1))`,
+		},
+		{
+			name:     "map receives left associative mixed additive source",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    `a ++ b -- c map __lambda("x", x)`,
+			expected: `__map(__remove(__concat(a, b), c), __lambda("x", x))`,
+		},
+		{
+			name:     "mapObject receives complete object merge source",
+			stage:    createFunctionalProcessingStage(nil),
+			input:    `a ++ b mapObject __lambda("v, k", v)`,
+			expected: `mapObject(__concat(a, b), __lambda("v, k", v))`,
+		},
+		{
 			name:     "regex splitBy operand before concatenate",
 			stage:    createFunctionalProcessingStage(nil),
 			input:    `a splitBy regex("b ++ c", "") ++ d`,

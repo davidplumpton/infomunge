@@ -447,6 +447,48 @@ Feature: Concatenation and Remove Operators
     Then the output should contain "cannot concatenate mixed types"
 
   # Combined scenarios
+  Scenario: map applies to the complete additive array source
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] + [3, 4] map $ * 10
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [10,20,30,40]
+      """
+
+  Scenario: map applies to the complete concatenated array source
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] ++ [3, 4] map $ * 10
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [10,20,30,40]
+      """
+
+  Scenario: map applies to the complete array removal source
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2, 3] -- [2] map $ * 10
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [10,30]
+      """
+
   Scenario: filter then concatenate arrays
     Given the following input content:
       """

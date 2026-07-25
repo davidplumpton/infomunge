@@ -334,6 +334,13 @@ func TestReplaceCollectionOperator(t *testing.T) {
 		{"flatMap basic", `arr flatMap __lambda("x", x)`, `__flatMap(arr, __lambda("x", x))`, replaceFlatMapOperator},
 		// Array literals are not transformed by these functions - they expect raw input
 		{"map with literal", `[1, 2] map __lambda("x", x)`, `__map([1, 2], __lambda("x", x))`, replaceMapOperator},
+		{"map includes additive array source", `[1, 2] + [3, 4] map __lambda("x", x * 10)`, `__map([1, 2] + [3, 4], __lambda("x", x * 10))`, replaceMapOperator},
+		{"map includes concatenated array source", `[1, 2] ++ [3, 4] map __lambda("x", x * 10)`, `__map([1, 2] ++ [3, 4], __lambda("x", x * 10))`, replaceMapOperator},
+		{"map includes array removal source", `[1, 2, 3] -- [2] map __lambda("x", x * 10)`, `__map([1, 2, 3] -- [2], __lambda("x", x * 10))`, replaceMapOperator},
+		{"map keeps additive expression in lambda", `[1, 2] + [3] map __lambda("x", x + 10)`, `__map([1, 2] + [3], __lambda("x", x + 10))`, replaceMapOperator},
+		{"map includes nested additive source", `([1] + ([2] + [3])) map __lambda("x", x)`, `__map(([1] + ([2] + [3])), __lambda("x", x))`, replaceMapOperator},
+		{"mapObject includes object merge source", `{a: 1} ++ {b: 2} mapObject __lambda("v, k", v)`, `mapObject({a: 1} ++ {b: 2}, __lambda("v, k", v))`, replaceMapObjectOperator},
+		{"map includes string concatenation source", `"a" ++ "b" map __lambda("x", x)`, `__map("a" ++ "b", __lambda("x", x))`, replaceMapOperator},
 		{"map stops before next collection operator", `arr map __lambda("x", (x + 1)) filter __lambda("x", x > 1)`, `__map(arr, __lambda("x", (x + 1))) filter __lambda("x", x > 1)`, replaceMapOperator},
 	}
 

@@ -82,7 +82,9 @@ func replaceCollectionOperator(s string, opKey string, funcName string) string {
 			afterOp := sc.Pos() + opLen
 			// Match operator followed by space, newline, or parenthesis
 			if afterOp < len(s) && (s[afterOp] == ' ' || s[afterOp] == '\n' || s[afterOp] == '\r' || s[afterOp] == '\t' || s[afterOp] == '(') {
-				arrayStart := stringutils.FindLeftOperandStart(result, nil)
+				// Collection operators bind less tightly than additive operators,
+				// so include +, -, ++, and -- in the complete source operand.
+				arrayStart := stringutils.FindLeftOperandStartWithStops(result, stringutils.MinimalStops)
 				if arrayStart >= len(result) {
 					result = append(result, []rune(opKey)...)
 					sc.Advance(opLen)
