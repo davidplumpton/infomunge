@@ -82,7 +82,7 @@ func callBuiltinEndsWith(args []Value, e *ast.CallExpr) (Value, error) {
 }
 
 // callBuiltinContains implements the contains(string, pattern) function.
-// For strings, the pattern is treated as a regex only if it looks like a regex pattern or is a Regex object.
+// String patterns are literal; Regex values use regular-expression semantics.
 func callBuiltinContains(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 2 {
 		return nil, newPosError("contains requires exactly 2 arguments", e.Pos())
@@ -95,20 +95,11 @@ func callBuiltinContains(args []Value, e *ast.CallExpr) (Value, error) {
 			return r.Re.MatchString(first), nil
 		}
 
-		// Check for string pattern
 		pattern, ok := args[1].(string)
 		if !ok {
 			return nil, newPosError(fmt.Sprintf("contains expects argument 2 to be string or Regex, got %T", args[1]), e.Pos())
 		}
 
-		// Only use regex if pattern looks like a regex
-		if looksLikeRegexPattern(pattern) {
-			re, regexErr := compileRegex(pattern, "")
-			if regexErr == nil {
-				return re.MatchString(first), nil
-			}
-		}
-		// Fall back to substring matching
 		return strings.Contains(first, pattern), nil
 	case Array:
 		for _, item := range first {
@@ -123,7 +114,7 @@ func callBuiltinContains(args []Value, e *ast.CallExpr) (Value, error) {
 }
 
 // callBuiltinReplace implements the replace(string, pattern, replacement) function.
-// The pattern is treated as a regex only if it looks like a regex pattern or is a Regex object.
+// String patterns are literal; Regex values use regular-expression semantics.
 func callBuiltinReplace(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 3 {
 		return nil, newPosError("replace requires exactly 3 arguments: string, pattern, replacement", e.Pos())
@@ -144,21 +135,11 @@ func callBuiltinReplace(args []Value, e *ast.CallExpr) (Value, error) {
 		return r.Re.ReplaceAllString(text, replacement), nil
 	}
 
-	// Check if pattern is a string
 	pattern, ok := args[1].(string)
 	if !ok {
 		return nil, newPosError(fmt.Sprintf("replace expects argument 2 to be string or Regex, got %T", args[1]), e.Pos())
 	}
 
-	// Only use regex if pattern looks like a regex
-	if looksLikeRegexPattern(pattern) {
-		re, regexErr := compileRegex(pattern, "")
-		if regexErr == nil {
-			return re.ReplaceAllString(text, replacement), nil
-		}
-	}
-
-	// Fall back to literal string replacement
 	return strings.ReplaceAll(text, pattern, replacement), nil
 }
 

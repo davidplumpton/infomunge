@@ -10,8 +10,8 @@ Feature: Find Function
     When I evaluate "'abbbc' find 'b'"
     Then the output should be "[1,2,3]"
 
-  Scenario: Find regex matches in a string
-    When I evaluate "'123-456-7890' find '[0-9]+'"
+  Scenario: Find explicit regex matches in a string
+    When I evaluate "'123-456-7890' find /[0-9]+/"
     Then the output should be "[[0,3],[4,7],[8,12]]"
 
   Scenario: Find regex matches with flags
@@ -26,10 +26,10 @@ Feature: Find Function
     When I evaluate "'hello' find 'world'"
     Then the output should be "[]"
 
-  Scenario: Find with special characters as literal (non-regex heuristic)
+  Scenario: Find with special characters as literal
     When I evaluate "'a.b' find '.'"
     Then the output should be "[1]"
 
-  Scenario: Find with special characters as regex (heuristic)
-    When I evaluate "'a.b' find '\.'"
-    Then the output should be "[[1,2]]"
+  Scenario: Find string patterns containing regex syntax literally
+    When I evaluate "'[0-9]+' find '[0-9]+'"
+    Then the output should be "[0]"

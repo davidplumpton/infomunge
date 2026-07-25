@@ -3,7 +3,6 @@ package evaluator
 import (
 	"fmt"
 	"go/ast"
-	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -61,7 +60,7 @@ func callBuiltinJoinBy(args []Value, e *ast.CallExpr) (Value, error) {
 }
 
 // callBuiltinSplitBy implements the splitBy(string, separator) function.
-// The separator is treated as a regex only if it looks like a regex pattern or is a Regex object.
+// String separators are literal; Regex values use regular-expression semantics.
 func callBuiltinSplitBy(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 2, "splitBy requires exactly 2 arguments: string, separator", e); err != nil {
 		return nil, err
@@ -87,20 +86,6 @@ func callBuiltinSplitBy(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("splitBy expects second argument to be a string or Regex, got %T", args[1]), e.Pos())
 	}
 
-	// Only use regex if separator looks like a regex pattern
-	if looksLikeRegexPattern(separator) {
-		re, err := regexp.Compile(separator)
-		if err == nil {
-			parts := re.Split(text, -1)
-			result := make(Array, len(parts))
-			for i, part := range parts {
-				result[i] = part
-			}
-			return result, nil
-		}
-	}
-
-	// Fall back to literal string split
 	parts := strings.Split(text, separator)
 	result := make(Array, len(parts))
 	for i, part := range parts {

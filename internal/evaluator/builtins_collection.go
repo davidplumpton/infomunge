@@ -618,7 +618,9 @@ func callBuiltinFind(args []Value, e *ast.CallExpr) (Value, error) {
 		if !ok {
 			return nil, newPosError(fmt.Sprintf("find on string expects search value to be a string or Regex, got %T", searchValue), e.Pos())
 		}
-		if flags != "" || looksLikeRegexPattern(searchStr) {
+		// Supplying flags explicitly selects regex behavior for the legacy
+		// three-argument form. Otherwise, string search values are literal.
+		if flags != "" {
 			if result, ok := findRegexInString(s, searchStr, flags); ok {
 				return result, nil
 			}
