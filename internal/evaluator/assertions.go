@@ -393,6 +393,19 @@ func compareValues(a, b Value) (int, error) {
 		return aNum.Cmp(bNum), nil
 	}
 
+	// DataWeave booleans are ordered with false before true.
+	aBool, aIsBool := a.(bool)
+	bBool, bIsBool := b.(bool)
+	if aIsBool && bIsBool {
+		if aBool == bBool {
+			return 0, nil
+		}
+		if !aBool {
+			return -1, nil
+		}
+		return 1, nil
+	}
+
 	// Try string comparison
 	aStr, aIsStr := a.(string)
 	bStr, bIsStr := b.(string)

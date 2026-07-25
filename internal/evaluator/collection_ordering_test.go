@@ -20,6 +20,50 @@ func TestCompareValuesPreservesLargeIntegerPrecision(t *testing.T) {
 	}
 }
 
+func TestCompareValuesOrdersBooleansAndStrings(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		a    Value
+		b    Value
+		want int
+	}{
+		{name: "false before true", a: false, b: true, want: -1},
+		{name: "true after false", a: true, b: false, want: 1},
+		{name: "false equals false", a: false, b: false, want: 0},
+		{name: "true equals true", a: true, b: true, want: 0},
+		{name: "strings retain lexical ordering", a: "alpha", b: "beta", want: -1},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cmp, err := compareValues(tt.a, tt.b)
+			if err != nil {
+				t.Fatalf("compareValues(%#v, %#v) returned an unexpected error: %v", tt.a, tt.b, err)
+			}
+			if cmp != tt.want {
+				t.Fatalf("compareValues(%#v, %#v) returned %d, want %d", tt.a, tt.b, cmp, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompareValuesRejectsMixedTypes(t *testing.T) {
+	t.Parallel()
+
+	_, err := compareValues(1, "1")
+	if err == nil {
+		t.Fatal("compareValues returned nil error for mixed number and string values")
+	}
+	if got, want := err.Error(), "EvalError: cannot compare values: int and string"; got != want {
+		t.Fatalf("compareValues returned error %q, want %q", got, want)
+	}
+}
+
 func TestSortPreservesLargeIntegerPrecision(t *testing.T) {
 	t.Parallel()
 

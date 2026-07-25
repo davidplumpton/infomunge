@@ -419,6 +419,34 @@ Feature: Aggregation Functions
       [9007199254740992,9007199254740993]
       """
 
+  Scenario: collection ordering supports literal boolean selector keys
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [[true, false] orderBy $, [true, false] minBy $, [true, false] maxBy $]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [[false,true],false,true]
+      """
+
+  Scenario: orderBy supports comparison-derived boolean selector keys
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] orderBy ($ == 1)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [2,1]
+      """
+
   Scenario: orderBy reports incomparable key positions
     Given the following input content:
       """
