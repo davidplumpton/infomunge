@@ -58,7 +58,7 @@
 
 [28] **Generated Test Data Pitfalls** - Property-generated source literals should avoid scientific notation and parser-active string sequences such as interpolation-looking `$(` unless explicitly testing those paths. Do not assume numeric source literals evaluate as `float64`; assert the runtime representation when an error test exposes Go types (whole-number literals can be `int`).
 
-[29] **Error Context Discipline** - When changing wrapped error messages or unified error plumbing, verify final rendered CLI stderr/output and preserve essential context such as filenames. Common evaluator errors stay typed as `errors.Error` and carry an unresolved generated token position until `sourcemap.Map.FormatEvalError` maps it to original line and column; their direct `Error()` text includes the `EvalError: ` prefix, so focused unit assertions must account for it. Do not resolve AST positions through an empty file set or reintroduce `:0:0`.
+[29] **Error Context Discipline** - When changing or asserting wrapped error messages, inspect the final rendered CLI stderr/output instead of inferring wording from helper names, and preserve essential context such as filenames. Common evaluator errors stay typed as `errors.Error` and carry an unresolved generated token position until `sourcemap.Map.FormatEvalError` maps it to original line and column; their direct `Error()` text includes the `EvalError: ` prefix, so focused unit assertions must account for it. Do not resolve AST positions through an empty file set or reintroduce `:0:0`.
 
 [30] **Context Refactor Discipline** - Preserve existing public/internal call signatures where practical by adding context-aware variants first, then migrate call sites incrementally to reduce compile fallout.
 

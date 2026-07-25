@@ -1,6 +1,17 @@
 %dw 2.0
 
-fun appendIfMissing(text, suffix) = __native("appendIfMissing", text, suffix)
-fun prependIfMissing(text, prefix) = __native("prependIfMissing", text, prefix)
-fun charCodeAt(text, index) = __native("charCodeAt", text, index)
-fun fromCharCode(code) = __native("fromCharCode", code)
+fun appendIfMissing(text, suffix) =
+  if (text == null) null
+  else __native("appendIfMissing", text, suffix)
+
+fun prependIfMissing(text, prefix) =
+  if (text == null) null
+  else __native("prependIfMissing", text, prefix)
+
+fun charCodeAt(text, index) =
+  if (text == null) null
+  else __native("charCodeAt", text, index)
+
+fun fromCharCode(code) =
+  if (code == null) null
+  else __native("fromCharCode", code)

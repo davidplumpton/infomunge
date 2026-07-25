@@ -92,3 +92,36 @@ Feature: Strings Module
       """
       90
       """
+
+  Scenario Outline: Strings null-helper overloads preserve null
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      import * from dw::core::Strings
+      ---
+      <expression>
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      null
+      """
+
+    Examples:
+      | expression                         |
+      | appendIfMissing(null, ".txt")      |
+      | prependIfMissing(null, "prefix")   |
+      | charCodeAt(null, 0)                |
+      | fromCharCode(null)                 |
+
+  Scenario: Direct appendIfMissing builtin remains strict for null
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      appendIfMissing(null, ".txt")
+      """
+    When I run the application and it fails
+    Then the output should contain "appendIfMissing expects a string as argument 1"
