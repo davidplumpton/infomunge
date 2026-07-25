@@ -358,8 +358,7 @@ func replaceFilterSelectors(s string) string {
 			if predicate == "" {
 				predicate = "false"
 			}
-			predicate = replaceImplicitParam(predicate, "$$", "__idx")
-			predicate = replaceImplicitParam(predicate, "$", "__arg")
+			predicate, _, _ = rewriteImplicitParams(predicate)
 
 			result = newResult
 			result = append(result, []rune("__filter_selector(")...)

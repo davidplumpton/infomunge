@@ -123,20 +123,13 @@ func replaceImplicitLambdaForOp(s string, op string) string {
 		}
 
 		bodyStr := string(runes[i:bodyEnd])
-		hasDollar, hasDoubleDollar := detectDollarParams(bodyStr)
+		newBody, hasDollar, hasDoubleDollar := rewriteImplicitParams(bodyStr)
 
 		if !hasDollar && !hasDoubleDollar {
 			i--
 			continue
 		}
 
-		newBody := bodyStr
-		if hasDoubleDollar {
-			newBody = replaceImplicitParam(newBody, "$$", "__idx")
-		}
-		if hasDollar {
-			newBody = replaceImplicitParam(newBody, "$", "__arg")
-		}
 		params := "__arg"
 		if hasDoubleDollar {
 			params = "__arg, __idx"
@@ -166,49 +159,151 @@ func matchesAt(runes []rune, i int, pattern string) bool {
 	return i+len(pattern) <= len(runes) && string(runes[i:i+len(pattern)]) == pattern
 }
 
-func detectDollarParams(s string) (hasDollar, hasDoubleDollar bool) {
-	for i := 0; i < len(s); i++ {
-		if s[i] == '$' {
-			if i+1 < len(s) && s[i+1] == '$' {
-				hasDoubleDollar = true
-				i++
-			} else {
-				hasDollar = true
-			}
-		}
-	}
-	return
-}
-
-// replaceImplicitParam replaces $ or $$ with the actual parameter name.
-func replaceImplicitParam(s string, placeholder string, replacement string) string {
+// rewriteImplicitParams replaces executable $ and $$ references while respecting
+// quoted payloads. Dollars in ordinary strings are implicit interpolation and
+// therefore become concatenation expressions rooted in an empty string so the
+// evaluator applies language string coercion. Strings passed to regex remain
+// literal pattern/flag payloads.
+func rewriteImplicitParams(s string) (rewritten string, hasDollar, hasDoubleDollar bool) {
 	var result strings.Builder
 	runes := []rune(s)
-	placeholderRunes := []rune(placeholder)
+	var regexCallStack []bool
 	i := 0
 
 	for i < len(runes) {
-		if i+len(placeholderRunes) <= len(runes) && string(runes[i:i+len(placeholderRunes)]) == placeholder {
-			if placeholder == "$" && i+1 < len(runes) && runes[i+1] == '$' {
-				result.WriteRune(runes[i])
-				i++
-				continue
+		switch runes[i] {
+		case '"':
+			end := quotedLiteralEnd(runes, i, '"')
+			if insideRegexCall(regexCallStack) {
+				result.WriteString(string(runes[i:end]))
+			} else {
+				interpolated, stringHasDollar, stringHasDoubleDollar := rewriteImplicitString(runes[i:end])
+				result.WriteString(interpolated)
+				hasDollar = hasDollar || stringHasDollar
+				hasDoubleDollar = hasDoubleDollar || stringHasDoubleDollar
 			}
-			afterPlaceholder := i + len(placeholderRunes)
-			if afterPlaceholder < len(runes) && (unicode.IsLetter(runes[afterPlaceholder]) || unicode.IsDigit(runes[afterPlaceholder]) || runes[afterPlaceholder] == '_') {
-				result.WriteRune(runes[i])
-				i++
-				continue
+			i = end
+			continue
+		case '\'':
+			end := quotedLiteralEnd(runes, i, '\'')
+			result.WriteString(string(runes[i:end]))
+			i = end
+			continue
+		case '(':
+			parentRegexCall := insideRegexCall(regexCallStack)
+			regexCallStack = append(regexCallStack, parentRegexCall || precedingIdentifierIs(runes, i, "regex"))
+		case ')':
+			if len(regexCallStack) > 0 {
+				regexCallStack = regexCallStack[:len(regexCallStack)-1]
+			}
+		case '$':
+			paramLen, replacement := implicitParamAt(runes, i)
+			if paramLen == 0 {
+				break
 			}
 			result.WriteString(replacement)
-			i += len(placeholderRunes)
+			if paramLen == 2 {
+				hasDoubleDollar = true
+			} else {
+				hasDollar = true
+			}
+			i += paramLen
 			continue
 		}
 		result.WriteRune(runes[i])
 		i++
 	}
 
-	return result.String()
+	return result.String(), hasDollar, hasDoubleDollar
+}
+
+func rewriteImplicitString(literal []rune) (string, bool, bool) {
+	if len(literal) < 2 || literal[0] != '"' || literal[len(literal)-1] != '"' {
+		return string(literal), false, false
+	}
+
+	content := literal[1 : len(literal)-1]
+	parts := []string{`""`}
+	literalStart := 0
+	hasDollar := false
+	hasDoubleDollar := false
+
+	for i := 0; i < len(content); {
+		if content[i] != '$' || stringutils.IsEscapedRuneAt(content, i) {
+			i++
+			continue
+		}
+		paramLen, replacement := implicitParamAt(content, i)
+		if paramLen == 0 {
+			i++
+			continue
+		}
+		if i > literalStart {
+			parts = append(parts, `"`+string(content[literalStart:i])+`"`)
+		}
+		parts = append(parts, "("+replacement+")")
+		if paramLen == 2 {
+			hasDoubleDollar = true
+		} else {
+			hasDollar = true
+		}
+		i += paramLen
+		literalStart = i
+	}
+
+	if !hasDollar && !hasDoubleDollar {
+		return string(literal), false, false
+	}
+	if literalStart < len(content) {
+		parts = append(parts, `"`+string(content[literalStart:])+`"`)
+	}
+	return "(" + strings.Join(parts, " + ") + ")", hasDollar, hasDoubleDollar
+}
+
+func implicitParamAt(runes []rune, i int) (int, string) {
+	if i >= len(runes) || runes[i] != '$' {
+		return 0, ""
+	}
+
+	paramLen := 1
+	replacement := "__arg"
+	if i+1 < len(runes) && runes[i+1] == '$' {
+		paramLen = 2
+		replacement = "__idx"
+	}
+	after := i + paramLen
+	if after < len(runes) && (unicode.IsLetter(runes[after]) || unicode.IsDigit(runes[after]) || runes[after] == '_') {
+		return 0, ""
+	}
+	return paramLen, replacement
+}
+
+func quotedLiteralEnd(runes []rune, start int, quote rune) int {
+	for i := start + 1; i < len(runes); i++ {
+		if runes[i] == quote && !stringutils.IsEscapedRuneAt(runes, i) {
+			return i + 1
+		}
+	}
+	return len(runes)
+}
+
+func insideRegexCall(stack []bool) bool {
+	return len(stack) > 0 && stack[len(stack)-1]
+}
+
+func precedingIdentifierIs(runes []rune, pos int, want string) bool {
+	end := pos
+	for end > 0 && unicode.IsSpace(runes[end-1]) {
+		end--
+	}
+	start := end
+	for start > 0 && (unicode.IsLetter(runes[start-1]) || unicode.IsDigit(runes[start-1]) || runes[start-1] == '_') {
+		start--
+	}
+	if start > 0 && (runes[start-1] == '.' || runes[start-1] == '$') {
+		return false
+	}
+	return string(runes[start:end]) == want
 }
 
 // replaceArrowFunctions converts arrow function syntax.

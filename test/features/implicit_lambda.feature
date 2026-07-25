@@ -253,3 +253,73 @@ Feature: Implicit Lambda Parameters ($ and $$)
       """
       [3,6,9]
       """
+
+  Scenario: Map interpolates current value in a bare dollar string
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] map "$"
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["1","2"]
+      """
+
+  Scenario: Map interpolates current index in a double dollar string
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] map "$$"
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["0","1"]
+      """
+
+  Scenario: Filter interpolates current value in a bare dollar string
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2] filter ("$" == "1")
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1]
+      """
+
+  Scenario: Map preserves a dollar anchor in a regex literal
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ["a", "ab", "ba"] map ($ matches /^a$/)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [true,false,false]
+      """
+
+  Scenario: Filter selector preserves a dollar anchor in a regex literal
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ["a", "ab", "ba"][?($ matches /^a$/)]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["a"]
+      """

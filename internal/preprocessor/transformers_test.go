@@ -23,6 +23,10 @@ func TestReplaceImplicitLambdas(t *testing.T) {
 		{"explicit map then implicit filter", "arr map (x) -> (x + 1) filter $ > 1", "arr map (x) -> (x + 1) filter (__arg) -> __arg > 1"},
 		{"reduce with paren no space", "data reduce($ + $$)", "data reduce (__arg, __idx) -> (__arg + __idx)"},
 		{"reduce with paren complex", `data reduce(($$ splitBy ":")[0])`, `data reduce (__arg, __idx) -> ((__idx splitBy ":")[0])`},
+		{"map interpolates dollar string", `payload map "$"`, `payload map (__arg) -> ("" + (__arg))`},
+		{"map interpolates index string", `payload map "$$"`, `payload map (__arg, __idx) -> ("" + (__idx))`},
+		{"filter interpolates dollar string", `payload filter ("$" == "1")`, `payload filter (__arg) -> (("" + (__arg)) == "1")`},
+		{"regex payload preserves anchor", `payload map ($ matches regex("a$", ""))`, `payload map (__arg) -> (__arg matches regex("a$", ""))`},
 	}
 
 	for _, tt := range tests {
@@ -88,6 +92,8 @@ func TestReplaceFilterSelectors(t *testing.T) {
 	}{
 		{"simple filter selector", "items[?($ > 1)]", `__filter_selector(items, __lambda("__arg, __idx", __arg > 1))`},
 		{"filter selector with index", "items[?($$ > 0)]", `__filter_selector(items, __lambda("__arg, __idx", __idx > 0))`},
+		{"filter selector interpolates dollar string", `items[?("$" == "1")]`, `__filter_selector(items, __lambda("__arg, __idx", ("" + (__arg)) == "1"))`},
+		{"filter selector preserves regex anchor", `items[?($ matches regex("a$", ""))]`, `__filter_selector(items, __lambda("__arg, __idx", __arg matches regex("a$", "")))`},
 	}
 
 	for _, tt := range tests {
