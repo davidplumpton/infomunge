@@ -69,3 +69,54 @@ Feature: User function name resolution
       """
       {"remaining":[2,3],"allPositive":true}
       """
+
+  Scenario: Local functions cannot intercept generated syntax helpers
+    Given the following script:
+      """
+      %im 0.1
+      fun __default(value, fallback) = 99
+      fun __lambda(parameters, body) = 99
+      fun __map(values, mapper) = [99]
+      fun __coerce(value, typeName) = "custom"
+      fun fail() = 1 / 0
+      output application/json
+      ---
+      {
+        lazyDefault: 7 default fail(),
+        fallback: null default 5,
+        mapped: [1, 2] map (value) -> value + 1,
+        coerced: "42" as Number
+      }
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"lazyDefault":7,"fallback":5,"mapped":[2,3],"coerced":42}
+      """
+
+  Scenario: Imported functions cannot intercept generated syntax helpers
+    Given a file named "modules/ShadowSyntaxHelpers.im" with content:
+      """
+      %im 0.1
+      fun __default(value, fallback) = 99
+      fun __lambda(parameters, body) = 99
+      fun __map(values, mapper) = [99]
+      fun __coerce(value, typeName) = "custom"
+      """
+    And the following input content:
+      """
+      %im 0.1
+      import __default, __lambda, __map, __coerce from modules::ShadowSyntaxHelpers
+      output application/json
+      ---
+      {
+        fallback: null default 5,
+        mapped: [1, 2] map (value) -> value + 1,
+        coerced: "42" as Number
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"fallback":5,"mapped":[2,3],"coerced":42}
+      """

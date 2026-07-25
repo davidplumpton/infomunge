@@ -281,6 +281,23 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 		return args, nil
 	}
 
+	// Double-underscore builtins are implementation details emitted by the
+	// preprocessor. Dispatch them before lexical bindings so a user declaration
+	// cannot intercept generated syntax such as default, arrows, map, or as.
+	// Public builtin names intentionally retain lexical-first resolution below.
+	if len(fun.Name) >= 2 && fun.Name[:2] == "__" {
+		if handler, ok := GetBuiltinSpecial(fun.Name); ok {
+			return handler(e, visitor.scope, visitor.depth)
+		}
+		if handler, ok := GetBuiltinFunction(fun.Name); ok {
+			args, err := evalArgs()
+			if err != nil {
+				return nil, err
+			}
+			return handler(args, e)
+		}
+	}
+
 	// Lexical function bindings take precedence over builtins. This keeps adding a
 	// builtin from silently changing the meaning of an existing user function.
 	if userFn, exists := visitor.scope.Vars[fun.Name]; exists {
