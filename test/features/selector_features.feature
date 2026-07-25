@@ -31,6 +31,48 @@ Feature: Selector Features
       {"b":2,"c":3}
       """
 
+  Scenario: Filter selector stays inside an implicit map lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{a: [1, 2]}, {a: [0, 3]}] map $.a[?($ == 2)]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [[2],[]]
+      """
+
+  Scenario: Range selector stays inside an implicit map lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{a: [1, 2]}, {a: [0, 3]}] map $.a[0 to 0]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [[1],[0]]
+      """
+
+  Scenario: Recursive selector stays inside an implicit map lambda
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{child: {name: "a"}}, {child: {name: "b"}}] map $..name
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [["a"],["b"]]
+      """
+
   Scenario: Metadata selector size
     Given the following input content:
       """

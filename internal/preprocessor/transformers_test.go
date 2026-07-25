@@ -133,6 +133,63 @@ func TestReplaceMetadataSelectors(t *testing.T) {
 	}
 }
 
+func TestSelectorsStayInsideCollectionLambdaBodies(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		expected  string
+		transform func(string) string
+	}{
+		{
+			name:      "filter selector",
+			input:     `items map $.a[?($ == 2)]`,
+			expected:  `items map __filter_selector($.a, __lambda("__arg, __idx", __arg == 2))`,
+			transform: replaceFilterSelectors,
+		},
+		{
+			name:      "range selector",
+			input:     `items map $.a[0 to 0]`,
+			expected:  `items map __rangeIndex($.a, 0, 0)`,
+			transform: replaceArrayRangeIndexing,
+		},
+		{
+			name:     "recursive selector",
+			input:    `items map $..name`,
+			expected: `items map __deep($, "name")`,
+			transform: func(input string) string {
+				got, _ := replaceRecursiveDescentWithMapping(input)
+				return got
+			},
+		},
+		{
+			name:      "metadata selector",
+			input:     `items map $.a.^size`,
+			expected:  `items map __metadata($.a, "size")`,
+			transform: replaceMetadataSelectors,
+		},
+		{
+			name:      "selector after grouped collection stays top level",
+			input:     `(items map $.a).^size`,
+			expected:  `__metadata((items map $.a), "size")`,
+			transform: replaceMetadataSelectors,
+		},
+		{
+			name:      "earlier lambda does not capture later argument selector",
+			input:     `combine(items map $.a, other[?($ > 1)])`,
+			expected:  `combine(items map $.a,__filter_selector(other, __lambda("__arg, __idx", __arg > 1)))`,
+			transform: replaceFilterSelectors,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.transform(tt.input); got != tt.expected {
+				t.Fatalf("%s = %q, want %q", tt.name, got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestReplaceStringInterpolation(t *testing.T) {
 	tests := []struct {
 		name     string

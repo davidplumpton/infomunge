@@ -143,7 +143,7 @@ func replaceFirstArrayRangeIndex(s string) (string, bool) {
 			}
 
 			prefix := []rune(s[:open])
-			exprStart := stringutils.FindLeftOperandStart(prefix, nil)
+			exprStart := selectorLeftOperandStart(prefix, stringutils.DefaultOperatorStops)
 			operandStart := exprStart
 			for operandStart < len(prefix) && unicode.IsSpace(prefix[operandStart]) {
 				operandStart++
@@ -250,7 +250,7 @@ func replaceRecursiveDescentWithMapping(s string) (string, []int) {
 
 	for sc.Pos() < len(s) {
 		if !sc.IsInString() && sc.Peek2() == ".*" {
-			leftStart := findLeftOperandStartBytesWithStops(buf.bytes, defaultStopBytes(nil))
+			leftStart := selectorLeftOperandStartBytes(buf.bytes, defaultStopBytes(nil))
 			if leftStart >= buf.Len() {
 				buf.AppendOriginal(s, sc.Pos(), sc.Pos()+1)
 				sc.Advance(1)
@@ -299,7 +299,7 @@ func replaceRecursiveDescentWithMapping(s string) (string, []int) {
 			for fieldEnd < len(s) && IsIdentifierPart(s[fieldEnd]) {
 				fieldEnd++
 			}
-			leftStart := findLeftOperandStartBytesWithStops(buf.bytes, defaultStopBytes(nil))
+			leftStart := selectorLeftOperandStartBytes(buf.bytes, defaultStopBytes(nil))
 			if leftStart >= buf.Len() {
 				buf.AppendOriginal(s, sc.Pos(), sc.Pos()+1)
 				sc.Advance(1)
@@ -329,7 +329,7 @@ func replaceFilterSelectors(s string) string {
 
 	for sc.Pos() < len(s) {
 		if !sc.IsInString() && sc.Peek() == '[' && sc.Pos()+2 < len(s) && s[sc.Pos()+1] == '?' && s[sc.Pos()+2] == '(' {
-			leftExpr, newResult, ok := extractLeftOperand(result)
+			leftExpr, newResult, ok := extractSelectorLeftOperand(result)
 			if !ok {
 				result = append(result, sc.NextRune())
 				continue
@@ -390,7 +390,7 @@ func replaceMetadataSelectors(s string) string {
 					metaEnd++
 				}
 
-				leftExpr, newResult, ok := extractLeftOperand(result)
+				leftExpr, newResult, ok := extractSelectorLeftOperand(result)
 				if !ok {
 					result = append(result, sc.NextRune())
 					continue

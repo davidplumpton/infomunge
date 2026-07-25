@@ -36,6 +36,98 @@ func extractLeftOperand(result []rune) (leftExpr string, newResult []rune, ok bo
 	return leftExpr, newResult, true
 }
 
+// selectorLeftOperandStart keeps selector operands inside collection lambda
+// bodies that have not yet been rewritten. Selector processing runs before
+// functional processing, so a raw expression such as "items map $.values"
+// would otherwise be treated as one left operand.
+func selectorLeftOperandStart(result []rune, stops []rune) int {
+	start := stringutils.FindLeftOperandStartWithStops(result, stops)
+	input := string(result)
+	bodyStart := collectionLambdaBodyStart(input)
+	if bodyStart < 0 {
+		return start
+	}
+	bodyStartRune := runeIndexAtByteOffset(input, bodyStart)
+	if bodyStartRune > start {
+		return bodyStartRune
+	}
+	return start
+}
+
+func extractSelectorLeftOperand(result []rune) (leftExpr string, newResult []rune, ok bool) {
+	start := selectorLeftOperandStart(result, stringutils.DefaultOperatorStops)
+	if start >= len(result) {
+		return "", result, false
+	}
+
+	leftExpr = strings.TrimSpace(string(result[start:]))
+	newResult = result[:start]
+	return leftExpr, newResult, true
+}
+
+func selectorLeftOperandStartBytes(result []byte, stops []byte) int {
+	start := findLeftOperandStartBytesWithStops(result, stops)
+	bodyStart := collectionLambdaBodyStart(string(result))
+	if bodyStart > start {
+		return bodyStart
+	}
+	return start
+}
+
+func collectionLambdaBodyStart(input string) int {
+	type candidate struct {
+		paren int
+		brack int
+		brace int
+		start int
+	}
+
+	var state ScanState
+	var candidates []candidate
+	for pos := 0; pos < len(input); pos++ {
+		if !state.InString() {
+			if bodyStart, ok := collectionOperatorBodyStartAt(input, pos); ok {
+				candidates = append(candidates, candidate{
+					paren: state.DepthParen,
+					brack: state.DepthBrack,
+					brace: state.DepthBrace,
+					start: bodyStart,
+				})
+			}
+		}
+		state.Advance(input[pos])
+	}
+
+	for i := len(candidates) - 1; i >= 0; i-- {
+		if candidates[i].paren == state.DepthParen &&
+			candidates[i].brack == state.DepthBrack &&
+			candidates[i].brace == state.DepthBrace {
+			return candidates[i].start
+		}
+	}
+	return -1
+}
+
+func collectionOperatorBodyStartAt(input string, pos int) (int, bool) {
+	if pos == 0 || !isWhitespace(input[pos-1]) {
+		return 0, false
+	}
+	for _, operator := range CollectionOperators {
+		end := pos + len(operator)
+		if end > len(input) || input[pos:end] != operator {
+			continue
+		}
+		if end >= len(input) || (!isWhitespace(input[end]) && input[end] != '(') {
+			continue
+		}
+		for end < len(input) && isWhitespace(input[end]) {
+			end++
+		}
+		return end, true
+	}
+	return 0, false
+}
+
 // isPatternMatchKeyword checks if the scanner is at a pattern match keyword position.
 func isPatternMatchKeyword(s string, sc *stringutils.ExpressionScanner) (int, int, bool) {
 	if sc.IsInString() {
