@@ -163,6 +163,21 @@ Feature: Arrays Module
       3
       """
 
+  Scenario: firstWith forwards the element index to its callback
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      import firstWith from dw::core::Arrays
+      ---
+      firstWith([10, 20, 30], (x, i) -> i == 1)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      20
+      """
+
   Scenario: indexOf returns the index of the first match
     Given the following input content:
       """

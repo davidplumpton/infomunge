@@ -16,7 +16,7 @@ fun every(array, criteria) = __native("every", array, criteria)
 
 fun firstWith(array, criteria) =
   if (array == null) null
-  else first(array filter (item) -> criteria(item))
+  else first(array filter criteria)
 
 fun indexOf(array, value) =
   using (matches = find(array, value))
