@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/ast"
 	"math"
+	"math/big"
 )
 
 // callBuiltinCeil implements the ceil(number) function.
@@ -12,11 +13,14 @@ func callBuiltinCeil(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "ceil function requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
-	num, err := toNumber(args[0], "ceil", e)
+	num, err := normalizedBuiltinNumber(args[0], "ceil", e)
 	if err != nil {
 		return nil, err
 	}
-	return math.Ceil(num), nil
+	if integer, ok := num.(int); ok {
+		return integer, nil
+	}
+	return math.Ceil(num.(float64)), nil
 }
 
 // callBuiltinFloor implements the floor(number) function.
@@ -24,11 +28,14 @@ func callBuiltinFloor(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "floor function requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
-	num, err := toNumber(args[0], "floor", e)
+	num, err := normalizedBuiltinNumber(args[0], "floor", e)
 	if err != nil {
 		return nil, err
 	}
-	return math.Floor(num), nil
+	if integer, ok := num.(int); ok {
+		return integer, nil
+	}
+	return math.Floor(num.(float64)), nil
 }
 
 // callBuiltinRound implements the round(number) function.
@@ -36,11 +43,14 @@ func callBuiltinRound(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "round function requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
-	num, err := toNumber(args[0], "round", e)
+	num, err := normalizedBuiltinNumber(args[0], "round", e)
 	if err != nil {
 		return nil, err
 	}
-	return math.Round(num), nil
+	if integer, ok := num.(int); ok {
+		return integer, nil
+	}
+	return math.Round(num.(float64)), nil
 }
 
 // callBuiltinSqrt implements the sqrt(number) function.
@@ -48,14 +58,36 @@ func callBuiltinSqrt(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "sqrt function requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
-	num, err := toNumber(args[0], "sqrt", e)
+	num, err := normalizedBuiltinNumber(args[0], "sqrt", e)
 	if err != nil {
 		return nil, err
 	}
-	if num < 0 {
+	if integer, ok := num.(int); ok {
+		if integer < 0 {
+			return nil, newPosError(fmt.Sprintf("sqrt: cannot take square root of negative number %v", integer), e.Pos())
+		}
+		root := new(big.Int).Sqrt(big.NewInt(int64(integer)))
+		if new(big.Int).Mul(new(big.Int).Set(root), root).Cmp(big.NewInt(int64(integer))) == 0 {
+			return int(root.Int64()), nil
+		}
+		if !intExactlyRepresentableAsFloat(integer) {
+			return nil, newPosError("sqrt: numeric precision loss converting integer input", e.Pos())
+		}
+		result := math.Sqrt(float64(integer))
+		if err := validateFloat(result, "sqrt"); err != nil {
+			return nil, newPosError(err.Error(), e.Pos())
+		}
+		return result, nil
+	}
+	floatValue := num.(float64)
+	if floatValue < 0 {
 		return nil, newPosError(fmt.Sprintf("sqrt: cannot take square root of negative number %v", num), e.Pos())
 	}
-	return math.Sqrt(num), nil
+	result := math.Sqrt(floatValue)
+	if err := validateFloat(result, "sqrt"); err != nil {
+		return nil, newPosError(err.Error(), e.Pos())
+	}
+	return result, nil
 }
 
 // callBuiltinAbs implements the abs(number) function.
@@ -63,11 +95,20 @@ func callBuiltinAbs(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 1, "abs function requires exactly 1 argument", e); err != nil {
 		return nil, err
 	}
-	num, err := toNumber(args[0], "abs", e)
+	num, err := normalizedBuiltinNumber(args[0], "abs", e)
 	if err != nil {
 		return nil, err
 	}
-	return math.Abs(num), nil
+	if integer, ok := num.(int); ok {
+		if integer == minInt() {
+			return nil, newPosError("integer overflow during abs", e.Pos())
+		}
+		if integer < 0 {
+			return -integer, nil
+		}
+		return integer, nil
+	}
+	return math.Abs(num.(float64)), nil
 }
 
 // callBuiltinMax implements the max(...numbers) or max(array) function.
@@ -77,35 +118,13 @@ func callBuiltinMax(args []Value, e *ast.CallExpr) (Value, error) {
 	}
 	if len(args) == 1 {
 		if arr, ok := args[0].(Array); ok {
-			// max(array)
 			if len(arr) == 0 {
 				return nil, newPosError("max function requires non-empty array", e.Pos())
 			}
-			maxVal := math.Inf(-1)
-			for _, item := range arr {
-				num, err := toNumber(item, "max", e)
-				if err != nil {
-					return nil, err
-				}
-				if num > maxVal {
-					maxVal = num
-				}
-			}
-			return maxVal, nil
+			return numericExtremum(arr, "max", true, e)
 		}
 	}
-	// max(...numbers)
-	maxVal := math.Inf(-1)
-	for _, arg := range args {
-		num, err := toNumber(arg, "max", e)
-		if err != nil {
-			return nil, err
-		}
-		if num > maxVal {
-			maxVal = num
-		}
-	}
-	return maxVal, nil
+	return numericExtremum(args, "max", true, e)
 }
 
 // callBuiltinMin implements the min(...numbers) or min(array) function.
@@ -115,35 +134,13 @@ func callBuiltinMin(args []Value, e *ast.CallExpr) (Value, error) {
 	}
 	if len(args) == 1 {
 		if arr, ok := args[0].(Array); ok {
-			// min(array)
 			if len(arr) == 0 {
 				return nil, newPosError("min function requires non-empty array", e.Pos())
 			}
-			minVal := math.Inf(1)
-			for _, item := range arr {
-				num, err := toNumber(item, "min", e)
-				if err != nil {
-					return nil, err
-				}
-				if num < minVal {
-					minVal = num
-				}
-			}
-			return minVal, nil
+			return numericExtremum(arr, "min", false, e)
 		}
 	}
-	// min(...numbers)
-	minVal := math.Inf(1)
-	for _, arg := range args {
-		num, err := toNumber(arg, "min", e)
-		if err != nil {
-			return nil, err
-		}
-		if num < minVal {
-			minVal = num
-		}
-	}
-	return minVal, nil
+	return numericExtremum(args, "min", false, e)
 }
 
 // callBuiltinPow implements the pow(base, exponent) function.
@@ -151,23 +148,79 @@ func callBuiltinPow(args []Value, e *ast.CallExpr) (Value, error) {
 	if err := requireExactArgs(args, 2, "pow function requires exactly 2 arguments: base, exponent", e); err != nil {
 		return nil, err
 	}
-	base, err := toNumber(args[0], "pow", e)
+	base, err := normalizedBuiltinNumber(args[0], "pow", e)
 	if err != nil {
 		return nil, err
 	}
-	exp, err := toNumber(args[1], "pow", e)
+	exponent, err := normalizedBuiltinNumber(args[1], "pow", e)
 	if err != nil {
 		return nil, err
 	}
-	return math.Pow(base, exp), nil
+
+	if expFloat, ok := exponent.(float64); ok && expFloat == 0 {
+		return 1.0, nil
+	}
+	if expInt, ok := exponent.(int); ok && expInt == 0 {
+		return 1, nil
+	}
+	if expFloat, ok := exponent.(float64); ok && expFloat == 1 {
+		return base, nil
+	}
+	if expInt, ok := exponent.(int); ok && expInt == 1 {
+		return base, nil
+	}
+
+	baseInt, baseIsInt := base.(int)
+	expInt, expIsInt := exponent.(int)
+	if baseIsInt && expIsInt && expInt >= 0 {
+		result, err := checkedIntPow(baseInt, expInt)
+		if err != nil {
+			return nil, newPosError(err.Error(), e.Pos())
+		}
+		return result, nil
+	}
+	if baseIsInt && expIsInt && expInt < 0 {
+		switch baseInt {
+		case 0:
+			return nil, newPosError("pow resulted in infinity", e.Pos())
+		case 1:
+			return 1, nil
+		case -1:
+			if expInt%2 == 0 {
+				return 1, nil
+			}
+			return -1, nil
+		}
+	}
+
+	baseFloat, err := exactBuiltinFloat(base, "pow", e)
+	if err != nil {
+		return nil, err
+	}
+	expFloat, err := exactBuiltinFloat(exponent, "pow", e)
+	if err != nil {
+		return nil, err
+	}
+	result := math.Pow(baseFloat, expFloat)
+	// Preserve the established language result for non-real powers (NaN),
+	// while still rejecting range overflow to infinity.
+	if math.IsInf(result, 0) {
+		return nil, newPosError("pow resulted in infinity", e.Pos())
+	}
+	return result, nil
 }
 
-// toNumber converts a value to a float64 number for math operations.
-func toNumber(val Value, funcName string, e *ast.CallExpr) (float64, error) {
-	if num, ok := ToFloat(val); ok {
-		return num, nil
-	}
+// normalizedBuiltinNumber preserves runtime integers while retaining the
+// historic bool/null coercions used by the unary math builtins.
+func normalizedBuiltinNumber(val Value, funcName string, e *ast.CallExpr) (Value, error) {
 	switch v := val.(type) {
+	case int:
+		return v, nil
+	case float64:
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return nil, newPosError(fmt.Sprintf("%s: expected a finite number", funcName), e.Pos())
+		}
+		return v, nil
 	case bool:
 		if v {
 			return 1, nil
@@ -178,6 +231,65 @@ func toNumber(val Value, funcName string, e *ast.CallExpr) (float64, error) {
 	default:
 		return 0, newPosError(fmt.Sprintf("%s: cannot convert %T to number", funcName, val), e.Pos())
 	}
+}
+
+func exactBuiltinFloat(val Value, funcName string, e *ast.CallExpr) (float64, error) {
+	switch number := val.(type) {
+	case int:
+		if !intExactlyRepresentableAsFloat(number) {
+			return 0, newPosError(fmt.Sprintf("%s: numeric precision loss converting integer input", funcName), e.Pos())
+		}
+		return float64(number), nil
+	case float64:
+		return number, nil
+	default:
+		return 0, newPosError(fmt.Sprintf("%s: cannot convert %T to number", funcName, val), e.Pos())
+	}
+}
+
+func numericExtremum(values []Value, funcName string, wantMax bool, e *ast.CallExpr) (Value, error) {
+	best, err := normalizedBuiltinNumber(values[0], funcName, e)
+	if err != nil {
+		return nil, err
+	}
+	bestRat, _ := exactNumericRat(best)
+	for _, candidateValue := range values[1:] {
+		candidate, err := normalizedBuiltinNumber(candidateValue, funcName, e)
+		if err != nil {
+			return nil, err
+		}
+		candidateRat, _ := exactNumericRat(candidate)
+		comparison := candidateRat.Cmp(bestRat)
+		if (wantMax && comparison > 0) || (!wantMax && comparison < 0) {
+			best = candidate
+			bestRat = candidateRat
+		}
+	}
+	return best, nil
+}
+
+func checkedIntPow(base, exponent int) (int, error) {
+	result := 1
+	factor := base
+	for exponent > 0 {
+		if exponent&1 == 1 {
+			product, err := checkedIntOp(result, factor, "multiplication")
+			if err != nil {
+				return 0, fmt.Errorf("integer overflow during pow")
+			}
+			result = product.(int)
+		}
+		exponent >>= 1
+		if exponent == 0 {
+			break
+		}
+		square, err := checkedIntOp(factor, factor, "multiplication")
+		if err != nil {
+			return 0, fmt.Errorf("integer overflow during pow")
+		}
+		factor = square.(int)
+	}
+	return result, nil
 }
 
 // callBuiltinSum implements the sum(array) function.
@@ -194,16 +306,7 @@ func callBuiltinSum(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("sum: expected array, got %T", args[0]), e.Pos())
 	}
 
-	var sum float64
-	for i, item := range arr {
-		num, ok := ToFloat(item)
-		if !ok {
-			return nil, newElementNotNumberError("sum", i, item, e.Pos())
-		}
-		sum += num
-	}
-
-	return sum, nil
+	return aggregateNumbers(arr, "sum", false, e)
 }
 
 // callBuiltinAvg implements the avg(array) function.
@@ -225,16 +328,48 @@ func callBuiltinAvg(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError("avg: cannot calculate average of empty array", e.Pos())
 	}
 
-	var sum float64
+	return aggregateNumbers(arr, "avg", true, e)
+}
+
+func aggregateNumbers(arr Array, funcName string, average bool, e *ast.CallExpr) (Value, error) {
+	total := new(big.Rat)
+	hasFloat := false
+	hasInexactInteger := false
 	for i, item := range arr {
-		num, ok := ToFloat(item)
+		number, ok := exactNumericRat(item)
 		if !ok {
-			return nil, newElementNotNumberError("avg", i, item, e.Pos())
+			return nil, newElementNotNumberError(funcName, i, item, e.Pos())
 		}
-		sum += num
+		total.Add(total, number)
+		switch value := item.(type) {
+		case float64:
+			hasFloat = true
+		case int:
+			hasInexactInteger = hasInexactInteger || !intExactlyRepresentableAsFloat(value)
+		}
+	}
+	if average {
+		total.Quo(total, new(big.Rat).SetInt64(int64(len(arr))))
 	}
 
-	return sum / float64(len(arr)), nil
+	if total.IsInt() && (!hasFloat || hasInexactInteger) {
+		if total.Num().IsInt64() {
+			value := total.Num().Int64()
+			if int64(int(value)) == value {
+				return int(value), nil
+			}
+		}
+		return nil, newPosError(fmt.Sprintf("integer overflow during %s", funcName), e.Pos())
+	}
+
+	result, exact := total.Float64()
+	if hasInexactInteger && !exact {
+		return nil, newPosError(fmt.Sprintf("numeric precision loss during %s", funcName), e.Pos())
+	}
+	if err := validateFloat(result, funcName); err != nil {
+		return nil, newPosError(err.Error(), e.Pos())
+	}
+	return result, nil
 }
 
 // callBuiltinIsDecimal implements the isDecimal(value) function.
@@ -266,8 +401,7 @@ func callBuiltinIsInteger(args []Value, e *ast.CallExpr) (Value, error) {
 
 	switch v := args[0].(type) {
 	case float64:
-		// Check if the float is actually an integer (no fractional part)
-		return v == float64(int64(v)), nil
+		return !math.IsNaN(v) && !math.IsInf(v, 0) && math.Trunc(v) == v, nil
 	case int:
 		return true, nil
 	case string, nil:
@@ -284,22 +418,20 @@ func callBuiltinIsEven(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	var num int64
 	switch v := args[0].(type) {
 	case float64:
-		if v != float64(int64(v)) {
+		if math.IsNaN(v) || math.IsInf(v, 0) || math.Trunc(v) != v {
 			return nil, newPosError(fmt.Sprintf("isEven expects an integer, got float %v", v), e.Pos())
 		}
-		num = int64(v)
+		return math.Mod(v, 2) == 0, nil
 	case int:
-		num = int64(v)
+		return v%2 == 0, nil
 	case string:
 		return nil, newPosError(fmt.Sprintf("isEven expects an integer, got string"), e.Pos())
 	default:
 		return nil, newPosError(fmt.Sprintf("isEven expects an integer, got %T", args[0]), e.Pos())
 	}
 
-	return num%2 == 0, nil
 }
 
 // callBuiltinIsOdd implements the isOdd(value) function.
@@ -309,22 +441,20 @@ func callBuiltinIsOdd(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	var num int64
 	switch v := args[0].(type) {
 	case float64:
-		if v != float64(int64(v)) {
+		if math.IsNaN(v) || math.IsInf(v, 0) || math.Trunc(v) != v {
 			return nil, newPosError(fmt.Sprintf("isOdd expects an integer, got float %v", v), e.Pos())
 		}
-		num = int64(v)
+		return math.Mod(v, 2) != 0, nil
 	case int:
-		num = int64(v)
+		return v%2 != 0, nil
 	case string:
 		return nil, newPosError(fmt.Sprintf("isOdd expects an integer, got string"), e.Pos())
 	default:
 		return nil, newPosError(fmt.Sprintf("isOdd expects an integer, got %T", args[0]), e.Pos())
 	}
 
-	return num%2 != 0, nil
 }
 
 // callBuiltinRandom implements the random() function.
@@ -341,12 +471,13 @@ func callBuiltinRandom(args []Value, e *ast.CallExpr) (Value, error) {
 	}
 
 	// Convert to a float between 0 and 1
-	randomInt := int64(0)
+	randomBits := uint64(0)
 	for i := 0; i < 8; i++ {
-		randomInt = (randomInt << 8) | int64(randomBytes[i])
+		randomBits = (randomBits << 8) | uint64(randomBytes[i])
 	}
-	// Ensure non-negative and in range [0, 1)
-	randomFloat := float64(randomInt&0x7FFFFFFFFFFFFFFF) / float64(0x7FFFFFFFFFFFFFFF)
+	// Retain 53 random bits so every possible result is exactly representable
+	// and strictly less than 1.
+	randomFloat := float64(randomBits>>11) / float64(uint64(1)<<53)
 	return randomFloat, nil
 }
 
@@ -357,35 +488,20 @@ func callBuiltinRandomInt(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	var max int64
-	switch v := args[0].(type) {
-	case float64:
-		max = int64(v)
-	case int:
-		max = int64(v)
-	default:
-		return nil, newPosError(fmt.Sprintf("randomInt expects a number, got %T", args[0]), e.Pos())
+	max, err := truncatedRuntimeInt(args[0], "randomInt", "max", e)
+	if err != nil {
+		return nil, err
 	}
 
 	if max <= 0 {
 		return nil, newPosError("randomInt max must be greater than 0", e.Pos())
 	}
 
-	// Generate a random integer
-	randomBytes := make([]byte, 8)
-	_, err := rand.Read(randomBytes)
+	randomValue, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
 	if err != nil {
 		return nil, newPosError(fmt.Sprintf("failed to generate random number: %s", err), e.Pos())
 	}
-
-	randomInt := int64(0)
-	for i := 0; i < 8; i++ {
-		randomInt = (randomInt << 8) | int64(randomBytes[i])
-	}
-
-	// Ensure non-negative and apply modulo
-	result := (randomInt & 0x7FFFFFFFFFFFFFFF) % max
-	return float64(result), nil
+	return int(randomValue.Int64()), nil
 }
 
 // callBuiltinTo implements the to(start, end) function.
@@ -394,38 +510,67 @@ func callBuiltinTo(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	var start, end int64
-	switch v := args[0].(type) {
-	case float64:
-		start = int64(v)
-	case int:
-		start = int64(v)
-	default:
-		return nil, newPosError(fmt.Sprintf("to expects start to be a number, got %T", args[0]), e.Pos())
+	start, err := truncatedRuntimeInt(args[0], "to", "start", e)
+	if err != nil {
+		return nil, err
+	}
+	end, err := truncatedRuntimeInt(args[1], "to", "end", e)
+	if err != nil {
+		return nil, err
 	}
 
-	switch v := args[1].(type) {
-	case float64:
-		end = int64(v)
-	case int:
-		end = int64(v)
-	default:
-		return nil, newPosError(fmt.Sprintf("to expects end to be a number, got %T", args[1]), e.Pos())
+	distance := new(big.Int).Sub(big.NewInt(int64(end)), big.NewInt(int64(start)))
+	distance.Abs(distance)
+	length := distance.Add(distance, big.NewInt(1))
+	if !length.IsInt64() || int64(int(length.Int64())) != length.Int64() {
+		return nil, newPosError("to range length exceeds supported integer range", e.Pos())
 	}
 
 	// Build the range
-	var result Array
+	result := make(Array, 0, int(length.Int64()))
 	if start <= end {
-		for i := start; i <= end; i++ {
-			result = append(result, float64(i))
+		for current := start; ; current++ {
+			result = append(result, current)
+			if current == end {
+				break
+			}
 		}
 	} else {
-		for i := start; i >= end; i-- {
-			result = append(result, float64(i))
+		for current := start; ; current-- {
+			result = append(result, current)
+			if current == end {
+				break
+			}
 		}
 	}
 
 	return result, nil
+}
+
+func truncatedRuntimeInt(value Value, funcName, argumentName string, e *ast.CallExpr) (int, error) {
+	switch number := value.(type) {
+	case int:
+		return number, nil
+	case float64:
+		if math.IsNaN(number) || math.IsInf(number, 0) {
+			return 0, newPosError(fmt.Sprintf("%s %s must be a finite number", funcName, argumentName), e.Pos())
+		}
+		truncated := math.Trunc(number)
+		asRat := new(big.Rat).SetFloat64(truncated)
+		if asRat == nil || !asRat.IsInt() || !asRat.Num().IsInt64() {
+			return 0, newPosError(fmt.Sprintf("%s %s is outside the supported integer range", funcName, argumentName), e.Pos())
+		}
+		asInt64 := asRat.Num().Int64()
+		if int64(int(asInt64)) != asInt64 {
+			return 0, newPosError(fmt.Sprintf("%s %s is outside the supported integer range", funcName, argumentName), e.Pos())
+		}
+		return int(asInt64), nil
+	default:
+		if funcName == "to" {
+			return 0, newPosError(fmt.Sprintf("to expects %s to be a number, got %T", argumentName, value), e.Pos())
+		}
+		return 0, newPosError(fmt.Sprintf("%s expects a number, got %T", funcName, value), e.Pos())
+	}
 }
 
 // callBuiltinMod implements the mod(dividend, divisor) function.
@@ -434,28 +579,19 @@ func callBuiltinMod(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	var dividend, divisor float64
-	switch v := args[0].(type) {
-	case float64:
-		dividend = v
-	case int:
-		dividend = float64(v)
-	default:
+	if _, ok := exactNumericRat(args[0]); !ok {
 		return nil, newPosError(fmt.Sprintf("mod expects dividend to be a number, got %T", args[0]), e.Pos())
 	}
-
-	switch v := args[1].(type) {
-	case float64:
-		divisor = v
-	case int:
-		divisor = float64(v)
-	default:
+	if _, ok := exactNumericRat(args[1]); !ok {
 		return nil, newPosError(fmt.Sprintf("mod expects divisor to be a number, got %T", args[1]), e.Pos())
 	}
-
-	if divisor == 0 {
+	divisor, _ := exactNumericRat(args[1])
+	if divisor.Sign() == 0 {
 		return nil, newPosError("mod: division by zero", e.Pos())
 	}
-
-	return math.Mod(dividend, divisor), nil
+	result, err := rem(args[0], args[1])
+	if err != nil {
+		return nil, newPosError(err.Error(), e.Pos())
+	}
+	return result, nil
 }

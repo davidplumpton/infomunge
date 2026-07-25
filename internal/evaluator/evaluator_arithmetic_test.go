@@ -140,13 +140,13 @@ func TestEvaluate_MathFunctions(t *testing.T) {
 		{"sqrt small", "sqrt(0.25)", 0.5},
 		{"abs positive", "abs(5.0)", 5.0},
 		{"abs zero", "abs(0.0)", 0.0},
-		{"max two", "max(3, 7)", 7.0},
-		{"max multiple", "max(1, 5, 3, 9, 2)", 9.0},
-		{"min two", "min(3, 7)", 3.0},
-		{"min multiple", "min(5, 2, 8, 1, 9)", 1.0},
-		{"pow", "pow(2, 8)", 256.0},
+		{"max two", "max(3, 7)", 7},
+		{"max multiple", "max(1, 5, 3, 9, 2)", 9},
+		{"min two", "min(3, 7)", 3},
+		{"min multiple", "min(5, 2, 8, 1, 9)", 1},
+		{"pow", "pow(2, 8)", 256},
 		{"pow fractional", "pow(4, 0.5)", 2.0},
-		{"pow with ints", "pow(3, 2)", 9.0},
+		{"pow with ints", "pow(3, 2)", 9},
 	}
 
 	ctx := make(Context)
@@ -205,8 +205,8 @@ func TestEvaluate_MathEdgeCases(t *testing.T) {
 		expr     string
 		expected Value
 	}{
-		{"mod 10 3", "mod(10, 3)", 1.0},
-		{"mod 7 2", "mod(7, 2)", 1.0},
+		{"mod 10 3", "mod(10, 3)", 1},
+		{"mod 7 2", "mod(7, 2)", 1},
 		{"isEven 4", "isEven(4)", true},
 		{"isEven 5", "isEven(5)", false},
 		{"isOdd 5", "isOdd(5)", true},
