@@ -3,6 +3,7 @@ package exprgen_test
 import (
 	"go/parser"
 	"strconv"
+	"strings"
 	"testing"
 
 	"infomunge/internal/evaluator"
@@ -46,6 +47,18 @@ func TestStringLiteral_ParsesAsGoExpr(t *testing.T) {
 		lit := exprgen.StringLiteral().Draw(t, "lit")
 		if _, err := parser.ParseExpr(lit); err != nil {
 			t.Fatalf("StringLiteral %q is not a valid Go expr: %v", lit, err)
+		}
+	})
+}
+
+func TestDWStringLiteral_AvoidsAmbiguousEscapes(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		lit := exprgen.DWStringLiteral().Draw(t, "lit")
+		if _, err := parser.ParseExpr(lit); err != nil {
+			t.Fatalf("DWStringLiteral %q is not a valid Go expr: %v", lit, err)
+		}
+		if strings.Contains(lit, `\`) {
+			t.Fatalf("DWStringLiteral %q contains an escape with language-specific semantics", lit)
 		}
 	})
 }

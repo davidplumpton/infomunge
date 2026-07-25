@@ -19,12 +19,13 @@ import (
 )
 
 const (
-	dwEvalTimeout    = 10 * time.Second
-	floatTolerance   = 1e-9
-	floatAbsFloor    = 1.0
-	dwNullString     = "null"
-	dwNilString      = "nil"
-	dwUndefinedValue = "undefined"
+	dwEvalTimeout       = 10 * time.Second
+	floatTolerance      = 1e-9
+	floatAbsFloor       = 1.0
+	dwNullString        = "null"
+	dwNilString         = "nil"
+	dwUndefinedValue    = "undefined"
+	dwHomeWarningPrefix = "Unable to detect Weave Home directory"
 )
 
 var runDWCommand = defaultRunDWCommand
@@ -35,8 +36,8 @@ func DWAvailable() bool {
 	return err == nil
 }
 
-// DWEval executes a DataWeave script with optional named inputs and returns
-// a normalized parsed value from stdout.
+// DWEval executes a DataWeave script with optional named JSON inputs and
+// returns a normalized parsed value from stdout.
 func DWEval(script string, inputs map[string]string) (evaluator.Value, error) {
 	if strings.TrimSpace(script) == "" {
 		return nil, errors.New("dw script cannot be empty")
@@ -74,6 +75,7 @@ func defaultRunDWCommand(ctx context.Context, script string, inputs map[string]s
 	args = append(args, inputArgs...)
 	args = append(args, script)
 	cmd := exec.CommandContext(ctx, "dw", args...)
+	cmd.Env = dwCommandEnvironment(os.Environ(), cmd.Path)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -82,6 +84,32 @@ func defaultRunDWCommand(ctx context.Context, script string, inputs map[string]s
 
 	err = cmd.Run()
 	return stdout.String(), stderr.String(), err
+}
+
+func dwCommandEnvironment(current []string, executable string) []string {
+	for _, entry := range current {
+		key, value, found := strings.Cut(entry, "=")
+		if found && key == "DW_HOME" && strings.TrimSpace(value) != "" {
+			return current
+		}
+	}
+
+	resolvedExecutable, err := filepath.EvalSymlinks(executable)
+	if err != nil {
+		resolvedExecutable = executable
+	}
+	// The CLI distribution keeps dw under its bin directory. Using the
+	// resolved installation root avoids its cwd-dependent fallback.
+	dwHome := filepath.Dir(filepath.Dir(resolvedExecutable))
+
+	env := make([]string, 0, len(current)+1)
+	for _, entry := range current {
+		key, _, found := strings.Cut(entry, "=")
+		if !found || key != "DW_HOME" {
+			env = append(env, entry)
+		}
+	}
+	return append(env, "DW_HOME="+dwHome)
 }
 
 func prepareDWInputArgs(inputs map[string]string) ([]string, func(), error) {
@@ -103,7 +131,7 @@ func prepareDWInputArgs(inputs map[string]string) ([]string, func(), error) {
 
 	args := make([]string, 0, len(inputs))
 	for idx, name := range keys {
-		filename := fmt.Sprintf("%03d_%s.input", idx, name)
+		filename := fmt.Sprintf("%03d_%s.json", idx, name)
 		filePath := filepath.Join(dir, filename)
 		if err := os.WriteFile(filePath, []byte(inputs[name]), 0o600); err != nil {
 			cleanup()
@@ -116,9 +144,9 @@ func prepareDWInputArgs(inputs map[string]string) ([]string, func(), error) {
 }
 
 func parseDWOutput(output string) (evaluator.Value, error) {
-	trimmed := strings.TrimSpace(output)
+	trimmed := strings.TrimSpace(removeDWHomeWarnings(output))
 	if trimmed == "" {
-		return nil, nil
+		return nil, errors.New("stdout did not contain a result")
 	}
 
 	if parsed, err := formats.Read(trimmed, "application/json"); err == nil {
@@ -143,7 +171,53 @@ func parseDWOutput(output string) (evaluator.Value, error) {
 		return unquoted, nil
 	}
 
-	return trimmed, nil
+	return nil, fmt.Errorf("unrecognized stdout %q", truncateOutput(trimmed))
+}
+
+func removeDWHomeWarnings(output string) string {
+	lines := strings.Split(output, "\n")
+	for len(lines) > 0 {
+		line := strings.TrimSpace(stripANSIControlSequences(lines[0]))
+		if line == "" {
+			lines = lines[1:]
+			continue
+		}
+		if !strings.HasPrefix(line, dwHomeWarningPrefix) {
+			break
+		}
+		lines = lines[1:]
+	}
+	return strings.Join(lines, "\n")
+}
+
+func stripANSIControlSequences(value string) string {
+	var cleaned strings.Builder
+	cleaned.Grow(len(value))
+
+	for i := 0; i < len(value); i++ {
+		if value[i] != '\x1b' || i+1 >= len(value) || value[i+1] != '[' {
+			cleaned.WriteByte(value[i])
+			continue
+		}
+
+		i += 2
+		for i < len(value) {
+			if value[i] >= '@' && value[i] <= '~' {
+				break
+			}
+			i++
+		}
+	}
+	return cleaned.String()
+}
+
+func truncateOutput(output string) string {
+	const maxOutputRunes = 200
+	runes := []rune(output)
+	if len(runes) <= maxOutputRunes {
+		return output
+	}
+	return string(runes[:maxOutputRunes]) + "..."
 }
 
 func normalizeValue(v interface{}) interface{} {

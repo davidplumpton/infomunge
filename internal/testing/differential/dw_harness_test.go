@@ -42,6 +42,44 @@ func TestDWEval_ParsesJSONOutput(t *testing.T) {
 	}
 }
 
+func TestDWEval_CommandParsesWarningPrefixedJSON(t *testing.T) {
+	dir := t.TempDir()
+	executable := filepath.Join(dir, "dw")
+	command := `#!/bin/sh
+if [ -z "$DW_HOME" ]; then
+  echo "DW_HOME was not configured" >&2
+  exit 2
+fi
+printf '\033[33mUnable to detect Weave Home directory so local directory is going to be used.\033[0m\n'
+printf '{"ok":true}\n'
+`
+	if err := os.WriteFile(executable, []byte(command), 0o700); err != nil {
+		t.Fatalf("write fake dw command: %v", err)
+	}
+
+	originalPath := os.Getenv("PATH")
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+originalPath)
+	originalDWHome, hadDWHome := os.LookupEnv("DW_HOME")
+	if err := os.Unsetenv("DW_HOME"); err != nil {
+		t.Fatalf("unset DW_HOME: %v", err)
+	}
+	t.Cleanup(func() {
+		if hadDWHome {
+			_ = os.Setenv("DW_HOME", originalDWHome)
+		} else {
+			_ = os.Unsetenv("DW_HOME")
+		}
+	})
+
+	got, err := DWEval("%dw 2.0\noutput application/json\n---\n{ok: true}", nil)
+	if err != nil {
+		t.Fatalf("DWEval failed: %v", err)
+	}
+	if err := StructuralCompare(got, evaluator.Object{"ok": true}); err != nil {
+		t.Fatalf("unexpected command result: %v", err)
+	}
+}
+
 func TestDWEval_Timeout(t *testing.T) {
 	orig := runDWCommand
 	t.Cleanup(func() { runDWCommand = orig })
@@ -143,6 +181,51 @@ func TestParseDWOutput_NormalizesNullLikeValues(t *testing.T) {
 	}
 }
 
+func TestParseDWOutput_RejectsUnexpectedStdoutPrefix(t *testing.T) {
+	_, err := parseDWOutput("unexpected diagnostic\n{\"ok\":true}\n")
+	if err == nil {
+		t.Fatal("expected unexpected stdout prefix to be rejected")
+	}
+	if !strings.Contains(err.Error(), "unrecognized stdout") {
+		t.Fatalf("expected unrecognized stdout error, got: %v", err)
+	}
+}
+
+func TestParseDWOutput_RejectsMissingResult(t *testing.T) {
+	_, err := parseDWOutput("\n\t")
+	if err == nil {
+		t.Fatal("expected empty stdout to be rejected")
+	}
+	if !strings.Contains(err.Error(), "did not contain a result") {
+		t.Fatalf("expected missing result error, got: %v", err)
+	}
+}
+
+func TestDWCommandEnvironment_PreservesConfiguredHome(t *testing.T) {
+	current := []string{"PATH=/bin", "DW_HOME=/configured/weave"}
+	got := dwCommandEnvironment(current, "/opt/dw/bin/dw")
+	if len(got) != len(current) {
+		t.Fatalf("expected environment to remain unchanged, got %#v", got)
+	}
+	if got[1] != current[1] {
+		t.Fatalf("expected configured DW_HOME to be preserved, got %#v", got)
+	}
+}
+
+func TestDWCommandEnvironment_InfersInstallRoot(t *testing.T) {
+	installRoot := t.TempDir()
+	executable := filepath.Join(installRoot, "bin", "dw")
+	got := dwCommandEnvironment([]string{"PATH=/bin", "DW_HOME="}, executable)
+
+	expected := "DW_HOME=" + installRoot
+	for _, entry := range got {
+		if entry == expected {
+			return
+		}
+	}
+	t.Fatalf("expected inferred %q in environment, got %#v", expected, got)
+}
+
 func TestPrepareDWInputArgs_CreatesSortedInputFiles(t *testing.T) {
 	args, cleanup, err := prepareDWInputArgs(map[string]string{
 		"users":   `{"id":1}`,
@@ -165,6 +248,9 @@ func TestPrepareDWInputArgs_CreatesSortedInputFiles(t *testing.T) {
 
 	firstPath := strings.TrimPrefix(args[0], "-i=payload=")
 	secondPath := strings.TrimPrefix(args[1], "-i=users=")
+	if filepath.Ext(firstPath) != ".json" || filepath.Ext(secondPath) != ".json" {
+		t.Fatalf("expected JSON input filenames, got %q and %q", firstPath, secondPath)
+	}
 
 	payloadData, err := os.ReadFile(firstPath)
 	if err != nil {

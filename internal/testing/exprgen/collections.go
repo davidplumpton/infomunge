@@ -86,7 +86,7 @@ func lambdaGenWithScope(depth int, features Feature, scope lambdaScope, cfg expr
 	if bodyDepth < 0 {
 		bodyDepth = 0
 	}
-	nestedFeatures := expressionNestedFeatures(features)
+	nestedFeatures := expressionNestedFeatures(features, cfg)
 
 	return rapid.Custom(func(t *rapid.T) string {
 		withIndex := rapid.Bool().Draw(t, "withIndex")
@@ -109,7 +109,7 @@ func collectionOpGenWithScope(depth int, features Feature, scope lambdaScope, cf
 
 	return rapid.Custom(func(t *rapid.T) string {
 		input := collectionInputExpr(t, depth, features, scope, cfg)
-		op := rapid.SampledFrom([]string{"map", "filter", "flatMap", "reduce"}).Draw(t, "collectionOp")
+		op := rapid.SampledFrom(cfg.collectionOps()).Draw(t, "collectionOp")
 		switch op {
 		case "map":
 			return mapExpr(t, input, bodyDepth, features, scope, cfg)
@@ -123,9 +123,17 @@ func collectionOpGenWithScope(depth int, features Feature, scope lambdaScope, cf
 	})
 }
 
+func (c exprConfig) collectionOps() []string {
+	ops := []string{"map", "filter", "flatMap"}
+	if !c.DWCompat {
+		ops = append(ops, "reduce")
+	}
+	return ops
+}
+
 func collectionInputExpr(t *rapid.T, depth int, features Feature, scope lambdaScope, cfg exprConfig) string {
-	nestedFeatures := expressionNestedFeatures(features)
-	if depth > 1 && features&FeatureCollections != 0 && rapid.IntRange(0, 3).Draw(t, "nestedCollection") == 0 {
+	nestedFeatures := expressionNestedFeatures(features, cfg)
+	if !cfg.DWCompat && depth > 1 && features&FeatureCollections != 0 && rapid.IntRange(0, 3).Draw(t, "nestedCollection") == 0 {
 		return collectionOpGenWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "nestedSource")
 	}
 	return filteredArrayExpr(max(depth-1, 0), nestedFeatures, scope, cfg).Draw(t, "arraySource")
@@ -139,7 +147,7 @@ func mapExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope la
 	}
 	params := uniqueLambdaParams(t, 1+boolToInt(rapid.Bool().Draw(t, "mapWithIndex")), scope)
 	lScope := scope.withNamed(params...)
-	body := expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features), lScope, cfg).Draw(t, "mapBody")
+	body := expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features, cfg), lScope, cfg).Draw(t, "mapBody")
 	return fmt.Sprintf("%s map (%s) -> %s", input, strings.Join(params, ", "), body)
 }
 
@@ -163,7 +171,7 @@ func flatMapExpr(t *rapid.T, input string, bodyDepth int, features Feature, scop
 	}
 	params := uniqueLambdaParams(t, 1+boolToInt(rapid.Bool().Draw(t, "flatMapWithIndex")), scope)
 	lScope := scope.withNamed(params...)
-	bodyExpr := expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features), lScope, cfg).Draw(t, "flatMapBody")
+	bodyExpr := expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features, cfg), lScope, cfg).Draw(t, "flatMapBody")
 	return fmt.Sprintf("%s flatMap (%s) -> [%s]", input, strings.Join(params, ", "), bodyExpr)
 }
 
@@ -184,7 +192,7 @@ func reduceExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope
 	}
 	// Occasionally emit a generated body to increase structural variety.
 	if rapid.IntRange(0, 4).Draw(t, "reduceBodyKind") == 0 {
-		body = expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features), lScope, cfg).Draw(t, "reduceBody")
+		body = expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features, cfg), lScope, cfg).Draw(t, "reduceBody")
 	}
 	return fmt.Sprintf("%s reduce (%s) -> %s", input, strings.Join(params, ", "), body)
 }

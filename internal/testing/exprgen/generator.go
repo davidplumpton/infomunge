@@ -127,6 +127,7 @@ func allWeightedBinaryOps() []string {
 // dwIncompatibleOps lists binary operators that have different syntax or
 // semantics in DataWeave and should be excluded from DW-compatible generation.
 var dwIncompatibleOps = map[string]bool{
+	"+":  true, // mixed string/number coercion differs (bd-qv20)
 	"++": true, // concatenation semantics may differ
 	"**": true, // DW uses pow() function
 	"~=": true, // infomunge-specific regex match
@@ -276,7 +277,7 @@ func expressionAtDepthWithScope(depth int, features Feature, scope lambdaScope, 
 	}
 	if hasIndexAccess {
 		forms = append(forms, form{weight: 2, name: "index", gen: func(d int) *rapid.Generator[string] {
-			return filteredIndexAccessExpr(d, features, scope)
+			return filteredIndexAccessExpr(d, features, scope, cfg)
 		}})
 	}
 	if hasRangeIndex {
@@ -340,7 +341,7 @@ func expressionAtDepthWithScope(depth int, features Feature, scope lambdaScope, 
 }
 
 func filteredBinaryExpr(depth int, features Feature, ops []string, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
-	nestedFeatures := expressionNestedFeatures(features)
+	nestedFeatures := expressionNestedFeatures(features, cfg)
 	return rapid.Custom(func(t *rapid.T) string {
 		left := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "left")
 		op := rapid.SampledFrom(ops).Draw(t, "op")
@@ -350,7 +351,7 @@ func filteredBinaryExpr(depth int, features Feature, ops []string, scope lambdaS
 }
 
 func filteredUnaryExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
-	nestedFeatures := expressionNestedFeatures(features)
+	nestedFeatures := expressionNestedFeatures(features, cfg)
 	return rapid.Custom(func(t *rapid.T) string {
 		op := UnaryOp().Draw(t, "op")
 		operand := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "operand")
@@ -359,7 +360,7 @@ func filteredUnaryExpr(depth int, features Feature, scope lambdaScope, cfg exprC
 }
 
 func filteredParenExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
-	nestedFeatures := expressionNestedFeatures(features)
+	nestedFeatures := expressionNestedFeatures(features, cfg)
 	return rapid.Custom(func(t *rapid.T) string {
 		inner := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "inner")
 		return fmt.Sprintf("(%s)", inner)
@@ -367,7 +368,7 @@ func filteredParenExpr(depth int, features Feature, scope lambdaScope, cfg exprC
 }
 
 func filteredArrayExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
-	nestedFeatures := expressionNestedFeatures(features)
+	nestedFeatures := expressionNestedFeatures(features, cfg)
 	return rapid.Custom(func(t *rapid.T) string {
 		n := rapid.IntRange(0, 5).Draw(t, "len")
 		if n == 0 {
@@ -382,7 +383,7 @@ func filteredArrayExpr(depth int, features Feature, scope lambdaScope, cfg exprC
 }
 
 func filteredObjectExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
-	nestedFeatures := expressionNestedFeatures(features)
+	nestedFeatures := expressionNestedFeatures(features, cfg)
 	return rapid.Custom(func(t *rapid.T) string {
 		n := rapid.IntRange(0, 5).Draw(t, "len")
 		if n == 0 {
@@ -407,8 +408,13 @@ func filteredDotAccessExpr(depth int, features Feature, scope lambdaScope) *rapi
 	})
 }
 
-func filteredIndexAccessExpr(depth int, features Feature, scope lambdaScope) *rapid.Generator[string] {
+func filteredIndexAccessExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
+		if cfg.DWCompat {
+			field := rapid.SampledFrom(ContextShapeFields()).Draw(t, "idxField")
+			return fmt.Sprintf("payload[%s]", strconv.Quote(field))
+		}
+
 		base := payloadOrScopeBaseExpr(t, scope)
 		index := rapid.OneOf(
 			rapid.Custom(func(t *rapid.T) string {
@@ -433,7 +439,7 @@ func filteredRangeIndexExpr(depth int, features Feature, scope lambdaScope) *rap
 }
 
 func filteredConditionalExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
-	nestedFeatures := expressionNestedFeatures(features)
+	nestedFeatures := expressionNestedFeatures(features, cfg)
 	return rapid.Custom(func(t *rapid.T) string {
 		cond := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "cond")
 		thenExpr := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "then")
@@ -443,7 +449,7 @@ func filteredConditionalExpr(depth int, features Feature, scope lambdaScope, cfg
 }
 
 func filteredDefaultExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
-	nestedFeatures := expressionNestedFeatures(features)
+	nestedFeatures := expressionNestedFeatures(features, cfg)
 	return rapid.Custom(func(t *rapid.T) string {
 		left := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "left")
 		right := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "right")
@@ -452,7 +458,7 @@ func filteredDefaultExpr(depth int, features Feature, scope lambdaScope, cfg exp
 }
 
 func filteredCaseExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
-	nestedFeatures := expressionNestedFeatures(features)
+	nestedFeatures := expressionNestedFeatures(features, cfg)
 	return rapid.Custom(func(t *rapid.T) string {
 		target := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "caseTarget")
 		caseCount := rapid.IntRange(1, 3).Draw(t, "caseCount")
@@ -501,7 +507,7 @@ func caseVarName(t *rapid.T, idx int) string {
 }
 
 func filteredStringInterpolationExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
-	nestedFeatures := expressionNestedFeatures(features)
+	nestedFeatures := expressionNestedFeatures(features, cfg)
 	return rapid.Custom(func(t *rapid.T) string {
 		prefix := interpolationTextPiece(t, "prefix")
 		mid := interpolationTextPiece(t, "mid")
@@ -512,7 +518,7 @@ func filteredStringInterpolationExpr(depth int, features Feature, scope lambdaSc
 }
 
 func filteredBuiltinCallExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
-	nestedFeatures := expressionNestedFeatures(features)
+	nestedFeatures := expressionNestedFeatures(features, cfg)
 	return rapid.Custom(func(t *rapid.T) string {
 		spec := rapid.SampledFrom(builtinSpecs).Draw(t, "builtin")
 		args := make([]string, spec.arity)
@@ -528,8 +534,12 @@ func interpolationTextPiece(t *rapid.T, label string) string {
 	return strings.ReplaceAll(piece, `"`, "")
 }
 
-func expressionNestedFeatures(features Feature) Feature {
-	return features &^ FeatureConditionals
+func expressionNestedFeatures(features Feature, cfg exprConfig) Feature {
+	nested := features &^ FeatureConditionals
+	if cfg.DWCompat {
+		nested &^= FeatureCollections
+	}
+	return nested
 }
 
 func payloadOrScopeBaseExpr(t *rapid.T, scope lambdaScope) string {

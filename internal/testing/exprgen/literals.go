@@ -90,6 +90,16 @@ func StringLiteral() *rapid.Generator[string] {
 	})
 }
 
+// DWStringLiteral returns quoted strings whose characters and escapes have the
+// same meaning in both infomunge and DataWeave.
+func DWStringLiteral() *rapid.Generator[string] {
+	const safeCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-.,!?"
+	return rapid.Custom(func(t *rapid.T) string {
+		value := rapid.StringOfN(rapid.RuneFrom([]rune(safeCharacters)), 0, 30, -1).Draw(t, "s")
+		return strconv.Quote(value)
+	})
+}
+
 // BoolLiteral returns a generator of infomunge boolean literal source strings.
 func BoolLiteral() *rapid.Generator[string] {
 	return rapid.SampledFrom([]string{"true", "false"})
@@ -120,7 +130,7 @@ func DWLiteral() *rapid.Generator[string] {
 	return rapid.OneOf(
 		IntLiteral(),
 		FloatLiteral(),
-		StringLiteral(),
+		DWStringLiteral(),
 		BoolLiteral(),
 		rapid.Just("null"),
 	)
