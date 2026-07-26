@@ -236,7 +236,7 @@ Feature: DataWeave Cookbook Examples Converted to InfoMunge
       input application/json
       output application/json
       ---
-      payload mapObject (key, value) -> [upper(key), value]
+      payload mapObject (value, key) -> [upper(key), value]
       """
     When I run the application with this JSON input:
       """

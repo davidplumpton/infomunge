@@ -30,12 +30,19 @@ descent when matching objects may be nested:
 items..name
 ```
 
-### 3. **mapObject Parameter Order is Reversed**
+### 3. **mapObject Uses DataWeave Parameter Order**
+
+`mapObject` callbacks receive `(value, key, index)`, matching DataWeave. The
+callback may declare only the leading parameters it needs:
+
 ```im
-// DataWeave: mapObject (value, key)
-// InfoMunge: mapObject (key, value)
-{ a: 1, b: 2 } mapObject (key, val) -> [upper(key), val]
+{ a: 1, b: 2 } mapObject (value, key) -> [upper(key), value]
 ```
+
+For compatibility with older InfoMunge scripts, the exact leading parameter-name
+pairs `(key, value)` and `(k, v)` retain the legacy key-first order; an optional
+third parameter still receives the index. Other parameter names use the
+DataWeave order.
 
 ### 4. **Parentheses Around Multi-line Operations**
 When chaining operations, wrap in parentheses if needed:
@@ -213,7 +220,7 @@ items: payload.books map (item, index) -> {
 input application/json
 output application/json
 ---
-payload.books map (item) -> (item mapObject (key, value) -> [upper(key), value])
+payload.books map (item) -> (item mapObject (value, key) -> [upper(key), value])
 ```
 
 **Alternative approach (simpler):**
@@ -515,7 +522,7 @@ payload mapObject (value, key) -> {
 input application/json
 output application/json
 ---
-payload mapObject (key, value) -> [upper(key), value]
+payload mapObject (value, key) -> [upper(key), value]
 ```
 
 **Input JSON:**
@@ -885,8 +892,8 @@ output application/json
 |---------|-----------|-----------|
 | **Header** | `%dw 2.0` | `%im 0.1` |
 | **Array Field Selection** | `.name` on array | Must use `..name` (recursive descent) or `map` |
-| **Object Iteration** | `mapObject (value, key)` | `mapObject (key, value)` |
-| **Object Iteration Result** | Single value (key is in parens) | Array `[key, value]` |
+| **Object Iteration** | `mapObject (value, key, index)` | `mapObject (value, key, index)`; exact `(key, value)` and `(k, v)` pairs keep legacy key-first order |
+| **Object Iteration Result** | Callback returns an object | Callback returns an object or an InfoMunge `[key, value]` pair |
 | **Default Parameters** | `$` (value), `$$` (index) | Named parameters required |
 | **String Concat in Objects** | `{key: val1 ++ val2}` | Must use `{key: (val1 ++ val2)}` (requires parens) |
 | **Complex Expressions in Objects** | Can use operators directly | Require parentheses: `{key: (expr1 op expr2)}` |
