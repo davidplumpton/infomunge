@@ -6,12 +6,13 @@ This document shows how to accomplish the DataWeave cookbook examples using Info
 
 Before reviewing the examples, be aware of these key InfoMunge syntax requirements:
 
-### 1. **Parentheses Required for Complex Expressions in Object Literals**
-```im
-// ❌ WRONG
-{ label: value1 ++ value2 }
+### 1. **Operator Expressions in Object Literals**
 
-// ✅ CORRECT
+Object values accept concatenation and other operator expressions directly.
+Parentheses remain useful when you want to make grouping explicit:
+
+```im
+{ label: value1 ++ value2 }
 { label: (value1 ++ value2) }
 ```
 
@@ -213,17 +214,6 @@ items: payload.books map (item, index) -> {
 
 ### InfoMunge Equivalent
 
-**Note:** Nested mapObject within object literals has parsing limitations. Transform all keys to uppercase as a separate step:
-
-```im
-%im 0.1
-input application/json
-output application/json
----
-payload.books map (item) -> (item mapObject (value, key) -> [upper(key), value])
-```
-
-**Alternative approach (simpler):**
 ```im
 %im 0.1
 input application/json
@@ -231,7 +221,9 @@ output application/json
 ---
 {
   items: payload.books map (item, index) -> {
-    book: item
+    book: item mapObject (value, key) -> {
+      (upper(key)): value
+    }
   }
 }
 ```
@@ -256,22 +248,28 @@ output application/json
 }
 ```
 
-**Output (with mapObject approach):**
+**Output:**
 ```json
-[
-  {
-    "TITLE": "Everyday Italian",
-    "AUTHOR": "Giada De Laurentiis",
-    "YEAR": "2005",
-    "PRICE": "30.00"
-  },
-  {
-    "TITLE": "Harry Potter",
-    "AUTHOR": "J K. Rowling",
-    "YEAR": "2005",
-    "PRICE": "29.99"
-  }
-]
+{
+  "items": [
+    {
+      "book": {
+        "TITLE": "Everyday Italian",
+        "AUTHOR": "Giada De Laurentiis",
+        "YEAR": "2005",
+        "PRICE": "30.00"
+      }
+    },
+    {
+      "book": {
+        "TITLE": "Harry Potter",
+        "AUTHOR": "J K. Rowling",
+        "YEAR": "2005",
+        "PRICE": "29.99"
+      }
+    }
+  ]
+}
 ```
 
 ---
@@ -563,7 +561,7 @@ payload mapObject (value, key) -> {
 input application/json
 output application/json
 ---
-payload filterObject (key, value) -> value > 2
+payload filterObject (value, key) -> value > 2
 ```
 
 **Input JSON:**
@@ -615,7 +613,7 @@ keysOf(payload)
 
 **Output:**
 ```json
-["age", "name"]
+["name", "age"]
 ```
 
 ---
@@ -684,8 +682,8 @@ entriesOf(payload)
 **Output:**
 ```json
 [
-  {"key": "age", "value": 30},
-  {"key": "name", "value": "Alice"}
+  {"key": "name", "value": "Alice"},
+  {"key": "age", "value": 30}
 ]
 ```
 
@@ -819,10 +817,11 @@ payload map (item) -> item.firstName ++ " " ++ item.lastName
 input application/json
 output application/json
 ---
-payload map (item) -> (item.firstName ++ " " ++ item.lastName)
+payload map (item) -> item.firstName ++ " " ++ item.lastName
 ```
 
-**Note:** String concatenation in lambda bodies doesn't require parentheses, but in object literals it does: `{label: (val1 ++ val2)}`
+**Note:** String concatenation works directly in lambda bodies and object values.
+Use parentheses only when you want explicit grouping.
 
 **Input JSON:**
 ```json
