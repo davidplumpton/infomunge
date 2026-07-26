@@ -203,6 +203,7 @@ func TestPrepareForParsing_ImplicitLambdaIndexAcrossCollectionOperators(t *testi
 		"orderBy",
 		"distinctBy",
 		"filterObject",
+		"mapObject",
 		"flatMap",
 		"pluck",
 	}

@@ -16,6 +16,10 @@ func TestReplaceImplicitLambdas(t *testing.T) {
 		{"map with $", "payload map $ + 1", "payload map (__arg) -> __arg + 1"},
 		{"filter with $", "payload filter $ > 10", "payload filter (__arg) -> __arg > 10"},
 		{"map with $ and $$", "payload map $ + $$", "payload map (__arg, __idx) -> __arg + __idx"},
+		{"mapObject with value and key", `{a: 1, b: 2} mapObject {($$): $ * 10}`, `{a: 1, b: 2} mapObject (__arg, __idx) -> {(__idx): __arg * 10}`},
+		{"nested mapObject keeps implicit scopes distinct", `[{a: 1, b: 2}] map ($ mapObject {($$): $ * 10})`, `[{a: 1, b: 2}] map (__arg) -> (__arg mapObject (__arg, __idx) -> {(__idx): __arg * 10})`},
+		{"mapObject interpolates value and key strings", `{a: 1} mapObject {"$$": "$"}`, `{a: 1} mapObject (__arg, __idx) -> {("" + (__idx)): ("" + (__arg))}`},
+		{"mapObject regex payload preserves anchor", `{a: "cat"} mapObject {($$): $ matches regex("t$", "")}`, `{a: "cat"} mapObject (__arg, __idx) -> {(__idx): __arg matches regex("t$", "")}`},
 		// Note: brace wrapping is done by wrapImplicitObjectLiteralBodies, not replaceImplicitLambdas
 		{"map with implicit object body", "payload map user: $.name", "payload map (__arg) -> user: __arg.name"},
 		{"top-level constant remains an operand", "payload map 1", "payload map 1"},

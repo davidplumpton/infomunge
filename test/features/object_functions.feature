@@ -436,6 +436,48 @@ Feature: Object Functions
     Then the output should contain "\"x_val\":105"
     And the output should contain "\"y_val\":110"
 
+  Scenario: mapObject with implicit value and key parameters
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {a: 1, b: 2} mapObject {($$): $ * 10}
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"a":10,"b":20}
+      """
+
+  Scenario: nested mapObject keeps implicit callback parameters scoped
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{a: 1, b: 2}] map ($ mapObject {($$): $ * 10})
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [{"a":10,"b":20}]
+      """
+
+  Scenario: mapObject implicit parameters preserve string interpolation and regex payloads
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {a: "cat"} mapObject {("$$"): "$" ++ ":" ++ (($ matches regex("cat$", "")) as String)}
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"a":"cat:true"}
+      """
+
   Scenario: mapObject with arbitrary parameter names uses DataWeave order
     Given the following input content:
       """

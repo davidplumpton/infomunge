@@ -17,6 +17,7 @@ var implicitLambdaOperators = []string{
 	" orderBy ",
 	" distinctBy ",
 	" filterObject ",
+	" mapObject ",
 	" flatMap ",
 	" pluck ",
 }
