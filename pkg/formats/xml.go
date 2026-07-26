@@ -106,14 +106,6 @@ func formatXML(result interface{}) (string, error) {
 	return formatXMLWithOptions(result, XMLOutputOptions{WriteDeclaration: true})
 }
 
-// formatXMLWithNamespaces formats result to XML, optionally applying declared namespaces.
-func formatXMLWithNamespaces(result interface{}, declaredNs map[string]string) (string, error) {
-	return formatXMLWithOptions(result, XMLOutputOptions{
-		DeclaredNamespaces: declaredNs,
-		WriteDeclaration:   true,
-	})
-}
-
 // formatXMLWithOptions formats result to XML using the supplied options.
 func formatXMLWithOptions(result interface{}, opts XMLOutputOptions) (string, error) {
 	renderOpts, err := normalizeXMLOptions(opts)
@@ -711,11 +703,6 @@ func simplifyXML(input interface{}) interface{} {
 	default:
 		return v
 	}
-}
-
-// toXML converts an internal representation to XML.
-func toXML(v interface{}, name string) string {
-	return toXMLWithOptions(v, name, xmlRenderOptions{})
 }
 
 func toXMLWithOptions(v interface{}, name string, opts xmlRenderOptions) string {

@@ -32,11 +32,6 @@ func SetOptions(metadata *Metadata, options map[string]string) {
 	metadata.Options = copyStringMap(options)
 }
 
-// FormatResult formats an evaluated result without header output metadata.
-func FormatResult(result evaluator.Value, mimeType string, evalCtx evaluator.Context) (string, error) {
-	return FormatResultWithMetadata(result, mimeType, evalCtx, Metadata{})
-}
-
 // FormatResultWithMetadata formats an evaluated result using explicit output metadata.
 func FormatResultWithMetadata(result evaluator.Value, mimeType string, evalCtx evaluator.Context, metadata Metadata) (string, error) {
 	if mimeType == "application/xml" {
