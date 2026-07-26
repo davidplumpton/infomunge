@@ -595,6 +595,38 @@ func TestConfiguredBinaryOperatorsPreserveMixedLeftAssociativity(t *testing.T) {
 	}
 }
 
+func TestDefaultStopsBeforeEveryCollectionOperator(t *testing.T) {
+	stage := createOperatorProcessingStage(nil)
+
+	for _, operator := range CollectionOperators {
+		t.Run(operator, func(t *testing.T) {
+			input := "source default fallback " + operator + " callback"
+			expected := "__default(source, fallback) " + operator + " callback"
+			result, _, err := stage.Execute(input, identityMapping(len(input)))
+			if err != nil {
+				t.Fatalf("operator stage returned error: %v", err)
+			}
+			if result != expected {
+				t.Fatalf("expected %q, got %q", expected, result)
+			}
+		})
+	}
+}
+
+func TestDefaultKeepsGroupedCollectionOperatorInFallback(t *testing.T) {
+	stage := createOperatorProcessingStage(nil)
+	input := "source default (fallback reduce callback)"
+	expected := "__default(source, (fallback reduce callback))"
+
+	result, _, err := stage.Execute(input, identityMapping(len(input)))
+	if err != nil {
+		t.Fatalf("operator stage returned error: %v", err)
+	}
+	if result != expected {
+		t.Fatalf("expected %q, got %q", expected, result)
+	}
+}
+
 func TestConfiguredBinaryOperatorsComposeAcrossPreprocessingPipeline(t *testing.T) {
 	tests := []struct {
 		name     string

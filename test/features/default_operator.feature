@@ -151,6 +151,38 @@ Feature: Default Operator
       [2,4]
       """
 
+  Scenario: An ungrouped collection operator consumes the completed default expression
+    Given the following input content:
+      """
+      %im 0.1
+      input application/json
+      output application/json
+      ---
+      payload.name default flatten([[0]]) reduce (item, x) -> x
+      """
+    When I run the application with this JSON input:
+      """
+      {"name":[]}
+      """
+    Then the output should be:
+      """
+      null
+      """
+
+  Scenario: Grouping keeps a collection operator inside the default fallback
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      null default (flatten([[0]]) reduce (item, x) -> x)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      0
+      """
+
   Scenario: Default to an array inside a lambda body
     Given the following input content:
       """

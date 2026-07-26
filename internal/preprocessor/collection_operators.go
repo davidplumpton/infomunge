@@ -7,6 +7,14 @@ var CollectionOperators = []string{
 	"sort", "orderBy", "maxBy", "minBy", "distinctBy", "filterObject", "mapObject",
 }
 
+func collectionOperatorStopOps() []string {
+	stops := make([]string, 0, len(CollectionOperators))
+	for _, operator := range CollectionOperators {
+		stops = append(stops, " "+operator+" ")
+	}
+	return stops
+}
+
 func isCollectionOperatorAt(s string, pos int) bool {
 	if pos < 0 || pos >= len(s) {
 		return false

@@ -140,6 +140,12 @@ func replaceConfiguredBinaryOperatorWithMappingAndPrecedence(
 	}
 	rightStopOps := mergeOperatorStops(config.RightStopOps, peerOps)
 	rightStopOps = mergeOperatorStops(rightStopOps, lowerPrecedenceOps)
+	if key == binaryOpDefault {
+		// Collection operators apply to the completed default expression.
+		// Explicit grouping is preserved because the right-operand scanner only
+		// observes stop operators at its top level.
+		rightStopOps = mergeOperatorStops(rightStopOps, collectionOperatorStopOps())
+	}
 	leftIgnoredOps := mergeOperatorStops(peerOps, higherPrecedenceOps)
 
 	buf := newMappedBuffer(len(s) + len(config.FuncName) + 4)

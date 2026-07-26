@@ -154,6 +154,22 @@ func TestPrepareForParsing_DefaultArrayFallbackInsideLambda(t *testing.T) {
 	}
 }
 
+func TestPrepareForParsing_CollectionOperatorAppliesOutsideDefault(t *testing.T) {
+	input := `payload.name default flatten([[0]]) reduce (item, x) -> x`
+	expected := `__reduce(__default(payload["name"], flatten([]interface{}{[]interface{}{0,},})), __lambda("item, x", x))`
+
+	result, mapping, err := PrepareForParsing(input, Options{})
+	if err != nil {
+		t.Fatalf("PrepareForParsing returned error: %v", err)
+	}
+	if result != expected {
+		t.Fatalf("expected %q, got %q", expected, result)
+	}
+	if len(mapping) != len(result) {
+		t.Fatalf("mapping length = %d, want %d", len(mapping), len(result))
+	}
+}
+
 func TestPrepareForParsing_IndexAccess(t *testing.T) {
 	tests := []struct {
 		name     string
