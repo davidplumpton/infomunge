@@ -3,6 +3,7 @@ package evaluator
 import (
 	"fmt"
 	"go/token"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -165,13 +166,44 @@ func TestEvalNumberIndexSupportsPresenceAndAssertSelectors(t *testing.T) {
 	}
 }
 
-func TestEvalNumberIndexKeepsOrdinalIndexesUnsupported(t *testing.T) {
-	_, err := evalNumberIndex(7, 0, token.Pos(1))
-	if err == nil {
-		t.Fatal("evalNumberIndex(integer) returned nil error")
+func TestEvalNumberIndexUsesStandardNumberStringRendering(t *testing.T) {
+	tests := []struct {
+		name   string
+		number Value
+		index  int
+		want   Value
+	}{
+		{name: "integer first character", number: 123, index: 0, want: "1"},
+		{name: "negative integer sign", number: -123, index: 0, want: "-"},
+		{name: "negative index", number: 123, index: -1, want: "3"},
+		{name: "decimal point", number: 12.5, index: 2, want: "."},
+		{name: "negative decimal", number: -0.25, index: 1, want: "0"},
+		{name: "scientific notation", number: 0.0000001, index: 1, want: "E"},
+		{name: "negative zero", number: math.Copysign(0, -1), index: 0, want: "0"},
 	}
-	if !strings.Contains(err.Error(), "cannot index into int") {
-		t.Fatalf("evalNumberIndex(integer) error = %q, want unsupported-index context", err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := evalNumberIndex(tt.number, tt.index, token.Pos(1))
+			if err != nil {
+				t.Fatalf("evalNumberIndex(%v, %d) returned an unexpected error: %v", tt.number, tt.index, err)
+			}
+			if got != tt.want {
+				t.Fatalf("evalNumberIndex(%v, %d) = %#v, want %#v", tt.number, tt.index, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEvalNumberIndexReturnsNullOutsideBothBounds(t *testing.T) {
+	for _, index := range []int{3, -4} {
+		got, err := evalNumberIndex(123, index, token.Pos(1))
+		if err != nil {
+			t.Fatalf("evalNumberIndex(123, %d) returned an unexpected error: %v", index, err)
+		}
+		if got != nil {
+			t.Fatalf("evalNumberIndex(123, %d) = %#v, want nil", index, got)
+		}
 	}
 }
 

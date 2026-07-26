@@ -174,9 +174,10 @@ func TestDWCompatNestedFeaturesIncludeCollections(t *testing.T) {
 	}
 }
 
-func TestDWCompatIndexAccessCoversRootAndNestedPayloadValues(t *testing.T) {
+func TestDWCompatIndexAccessCoversPayloadAndNumericOrdinalValues(t *testing.T) {
 	sawRoot := false
 	sawNested := false
+	sawNumber := false
 	rapid.Check(t, func(t *rapid.T) {
 		got := filteredIndexAccessExpr(3, FeatureDWCompat, lambdaScope{}, exprConfig{DWCompat: true}).Draw(t, "index")
 		if strings.HasPrefix(got, `payload["`) {
@@ -185,11 +186,17 @@ func TestDWCompatIndexAccessCoversRootAndNestedPayloadValues(t *testing.T) {
 		if strings.HasPrefix(got, `payload.`) {
 			sawNested = true
 		}
+		if strings.HasPrefix(got, "(") {
+			sawNumber = true
+		}
 	})
 	if !sawRoot {
 		t.Fatal("DW-compatible index access never selected the root payload")
 	}
 	if !sawNested {
 		t.Fatal("DW-compatible index access never selected a nested payload value")
+	}
+	if !sawNumber {
+		t.Fatal("DW-compatible index access never selected a numeric ordinal value")
 	}
 }

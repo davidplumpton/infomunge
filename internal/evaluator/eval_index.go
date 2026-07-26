@@ -108,12 +108,21 @@ func evalStringIndex(s string, idx Value, pos token.Pos) (Value, error) {
 	}
 }
 
-// evalNumberIndex handles field selection from numbers. DataWeave treats
-// string-key selection as a missing field, while presence and assert selectors
-// respectively report false and a missing-key error. Other index forms remain
-// unsupported.
+// evalNumberIndex handles selection from numbers. Ordinal selection indexes
+// the number's standard string coercion and returns null outside its bounds.
+// String-key selection behaves like a missing field, while presence and assert
+// selectors respectively report false and a missing-key error.
 func evalNumberIndex(number Value, idx Value, pos token.Pos) (Value, error) {
 	switch i := idx.(type) {
+	case int:
+		runes := []rune(coerceToString(number))
+		if i < 0 {
+			i += len(runes)
+		}
+		if i < 0 || i >= len(runes) {
+			return nil, nil
+		}
+		return string(runes[i]), nil
 	case string:
 		return nil, nil
 	case selectorOperation:

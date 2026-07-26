@@ -197,7 +197,7 @@ Feature: Error Messages
       """
       %im 0.1
       ---
-      42[0]
+      true[0]
       """
     When I run the application and it fails
     Then the error should contain "cannot index into"

@@ -471,9 +471,18 @@ func filteredDotAccessExpr(depth int, features Feature, scope lambdaScope) *rapi
 func filteredIndexAccessExpr(depth int, features Feature, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
 		if cfg.DWCompat {
-			base := payloadBaseExpr(t)
-			field := rapid.SampledFrom(ContextShapeFields()).Draw(t, "idxField")
-			return fmt.Sprintf("%s[%s]", base, strconv.Quote(field))
+			return rapid.OneOf(
+				rapid.Custom(func(t *rapid.T) string {
+					base := payloadBaseExpr(t)
+					field := rapid.SampledFrom(ContextShapeFields()).Draw(t, "idxField")
+					return fmt.Sprintf("%s[%s]", base, strconv.Quote(field))
+				}),
+				rapid.Custom(func(t *rapid.T) string {
+					number := rapid.SampledFrom([]string{"0", "123", "-45", "12.5", "-0.25", "0.000001", "0.0000001"}).Draw(t, "idxNumber")
+					index := rapid.IntRange(-4, 4).Draw(t, "idxOrdinal")
+					return fmt.Sprintf("(%s)[%d]", number, index)
+				}),
+			).Draw(t, "dwIndex")
 		}
 
 		base := payloadOrScopeBaseExpr(t, scope)
