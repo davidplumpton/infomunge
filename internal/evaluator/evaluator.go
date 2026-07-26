@@ -411,11 +411,10 @@ func isNumber(value Value) bool {
 	}
 }
 
-// sub performs subtraction or object key removal
+// sub performs subtraction or object key removal.
 func sub(left, right Value) (Value, error) {
-	// Special case: object key removal (object - "key" → object without that key)
 	if obj, ok := left.(Object); ok {
-		if key, ok := right.(string); ok {
+		if key, ok := objectRemovalKey(right); ok {
 			result := values.CloneObject(obj)
 			delete(result, key)
 			return result, nil
@@ -428,6 +427,30 @@ func sub(left, right Value) (Value, error) {
 	return numericOp(left, right,
 		func(l, r float64) float64 { return l - r },
 		"subtraction", "subtract")
+}
+
+// objectRemovalKey implements DataWeave's Object - String overload together
+// with its implicit scalar-to-string coercions. Collections, null, and
+// functions are deliberately excluded: DataWeave rejects those operand types
+// instead of converting their display representations into object keys.
+func objectRemovalKey(value Value) (string, bool) {
+	switch typed := value.(type) {
+	case string, int, float64, bool:
+		return coerceToString(typed), true
+	case *Regex:
+		if typed != nil {
+			return typed.Pattern, true
+		}
+	case Namespace:
+		return typed.URI, true
+	case *TypeDef:
+		if typed != nil {
+			return typed.Name, true
+		}
+	case []byte:
+		return string(typed), true
+	}
+	return "", false
 }
 
 // mul performs multiplication

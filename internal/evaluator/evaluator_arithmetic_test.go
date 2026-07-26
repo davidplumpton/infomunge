@@ -1,8 +1,11 @@
 package evaluator
 
 import (
+	"regexp"
 	"strings"
 	"testing"
+
+	"infomunge/pkg/values"
 )
 
 func TestEvaluate_Arithmetic(t *testing.T) {
@@ -51,6 +54,112 @@ func TestEvaluate_Arithmetic(t *testing.T) {
 			}
 			if result != tt.expected {
 				t.Errorf("expected %v (%T), got %v (%T)", tt.expected, tt.expected, result, result)
+			}
+		})
+	}
+}
+
+func TestEvaluate_ObjectSubtractionUsesScalarKeys(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   Object
+		right    Value
+		expected Object
+	}{
+		{
+			name:     "string key",
+			source:   Object{"remove": 1, "keep": 2},
+			right:    "remove",
+			expected: Object{"keep": 2},
+		},
+		{
+			name:     "integer key",
+			source:   Object{"1": "remove", "keep": 2},
+			right:    1,
+			expected: Object{"keep": 2},
+		},
+		{
+			name:     "integral float key",
+			source:   Object{"0": "remove", "keep": 2},
+			right:    0.0,
+			expected: Object{"keep": 2},
+		},
+		{
+			name:     "decimal key",
+			source:   Object{"1.5": "remove", "keep": 2},
+			right:    1.5,
+			expected: Object{"keep": 2},
+		},
+		{
+			name:     "boolean key",
+			source:   Object{"true": "remove", "keep": 2},
+			right:    true,
+			expected: Object{"keep": 2},
+		},
+		{
+			name:     "regex key",
+			source:   Object{"remove": 1, "keep": 2},
+			right:    &Regex{Pattern: "remove", Re: regexp.MustCompile("remove")},
+			expected: Object{"keep": 2},
+		},
+		{
+			name:     "namespace key",
+			source:   Object{"https://example.com/ns": "remove", "keep": 2},
+			right:    Namespace{Prefix: "ns", URI: "https://example.com/ns"},
+			expected: Object{"keep": 2},
+		},
+		{
+			name:     "type key",
+			source:   Object{"Currency": "remove", "keep": 2},
+			right:    &TypeDef{Name: "Currency", BaseType: "String"},
+			expected: Object{"keep": 2},
+		},
+		{
+			name:     "binary key",
+			source:   Object{"remove": 1, "keep": 2},
+			right:    []byte("remove"),
+			expected: Object{"keep": 2},
+		},
+		{
+			name:     "missing coerced key",
+			source:   Object{"keep": 2},
+			right:    false,
+			expected: Object{"keep": 2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			original := values.CloneObject(tt.source)
+			result, err := sub(tt.source, tt.right)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !isEqual(result, tt.expected) {
+				t.Fatalf("expected %#v, got %#v", tt.expected, result)
+			}
+			if !isEqual(tt.source, original) {
+				t.Fatal("object subtraction mutated the source object")
+			}
+		})
+	}
+}
+
+func TestObjectSubtractionRejectsNonKeyOperands(t *testing.T) {
+	tests := []struct {
+		name  string
+		right Value
+	}{
+		{name: "null", right: nil},
+		{name: "array", right: Array{"remove"}},
+		{name: "object", right: Object{"remove": true}},
+		{name: "function", right: &Lambda{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := sub(Object{"remove": 1}, tt.right); err == nil {
+				t.Fatal("expected object subtraction to reject the right operand")
 			}
 		})
 	}

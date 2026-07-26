@@ -134,6 +134,53 @@ func TestDifferential_InfomungeVsDataWeave(t *testing.T) {
 	}
 }
 
+func TestDifferential_ObjectSubtractionMatchesDataWeave(t *testing.T) {
+	if !DWAvailable() {
+		t.Skip("dw CLI not available on PATH")
+	}
+
+	supported := []string{
+		`{"remove": 1, "keep": 2} - "remove"`,
+		`{"0": 1, "keep": 2} - 0.0`,
+		`{"1.5": 1, "keep": 2} - 1.5`,
+		`{"true": 1, "keep": 2} - true`,
+		`{"keep": 2} - false`,
+	}
+	for _, expr := range supported {
+		t.Run("supported "+expr, func(t *testing.T) {
+			script := exprgen.WrapDWScript(expr)
+			imResult, imErr := safeEvalInfomunge(script, evaluator.Context{})
+			if imErr != nil {
+				t.Fatalf("InfoMunge returned an error: %v", imErr)
+			}
+			dwResult, dwErr := DWEval(script, nil)
+			if dwErr != nil {
+				t.Fatalf("DataWeave returned an error: %v", dwErr)
+			}
+			if err := StructuralCompare(imResult, dwResult); err != nil {
+				t.Fatalf("object subtraction differs: %v", err)
+			}
+		})
+	}
+
+	rejected := []string{
+		`{"a": 1} - null`,
+		`{"a": 1} - ["a"]`,
+		`{"a": 1} - {"a": 1}`,
+	}
+	for _, expr := range rejected {
+		t.Run("rejected "+expr, func(t *testing.T) {
+			script := exprgen.WrapDWScript(expr)
+			if _, err := safeEvalInfomunge(script, evaluator.Context{}); err == nil {
+				t.Fatal("InfoMunge unexpectedly accepted the operand")
+			}
+			if _, err := DWEval(script, nil); err == nil {
+				t.Fatal("DataWeave unexpectedly accepted the operand")
+			}
+		})
+	}
+}
+
 func (outcomes *differentialOutcomes) record(imErr, dwErr error) differentialOutcome {
 	outcomes.generated++
 	if imErr != nil && outcomes.firstInfomungeError == "" {

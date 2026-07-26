@@ -381,6 +381,25 @@ Feature: Basic Operators
       {}
       """
 
+  Scenario: Object key removal coerces scalar keys
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [
+        {"0": "remove", keep: 1} - 0.0,
+        {"1.5": "remove", keep: 1} - 1.5,
+        {"true": "remove", keep: 1} - true,
+        {keep: 1} - false
+      ]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [{"keep":1},{"keep":1},{"keep":1},{"keep":1}]
+      """
+
   Scenario: Chained object key removal
     Given the following input content:
       """
