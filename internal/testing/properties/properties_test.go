@@ -238,7 +238,11 @@ func drawSmallFloatLiteral(t *rapid.T, label string) string {
 	if math.IsNaN(v) || math.IsInf(v, 0) {
 		v = 0
 	}
-	return strconv.FormatFloat(v, 'f', 6, 64)
+	formatted := strconv.FormatFloat(v, 'f', 6, 64)
+	if formatted == "-0.000000" {
+		return "0.000000"
+	}
+	return formatted
 }
 
 func drawNonNullLiteral(t *rapid.T, label string) string {

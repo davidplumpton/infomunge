@@ -3,6 +3,42 @@ Feature: NDJSON Reading
   As a developer
   I want to read and parse NDJSON content
 
+  Scenario: Preserve exact NDJSON integers across the float precision boundary and runtime range
+    Given the following NDJSON input:
+      """
+      {"value":9007199254740991}
+      {"value":9007199254740993}
+      {"value":9223372036854775807}
+      {"value":-9223372036854775808}
+      """
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [{"value":9007199254740991},{"value":9007199254740993},{"value":9223372036854775807},{"value":-9223372036854775808}]
+      """
+
+  Scenario: Reject an NDJSON integer below the runtime range
+    Given the following NDJSON input:
+      """
+      {"value":-9223372036854775809}
+      """
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    Then running the script should fail with error containing "NDJSON parse error on line 1"
+    And running the script should fail with error containing "outside the supported numeric range"
+
   Scenario: Read simple NDJSON records
     Given the following NDJSON input:
       """

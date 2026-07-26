@@ -582,7 +582,7 @@ func TestFormatWithOptions_JavaStructured(t *testing.T) {
 
 	expected := Object{
 		"@class": "java.util.LinkedHashMap",
-		"value":  Object{"name": "Alice", "age": 30.0},
+		"value":  Object{"name": "Alice", "age": 30},
 	}
 	if parsedObj, ok := parsed.(Object); !ok || !reflect.DeepEqual(parsedObj, expected) {
 		t.Fatalf("expected %#v, got %#v", expected, parsed)

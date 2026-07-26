@@ -68,9 +68,9 @@ func TestRead_JSON(t *testing.T) {
 		expected interface{}
 	}{
 		{"object", `{"key": "value"}`, Object{"key": "value"}},
-		{"array", `[1, 2, 3]`, Array{1.0, 2.0, 3.0}},
+		{"array", `[1, 2, 3]`, Array{1, 2, 3}},
 		{"string", `"hello"`, "hello"},
-		{"number", `42`, 42.0},
+		{"number", `42`, 42},
 		{"boolean", `true`, true},
 		{"null", `null`, nil},
 	}
@@ -472,7 +472,7 @@ func TestReadWithOptions_JavaStructured(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := Object{"name": "Alice", "age": 30.0}
+	expected := Object{"name": "Alice", "age": 30}
 	if !reflect.DeepEqual(result, expected) {
 		t.Fatalf("expected %#v, got %#v", expected, result)
 	}

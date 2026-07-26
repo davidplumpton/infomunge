@@ -9,8 +9,8 @@ import (
 )
 
 // Reader is a function that parses content into an interface{} representation.
-// Readers should return one of: values.Object, values.Array, string, float64,
-// bool, or nil.
+// Readers should return one of: values.Object, values.Array, string, int,
+// float64, bool, or nil.
 type Reader func(content string) (interface{}, error)
 
 // Writer is a function that serializes an interface{} into a string.

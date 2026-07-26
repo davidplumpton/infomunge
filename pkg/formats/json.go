@@ -18,6 +18,7 @@ func init() {
 
 func readJSON(content string) (interface{}, error) {
 	decoder := json.NewDecoder(strings.NewReader(content))
+	decoder.UseNumber()
 	result, err := decodeJSONValue(decoder)
 	if err != nil {
 		return nil, unifiederrors.WrapValidationf(err, "JSON parse error: %v", err)
@@ -53,6 +54,13 @@ func decodeJSONValue(decoder *json.Decoder) (interface{}, error) {
 	}
 	delim, isDelim := token.(json.Delim)
 	if !isDelim {
+		if number, ok := token.(json.Number); ok {
+			value, valid := values.ParseNumericLiteral(number.String())
+			if !valid {
+				return nil, fmt.Errorf("number %q is outside the supported numeric range", number)
+			}
+			return value, nil
+		}
 		return token, nil
 	}
 	switch delim {

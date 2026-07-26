@@ -3,7 +3,7 @@ package formats
 import formatcore "infomunge/pkg/formats/core"
 
 // Reader is a function that parses content into an interface{} representation.
-// Readers should return one of: Object, Array, string, float64, bool, or nil.
+// Readers should return one of: Object, Array, string, int, float64, bool, or nil.
 // Use ReadAsObject or ReadAsArray for type-safe access with Result types.
 type Reader = formatcore.Reader
 

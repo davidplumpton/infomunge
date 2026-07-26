@@ -240,10 +240,10 @@ Feature: JSON Reading
       "C:\\Users\\Alice\\file.txt"
       """
 
-  Scenario: Read JSON with numeric precision
+  Scenario: Preserve exact JSON integers across the float precision boundary and runtime range
     Given the following JSON input:
       """
-      {"large_int": 9007199254740991, "decimal": 0.1, "negative": -42.5}
+      {"below_float_boundary":9007199254740991,"above_float_boundary":9007199254740993,"maximum":9223372036854775807,"minimum":-9223372036854775808,"decimal":0.1}
       """
     And the following script:
       """
@@ -255,10 +255,24 @@ Feature: JSON Reading
     When I run the script
     Then the output should be:
       """
-      {"large_int":9007199254740991,"decimal":0.1,"negative":-42.5}
+      {"below_float_boundary":9007199254740991,"above_float_boundary":9007199254740993,"maximum":9223372036854775807,"minimum":-9223372036854775808,"decimal":0.1}
       """
 
   # Error Handling
+  Scenario: Reject a JSON integer above the runtime range
+    Given the following JSON input:
+      """
+      9223372036854775808
+      """
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    Then running the script should fail with error containing "outside the supported numeric range"
+
   Scenario: Error on malformed JSON - missing closing brace
     Given the following JSON input:
       """
