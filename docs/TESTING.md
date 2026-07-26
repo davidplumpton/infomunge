@@ -17,10 +17,17 @@ INTENSIVE_TEST_SOAK=1 go test -v ./internal/testing/mutation -run TestMutatedCor
 ```
 
 When `dw` is available, the bounded suite generates 50 differential cases and
-requires at least 20% to reach structural comparison after evaluator errors are
-classified. Each DataWeave evaluation starts an external CLI process, so this
-budget is deliberately smaller than the in-process property-test budgets. Run
-the larger 500-case budget explicitly:
+always evaluates each case in both runtimes. It reports both-error,
+InfoMunge-only error, DataWeave-only error, and both-success outcomes
+separately, and requires at least 20% to reach structural comparison. An
+InfoMunge-only error always saves a reproducible JSON artifact under
+`tmp/intensive-testing/failures/`; shared errors and DataWeave-only errors remain
+accounted skips. A small error-signature allowlist keeps known compatibility gaps
+visible without failing every run; every entry names an open beads issue and
+must be removed when that issue closes. New one-sided signatures and
+artifact-write failures fail the gate. Each DataWeave evaluation starts an
+external CLI process, so this budget is deliberately smaller than the in-process
+property-test budgets. Run the larger 500-case budget explicitly:
 
 ```bash
 make test-differential-soak

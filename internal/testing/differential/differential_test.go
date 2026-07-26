@@ -2,6 +2,7 @@ package differential
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -21,13 +22,46 @@ import (
 
 const minimumComparisonPercent = 20
 
+type infomungeOnlyErrorAllowance struct {
+	issueID        string
+	errorSubstring string
+}
+
+// infomungeOnlyErrorAllowlist is deliberately limited to known, ticketed
+// compatibility gaps. Every matching case is still counted and saved as an
+// artifact. Remove each entry when its issue is closed.
+var infomungeOnlyErrorAllowlist = []infomungeOnlyErrorAllowance{
+	{issueID: "bd-3ryv", errorSubstring: "cannot index into "},
+	{issueID: "bd-2q0t", errorSubstring: "lower expects a string"},
+	{issueID: "bd-2q0t", errorSubstring: "upper expects a string"},
+	{issueID: "bd-2q0t", errorSubstring: "trim expects a string"},
+	{issueID: "bd-2q0t", errorSubstring: "startsWith expects a string"},
+	{issueID: "bd-2q0t", errorSubstring: "endsWith expects a string"},
+	{issueID: "bd-2q0t", errorSubstring: "contains expects argument 2 to be string or Regex"},
+	{issueID: "bd-2q0t", errorSubstring: "contains expects a string or array as argument 1"},
+	{issueID: "bd-1hpj", errorSubstring: "sizeOf: unsupported type"},
+	{issueID: "bd-2kbq", errorSubstring: "'_' must separate successive digits"},
+}
+
+type differentialOutcome int
+
+const (
+	outcomeBothErrors differentialOutcome = iota
+	outcomeInfomungeOnlyError
+	outcomeDataWeaveOnlyError
+	outcomeBothSuccess
+)
+
 type differentialOutcomes struct {
-	generated           int
-	infomungeErrors     int
-	dataWeaveErrors     int
-	structuralChecks    int
-	firstInfomungeError string
-	firstDataWeaveError string
+	generated                      int
+	bothErrors                     int
+	infomungeOnlyErrors            int
+	allowlistedInfomungeOnlyErrors int
+	dataWeaveOnlyErrors            int
+	bothSuccess                    int
+	artifactSaveErrors             int
+	firstInfomungeError            string
+	firstDataWeaveError            string
 }
 
 // TestDifferential_InfomungeVsDataWeave generates DW-compatible expressions,
@@ -43,79 +77,122 @@ func TestDifferential_InfomungeVsDataWeave(t *testing.T) {
 	var outcomes differentialOutcomes
 
 	rapid.Check(t, func(t *rapid.T) {
-		outcomes.generated++
 		tc := exprgen.SampleContext().Draw(t, "ctx")
 		expr := exprgen.DWCompatExpression(3).Draw(t, "expr")
 
 		script := exprgen.WrapDWScript(expr)
 
-		// Evaluate in infomunge.
 		imResult, imErr := safeEvalInfomunge(script, tc.Value)
-		if imErr != nil {
-			if strings.Contains(strings.ToLower(imErr.Error()), "panic:") {
-				metrics.RecordPanic()
-			}
-			outcomes.infomungeErrors++
-			if outcomes.firstInfomungeError == "" {
-				outcomes.firstInfomungeError = imErr.Error()
-			}
-			// Expression errors (type errors, div-by-zero, etc.) are not
-			// differential mismatches — skip.
-			return
+		if imErr != nil && strings.Contains(strings.ToLower(imErr.Error()), "panic:") {
+			metrics.RecordPanic()
 		}
 
-		// Evaluate in DataWeave.
 		dwResult, dwErr := DWEval(script, map[string]string{"payload": tc.JSON})
-		if dwErr != nil {
-			outcomes.dataWeaveErrors++
-			if outcomes.firstDataWeaveError == "" {
-				outcomes.firstDataWeaveError = dwErr.Error()
-			}
-			// DW may be stricter or have different type coercion; skip DW errors.
+		switch outcomes.record(imErr, dwErr) {
+		case outcomeBothErrors:
 			return
-		}
-
-		// Compare results structurally.
-		outcomes.structuralChecks++
-		if err := StructuralCompare(imResult, dwResult); err != nil {
+		case outcomeInfomungeOnlyError:
 			artifact := failures.Artifact{
-				Property:            "differential-dw",
+				Property:            "differential-infomunge-only-error",
 				MinimizedExpression: expr,
 				OriginalExpression:  script,
 				InputPayload:        tc.Value["payload"],
 				Expected:            dwResult,
-				Actual:              imResult,
+				Actual:              imErr.Error(),
 			}
 			if _, saveErr := failures.SaveArtifact(artifact); saveErr != nil {
+				outcomes.artifactSaveErrors++
 				t.Logf("failed to save artifact: %v", saveErr)
 			}
+			if issueID, allowed := allowlistedInfomungeOnlyError(imErr); allowed {
+				outcomes.allowlistedInfomungeOnlyErrors++
+				t.Logf("allowlisted InfoMunge-only error tracked by %s: %v", issueID, imErr)
+			}
+			return
+		case outcomeDataWeaveOnlyError:
+			return
+		case outcomeBothSuccess:
+			if err := StructuralCompare(imResult, dwResult); err != nil {
+				artifact := failures.Artifact{
+					Property:            "differential-dw",
+					MinimizedExpression: expr,
+					OriginalExpression:  script,
+					InputPayload:        tc.Value["payload"],
+					Expected:            dwResult,
+					Actual:              imResult,
+				}
+				if _, saveErr := failures.SaveArtifact(artifact); saveErr != nil {
+					t.Logf("failed to save artifact: %v", saveErr)
+				}
 
-			t.Fatalf(
-				"differential mismatch\nexpr: %s\npayload: %s\ninfomunge: %#v\ndw:       %#v\ndiff: %v",
-				expr, tc.JSON, imResult, dwResult, err,
-			)
+				t.Fatalf(
+					"differential mismatch\nexpr: %s\npayload: %s\ninfomunge: %#v\ndw:       %#v\ndiff: %v",
+					expr, tc.JSON, imResult, dwResult, err,
+				)
+			}
 		}
 	})
 
 	t.Logf("differential outcomes: %s", outcomes)
 	if outcomes.firstInfomungeError != "" {
-		t.Logf("first infomunge skip: %s", outcomes.firstInfomungeError)
+		t.Logf("first InfoMunge error: %s", outcomes.firstInfomungeError)
 	}
 	if outcomes.firstDataWeaveError != "" {
-		t.Logf("first DataWeave skip: %s", outcomes.firstDataWeaveError)
+		t.Logf("first DataWeave error: %s", outcomes.firstDataWeaveError)
 	}
 	if err := outcomes.validate(checks); err != nil {
 		t.Fatal(err)
 	}
 }
 
+func (outcomes *differentialOutcomes) record(imErr, dwErr error) differentialOutcome {
+	outcomes.generated++
+	if imErr != nil && outcomes.firstInfomungeError == "" {
+		outcomes.firstInfomungeError = imErr.Error()
+	}
+	if dwErr != nil && outcomes.firstDataWeaveError == "" {
+		outcomes.firstDataWeaveError = dwErr.Error()
+	}
+
+	switch {
+	case imErr != nil && dwErr != nil:
+		outcomes.bothErrors++
+		return outcomeBothErrors
+	case imErr != nil:
+		outcomes.infomungeOnlyErrors++
+		return outcomeInfomungeOnlyError
+	case dwErr != nil:
+		outcomes.dataWeaveOnlyErrors++
+		return outcomeDataWeaveOnlyError
+	default:
+		outcomes.bothSuccess++
+		return outcomeBothSuccess
+	}
+}
+
+func allowlistedInfomungeOnlyError(err error) (string, bool) {
+	if err == nil {
+		return "", false
+	}
+	message := err.Error()
+	for _, allowance := range infomungeOnlyErrorAllowlist {
+		if strings.Contains(message, allowance.errorSubstring) {
+			return allowance.issueID, true
+		}
+	}
+	return "", false
+}
+
 func (outcomes differentialOutcomes) String() string {
 	return fmt.Sprintf(
-		"generated=%d compared=%d infomunge_errors=%d dataweave_errors=%d",
+		"generated=%d both_errors=%d infomunge_only_errors=%d allowlisted_infomunge_only_errors=%d dataweave_only_errors=%d both_success=%d artifact_save_errors=%d",
 		outcomes.generated,
-		outcomes.structuralChecks,
-		outcomes.infomungeErrors,
-		outcomes.dataWeaveErrors,
+		outcomes.bothErrors,
+		outcomes.infomungeOnlyErrors,
+		outcomes.allowlistedInfomungeOnlyErrors,
+		outcomes.dataWeaveOnlyErrors,
+		outcomes.bothSuccess,
+		outcomes.artifactSaveErrors,
 	)
 }
 
@@ -128,7 +205,7 @@ func (outcomes differentialOutcomes) validate(expectedChecks int) error {
 		)
 	}
 
-	accounted := outcomes.infomungeErrors + outcomes.dataWeaveErrors + outcomes.structuralChecks
+	accounted := outcomes.bothErrors + outcomes.infomungeOnlyErrors + outcomes.dataWeaveOnlyErrors + outcomes.bothSuccess
 	if accounted != outcomes.generated {
 		return fmt.Errorf(
 			"incomplete differential outcome accounting: %s; accounted for %d cases",
@@ -137,11 +214,34 @@ func (outcomes differentialOutcomes) validate(expectedChecks int) error {
 		)
 	}
 
+	if outcomes.allowlistedInfomungeOnlyErrors > outcomes.infomungeOnlyErrors {
+		return fmt.Errorf(
+			"invalid differential allowlist accounting: %s",
+			outcomes,
+		)
+	}
+	if outcomes.artifactSaveErrors > 0 {
+		return fmt.Errorf(
+			"failed to save %d differential failure artifact(s): %s",
+			outcomes.artifactSaveErrors,
+			outcomes,
+		)
+	}
+
+	unallowlistedInfomungeOnlyErrors := outcomes.infomungeOnlyErrors - outcomes.allowlistedInfomungeOnlyErrors
+	if unallowlistedInfomungeOnlyErrors > 0 {
+		return fmt.Errorf(
+			"differential mismatch: %s; %d case(s) failed only in InfoMunge; see saved failure artifacts",
+			outcomes,
+			unallowlistedInfomungeOnlyErrors,
+		)
+	}
+
 	minimumComparisons := outcomes.generated * minimumComparisonPercent / 100
 	if minimumComparisons < 1 {
 		minimumComparisons = 1
 	}
-	if outcomes.structuralChecks >= minimumComparisons {
+	if outcomes.bothSuccess >= minimumComparisons {
 		return nil
 	}
 	return fmt.Errorf(
@@ -153,28 +253,61 @@ func (outcomes differentialOutcomes) validate(expectedChecks int) error {
 	)
 }
 
+func TestDifferentialOutcomes_RecordsEveryRuntimeCombination(t *testing.T) {
+	imErr := errors.New("infomunge failed")
+	dwErr := errors.New("DataWeave failed")
+	testCases := []struct {
+		name    string
+		imErr   error
+		dwErr   error
+		outcome differentialOutcome
+	}{
+		{name: "both error", imErr: imErr, dwErr: dwErr, outcome: outcomeBothErrors},
+		{name: "only InfoMunge errors", imErr: imErr, outcome: outcomeInfomungeOnlyError},
+		{name: "only DataWeave errors", dwErr: dwErr, outcome: outcomeDataWeaveOnlyError},
+		{name: "both succeed", outcome: outcomeBothSuccess},
+	}
+
+	var outcomes differentialOutcomes
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := outcomes.record(tc.imErr, tc.dwErr); got != tc.outcome {
+				t.Fatalf("record() = %v, want %v", got, tc.outcome)
+			}
+		})
+	}
+
+	if outcomes.generated != 4 ||
+		outcomes.bothErrors != 1 ||
+		outcomes.infomungeOnlyErrors != 1 ||
+		outcomes.dataWeaveOnlyErrors != 1 ||
+		outcomes.bothSuccess != 1 {
+		t.Fatalf("unexpected outcome accounting: %s", outcomes)
+	}
+}
+
 func TestDifferentialOutcomes_RejectsEveryGeneratedCaseSkipped(t *testing.T) {
 	outcomes := differentialOutcomes{
-		generated:       50,
-		infomungeErrors: 25,
-		dataWeaveErrors: 25,
+		generated:           50,
+		bothErrors:          25,
+		dataWeaveOnlyErrors: 25,
 	}
 
 	err := outcomes.validate(50)
 	if err == nil {
 		t.Fatal("expected an all-skipped differential run to fail")
 	}
-	if !strings.Contains(err.Error(), "compared=0") {
+	if !strings.Contains(err.Error(), "both_success=0") {
 		t.Fatalf("expected outcome counts in error, got: %v", err)
 	}
 }
 
 func TestDifferentialOutcomes_RejectsUnaccountedGeneratedCase(t *testing.T) {
 	outcomes := differentialOutcomes{
-		generated:        50,
-		infomungeErrors:  10,
-		dataWeaveErrors:  10,
-		structuralChecks: 29,
+		generated:           50,
+		bothErrors:          10,
+		dataWeaveOnlyErrors: 10,
+		bothSuccess:         29,
 	}
 
 	err := outcomes.validate(50)
@@ -183,6 +316,111 @@ func TestDifferentialOutcomes_RejectsUnaccountedGeneratedCase(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "accounted for 49 cases") {
 		t.Fatalf("expected accounting details in error, got: %v", err)
+	}
+}
+
+func TestDifferentialOutcomes_RejectsInfomungeOnlyErrors(t *testing.T) {
+	outcomes := differentialOutcomes{
+		generated:           50,
+		infomungeOnlyErrors: 1,
+		bothSuccess:         49,
+	}
+
+	err := outcomes.validate(50)
+	if err == nil {
+		t.Fatal("expected an InfoMunge-only error to fail the differential gate")
+	}
+	if !strings.Contains(err.Error(), "failed only in InfoMunge") {
+		t.Fatalf("expected one-sided failure details, got: %v", err)
+	}
+}
+
+func TestDifferentialOutcomes_AcceptsTicketedInfomungeOnlyErrors(t *testing.T) {
+	outcomes := differentialOutcomes{
+		generated:                      50,
+		infomungeOnlyErrors:            2,
+		allowlistedInfomungeOnlyErrors: 2,
+		bothSuccess:                    48,
+	}
+
+	if err := outcomes.validate(50); err != nil {
+		t.Fatalf("expected ticketed compatibility gaps to remain visible but allowed, got: %v", err)
+	}
+}
+
+func TestDifferentialOutcomes_RejectsMissingOneSidedArtifacts(t *testing.T) {
+	outcomes := differentialOutcomes{
+		generated:                      50,
+		infomungeOnlyErrors:            1,
+		allowlistedInfomungeOnlyErrors: 1,
+		bothSuccess:                    49,
+		artifactSaveErrors:             1,
+	}
+
+	err := outcomes.validate(50)
+	if err == nil {
+		t.Fatal("expected an artifact persistence failure to fail the differential gate")
+	}
+	if !strings.Contains(err.Error(), "failed to save 1 differential failure artifact") {
+		t.Fatalf("expected artifact persistence details, got: %v", err)
+	}
+}
+
+func TestDifferentialOutcomes_RejectsImpossibleAllowlistAccounting(t *testing.T) {
+	outcomes := differentialOutcomes{
+		generated:                      50,
+		allowlistedInfomungeOnlyErrors: 1,
+		bothSuccess:                    50,
+	}
+
+	err := outcomes.validate(50)
+	if err == nil {
+		t.Fatal("expected impossible allowlist accounting to fail")
+	}
+	if !strings.Contains(err.Error(), "invalid differential allowlist accounting") {
+		t.Fatalf("expected allowlist accounting details, got: %v", err)
+	}
+}
+
+func TestDifferentialOutcomes_AcceptsAccountedRunWithSufficientComparisons(t *testing.T) {
+	outcomes := differentialOutcomes{
+		generated:           50,
+		bothErrors:          20,
+		dataWeaveOnlyErrors: 20,
+		bothSuccess:         10,
+	}
+
+	if err := outcomes.validate(50); err != nil {
+		t.Fatalf("expected sufficient differential coverage, got: %v", err)
+	}
+}
+
+func TestAllowlistedInfomungeOnlyError_IsNarrowAndTicketed(t *testing.T) {
+	testCases := []struct {
+		message string
+		issueID string
+		allowed bool
+	}{
+		{message: "4:1: cannot index into int", issueID: "bd-3ryv", allowed: true},
+		{message: "4:1: lower expects a string", issueID: "bd-2q0t", allowed: true},
+		{message: "4:1: sizeOf: unsupported type int", issueID: "bd-1hpj", allowed: true},
+		{message: "4:51: '_' must separate successive digits", issueID: "bd-2kbq", allowed: true},
+		{message: "4:1: unexpected new evaluator failure", allowed: false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.message, func(t *testing.T) {
+			issueID, allowed := allowlistedInfomungeOnlyError(errors.New(tc.message))
+			if issueID != tc.issueID || allowed != tc.allowed {
+				t.Fatalf(
+					"allowlistedInfomungeOnlyError() = (%q, %t), want (%q, %t)",
+					issueID,
+					allowed,
+					tc.issueID,
+					tc.allowed,
+				)
+			}
+		})
 	}
 }
 
