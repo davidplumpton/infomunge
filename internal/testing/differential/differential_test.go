@@ -31,13 +31,6 @@ type infomungeOnlyErrorAllowance struct {
 // compatibility gaps. Every matching case is still counted and saved as an
 // artifact. Remove each entry when its issue is closed.
 var infomungeOnlyErrorAllowlist = []infomungeOnlyErrorAllowance{
-	{issueID: "bd-2q0t", errorSubstring: "lower expects a string"},
-	{issueID: "bd-2q0t", errorSubstring: "upper expects a string"},
-	{issueID: "bd-2q0t", errorSubstring: "trim expects a string"},
-	{issueID: "bd-2q0t", errorSubstring: "startsWith expects a string"},
-	{issueID: "bd-2q0t", errorSubstring: "endsWith expects a string"},
-	{issueID: "bd-2q0t", errorSubstring: "contains expects argument 2 to be string or Regex"},
-	{issueID: "bd-2q0t", errorSubstring: "contains expects a string or array as argument 1"},
 	{issueID: "bd-1hpj", errorSubstring: "sizeOf: unsupported type"},
 }
 
@@ -399,8 +392,8 @@ func TestAllowlistedInfomungeOnlyError_IsNarrowAndTicketed(t *testing.T) {
 		issueID string
 		allowed bool
 	}{
-		{message: "4:1: lower expects a string", issueID: "bd-2q0t", allowed: true},
 		{message: "4:1: sizeOf: unsupported type int", issueID: "bd-1hpj", allowed: true},
+		{message: "4:1: lower expects a string", allowed: false},
 		{message: "4:1: unexpected new evaluator failure", allowed: false},
 	}
 

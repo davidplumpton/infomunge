@@ -9,13 +9,12 @@ import (
 
 // callBuiltinTrim implements the trim(string) function.
 func callBuiltinTrim(args []Value, e *ast.CallExpr) (Value, error) {
-	if err := requireExactArgs(args, 1, "trim requires exactly 1 argument", e); err != nil {
-		return nil, err
-	}
-
-	str, err := assertStringArg(args[0], 0, "trim", e)
+	str, isNull, err := requireOneNullableScalarStringArg(args, "trim", e)
 	if err != nil {
 		return nil, err
+	}
+	if isNull {
+		return nil, nil
 	}
 
 	return strings.TrimSpace(str), nil

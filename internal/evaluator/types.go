@@ -310,6 +310,14 @@ func coerceToStringValue(value Value, topLevel bool) string {
 	}
 
 	switch typed := value.(type) {
+	case string:
+		return typed
+	case int:
+		return strconv.Itoa(typed)
+	case float64:
+		return formatCoercedFloat(typed)
+	case bool:
+		return strconv.FormatBool(typed)
 	case *Lambda:
 		if topLevel {
 			return "<function>"
@@ -323,6 +331,35 @@ func coerceToStringValue(value Value, topLevel bool) string {
 	}
 
 	return fmt.Sprintf("%v", value)
+}
+
+func formatCoercedFloat(value float64) string {
+	if value == 0 {
+		return "0"
+	}
+
+	absolute := math.Abs(value)
+	if absolute >= 1e-6 && absolute < 1 {
+		return strconv.FormatFloat(value, 'f', -1, 64)
+	}
+
+	formatted := strconv.FormatFloat(value, 'G', -1, 64)
+	exponentIndex := strings.IndexByte(formatted, 'E')
+	if exponentIndex < 0 {
+		return formatted
+	}
+
+	exponent := formatted[exponentIndex+1:]
+	sign := ""
+	if strings.HasPrefix(exponent, "+") || strings.HasPrefix(exponent, "-") {
+		sign = exponent[:1]
+		exponent = exponent[1:]
+	}
+	exponent = strings.TrimLeft(exponent, "0")
+	if exponent == "" {
+		exponent = "0"
+	}
+	return formatted[:exponentIndex+1] + sign + exponent
 }
 
 func coerceStringSequence(sequence []Value) string {

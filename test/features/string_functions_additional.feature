@@ -88,13 +88,13 @@ Feature: Additional String Functions
       "hello"
       """
 
-  Scenario: trim on non-string fails
+  Scenario: trim on collection fails
     Given the following input content:
       """
       %im 0.1
       output application/json
       ---
-      trim(123)
+      trim([123])
       """
     When I run the application and it fails
     Then the output should contain "trim expects a string"

@@ -96,18 +96,24 @@ func callBuiltinSplitBy(args []Value, e *ast.CallExpr) (Value, error) {
 
 // callBuiltinLower implements the lower(string) function.
 func callBuiltinLower(args []Value, e *ast.CallExpr) (Value, error) {
-	text, err := requireOneStringArg(args, "lower", e)
+	text, isNull, err := requireOneNullableScalarStringArg(args, "lower", e)
 	if err != nil {
 		return nil, err
+	}
+	if isNull {
+		return nil, nil
 	}
 	return strings.ToLower(text), nil
 }
 
 // callBuiltinUpper implements the upper(string) function.
 func callBuiltinUpper(args []Value, e *ast.CallExpr) (Value, error) {
-	text, err := requireOneStringArg(args, "upper", e)
+	text, isNull, err := requireOneNullableScalarStringArg(args, "upper", e)
 	if err != nil {
 		return nil, err
+	}
+	if isNull {
+		return nil, nil
 	}
 	return strings.ToUpper(text), nil
 }

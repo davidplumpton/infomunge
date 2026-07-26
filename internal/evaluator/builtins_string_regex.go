@@ -77,22 +77,42 @@ func fullStringSubmatch(re *regexp.Regexp, text string) []string {
 
 // callBuiltinStartsWith implements the startsWith(string, prefix) function.
 func callBuiltinStartsWith(args []Value, e *ast.CallExpr) (Value, error) {
-	strs, err := assertStringArgs(args, 2, "startsWith", e)
+	if err := requireExactArgs(args, 2, "startsWith requires exactly 2 arguments", e); err != nil {
+		return nil, err
+	}
+	if args[0] == nil {
+		return false, nil
+	}
+
+	text, err := coerceScalarStringArg(args[0], 1, "startsWith", e)
 	if err != nil {
 		return nil, err
 	}
-
-	return strings.HasPrefix(strs[0], strs[1]), nil
+	prefix, err := coerceScalarStringArg(args[1], 2, "startsWith", e)
+	if err != nil {
+		return nil, err
+	}
+	return strings.HasPrefix(text, prefix), nil
 }
 
 // callBuiltinEndsWith implements the endsWith(string, suffix) function.
 func callBuiltinEndsWith(args []Value, e *ast.CallExpr) (Value, error) {
-	strs, err := assertStringArgs(args, 2, "endsWith", e)
+	if err := requireExactArgs(args, 2, "endsWith requires exactly 2 arguments", e); err != nil {
+		return nil, err
+	}
+	if args[0] == nil {
+		return false, nil
+	}
+
+	text, err := coerceScalarStringArg(args[0], 1, "endsWith", e)
 	if err != nil {
 		return nil, err
 	}
-
-	return strings.HasSuffix(strs[0], strs[1]), nil
+	suffix, err := coerceScalarStringArg(args[1], 2, "endsWith", e)
+	if err != nil {
+		return nil, err
+	}
+	return strings.HasSuffix(text, suffix), nil
 }
 
 // callBuiltinContains implements the contains(string, pattern) function.
@@ -103,18 +123,25 @@ func callBuiltinContains(args []Value, e *ast.CallExpr) (Value, error) {
 	}
 
 	switch first := args[0].(type) {
-	case string:
+	case nil:
+		return false, nil
+	case string, int, float64, bool:
+		text, err := coerceScalarStringArg(first, 1, "contains", e)
+		if err != nil {
+			return nil, err
+		}
+
 		// Check for Regex object
 		if r, ok := args[1].(*Regex); ok {
-			return r.Re.MatchString(first), nil
+			return r.Re.MatchString(text), nil
 		}
 
-		pattern, ok := args[1].(string)
-		if !ok {
-			return nil, newPosError(fmt.Sprintf("contains expects argument 2 to be string or Regex, got %T", args[1]), e.Pos())
+		pattern, err := coerceScalarStringArg(args[1], 2, "contains", e)
+		if err != nil {
+			return nil, err
 		}
 
-		return strings.Contains(first, pattern), nil
+		return strings.Contains(text, pattern), nil
 	case Array:
 		for _, item := range first {
 			if isEqual(item, args[1]) {

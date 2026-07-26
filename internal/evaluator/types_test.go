@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"go/token"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -119,6 +120,29 @@ func TestCoerceToStringUsesLanguageNullSpellingRecursively(t *testing.T) {
 			}
 			if strings.Contains(got, "<nil>") {
 				t.Fatalf("coerceToString() leaked Go null spelling in %q", got)
+			}
+		})
+	}
+}
+
+func TestCoerceToStringUsesDataWeaveNumberFormatting(t *testing.T) {
+	tests := []struct {
+		name  string
+		value Value
+		want  string
+	}{
+		{name: "integer", value: 123, want: "123"},
+		{name: "ordinary decimal", value: 12.5, want: "12.5"},
+		{name: "small plain decimal", value: 1e-6, want: "0.000001"},
+		{name: "small exponent", value: 1e-7, want: "1E-7"},
+		{name: "positive exponent", value: 1e10, want: "1E+10"},
+		{name: "negative zero", value: math.Copysign(0, -1), want: "0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := coerceToString(tt.value); got != tt.want {
+				t.Fatalf("coerceToString() = %q, want %q", got, tt.want)
 			}
 		})
 	}

@@ -59,6 +59,34 @@ Feature: String Functions
       "HELLO"
       """
 
+  Scenario: unary string functions coerce scalar values and propagate null
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [lower(123), lower(true), lower(null), upper(-12.5), upper(false), upper(null), trim(12.5), trim(1e10), trim(true), trim(null)]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["123","true",null,"-12.5","FALSE",null,"12.5","1E+10","true",null]
+      """
+
+  Scenario: string predicates coerce scalar values and treat null sources as empty
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [startsWith(12345, 123), startsWith(true, true), startsWith(null, null), endsWith(12345, 45), endsWith(false, false), endsWith(null, null), contains(12345, 234), contains(1e10, "E"), contains(true, true), contains(12345, /23/), contains(null, null), contains("12345", 234), contains([1, null], null)]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [true,true,false,true,true,false,true,true,true,true,false,true,true]
+      """
+
   Scenario: joinBy basic usage
     Given the following input content:
       """

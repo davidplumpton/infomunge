@@ -40,6 +40,32 @@ func requireOneStringArg(args []Value, funcName string, e *ast.CallExpr) (string
 	return assertStringArg(args[0], 0, funcName, e)
 }
 
+// requireOneNullableScalarStringArg implements the DataWeave overload shared
+// by scalar string functions: null propagates, while strings, numbers, and
+// booleans are accepted through the language's string coercion.
+func requireOneNullableScalarStringArg(args []Value, funcName string, e *ast.CallExpr) (string, bool, error) {
+	if err := requireExactArgs(args, 1, funcName+" requires exactly 1 argument", e); err != nil {
+		return "", false, err
+	}
+	if args[0] == nil {
+		return "", true, nil
+	}
+	text, err := coerceScalarStringArg(args[0], 0, funcName, e)
+	return text, false, err
+}
+
+// coerceScalarStringArg accepts only the scalar values DataWeave implicitly
+// coerces for String parameters. Collections and other runtime values remain
+// type errors instead of inheriting coerceToString's broader display behavior.
+func coerceScalarStringArg(val Value, argIndex int, funcName string, e *ast.CallExpr) (string, error) {
+	switch val.(type) {
+	case string, int, float64, bool:
+		return coerceToString(val), nil
+	default:
+		return assertStringArg(val, argIndex, funcName, e)
+	}
+}
+
 // assertStringArg validates that an argument is a string.
 func assertStringArg(val Value, argIndex int, funcName string, e *ast.CallExpr) (string, error) {
 	str, ok := val.(string)
