@@ -1,6 +1,7 @@
 package preprocessor
 
 import (
+	"go/parser"
 	"strings"
 	"testing"
 )
@@ -151,6 +152,50 @@ func TestPrepareForParsing_DefaultArrayFallbackInsideLambda(t *testing.T) {
 	}
 	if len(mapping) != len(result) {
 		t.Fatalf("mapping length = %d, want %d", len(mapping), len(result))
+	}
+}
+
+func TestPrepareForParsing_SignedExponentLiteralsInsideNestedOperators(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		literals []string
+	}{
+		{
+			name:     "positive exponent signs",
+			input:    `[-4.4420514987125e+10] contains (-4.4420514987125e+10 default 3.4133172375e+07)`,
+			literals: []string{"4.4420514987125e+10", "3.4133172375e+07"},
+		},
+		{
+			name:     "negative exponent signs",
+			input:    `[4.4420514987125e-10] contains (4.4420514987125e-10 default 3.4133172375e-07)`,
+			literals: []string{"4.4420514987125e-10", "3.4133172375e-07"},
+		},
+		{
+			name:     "uppercase exponent marker",
+			input:    `[4.4420514987125E+10] contains (4.4420514987125E+10 default 3.4133172375E-07)`,
+			literals: []string{"4.4420514987125E+10", "3.4133172375E-07"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, mapping, err := PrepareForParsing(tt.input, Options{})
+			if err != nil {
+				t.Fatalf("PrepareForParsing returned error: %v", err)
+			}
+			if _, err := parser.ParseExpr(result); err != nil {
+				t.Fatalf("preprocessed expression is not valid Go syntax: %v\nresult: %s", err, result)
+			}
+			for _, literal := range tt.literals {
+				if !strings.Contains(result, literal) {
+					t.Fatalf("preprocessed expression lost signed exponent literal %q: %s", literal, result)
+				}
+			}
+			if len(mapping) != len(result) {
+				t.Fatalf("mapping length = %d, want %d", len(mapping), len(result))
+			}
+		})
 	}
 }
 

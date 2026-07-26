@@ -71,6 +71,20 @@ Feature: Complex DataWeave Expressions
     When I run the script
     Then the output should be valid JSON with number close to 25000000
 
+  Scenario: Signed scientific notation survives nested default and contains operators
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [-4.4420514987125e+10] contains (-4.4420514987125e+10 default 3.4133172375e+07)
+      """
+    When I run the script
+    Then the output should be:
+      """
+      true
+      """
+
   Scenario: Using expression inside map
     Given the following script:
       """

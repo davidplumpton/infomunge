@@ -211,6 +211,9 @@ func FindLeftOperandStartWithStops(result []rune, stops []rune) int {
 		if depth == 0 {
 			for _, stop := range stops {
 				if ch == stop {
+					if isSignedDecimalExponent(result, pos) {
+						break
+					}
 					return pos + 1
 				}
 			}
@@ -228,4 +231,17 @@ func FindLeftOperandStartWithStops(result []rune, stops []rune) int {
 	}
 
 	return 0
+}
+
+func isSignedDecimalExponent(result []rune, signPos int) bool {
+	if signPos < 2 || signPos+1 >= len(result) {
+		return false
+	}
+	if result[signPos] != '+' && result[signPos] != '-' {
+		return false
+	}
+	if result[signPos-1] != 'e' && result[signPos-1] != 'E' {
+		return false
+	}
+	return unicode.IsDigit(result[signPos-2]) && unicode.IsDigit(result[signPos+1])
 }

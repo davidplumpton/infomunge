@@ -91,6 +91,9 @@ func findLeftOperandStartBytesWithIgnoredOperators(result []byte, stops []byte, 
 			}
 			for _, stop := range stops {
 				if ch == stop {
+					if isSignedDecimalExponentBytes(result, pos) {
+						break
+					}
 					return pos + 1
 				}
 			}
@@ -109,6 +112,23 @@ func findLeftOperandStartBytesWithIgnoredOperators(result []byte, stops []byte, 
 	}
 
 	return 0
+}
+
+func isSignedDecimalExponentBytes(result []byte, signPos int) bool {
+	if signPos < 2 || signPos+1 >= len(result) {
+		return false
+	}
+	if result[signPos] != '+' && result[signPos] != '-' {
+		return false
+	}
+	if result[signPos-1] != 'e' && result[signPos-1] != 'E' {
+		return false
+	}
+	return isASCIIDigit(result[signPos-2]) && isASCIIDigit(result[signPos+1])
+}
+
+func isASCIIDigit(ch byte) bool {
+	return ch >= '0' && ch <= '9'
 }
 
 func ignoredOperatorEndingAt(result []byte, pos int, operators []string) (int, bool) {

@@ -39,7 +39,6 @@ var infomungeOnlyErrorAllowlist = []infomungeOnlyErrorAllowance{
 	{issueID: "bd-2q0t", errorSubstring: "contains expects argument 2 to be string or Regex"},
 	{issueID: "bd-2q0t", errorSubstring: "contains expects a string or array as argument 1"},
 	{issueID: "bd-1hpj", errorSubstring: "sizeOf: unsupported type"},
-	{issueID: "bd-2kbq", errorSubstring: "'_' must separate successive digits"},
 }
 
 type differentialOutcome int
@@ -402,7 +401,6 @@ func TestAllowlistedInfomungeOnlyError_IsNarrowAndTicketed(t *testing.T) {
 	}{
 		{message: "4:1: lower expects a string", issueID: "bd-2q0t", allowed: true},
 		{message: "4:1: sizeOf: unsupported type int", issueID: "bd-1hpj", allowed: true},
-		{message: "4:51: '_' must separate successive digits", issueID: "bd-2kbq", allowed: true},
 		{message: "4:1: unexpected new evaluator failure", allowed: false},
 	}
 

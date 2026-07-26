@@ -350,6 +350,16 @@ func TestFindLeftOperandStart(t *testing.T) {
 			input:    []rune("foo(a, b) + bar[x]"),
 			expected: 11,
 		},
+		{
+			name:     "positive scientific notation exponent",
+			input:    []rune("3.4133172375e+07"),
+			expected: 0,
+		},
+		{
+			name:     "negative scientific notation exponent",
+			input:    []rune("3.4133172375e-07"),
+			expected: 0,
+		},
 	}
 
 	for _, tt := range tests {
