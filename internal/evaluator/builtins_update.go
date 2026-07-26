@@ -46,7 +46,8 @@ func callBuiltinUpdateExpr(e *ast.CallExpr, scope *Scope, depth int) (Value, err
 func applyUpdateCases(value Value, casesStr string, scope *Scope, depth int) (Value, error) {
 	// Parse case statements line by line
 	lines := strings.Split(casesStr, "\n")
-	result := deepCopy(value) // Start with a copy of the value
+	source := deepCopy(value)
+	updates := make([]evaluatedUpdate, 0, len(lines))
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -82,34 +83,95 @@ func applyUpdateCases(value Value, casesStr string, scope *Scope, depth int) (Va
 		selector := strings.TrimSpace(afterAt[:arrowIdx])
 		expression := strings.TrimSpace(afterAt[arrowIdx+4:])
 
-		// Apply this case
-		var applyErr error
-		result, applyErr = applyUpdateCase(result, varName, selector, expression, scope, depth)
-		if applyErr != nil {
-			return nil, applyErr
+		update, matched, err := evaluateUpdateCase(source, varName, selector, expression, scope, depth)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			updates = mergeEvaluatedUpdate(updates, update)
+		}
+	}
+
+	result := deepCopy(value)
+	for _, update := range updates {
+		var err error
+		result, err = setValueAtPath(result, update.path, update.value, 0)
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	return result, nil
 }
 
-// applyUpdateCase applies a single update case to a value
-func applyUpdateCase(value Value, varName, selector, expression string, scope *Scope, depth int) (Value, error) {
+type evaluatedUpdate struct {
+	path  []selectorSegment
+	value Value
+}
+
+// mergeEvaluatedUpdate applies DataWeave's conflict rules. An update to an
+// ancestor replaces updates to its descendants regardless of case order. For
+// repeated identical selectors, the first case wins.
+func mergeEvaluatedUpdate(updates []evaluatedUpdate, candidate evaluatedUpdate) []evaluatedUpdate {
+	for _, update := range updates {
+		switch {
+		case selectorPathEqual(update.path, candidate.path):
+			return updates
+		case selectorPathPrefix(update.path, candidate.path):
+			return updates
+		}
+	}
+
+	merged := updates[:0]
+	for _, update := range updates {
+		if selectorPathPrefix(candidate.path, update.path) {
+			continue
+		}
+		merged = append(merged, update)
+	}
+	return append(merged, candidate)
+}
+
+func selectorPathEqual(left, right []selectorSegment) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func selectorPathPrefix(prefix, path []selectorSegment) bool {
+	if len(prefix) >= len(path) {
+		return false
+	}
+	for i := range prefix {
+		if prefix[i] != path[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func evaluateUpdateCase(value Value, varName, selector, expression string, scope *Scope, depth int) (evaluatedUpdate, bool, error) {
 	// Parse the selector path
 	path, err := parseSelectorPath(selector)
 	if err != nil {
-		return nil, err
+		return evaluatedUpdate{}, false, err
 	}
 
 	if len(path) == 0 {
-		return nil, unifiederrors.EvalError("empty selector path")
+		return evaluatedUpdate{}, false, unifiederrors.EvalError("empty selector path")
 	}
 
 	// Get the current value at the selector path
 	currentValue, err := getValueAtPath(value, path)
 	if err != nil {
 		// Path doesn't exist, return original value unchanged
-		return value, nil
+		return evaluatedUpdate{}, false, nil
 	}
 
 	// Create local context with the variable binding
@@ -118,16 +180,15 @@ func applyUpdateCase(value Value, varName, selector, expression string, scope *S
 
 	parsedExpr, err := compileExpressionInScope(scope, expression)
 	if err != nil {
-		return nil, unifiederrors.EvalErrorf("compile error in update case expression: %s", err)
+		return evaluatedUpdate{}, false, unifiederrors.EvalErrorf("compile error in update case expression: %s", err)
 	}
 
 	newValue, err := evalASTInScopeWithDepth(parsedExpr, localScope, depth+1)
 	if err != nil {
-		return nil, err
+		return evaluatedUpdate{}, false, err
 	}
 
-	// Set the new value at the path
-	return setValueAtPath(value, path, newValue, 0)
+	return evaluatedUpdate{path: path, value: deepCopy(newValue)}, true, nil
 }
 
 // selectorSegment represents a part of a selector path

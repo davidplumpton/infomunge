@@ -90,6 +90,91 @@ Feature: Update Expression
     Then the output should contain "HELLO"
     And the output should contain "WORLD"
 
+  Scenario: Ancestor update wins over a later descendant update
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {a: {b: 1}} update {
+        case whole at .a -> {b: whole.b + 1}
+        case leaf at .a.b -> leaf * 10
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"a":{"b":2}}
+      """
+
+  Scenario: Ancestor update wins over an earlier descendant update
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {a: {b: 1}} update {
+        case leaf at .a.b -> leaf * 10
+        case whole at .a -> {b: whole.b + 1}
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"a":{"b":2}}
+      """
+
+  Scenario: First update wins for repeated identical selectors
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {a: {b: 1}} update {
+        case first at .a -> {b: first.b + 1}
+        case second at .a -> {b: second.b * 10}
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"a":{"b":2}}
+      """
+
+  Scenario: Disjoint update selectors both apply
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {a: 1, b: 2} update {
+        case left at .a -> left + 1
+        case right at .b -> right * 10
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"a":2,"b":20}
+      """
+
+  Scenario: Array ancestor update wins over an object descendant update
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {items: [{value: 1}]} update {
+        case value at .items[0].value -> value * 10
+        case item at .items[0] -> {value: item.value + 1}
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"items":[{"value":2}]}
+      """
+
   Scenario: Update with variable
     Given the following input content:
       """
