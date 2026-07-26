@@ -1003,3 +1003,17 @@ Feature: Array Functions
       """
       [2,3]
       """
+
+  Scenario: generic slice keeps end-relative negative bounds
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      slice([1, 2, 3, 4], -2, 4)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [3,4]
+      """

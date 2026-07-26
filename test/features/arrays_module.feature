@@ -290,6 +290,34 @@ Feature: Arrays Module
       [2,3,4]
       """
 
+  Scenario Outline: slice clamps bounds with DataWeave Arrays semantics
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      import * from dw::core::Arrays
+      ---
+      slice([1, 2, 3, 4], <start>, <end>)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      <result>
+      """
+
+    Examples:
+      | start | end | result    |
+      | -2    | 2   | [1,2]     |
+      | -2    | 4   | [1,2,3,4] |
+      | -2    | -1  | []        |
+      | 1     | -1  | []        |
+      | 1     | 99  | [2,3,4]   |
+      | 3     | 1   | []        |
+      | 2     | 2   | []        |
+      | 3     | 4   | [4]       |
+      | 4     | 5   | []        |
+      | 99    | 100 | []        |
+
   Scenario: some returns true when any item matches
     Given the following input content:
       """

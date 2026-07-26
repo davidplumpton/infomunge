@@ -54,7 +54,7 @@ fun partition(array, criteria) =
       failure: array filter (item) -> not criteria(item)
     }
 
-fun slice(array, start, end) = __native("slice", array, start, end)
+fun slice(array, start, end) = __native("__arraysSlice", array, start, end)
 fun some(array, criteria) = __native("some", array, criteria)
 
 fun splitAt(array, index) =

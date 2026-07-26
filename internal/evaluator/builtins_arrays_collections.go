@@ -114,6 +114,40 @@ func callBuiltinSlice(args []Value, e *ast.CallExpr) (Value, error) {
 	return nil, newPosError("slice first argument must be an array or string", e.Args[0].Pos())
 }
 
+// callBuiltinArraysSlice implements dw::core::Arrays::slice. Unlike the
+// generic slice builtin, DataWeave clamps negative bounds to the start of the
+// array instead of resolving them relative to the end.
+func callBuiltinArraysSlice(args []Value, e *ast.CallExpr) (Value, error) {
+	if args[0] == nil {
+		return nil, nil
+	}
+
+	arrayVal, ok := args[0].(Array)
+	if !ok {
+		return nil, newPosError("slice first argument must be an array", e.Args[0].Pos())
+	}
+
+	start, ok := numericIndex(args[1])
+	if !ok {
+		return nil, newPosError("slice start must be a number", e.Args[1].Pos())
+	}
+	end, ok := numericIndex(args[2])
+	if !ok {
+		return nil, newPosError("slice end must be a number", e.Args[2].Pos())
+	}
+
+	if start < 0 {
+		start = 0
+	}
+	if end < 0 || start >= len(arrayVal) || start >= end {
+		return Array{}, nil
+	}
+	if end > len(arrayVal) {
+		end = len(arrayVal)
+	}
+	return arrayVal[start:end], nil
+}
+
 // callBuiltinRangeIndex implements DataWeave's inclusive start-to-end selector.
 // Negative bounds are resolved relative to the collection, and descending
 // bounds return values in reverse index order.

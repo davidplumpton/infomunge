@@ -196,6 +196,75 @@ func TestNullArrayValueHelpersPropagateNull(t *testing.T) {
 	}
 }
 
+func TestBuiltinArraysSliceClampsDataWeaveBounds(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    Array
+		start    int
+		end      int
+		expected Array
+	}{
+		{
+			name:     "negative start clamps to first element",
+			input:    Array{1, 2, 3, 4},
+			start:    -2,
+			end:      2,
+			expected: Array{1, 2},
+		},
+		{
+			name:     "negative end returns empty",
+			input:    Array{1, 2, 3, 4},
+			start:    1,
+			end:      -1,
+			expected: Array{},
+		},
+		{
+			name:     "oversized end clamps after last element",
+			input:    Array{1, 2, 3, 4},
+			start:    1,
+			end:      99,
+			expected: Array{2, 3, 4},
+		},
+		{
+			name:     "reversed bounds return empty",
+			input:    Array{1, 2, 3, 4},
+			start:    3,
+			end:      1,
+			expected: Array{},
+		},
+		{
+			name:     "start after last element returns empty",
+			input:    Array{1, 2, 3, 4},
+			start:    4,
+			end:      5,
+			expected: Array{},
+		},
+		{
+			name:     "empty input returns empty",
+			input:    Array{},
+			start:    -1,
+			end:      1,
+			expected: Array{},
+		},
+	}
+
+	call := &ast.CallExpr{Fun: &ast.Ident{Name: "__arraysSlice"}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := callBuiltinArraysSlice(
+				[]Value{tt.input, tt.start, tt.end},
+				call,
+			)
+			if err != nil {
+				t.Fatalf("callBuiltinArraysSlice() error = %v", err)
+			}
+			if !numericEquals(result, tt.expected) {
+				t.Fatalf("callBuiltinArraysSlice() = %#v, want %#v", result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestInclusiveRangeBounds(t *testing.T) {
 	tests := []struct {
 		name          string
