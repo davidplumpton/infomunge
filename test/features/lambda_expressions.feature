@@ -464,3 +464,7 @@ Feature: Lambda Expression Support
       | [[10, 20], [30]] map ($ map ($ + $$))                 | [[10,21],[30]]    |
       | [[1], [2]] map ((x) -> x flatMap [$, $])              | [[1,1],[2,2]]     |
       | [1] map (i, x) -> [] flatMap (x0) -> [true]           | [[]]              |
+      | [1,2] map (x) -> flatten([[x, x + 1]]) reduce (v,a) -> v + a | [3,5]       |
+      | [1,2] map (x) -> {a:x,b:x+1} pluck $                  | [[1,2],[2,3]]     |
+      | [1,2] map (x) -> [x] ++ [x + 1] map (v) -> v * 2     | [[2,4],[4,6]]     |
+      | [1,2] map (x) -> flatten(if (x > 1) [[x]] else [[x + 1]]) filter (v) -> v > 0 | [[2],[2]] |

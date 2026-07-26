@@ -1,6 +1,9 @@
 package preprocessor
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestPrepareForParsingPreservesNestedCollectionLambdas(t *testing.T) {
 	tests := []struct {
@@ -78,6 +81,105 @@ func TestPrepareForParsingPreservesNestedCollectionLambdas(t *testing.T) {
 				if _, ok := changedTraceEntry(trace, "replaceImplicitLambdas"); !ok {
 					t.Fatalf("trace did not include an implicit-lambda rewrite")
 				}
+			}
+		})
+	}
+}
+
+func TestPrepareForParsingPreservesComputedCollectionSourcesInExplicitLambdaBodies(t *testing.T) {
+	tests := []struct {
+		name            string
+		input           string
+		expected        string
+		arrowContains   string
+		nestedTransform string
+	}{
+		{
+			name:            "function call followed by reduce",
+			input:           `[1,2] map (x) -> flatten([[x, x + 1]]) reduce (v,a) -> v + a`,
+			expected:        `__map([]interface{}{1,2,}, __lambda("x",__reduce(flatten([]interface{}{[]interface{}{x, x + 1,},}), __lambda("v,a", v + a))))`,
+			arrowContains:   `__lambda("x", flatten([]interface{}{[]interface{}{x, x + 1,},}) reduce __lambda("v,a", v + a))`,
+			nestedTransform: "replaceReduceOperator",
+		},
+		{
+			name:            "concatenated arrays followed by map",
+			input:           `[1,2] map (x) -> [x] ++ [x + 1] map (v) -> v * 2`,
+			expected:        `__map([]interface{}{1,2,}, __lambda("x",__map(__concat([]interface{}{x,}, []interface{}{x + 1,}), __lambda("v", v * 2))))`,
+			arrowContains:   `__lambda("x", []interface{}{x,} ++ []interface{}{x + 1,} map __lambda("v", v * 2))`,
+			nestedTransform: "replaceMapOperator",
+		},
+		{
+			name:            "object literal followed by pluck",
+			input:           `[1,2] map (x) -> {a:x,b:x+1} pluck $`,
+			expected:        `__map([]interface{}{1,2,}, __lambda("x",__pluck(map[string]interface{}{"a":x,"b":x+1,}, __lambda("__arg", __arg))))`,
+			arrowContains:   `__lambda("x", map[string]interface{}{"a":x,"b":x+1,} pluck __lambda("__arg", __arg))`,
+			nestedTransform: "replacePluckOperator",
+		},
+		{
+			name:            "conditional call source followed by filter",
+			input:           `[1,2] map (x) -> flatten(if (x > 1) [[x]] else [[x + 1]]) filter (v) -> v > 0`,
+			expected:        `__map([]interface{}{1,2,}, __lambda("x",__filter(flatten(__ifelse(x > 1, []interface{}{[]interface{}{x,},}, []interface{}{[]interface{}{x + 1,},})), __lambda("v", v > 0))))`,
+			arrowContains:   `__lambda("x", flatten(__ifelse(x > 1, []interface{}{[]interface{}{x,},}, []interface{}{[]interface{}{x + 1,},})) filter __lambda("v", v > 0))`,
+			nestedTransform: "replaceFilterOperator",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var trace []TransformTraceEntry
+			result, mapping, err := PrepareForParsing(tt.input, Options{
+				TraceTransforms: func(entry TransformTraceEntry) {
+					trace = append(trace, entry)
+				},
+			})
+			if err != nil {
+				t.Fatalf("PrepareForParsing returned error: %v", err)
+			}
+			if result != tt.expected {
+				t.Fatalf("result = %q, want %q", result, tt.expected)
+			}
+			if len(mapping) != len(result) {
+				t.Fatalf("mapping length = %d, want %d", len(mapping), len(result))
+			}
+
+			arrowEntry, ok := changedTraceEntry(trace, "replaceArrowFunctions")
+			if !ok {
+				t.Fatal("trace did not include an arrow-function rewrite")
+			}
+			if !strings.Contains(arrowEntry.After, tt.arrowContains) {
+				t.Fatalf("arrow rewrite did not keep nested collection in body:\n%s", arrowEntry.After)
+			}
+			if _, ok := changedTraceEntry(trace, tt.nestedTransform); !ok {
+				t.Fatalf("trace did not include nested %s rewrite", tt.nestedTransform)
+			}
+		})
+	}
+}
+
+func TestCollectionSourceOwnsOperatorPreservesOuterChainingCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		body     string
+		operator string
+		want     bool
+	}{
+		{"array map", `[]interface{}{x,}`, " map value", true},
+		{"array does not own object operator", `[]interface{}{x,}`, " pluck value", false},
+		{"object pluck", `map[string]interface{}{"a":x,}`, " pluck value", true},
+		{"object mapObject", `map[string]interface{}{"a":x,}`, " mapObject value", true},
+		{"object does not own array operator", `map[string]interface{}{"a":x,}`, " map value", false},
+		{"complete function call", `flatten([]interface{}{x,})`, " reduce value", true},
+		{"concatenated arrays", `[]interface{}{x,} ++ []interface{}{x + 1,}`, " groupBy value", true},
+		{"scalar body remains outer", `x + 1`, " filter value", false},
+		{"predicate body remains outer", `x > 1`, " map value", false},
+		{"completed grouped body remains outer", `(flatten([]interface{}{x,}))`, " reduce value", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := collectionSourceOwnsOperator(tt.body, tt.operator, 0)
+			if got != tt.want {
+				t.Fatalf("collectionSourceOwnsOperator(%q, %q) = %v, want %v", tt.body, tt.operator, got, tt.want)
 			}
 		})
 	}

@@ -108,8 +108,8 @@ func collectionOpGenWithScope(depth int, features Feature, scope lambdaScope, cf
 	}
 
 	return rapid.Custom(func(t *rapid.T) string {
-		input := collectionInputExpr(t, depth, features, scope, cfg)
 		op := rapid.SampledFrom(cfg.collectionOps()).Draw(t, "collectionOp")
+		input := collectionInputExpr(t, depth, features, scope, cfg, op)
 		switch op {
 		case "map":
 			return mapExpr(t, input, bodyDepth, features, scope, cfg)
@@ -117,6 +117,12 @@ func collectionOpGenWithScope(depth int, features Feature, scope lambdaScope, cf
 			return filterExpr(t, input, bodyDepth, features, scope, cfg)
 		case "flatMap":
 			return flatMapExpr(t, input, bodyDepth, features, scope, cfg)
+		case "groupBy":
+			return groupByExpr(t, input, scope)
+		case "pluck":
+			return pluckExpr(t, input, scope)
+		case "mapObject":
+			return mapObjectExpr(t, input, scope)
 		default:
 			return reduceExpr(t, input, bodyDepth, features, scope, cfg)
 		}
@@ -124,15 +130,47 @@ func collectionOpGenWithScope(depth int, features Feature, scope lambdaScope, cf
 }
 
 func (c exprConfig) collectionOps() []string {
+	if c.DWCompat {
+		return []string{"map", "filter", "flatMap", "reduce", "groupBy", "pluck", "mapObject"}
+	}
 	return []string{"map", "filter", "flatMap", "reduce"}
 }
 
-func collectionInputExpr(t *rapid.T, depth int, features Feature, scope lambdaScope, cfg exprConfig) string {
+func collectionInputExpr(t *rapid.T, depth int, features Feature, scope lambdaScope, cfg exprConfig, op string) string {
 	nestedFeatures := expressionNestedFeatures(features, cfg)
 	if !cfg.DWCompat && depth > 1 && features&FeatureCollections != 0 && rapid.IntRange(0, 3).Draw(t, "nestedCollection") == 0 {
 		return collectionOpGenWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "nestedSource")
 	}
+	if cfg.DWCompat && (op == "pluck" || op == "mapObject") {
+		return filteredObjectExpr(max(depth-1, 0), nestedFeatures, scope, cfg).Draw(t, "objectSource")
+	}
+	if cfg.DWCompat && depth > 1 {
+		return dwComputedArraySource(t, depth, nestedFeatures, scope, cfg)
+	}
 	return filteredArrayExpr(max(depth-1, 0), nestedFeatures, scope, cfg).Draw(t, "arraySource")
+}
+
+func dwComputedArraySource(t *rapid.T, depth int, features Feature, scope lambdaScope, cfg exprConfig) string {
+	sourceDepth := max(depth-2, 0)
+	array := func(label string) string {
+		return filteredArrayExpr(sourceDepth, features, scope, cfg).Draw(t, label)
+	}
+
+	switch rapid.IntRange(0, 3).Draw(t, "computedArraySourceKind") {
+	case 1:
+		return fmt.Sprintf("flatten([%s])", array("functionArray"))
+	case 2:
+		return fmt.Sprintf("%s ++ %s", array("concatLeft"), array("concatRight"))
+	case 3:
+		return fmt.Sprintf(
+			"flatten(if (%t) [%s] else [%s])",
+			rapid.Bool().Draw(t, "conditionalChoice"),
+			array("conditionalThen"),
+			array("conditionalElse"),
+		)
+	default:
+		return array("arraySource")
+	}
 }
 
 func mapExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope lambdaScope, cfg exprConfig) string {
@@ -169,6 +207,21 @@ func flatMapExpr(t *rapid.T, input string, bodyDepth int, features Feature, scop
 	lScope := scope.withNamed(params...)
 	bodyExpr := expressionAtDepthWithScope(bodyDepth, expressionNestedFeatures(features, cfg), lScope, cfg).Draw(t, "flatMapBody")
 	return fmt.Sprintf("%s flatMap (%s) -> [%s]", input, strings.Join(params, ", "), bodyExpr)
+}
+
+func groupByExpr(t *rapid.T, input string, scope lambdaScope) string {
+	params := uniqueLambdaParams(t, 1, scope)
+	return fmt.Sprintf("%s groupBy (%s) -> typeOf(%s)", input, params[0], params[0])
+}
+
+func pluckExpr(t *rapid.T, input string, scope lambdaScope) string {
+	params := uniqueLambdaParams(t, 2, scope)
+	return fmt.Sprintf("%s pluck (%s) -> %s", input, strings.Join(params, ", "), params[0])
+}
+
+func mapObjectExpr(t *rapid.T, input string, scope lambdaScope) string {
+	params := uniqueLambdaParams(t, 2, scope)
+	return fmt.Sprintf("%s mapObject (%s) -> {(%s): %s}", input, strings.Join(params, ", "), params[1], params[0])
 }
 
 func reduceExpr(t *rapid.T, input string, bodyDepth int, features Feature, scope lambdaScope, cfg exprConfig) string {

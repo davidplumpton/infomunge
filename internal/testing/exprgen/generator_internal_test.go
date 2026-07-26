@@ -18,9 +18,49 @@ func TestDWCompatOperatorsReplacePercentWithInfixMod(t *testing.T) {
 
 func TestDWCompatCollectionOpsIncludeReduce(t *testing.T) {
 	got := (exprConfig{DWCompat: true}).collectionOps()
-	want := []string{"map", "filter", "flatMap", "reduce"}
+	want := []string{"map", "filter", "flatMap", "reduce", "groupBy", "pluck", "mapObject"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("DW-compatible collection operators = %v, want %v", got, want)
+	}
+}
+
+func TestDWCompatCollectionInputsCoverComputedCollectionSources(t *testing.T) {
+	sawFunctionCall := false
+	sawConcatenation := false
+	sawConditional := false
+	for i := 0; i < 1000; i++ {
+		var got string
+		rapid.Check(t, func(t *rapid.T) {
+			got = collectionInputExpr(t, 3, FeatureDWCompat, lambdaScope{}, exprConfig{DWCompat: true}, "map")
+		})
+		sawFunctionCall = sawFunctionCall || strings.HasPrefix(got, "flatten([")
+		sawConcatenation = sawConcatenation || strings.Contains(got, " ++ ")
+		sawConditional = sawConditional || strings.HasPrefix(got, "flatten(if (")
+		if sawFunctionCall && sawConcatenation && sawConditional {
+			break
+		}
+	}
+	if !sawFunctionCall {
+		t.Fatal("DW-compatible collection inputs never selected a function-call source")
+	}
+	if !sawConcatenation {
+		t.Fatal("DW-compatible collection inputs never selected a concatenated-array source")
+	}
+	if !sawConditional {
+		t.Fatal("DW-compatible collection inputs never selected a conditional source")
+	}
+}
+
+func TestDWCompatObjectCollectionInputsUseObjectSources(t *testing.T) {
+	for _, op := range []string{"pluck", "mapObject"} {
+		t.Run(op, func(t *testing.T) {
+			rapid.Check(t, func(t *rapid.T) {
+				got := collectionInputExpr(t, 3, FeatureDWCompat, lambdaScope{}, exprConfig{DWCompat: true}, op)
+				if !strings.HasPrefix(got, "{") {
+					t.Fatalf("DW-compatible %s source = %q, want object expression", op, got)
+				}
+			})
+		})
 	}
 }
 

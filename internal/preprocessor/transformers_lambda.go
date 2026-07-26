@@ -380,8 +380,7 @@ func replaceArrowFunctions(s string) string {
 								}
 								if isCollectionOperatorWithSpacesAt(s, pos) &&
 									((!allowUngroupedCollection &&
-										!(isCompleteArrayLiteralLambdaBody(s[bodyStart:pos]) &&
-											isArrayCollectionOperatorWithSpacesAt(s, pos))) ||
+										!collectionSourceOwnsOperator(s[bodyStart:pos], s, pos)) ||
 										isCompleteGroupedLambdaBody(s[bodyStart:pos])) {
 									break
 								}
@@ -436,6 +435,107 @@ func isCompleteArrayLiteralLambdaBody(body string) bool {
 		return sc.FindMatchingCloseBracket(open) == len(body)-1
 	}
 	return isCompleteLambdaBodyDelimitedBy(body, '[')
+}
+
+type collectionSourceKind uint8
+
+const (
+	collectionSourceNone collectionSourceKind = iota
+	collectionSourceArray
+	collectionSourceObject
+	collectionSourceUnknown
+)
+
+// collectionSourceOwnsOperator recognizes computed collection sources in an
+// ungrouped explicit lambda body. The arrow scanner cannot evaluate types, but
+// it can preserve ownership for syntax that produces a collection: collection
+// literals, complete calls (including rewritten conditionals), and collection
+// concatenations. Scalar and predicate bodies retain the existing outer-chain
+// boundary.
+func collectionSourceOwnsOperator(body, input string, operatorPos int) bool {
+	switch collectionSourceKindOf(body) {
+	case collectionSourceArray:
+		return isArrayCollectionOperatorWithSpacesAt(input, operatorPos)
+	case collectionSourceObject:
+		return isObjectCollectionOperatorWithSpacesAt(input, operatorPos)
+	case collectionSourceUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+func collectionSourceKindOf(body string) collectionSourceKind {
+	body = strings.TrimSpace(body)
+	if body == "" || isCompleteGroupedLambdaBody(body) {
+		return collectionSourceNone
+	}
+	if isCompleteArrayLiteralLambdaBody(body) {
+		return collectionSourceArray
+	}
+	if isCompleteObjectLiteralLambdaBody(body) {
+		return collectionSourceObject
+	}
+	if left, right, ok := splitTopLevelCollectionConcat(body); ok {
+		return combineCollectionSourceKinds(collectionSourceKindOf(left), collectionSourceKindOf(right))
+	}
+	if isCompleteCallLambdaBody(body) {
+		return collectionSourceUnknown
+	}
+	return collectionSourceNone
+}
+
+func isCompleteObjectLiteralLambdaBody(body string) bool {
+	body = strings.TrimSpace(body)
+	const rewrittenObjectPrefix = "map[string]interface{}"
+	if strings.HasPrefix(body, rewrittenObjectPrefix+"{") {
+		open := len(rewrittenObjectPrefix)
+		sc := stringutils.NewExpressionScanner(body)
+		return sc.FindMatchingCloseBracket(open) == len(body)-1
+	}
+	return isCompleteLambdaBodyDelimitedBy(body, '{')
+}
+
+func isCompleteCallLambdaBody(body string) bool {
+	body = strings.TrimSpace(body)
+	open := strings.IndexByte(body, '(')
+	if open <= 0 {
+		return false
+	}
+	for _, ch := range body[:open] {
+		if !(unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' || ch == '.') {
+			return false
+		}
+	}
+	sc := stringutils.NewExpressionScanner(body)
+	return sc.FindMatchingCloseBracket(open) == len(body)-1
+}
+
+func splitTopLevelCollectionConcat(body string) (left, right string, ok bool) {
+	var state ScanState
+	for pos := 0; pos+4 <= len(body); pos++ {
+		if !state.InString() && state.Depth() == 0 && body[pos:pos+4] == " ++ " {
+			return body[:pos], body[pos+4:], true
+		}
+		state.Advance(body[pos])
+	}
+	return "", "", false
+}
+
+func combineCollectionSourceKinds(left, right collectionSourceKind) collectionSourceKind {
+	if left == collectionSourceNone || right == collectionSourceNone {
+		return collectionSourceNone
+	}
+	if left == right {
+		return left
+	}
+	if left == collectionSourceUnknown {
+		return right
+	}
+	if right == collectionSourceUnknown {
+		return left
+	}
+	return collectionSourceUnknown
 }
 
 func isCompleteLambdaBodyDelimitedBy(body string, opener byte) bool {
