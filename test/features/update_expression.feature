@@ -211,3 +211,19 @@ Feature: Update Expression
       """
       {"a":2}
       """
+
+  Scenario: Update expression remains inside an explicit map callback
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [{a: 1}, {a: 2}] map (item) -> item update {
+        case value at .a -> value * 10
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [{"a":10},{"a":20}]
+      """

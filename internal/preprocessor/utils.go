@@ -24,6 +24,52 @@ func findLeftOperandStartBytes(result []byte) int {
 	return stringutils.FindLeftOperandStartWithStops(runes, stringutils.MinimalStops)
 }
 
+// updateLeftOperandStartBytes keeps an update expression inside an unresolved
+// collection callback. Core rewriting runs before collection and arrow
+// transforms, so the generic minimal-stop scan would otherwise consume the
+// collection source and operator as part of the update's left operand.
+func updateLeftOperandStartBytes(result []byte) int {
+	start := findLeftOperandStartBytes(result)
+	bodyStart := collectionLambdaBodyStart(string(result))
+	if bodyStart < 0 {
+		return start
+	}
+	if isCompleteGroupedLambdaBody(string(result[bodyStart:])) {
+		return start
+	}
+
+	expressionStart := collectionLambdaExpressionStart(result, bodyStart)
+	if expressionStart > start {
+		return expressionStart
+	}
+	return start
+}
+
+// collectionLambdaExpressionStart returns the expression after an explicit
+// callback arrow, or the implicit callback body start when no arrow is present.
+func collectionLambdaExpressionStart(input []byte, bodyStart int) int {
+	pos := bodyStart
+	for pos < len(input) && isWhitespace(input[pos]) {
+		pos++
+	}
+	implicitStart := pos
+
+	var state ScanState
+	for pos+1 < len(input) {
+		if !state.InString() && state.Depth() == 0 &&
+			input[pos] == '-' && input[pos+1] == '>' {
+			pos += 2
+			for pos < len(input) && isWhitespace(input[pos]) {
+				pos++
+			}
+			return pos
+		}
+		state.Advance(input[pos])
+		pos++
+	}
+	return implicitStart
+}
+
 // extractLeftOperand extracts the left operand expression.
 func extractLeftOperand(result []rune) (leftExpr string, newResult []rune, ok bool) {
 	start := stringutils.FindLeftOperandStart(result, nil)

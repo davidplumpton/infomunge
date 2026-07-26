@@ -469,7 +469,7 @@ func (r *rewriter) handleUpdateExprBlock() bool {
 	}
 
 	casesContent := strings.TrimSpace(r.input[braceStart+1 : braceEnd])
-	leftStart := findLeftOperandStartBytes(r.result)
+	leftStart := updateLeftOperandStartBytes(r.result)
 	if leftStart >= len(r.result) {
 		return false
 	}
