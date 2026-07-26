@@ -526,9 +526,13 @@ func mergeIntoResult(result Object, key string, value Value) {
 	}
 }
 
-// callBuiltinGroupBy implements the __groupBy(array, lambda) function.
+// callBuiltinGroupBy implements the __groupBy(source, lambda) function.
 func callBuiltinGroupBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
-	array, lambda, nullHandled, err := evalNullPropagatingArrayAndLambda("groupBy", e, scope, depth, 0, 2)
+	if len(e.Args) != 2 {
+		return nil, newPosError("groupBy requires exactly 2 arguments: source, lambda", e.Pos())
+	}
+
+	source, nullHandled, err := evalCollectionSource(e, scope, depth, propagateNullCollectionSource)
 	if err != nil {
 		return nil, err
 	}
@@ -536,19 +540,44 @@ func callBuiltinGroupBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 		return nil, nil
 	}
 
+	var (
+		arraySource  Array
+		stringSource string
+		isString     bool
+	)
+	switch typed := source.(type) {
+	case Array:
+		arraySource = typed
+	case string, int, float64, bool:
+		stringSource = coerceToString(typed)
+		isString = true
+	case Object:
+		return nil, newPosError("groupBy expects an array or string, got object", e.Args[0].Pos())
+	default:
+		return nil, newPosError(fmt.Sprintf("groupBy expects an array or string, got %T", source), e.Args[0].Pos())
+	}
+
+	lambda, err := evalCollectionLambda("groupBy", e, scope, depth, 0, 2)
+	if err != nil {
+		return nil, err
+	}
+
+	if isString {
+		return groupStringBy(stringSource, lambda, scope, depth, e)
+	}
+	return groupArrayBy(arraySource, lambda, scope, depth, e)
+}
+
+func groupArrayBy(array Array, lambda *Lambda, scope *Scope, depth int, e *ast.CallExpr) (Value, error) {
 	result := values.NewObject(0)
 
-	err = executeLambdaOnArrayElements(array, lambda, scope, depth, func(elem Value, _ int, key Value) error {
-		// Convert key with the same language-level policy used by string
-		// coercion, so null and functions never expose Go representations.
+	err := executeLambdaOnArrayElements(array, lambda, scope, depth, func(elem Value, _ int, key Value) error {
 		keyStr := coerceToString(key)
 
-		// Get or create the group for this key
 		if _, exists := result[keyStr]; !exists {
 			values.SetObjectValue(result, keyStr, make(Array, 0))
 		}
 
-		// Append element to the group with proper type checking
 		groupVal, ok := result[keyStr].(Array)
 		if !ok {
 			return newPosError("groupBy: internal error - unexpected type for group", e.Fun.Pos())
@@ -557,6 +586,35 @@ func callBuiltinGroupBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 		return nil
 	})
 	return result, err
+}
+
+func groupStringBy(source string, lambda *Lambda, scope *Scope, depth int, e *ast.CallExpr) (Value, error) {
+	result := values.NewObject(0)
+
+	for index, char := range []rune(source) {
+		elem := string(char)
+		key, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+			bindArrayLambdaParameters(lambdaContext, lambda, elem, index)
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		keyStr := coerceToString(key)
+		group, ok := result[keyStr]
+		if !ok {
+			values.SetObjectValue(result, keyStr, elem)
+			continue
+		}
+
+		groupString, ok := group.(string)
+		if !ok {
+			return nil, newPosError("groupBy: internal error - unexpected type for group", e.Fun.Pos())
+		}
+		values.SetObjectValue(result, keyStr, groupString+elem)
+	}
+
+	return result, nil
 }
 
 // callBuiltinPluck implements the __pluck(source, selector) function.

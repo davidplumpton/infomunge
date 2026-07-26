@@ -90,16 +90,37 @@ Feature: Array Functions
     When I run the application and it fails
     Then the output should contain "groupBy expects a lambda function"
 
-  Scenario: groupBy on non-array fails
+  Scenario Outline: groupBy uses string semantics for scalar sources
     Given the following input content:
       """
       %im 0.1
       output application/json
       ---
-      "not an array" groupBy (x) -> x
+      <source> groupBy <selector>
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      <output>
+      """
+
+    Examples:
+      | source | selector                  | output                       |
+      | 1.5    | (item) -> typeOf(item)    | {"String":"1.5"}             |
+      | true   | (item) -> typeOf(item)    | {"String":"true"}            |
+      | "aba"  | (item) -> item            | {"a":"aa","b":"b"}           |
+      | null   | (item) -> panic("unused") | null                         |
+
+  Scenario: groupBy on an object fails
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {value: 1} groupBy (x) -> x
       """
     When I run the application and it fails
-    Then the output should contain "groupBy expects an array"
+    Then the output should contain "groupBy expects an array or string"
 
   Scenario: pluck basic usage
     Given the following input content:

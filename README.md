@@ -43,6 +43,7 @@ Notes:
 - String-key selectors on numbers return `null`, matching DataWeave's missing-field behavior for both dot and bracket notation; booleans and strings remain invalid keyed-selector sources.
 - Header `input` directives are accepted for DataWeave compatibility and documentation only. Input data is parsed before execution by the CLI `-i` flags, server `/run` inputs, or embedding test harness; header `input` lines do not reparse, rename, validate, or create inputs.
 - `reduce` callbacks follow DataWeave's `(item, accumulator)` parameter order. A default on the second parameter supplies the initial accumulator; without one, the first array item is the initial accumulator. In implicit callbacks, `$` is the current item and `$$` is the accumulator. InfoMunge additionally supports a third index parameter.
+- `groupBy` groups array inputs into arrays. String inputs are grouped character-by-character into strings; numbers and booleans use the same behavior after string coercion, while `null` propagates without invoking the callback.
 
 ### Comparison with DataWeave
 

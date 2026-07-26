@@ -90,14 +90,23 @@ func evalArrayAndLambdaWithNullPolicy(
 		return nil, nil, false, newPosError(fmt.Sprintf("%s expects an array, got %T", funcName, arrayVal), e.Args[0].Pos())
 	}
 
-	lambdaVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
+	lambda, err := evalCollectionLambda(funcName, e, scope, depth, minParams, maxParams)
 	if err != nil {
 		return nil, nil, false, err
 	}
 
+	return array, lambda, false, nil
+}
+
+func evalCollectionLambda(funcName string, e *ast.CallExpr, scope *Scope, depth int, minParams, maxParams int) (*Lambda, error) {
+	lambdaVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
+	if err != nil {
+		return nil, err
+	}
+
 	lambda, ok := lambdaVal.(*Lambda)
 	if !ok {
-		return nil, nil, false, newPosError(fmt.Sprintf("%s expects a lambda function, got %T", funcName, lambdaVal), e.Args[1].Pos())
+		return nil, newPosError(fmt.Sprintf("%s expects a lambda function, got %T", funcName, lambdaVal), e.Args[1].Pos())
 	}
 
 	if lambda.ParamCount() < minParams || lambda.ParamCount() > maxParams {
@@ -107,10 +116,10 @@ func evalArrayAndLambdaWithNullPolicy(
 		} else {
 			requirement = fmt.Sprintf("between %d and %d", minParams, maxParams)
 		}
-		return nil, nil, false, newPosError(fmt.Sprintf("%s lambda must have %s parameters, got %d", funcName, requirement, lambda.ParamCount()), e.Args[1].Pos())
+		return nil, newPosError(fmt.Sprintf("%s lambda must have %s parameters, got %d", funcName, requirement, lambda.ParamCount()), e.Args[1].Pos())
 	}
 
-	return array, lambda, false, nil
+	return lambda, nil
 }
 
 // callBuiltinFilter implements the __filter(array, lambda) function.
