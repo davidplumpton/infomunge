@@ -1,7 +1,7 @@
 Feature: Size Of Function
-  In order to determine the length or count of collections
+  In order to determine the length or count of values
   As a developer
-  I want to use the sizeOf function to get the size of strings, arrays, and objects
+  I want to use the sizeOf function to get the size of strings, numbers, arrays, and objects
 
   Scenario: Get length of a string
     Given the following input content:
@@ -214,17 +214,33 @@ Feature: Size Of Function
     When I run the application and it fails
     Then the error should contain "requires exactly 1 argument"
 
-  Scenario: sizeOf on integer should fail
+  Scenario: Get the character length of numeric values
     Given the following input content:
       """
       %im 0.1
-      var num = 42
       output application/json
       ---
-      sizeOf(num)
+      [sizeOf(211), sizeOf(-211), sizeOf(123.45), sizeOf(-123.45), sizeOf(1e10), sizeOf(1e-7)]
       """
-    When I run the application and it fails
-    Then the error should contain "unsupported type"
+    When I run the application with this content
+    Then the output should be:
+      """
+      [3,4,6,7,5,4]
+      """
+
+  Scenario: Get the character length of numeric edge values
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [sizeOf(9223372036854775807), sizeOf(1.7976931348623157e308), sizeOf(5e-324)]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [19,23,6]
+      """
 
   Scenario: sizeOf on boolean should fail
     Given the following input content:

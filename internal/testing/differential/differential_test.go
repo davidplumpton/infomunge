@@ -30,9 +30,7 @@ type infomungeOnlyErrorAllowance struct {
 // infomungeOnlyErrorAllowlist is deliberately limited to known, ticketed
 // compatibility gaps. Every matching case is still counted and saved as an
 // artifact. Remove each entry when its issue is closed.
-var infomungeOnlyErrorAllowlist = []infomungeOnlyErrorAllowance{
-	{issueID: "bd-1hpj", errorSubstring: "sizeOf: unsupported type"},
-}
+var infomungeOnlyErrorAllowlist []infomungeOnlyErrorAllowance
 
 type differentialOutcome int
 
@@ -386,13 +384,13 @@ func TestDifferentialOutcomes_AcceptsAccountedRunWithSufficientComparisons(t *te
 	}
 }
 
-func TestAllowlistedInfomungeOnlyError_IsNarrowAndTicketed(t *testing.T) {
+func TestAllowlistedInfomungeOnlyError_RejectsClosedCompatibilityGap(t *testing.T) {
 	testCases := []struct {
 		message string
 		issueID string
 		allowed bool
 	}{
-		{message: "4:1: sizeOf: unsupported type int", issueID: "bd-1hpj", allowed: true},
+		{message: "4:1: sizeOf: unsupported type int", allowed: false},
 		{message: "4:1: lower expects a string", allowed: false},
 		{message: "4:1: unexpected new evaluator failure", allowed: false},
 	}

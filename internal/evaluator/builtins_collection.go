@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"infomunge/pkg/values"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -34,6 +35,10 @@ func callBuiltinSizeOf(args []Value, e *ast.CallExpr) (Value, error) {
 		return len(v), nil
 	case Object:
 		return len(v), nil
+	case int:
+		return len(strconv.Itoa(v)), nil
+	case float64:
+		return len(formatCoercedFloat(v)), nil
 	case nil:
 		return nil, nil
 	default:
