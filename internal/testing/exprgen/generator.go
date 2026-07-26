@@ -145,6 +145,33 @@ type exprConfig struct {
 	DWCompat bool
 }
 
+type dwPlusOperandCategory uint8
+
+const (
+	dwPlusNumber dwPlusOperandCategory = iota
+	dwPlusNumericString
+	dwPlusString
+	dwPlusArray
+	dwPlusObject
+	dwPlusBoolean
+	dwPlusNull
+)
+
+type dwPlusOperandPair struct {
+	left  dwPlusOperandCategory
+	right dwPlusOperandCategory
+}
+
+// dwCompatiblePlusPairs contains only operand categories for which infomunge
+// and DataWeave share + semantics. In particular, DataWeave appends any
+// right-hand value to an array while infomunge does not, and infomunge's
+// nonnumeric string concatenation is an extension.
+var dwCompatiblePlusPairs = []dwPlusOperandPair{
+	{left: dwPlusNumber, right: dwPlusNumber},
+	{left: dwPlusNumber, right: dwPlusNumericString},
+	{left: dwPlusNumericString, right: dwPlusNumber},
+}
+
 // literalGen returns the appropriate literal generator for the config.
 func (c exprConfig) literalGen() *rapid.Generator[string] {
 	if c.DWCompat {
@@ -342,10 +369,44 @@ func expressionAtDepthWithScope(depth int, features Feature, scope lambdaScope, 
 func filteredBinaryExpr(depth int, features Feature, ops []string, scope lambdaScope, cfg exprConfig) *rapid.Generator[string] {
 	nestedFeatures := expressionNestedFeatures(features, cfg)
 	return rapid.Custom(func(t *rapid.T) string {
-		left := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "left")
 		op := rapid.SampledFrom(ops).Draw(t, "op")
+		if cfg.DWCompat && op == "+" {
+			return dwCompatiblePlusExpr(t)
+		}
+		left := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "left")
 		right := expressionAtDepthWithScope(depth-1, nestedFeatures, scope, cfg).Draw(t, "right")
 		return fmt.Sprintf("%s %s %s", left, op, right)
+	})
+}
+
+func dwCompatiblePlusExpr(t *rapid.T) string {
+	pair := rapid.SampledFrom(dwCompatiblePlusPairs).Draw(t, "plusPair")
+	left := dwPlusOperand(pair.left).Draw(t, "left")
+	right := dwPlusOperand(pair.right).Draw(t, "right")
+	return fmt.Sprintf("%s + %s", left, right)
+}
+
+func dwPlusOperand(category dwPlusOperandCategory) *rapid.Generator[string] {
+	switch category {
+	case dwPlusNumber:
+		return dwPlusNumberLiteral()
+	case dwPlusNumericString:
+		return rapid.Custom(func(t *rapid.T) string {
+			return strconv.Quote(dwPlusNumberLiteral().Draw(t, "numericString"))
+		})
+	default:
+		panic(fmt.Sprintf("unsupported DW-compatible plus operand category %d", category))
+	}
+}
+
+func dwPlusNumberLiteral() *rapid.Generator[string] {
+	return rapid.Custom(func(t *rapid.T) string {
+		if rapid.Bool().Draw(t, "integer") {
+			return strconv.Itoa(rapid.IntRange(-1000, 1000).Draw(t, "value"))
+		}
+		whole := rapid.IntRange(-1000, 1000).Draw(t, "whole")
+		fraction := rapid.IntRange(0, 999).Draw(t, "fraction")
+		return fmt.Sprintf("%d.%03d", whole, fraction)
 	})
 }
 

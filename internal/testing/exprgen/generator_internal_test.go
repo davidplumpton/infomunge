@@ -16,6 +16,83 @@ func TestDWCompatOperatorsReplacePercentWithInfixMod(t *testing.T) {
 	}
 }
 
+func TestDWCompatPlusPairsIncludeOnlySharedOperandCategories(t *testing.T) {
+	want := []dwPlusOperandPair{
+		{left: dwPlusNumber, right: dwPlusNumber},
+		{left: dwPlusNumber, right: dwPlusNumericString},
+		{left: dwPlusNumericString, right: dwPlusNumber},
+	}
+	if !reflect.DeepEqual(dwCompatiblePlusPairs, want) {
+		t.Fatalf("DW-compatible plus pairs = %v, want %v", dwCompatiblePlusPairs, want)
+	}
+}
+
+func TestDWCompatPlusPairsExcludeExtensionCategories(t *testing.T) {
+	excluded := []struct {
+		name string
+		pair dwPlusOperandPair
+		expr string
+	}{
+		{
+			name: "minimized array-left string-right regression",
+			pair: dwPlusOperandPair{left: dwPlusArray, right: dwPlusString},
+			expr: `[""] + ""`,
+		},
+		{
+			name: "string concatenation extension",
+			pair: dwPlusOperandPair{left: dwPlusString, right: dwPlusString},
+			expr: `"a" + "b"`,
+		},
+		{
+			name: "array concatenation mismatch",
+			pair: dwPlusOperandPair{left: dwPlusArray, right: dwPlusArray},
+			expr: `[1] + [2]`,
+		},
+		{
+			name: "unsupported object operands",
+			pair: dwPlusOperandPair{left: dwPlusObject, right: dwPlusObject},
+			expr: `{a: 1} + {b: 2}`,
+		},
+		{
+			name: "unsupported boolean operands",
+			pair: dwPlusOperandPair{left: dwPlusBoolean, right: dwPlusBoolean},
+			expr: `true + false`,
+		},
+		{
+			name: "unsupported null operands",
+			pair: dwPlusOperandPair{left: dwPlusNull, right: dwPlusNull},
+			expr: `null + null`,
+		},
+	}
+
+	for _, tc := range excluded {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, generated := range dwCompatiblePlusPairs {
+				if generated == tc.pair {
+					t.Fatalf("DW-compatible plus pairs include %s (%s)", tc.name, tc.expr)
+				}
+			}
+		})
+	}
+}
+
+func TestDWCompatBinaryPlusUsesTypedSharedOperands(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		got := filteredBinaryExpr(
+			3,
+			FeatureDWCompat,
+			[]string{"+"},
+			lambdaScope{},
+			exprConfig{DWCompat: true},
+		).Draw(t, "plus")
+		if strings.Contains(got, "[") || strings.Contains(got, "{") ||
+			strings.Contains(got, "true") || strings.Contains(got, "false") ||
+			strings.Contains(got, "null") {
+			t.Fatalf("DW-compatible plus generated a nonnumeric operand: %q", got)
+		}
+	})
+}
+
 func TestDWCompatCollectionOpsIncludeReduce(t *testing.T) {
 	got := (exprConfig{DWCompat: true}).collectionOps()
 	want := []string{"map", "filter", "flatMap", "reduce", "groupBy", "pluck", "mapObject"}
