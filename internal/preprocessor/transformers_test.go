@@ -368,6 +368,8 @@ func TestReplaceArrowFunctions(t *testing.T) {
 		{"simple arrow", "(x) -> x + 1", `__lambda("x", x + 1)`},
 		{"multiple params", "(a, b) -> a + b", `__lambda("a, b", a + b)`},
 		{"nested parens in body", "(x) -> (x + 1) * 2", `__lambda("x", (x + 1) * 2)`},
+		{"ungrouped collection in ungrouped lambda body", `(x) -> [] flatMap (y) -> [y]`, `__lambda("x", [] flatMap (y) -> [y])`},
+		{"array body ends before object collection", `(x) -> [x] filterObject (v) -> v`, `__lambda("x", [x]) filterObject __lambda("v", v)`},
 		{"ungrouped collection in body", `((x) -> x map (y) -> y)`, `(__lambda("x", x map (y) -> y))`},
 		{"grouped body ends before collection", `(x) -> (x + 1) filter (__arg) -> __arg > 2`, `__lambda("x", (x + 1)) filter __lambda("__arg", __arg > 2)`},
 		{"string in body", `(x) -> "hello"`, `__lambda("x", "hello")`},

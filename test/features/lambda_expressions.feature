@@ -463,3 +463,4 @@ Feature: Lambda Expression Support
       | [[1], [2]] map ($ flatMap ((y) -> [y, y]))            | [[1,1],[2,2]]     |
       | [[10, 20], [30]] map ($ map ($ + $$))                 | [[10,21],[30]]    |
       | [[1], [2]] map ((x) -> x flatMap [$, $])              | [[1,1],[2,2]]     |
+      | [1] map (i, x) -> [] flatMap (x0) -> [true]           | [[]]              |

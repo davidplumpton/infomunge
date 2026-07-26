@@ -42,10 +42,10 @@ func TestDWCompatReduceUsesTwoParametersAndReturnsAccumulator(t *testing.T) {
 	})
 }
 
-func TestDWCompatNestedFeaturesExcludeCollections(t *testing.T) {
+func TestDWCompatNestedFeaturesIncludeCollections(t *testing.T) {
 	features := FeatureCollections | FeatureArrays | FeatureConditionals
 	got := expressionNestedFeatures(features, exprConfig{DWCompat: true})
-	want := FeatureArrays
+	want := FeatureCollections | FeatureArrays
 	if got != want {
 		t.Fatalf("DW-compatible nested features = %v, want %v", got, want)
 	}

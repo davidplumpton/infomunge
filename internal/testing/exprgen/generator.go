@@ -536,9 +536,6 @@ func interpolationTextPiece(t *rapid.T, label string) string {
 
 func expressionNestedFeatures(features Feature, cfg exprConfig) Feature {
 	nested := features &^ FeatureConditionals
-	if cfg.DWCompat {
-		nested &^= FeatureCollections
-	}
 	return nested
 }
 

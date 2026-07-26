@@ -24,6 +24,12 @@ func TestPrepareForParsingPreservesNestedCollectionLambdas(t *testing.T) {
 			nestedTransform: "replaceMapOperator",
 		},
 		{
+			name:            "ungrouped explicit outer and ungrouped explicit inner",
+			input:           `[1] map (i, x) -> [] flatMap (x0) -> [true]`,
+			expected:        `__map([]interface{}{1,}, __lambda("i, x",__flatMap([]interface{}{}, __lambda("x0", []interface{}{true,}))))`,
+			nestedTransform: "replaceFlatMapOperator",
+		},
+		{
 			name:            "explicit outer and grouped explicit inner",
 			input:           `[[1]] map ((x) -> (x map (y) -> y))`,
 			expected:        `__map([]interface{}{[]interface{}{1,},}, (__lambda("x", (__map(x, __lambda("y", y))))))`,

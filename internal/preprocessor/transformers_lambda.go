@@ -379,7 +379,9 @@ func replaceArrowFunctions(s string) string {
 									break
 								}
 								if isCollectionOperatorWithSpacesAt(s, pos) &&
-									(!allowUngroupedCollection ||
+									((!allowUngroupedCollection &&
+										!(isCompleteArrayLiteralLambdaBody(s[bodyStart:pos]) &&
+											isArrayCollectionOperatorWithSpacesAt(s, pos))) ||
 										isCompleteGroupedLambdaBody(s[bodyStart:pos])) {
 									break
 								}
@@ -422,13 +424,26 @@ func isGroupedArrowLambda(s string, paramsStart int) bool {
 }
 
 func isCompleteGroupedLambdaBody(body string) bool {
+	return isCompleteLambdaBodyDelimitedBy(body, '(')
+}
+
+func isCompleteArrayLiteralLambdaBody(body string) bool {
+	body = strings.TrimSpace(body)
+	const rewrittenArrayPrefix = "[]interface{}"
+	if strings.HasPrefix(body, rewrittenArrayPrefix+"{") {
+		open := len(rewrittenArrayPrefix)
+		sc := stringutils.NewExpressionScanner(body)
+		return sc.FindMatchingCloseBracket(open) == len(body)-1
+	}
+	return isCompleteLambdaBodyDelimitedBy(body, '[')
+}
+
+func isCompleteLambdaBodyDelimitedBy(body string, opener byte) bool {
 	body = strings.TrimSpace(body)
 	if len(body) < 2 {
 		return false
 	}
-	switch body[0] {
-	case '(', '[', '{':
-	default:
+	if body[0] != opener {
 		return false
 	}
 
