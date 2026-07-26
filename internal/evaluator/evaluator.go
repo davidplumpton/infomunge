@@ -333,6 +333,34 @@ func evalMinIntLiteral(expr *ast.UnaryExpr) (Value, bool) {
 	return minInt(), true
 }
 
+// evalDoubleNegatedMinIntLiteral preserves the exact identity -(-x) == x for
+// the minimum signed integer literal. Evaluating the inner expression first
+// would produce minInt and then trip the ordinary single-negation overflow
+// guard, even though the complete double negation is representable.
+//
+// Keep this recognition syntactic: negating a computed minInt still reports
+// overflow rather than weakening the runtime integer range checks.
+func evalDoubleNegatedMinIntLiteral(expr *ast.UnaryExpr) (Value, bool) {
+	if expr.Op != token.SUB {
+		return nil, false
+	}
+
+	operand := expr.X
+	for {
+		paren, ok := operand.(*ast.ParenExpr)
+		if !ok {
+			break
+		}
+		operand = paren.X
+	}
+
+	inner, ok := operand.(*ast.UnaryExpr)
+	if !ok {
+		return nil, false
+	}
+	return evalMinIntLiteral(inner)
+}
+
 // evalIdent evaluates identifiers (variables, constants)
 func evalIdent(e *ast.Ident, context Context) (Value, error) {
 	switch e.Name {

@@ -40,6 +40,20 @@ Feature: Exact numeric behavior
       -9223372036854775808
       """
 
+  Scenario: Double negation preserves the minimum signed integer
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      contains(null, -(-9223372036854775808))
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      false
+      """
+
   Scenario: Equality preserves integers above float precision
     Given the following input content:
       """

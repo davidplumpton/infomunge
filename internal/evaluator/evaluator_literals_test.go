@@ -57,6 +57,21 @@ func TestEvaluate_MinimumSignedIntegerLiteral(t *testing.T) {
 	}
 }
 
+func TestEvaluate_MinimumSignedIntegerDoubleNegation(t *testing.T) {
+	if strconv.IntSize != 64 {
+		t.Skip("acceptance value is specific to 64-bit int builds")
+	}
+
+	const expr = "-(-9223372036854775808)"
+	result, err := Evaluate(expr, Context{}, nil, 0, expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != minInt() {
+		t.Fatalf("expected %d (%T), got %v (%T)", minInt(), minInt(), result, result)
+	}
+}
+
 func TestEvaluate_MinimumSignedIntegerLiteralRangeSafety(t *testing.T) {
 	if strconv.IntSize != 64 {
 		t.Skip("acceptance values are specific to 64-bit int builds")
@@ -73,8 +88,8 @@ func TestEvaluate_MinimumSignedIntegerLiteralRangeSafety(t *testing.T) {
 			want: "invalid integer literal",
 		},
 		{
-			name: "double negation remains overflow",
-			expr: "-(-9223372036854775808)",
+			name: "computed minimum negation remains overflow",
+			expr: "-(-9223372036854775807 - 1)",
 			want: "integer overflow during negation",
 		},
 	}
