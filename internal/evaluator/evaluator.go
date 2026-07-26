@@ -355,8 +355,22 @@ func evalIdent(e *ast.Ident, context Context) (Value, error) {
 
 // Binary operations
 
-// add performs addition with type coercion and concatenation support
+// add performs addition with numeric-string coercion and concatenation support.
 func add(left, right Value) (Value, error) {
+	// DataWeave coerces a numeric-looking string when the other operand is a
+	// number. Keep InfoMunge's string-concatenation extension as the fallback
+	// for nonnumeric strings.
+	if l, ok := left.(string); ok && isNumber(right) {
+		if number, ok := values.ParseNumericLiteral(l); ok {
+			return add(number, right)
+		}
+	}
+	if r, ok := right.(string); ok && isNumber(left) {
+		if number, ok := values.ParseNumericLiteral(r); ok {
+			return add(left, number)
+		}
+	}
+
 	// Special case: string concatenation (supports string + any and any + string)
 	if l, okL := left.(string); okL {
 		if r, okR := right.(string); okR {
@@ -386,6 +400,15 @@ func add(left, right Value) (Value, error) {
 	return numericOp(left, right,
 		func(l, r float64) float64 { return l + r },
 		"addition", "add")
+}
+
+func isNumber(value Value) bool {
+	switch value.(type) {
+	case int, float64:
+		return true
+	default:
+		return false
+	}
 }
 
 // sub performs subtraction or object key removal

@@ -35,6 +35,7 @@ Notes:
 - See the [supported-format and fidelity matrix](docs/FORMATS.md) for MIME aliases, file extensions, input/output direction, structured options, and passthrough limitations.
 - Date formatting uses a documented subset of Java SimpleDateFormat tokens; see `docs/DATE_FORMATS.md`.
 - For null literals, use `null` for DataWeave compatibility. InfoMunge also accepts `nil` as an alias.
+- With `+`, a numeric string and a number are added numerically in either operand order. Other string operands use InfoMunge's string-concatenation extension; DataWeave-compatible scripts should use `++` for string concatenation.
 - InfoMunge supports `%` as a modulo operator. DataWeave-compatible scripts should use the left-associative `mod` operator instead. Like DataWeave, infix `mod` binds less tightly than `+`, `-`, `*`, `/`, and `%`; use parentheses to override that precedence.
 - Range selectors such as `items[1 to 3]` are inclusive. If either bound is outside the collection after resolving negative indexes, the selector returns `null`; direct array and string indexes remain strict and return an out-of-bounds error.
 - String-key selectors on arrays collect matching fields from immediate object elements, skip elements without the field, and return `null` when no element matches. Recursive descent (`..field`) uses the same `null`-on-no-match rule but searches nested arrays and objects.

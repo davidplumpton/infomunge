@@ -26,7 +26,13 @@ func TestEvaluate_Arithmetic(t *testing.T) {
 		{"mixed modulo", "10 % 4.0", 2.0},
 		{"int + float", "2 + 3.5", 5.5},
 		{"float + int", "2.5 + 3", 5.5},
+		{"int + numeric string", `2 + "3"`, 5},
+		{"numeric string + int", `"2" + 3`, 5},
+		{"float + numeric string", `0.08003611321817175 + "1"`, 1.0800361132181717},
+		{"numeric string + float", `"1" + 0.08003611321817175`, 1.0800361132181717},
 		{"string concat", `"hello" + " world"`, "hello world"},
+		{"nonnumeric string + number", `"Count: " + 42`, "Count: 42"},
+		{"number + nonnumeric string", `42 + " items"`, "42 items"},
 		{"complex expression", "(2 + 3) * 4", 20},
 		{"modulo precedence", "2 + 5 % 3 * 4", 10},
 	}

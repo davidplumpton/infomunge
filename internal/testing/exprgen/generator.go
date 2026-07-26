@@ -127,7 +127,6 @@ func allWeightedBinaryOps() []string {
 // dwIncompatibleOps lists binary operators that have different syntax or
 // semantics in DataWeave and should be excluded from DW-compatible generation.
 var dwIncompatibleOps = map[string]bool{
-	"+":  true, // mixed string/number coercion differs (bd-qv20)
 	"++": true, // concatenation semantics may differ
 	"**": true, // DW uses pow() function
 	"~=": true, // infomunge-specific regex match

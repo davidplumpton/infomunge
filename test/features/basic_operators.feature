@@ -17,6 +17,20 @@ Feature: Basic Operators
       3
       """
 
+  Scenario: Mixed numbers and numeric strings use numeric addition
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1 + "2", "2" + 1, 0.08003611321817175 + "1", "1" + 0.08003611321817175]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [3,3,1.0800361132181717,1.0800361132181717]
+      """
+
   Scenario: Arithmetic Subtraction
     Given the following input content:
       """
