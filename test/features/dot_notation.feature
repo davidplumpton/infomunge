@@ -57,6 +57,62 @@ Feature: Dot Notation for Field Access
       "Item1"
       """
 
+  Scenario: Numeric field selectors return null
+    Given the following input content:
+      """
+      %im 0.1
+      input application/json
+      output application/json
+      ---
+      [payload.name.name, payload.age["age"]]
+      """
+    When I run the application with this JSON input:
+      """
+      {"name": 7, "age": -80.45}
+      """
+    Then the output should be:
+      """
+      [null,null]
+      """
+
+  Scenario: Numeric field selectors return null inside collection callbacks
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, {items: [2]}, 3] map (x) -> x.items
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [null,[2],null]
+      """
+
+  Scenario: Numeric presence selectors report missing fields
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      (7).missing?
+      """
+    When I run the script
+    Then the output should be:
+      """
+      false
+      """
+
+  Scenario: Numeric assert selectors report missing fields
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      (7).missing!
+      """
+    Then running the script should fail with error containing "assert selector failed: missing key"
+
   Scenario: Dot notation with non-existent field returns nil
     Given the following input content:
       """

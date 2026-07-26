@@ -127,6 +127,54 @@ func TestEvalIndexUsesExplicitSelectorOperations(t *testing.T) {
 	}
 }
 
+func TestEvalNumberIndexTreatsStringKeysAsMissingFields(t *testing.T) {
+	for _, number := range []Value{7, -80.45} {
+		got, err := evalNumberIndex(number, "score", token.Pos(1))
+		if err != nil {
+			t.Fatalf("evalNumberIndex(%v, string) returned an unexpected error: %v", number, err)
+		}
+		if got != nil {
+			t.Fatalf("evalNumberIndex(%v, string) = %#v, want nil", number, got)
+		}
+	}
+}
+
+func TestEvalNumberIndexSupportsPresenceAndAssertSelectors(t *testing.T) {
+	got, err := evalNumberIndex(
+		7,
+		selectorOperation{mode: selectorModePresence, key: "score"},
+		token.Pos(1),
+	)
+	if err != nil {
+		t.Fatalf("evalNumberIndex(presence) returned an unexpected error: %v", err)
+	}
+	if got != false {
+		t.Fatalf("evalNumberIndex(presence) = %#v, want false", got)
+	}
+
+	_, err = evalNumberIndex(
+		7,
+		selectorOperation{mode: selectorModeAssert, key: "score"},
+		token.Pos(1),
+	)
+	if err == nil {
+		t.Fatal("evalNumberIndex(assert) returned nil error")
+	}
+	if !strings.Contains(err.Error(), `assert selector failed: missing key "score"`) {
+		t.Fatalf("evalNumberIndex(assert) error = %q, want missing-key context", err)
+	}
+}
+
+func TestEvalNumberIndexKeepsOrdinalIndexesUnsupported(t *testing.T) {
+	_, err := evalNumberIndex(7, 0, token.Pos(1))
+	if err == nil {
+		t.Fatal("evalNumberIndex(integer) returned nil error")
+	}
+	if !strings.Contains(err.Error(), "cannot index into int") {
+		t.Fatalf("evalNumberIndex(integer) error = %q, want unsupported-index context", err)
+	}
+}
+
 func TestEvalObjectStringIndexTreatsSelectorSuffixesAsLiteralKeys(t *testing.T) {
 	object := Object{"score?": 7, "score!": 8}
 

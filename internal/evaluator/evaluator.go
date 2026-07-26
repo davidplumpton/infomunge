@@ -847,6 +847,8 @@ func evalIndex(obj Value, idx Value, pos token.Pos) (Value, error) {
 		return evalArrayIndex(v, idx, pos)
 	case XMLMultiValue:
 		return evalArrayIndex(Array(v), idx, pos)
+	case int, float64:
+		return evalNumberIndex(obj, idx, pos)
 	case string:
 		return evalStringIndex(v, idx, pos)
 	case Object:

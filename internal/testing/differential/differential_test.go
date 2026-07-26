@@ -31,7 +31,6 @@ type infomungeOnlyErrorAllowance struct {
 // compatibility gaps. Every matching case is still counted and saved as an
 // artifact. Remove each entry when its issue is closed.
 var infomungeOnlyErrorAllowlist = []infomungeOnlyErrorAllowance{
-	{issueID: "bd-3ryv", errorSubstring: "cannot index into "},
 	{issueID: "bd-2q0t", errorSubstring: "lower expects a string"},
 	{issueID: "bd-2q0t", errorSubstring: "upper expects a string"},
 	{issueID: "bd-2q0t", errorSubstring: "trim expects a string"},
@@ -401,7 +400,6 @@ func TestAllowlistedInfomungeOnlyError_IsNarrowAndTicketed(t *testing.T) {
 		issueID string
 		allowed bool
 	}{
-		{message: "4:1: cannot index into int", issueID: "bd-3ryv", allowed: true},
 		{message: "4:1: lower expects a string", issueID: "bd-2q0t", allowed: true},
 		{message: "4:1: sizeOf: unsupported type int", issueID: "bd-1hpj", allowed: true},
 		{message: "4:51: '_' must separate successive digits", issueID: "bd-2kbq", allowed: true},
