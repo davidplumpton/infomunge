@@ -61,15 +61,22 @@ const (
 	TransformPrecedenceDefault
 	TransformPrecedenceNullChain
 	TransformPrecedenceRange
-	TransformPrecedenceComparison
+	// Keyword comparisons cover functional operators such as contains,
+	// match, matches, and scan. Their DataWeave grammar precedence differs
+	// from native equality and ordering operators.
+	TransformPrecedenceKeywordComparison
 	// Collection operators bind more tightly than comparison operators so
 	// downstream match, matches, scan, and contains operations receive the
 	// completed collection result.
 	TransformPrecedenceCollection
-	TransformPrecedenceType
 	// TransformPrecedenceModulo matches DataWeave's infix mod operator:
-	// it binds less tightly than additive and multiplicative arithmetic.
+	// it binds more tightly than keyword collection/comparison operators but
+	// less tightly than logical, native comparison, type, and arithmetic
+	// operators.
 	TransformPrecedenceModulo
+	TransformPrecedenceLogical
+	TransformPrecedenceComparison
+	TransformPrecedenceType
 	TransformPrecedenceAdditive
 	TransformPrecedenceMultiplicative
 	TransformPrecedencePower

@@ -855,7 +855,7 @@ Feature: Array Functions
        %im 0.1
        output application/json
        ---
-       some([2, 4, 6], (x) -> x mod 2 == 0)
+       some([2, 4, 6], (x) -> (x mod 2) == 0)
        """
      When I run the application with this content
      Then the output should be true
@@ -910,7 +910,7 @@ Feature: Array Functions
        %im 0.1
        output application/json
        ---
-       every([2, 4, 6], (x) -> x mod 2 == 0)
+       every([2, 4, 6], (x) -> (x mod 2) == 0)
        """
      When I run the application with this content
      Then the output should be true

@@ -104,7 +104,7 @@ var binaryOperatorConfigs = map[string]stringutils.BinaryOperatorConfig{
 	binaryOpMod: {
 		Operator:     " mod ",
 		FuncName:     "mod",
-		RightStopOps: []string{" mod ", " repeat ", "==", "!=", "<", ">", "<=", ">=", " matches "},
+		RightStopOps: []string{" mod ", " repeat ", " matches "},
 	},
 }
 

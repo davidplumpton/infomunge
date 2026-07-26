@@ -425,16 +425,66 @@ Feature: Operator transformer rewrite coverage
       2
       """
 
-  Scenario: Infix mod operator in comparison
+  Scenario Outline: Infix mod binds less tightly than native operators
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      <expression>
+      """
+    When I run the application and it fails
+    Then the error should contain "<error>"
+
+    Examples:
+      | family   | expression                     | error                              |
+      | equality | 10 mod 3 == 1                  | mod expects divisor to be a number |
+      | ordering | 10 mod 3 > 0                   | mod expects divisor to be a number |
+      | logical  | 10 mod 3 and true              | logical AND requires booleans       |
+      | type     | 10 mod 3 is Number             | mod expects divisor to be a number |
+      | default  | 10 mod null default 3          | mod expects divisor to be a number |
+      | onNull   | 10 mod null onNull (() -> 3)   | mod expects divisor to be a number |
+      | joinBy   | 10 mod [3] joinBy ""           | mod expects divisor to be a number |
+      | contains | 10 mod [3] contains 3          | mod expects divisor to be a number |
+
+  Scenario: Parentheses compare the result of infix mod
     Given the following script:
       """
       %im 0.1
       output application/json
       ---
-      10 mod 3 == 1
+      (10 mod 3) == 1
       """
     When I run the script
     Then the output should be true
+
+  Scenario: Infix mod completes before then and range operators
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [10 mod 3 then ((x) -> 2), 10 mod 1 to 3]
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [2,[0,1,2,3]]
+      """
+
+  Scenario: Parentheses keep lower-precedence operators inside the divisor
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [10 mod (null default 3), 10 mod (null onNull (() -> 3)), 10 mod (3 then ((x) -> 2))]
+      """
+    When I run the script
+    Then the output should be:
+      """
+      [1,1,0]
+      """
 
   Scenario: Infix mod uses DataWeave precedence and preserves parentheses
     Given the following script:

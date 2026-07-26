@@ -934,6 +934,9 @@ func TestReplaceModOperatorUsesDataWeavePrecedence(t *testing.T) {
 		{"additive expression before mod", "2 + 8 * 4 mod 3", "mod(2 + 8 * 4, 3)"},
 		{"unary sign in chain", "8 * -4 mod 3", "mod(8 * -4, 3)"},
 		{"unary sign on right", "8 mod -3 * 2", "mod(8, -3 * 2)"},
+		{"equality inside right operand", "10 mod 3 == 1", "mod(10, 3 == 1)"},
+		{"ordering inside left operand", "10 < 11 mod 3", "mod(10 < 11, 3)"},
+		{"logical expression inside right operand", "10 mod 3 && true", "mod(10, 3 && true)"},
 		{"grouped left operand", "(8 / 4) mod 3", "mod((8 / 4), 3)"},
 		{"grouped right operand", "8 / (4 mod 3)", "8 / (mod(4, 3))"},
 	}

@@ -76,26 +76,108 @@ func TestModContractDeclaresDataWeavePrecedence(t *testing.T) {
 	if contract.Associativity != TransformAssociativityLeft {
 		t.Fatalf("mod associativity = %q, want %q", contract.Associativity, TransformAssociativityLeft)
 	}
-	if !(TransformPrecedenceComparison < contract.Precedence &&
+	if !(TransformPrecedenceCollection < contract.Precedence &&
+		contract.Precedence < TransformPrecedenceLogical &&
+		contract.Precedence < TransformPrecedenceComparison &&
+		contract.Precedence < TransformPrecedenceType &&
 		contract.Precedence < TransformPrecedenceAdditive) {
 		t.Fatalf(
-			"mod precedence %d should be between comparison %d and additive %d",
+			"mod precedence %d should be above collection %d and below logical %d, comparison %d, type %d, and additive %d",
 			contract.Precedence,
+			TransformPrecedenceCollection,
+			TransformPrecedenceLogical,
 			TransformPrecedenceComparison,
+			TransformPrecedenceType,
 			TransformPrecedenceAdditive,
 		)
 	}
 }
 
 func TestCollectionOperatorsBindMoreTightlyThanComparisonOperators(t *testing.T) {
-	if !(TransformPrecedenceComparison < TransformPrecedenceCollection &&
+	if !(TransformPrecedenceKeywordComparison < TransformPrecedenceCollection &&
 		TransformPrecedenceCollection < TransformPrecedenceAdditive) {
 		t.Fatalf(
-			"collection precedence %d should be between comparison %d and additive %d",
+			"collection precedence %d should be between keyword comparison %d and additive %d",
 			TransformPrecedenceCollection,
-			TransformPrecedenceComparison,
+			TransformPrecedenceKeywordComparison,
 			TransformPrecedenceAdditive,
 		)
+	}
+}
+
+func TestModuloComposesWithDataWeavePrecedenceFamilies(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "equality binds inside right operand",
+			input:    `10 mod 3 == 1`,
+			expected: `mod(10, 3 == 1)`,
+		},
+		{
+			name:     "ordering binds inside left operand",
+			input:    `10 < 11 mod 3`,
+			expected: `mod(10 < 11, 3)`,
+		},
+		{
+			name:     "logical expression binds inside right operand",
+			input:    `10 mod 3 and true`,
+			expected: `mod(10, 3 && true)`,
+		},
+		{
+			name:     "type check binds inside right operand",
+			input:    `10 mod 3 is Number`,
+			expected: `mod(10, __isType(3, "Number"))`,
+		},
+		{
+			name:     "default remains outside modulo",
+			input:    `10 mod null default 3`,
+			expected: `__default(mod(10, null), 3)`,
+		},
+		{
+			name:     "onNull remains outside modulo",
+			input:    `10 mod null onNull fallback`,
+			expected: `onNull(mod(10, null), fallback)`,
+		},
+		{
+			name:     "then remains outside modulo",
+			input:    `10 mod 3 then transform`,
+			expected: `then(mod(10, 3), transform)`,
+		},
+		{
+			name:     "range remains outside modulo",
+			input:    `10 mod 1 to 3`,
+			expected: `to(mod(10, 1), 3)`,
+		},
+		{
+			name:     "collection operator remains outside modulo",
+			input:    `10 mod values joinBy ""`,
+			expected: `joinBy(mod(10, values), "")`,
+		},
+		{
+			name:     "keyword comparison remains outside modulo",
+			input:    `10 mod values contains 3`,
+			expected: `contains(mod(10, values), 3)`,
+		},
+		{
+			name:     "parentheses override native comparison precedence",
+			input:    `(10 mod 3) == 1`,
+			expected: `(mod(10, 3)) == 1`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, _, err := PrepareForParsing(tt.input, Options{})
+			if err != nil {
+				t.Fatalf("PrepareForParsing returned error: %v", err)
+			}
+			if result != tt.expected {
+				t.Fatalf("expected %q, got %q", tt.expected, result)
+			}
+		})
 	}
 }
 

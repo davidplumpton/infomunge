@@ -91,10 +91,11 @@ func findTypedOperatorLeftOperandStartBytes(result []byte) int {
 	return leftStart
 }
 
-// findModuloLeftOperandStartBytes includes additive and multiplicative
-// arithmetic in the left operand. DataWeave's infix mod binds less tightly
-// than those operators, but more tightly than comparisons and logical
-// operators.
+// findModuloLeftOperandStartBytes includes logical, native comparison, type,
+// additive, and multiplicative expressions in the left operand. DataWeave's
+// infix mod binds less tightly than those operators. Lower-precedence keyword
+// operators have already wrapped their operands or provide structural call
+// boundaries before this scanner runs.
 func findModuloLeftOperandStartBytes(result []byte) int {
 	pos := len(result) - 1
 	for pos >= 0 && isWhitespace(result[pos]) {
@@ -141,7 +142,7 @@ func findModuloLeftOperandStartBytes(result []byte) int {
 
 func isModuloLeftBoundary(ch byte) bool {
 	switch ch {
-	case '=', '<', '>', '!', '&', '|', ',', ';', ':', '(', '[', '{':
+	case ',', ';', ':', '(', '[', '{':
 		return true
 	default:
 		return false
@@ -150,7 +151,7 @@ func isModuloLeftBoundary(ch byte) bool {
 
 func shouldStopModuloRightOperand(input string, pos, _ int) bool {
 	switch input[pos] {
-	case '=', '<', '>', '!', '&', '|', ';', ':':
+	case ';', ':':
 		return true
 	default:
 		return false
