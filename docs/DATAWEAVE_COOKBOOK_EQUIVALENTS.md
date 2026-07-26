@@ -891,12 +891,12 @@ output application/json
 | Feature | DataWeave | InfoMunge |
 |---------|-----------|-----------|
 | **Header** | `%dw 2.0` | `%im 0.1` |
-| **Array Field Selection** | `.name` on array | Must use `..name` (recursive descent) or `map` |
+| **Array Field Selection** | `.name` on array | `.name` or `["name"]` selects immediate fields; `..name` uses recursive descent |
 | **Object Iteration** | `mapObject (value, key, index)` | `mapObject (value, key, index)`; exact `(key, value)` and `(k, v)` pairs keep legacy key-first order |
 | **Object Iteration Result** | Callback returns an object | Callback returns an object or an InfoMunge `[key, value]` pair |
-| **Default Parameters** | `$` (value), `$$` (index) | Named parameters required |
-| **String Concat in Objects** | `{key: val1 ++ val2}` | Must use `{key: (val1 ++ val2)}` (requires parens) |
-| **Complex Expressions in Objects** | Can use operators directly | Require parentheses: `{key: (expr1 op expr2)}` |
+| **Implicit Callback Parameters** | `$` (value), `$$` (index) | `$` and `$$` are supported; named parameters are also available |
+| **String Concat in Objects** | `{key: val1 ++ val2}` | `{key: val1 ++ val2}`; parentheses are optional for grouping |
+| **Complex Expressions in Objects** | Can use operators directly | Operators are supported directly; parentheses are optional for grouping |
 | **Multiple Inputs** | `input <name> <format>` | CLI/server input names create variables; `input <name> <format>` headers are compatibility metadata |
 | **Null Literal** | `null` | `null` (preferred), `nil` alias also accepted |
 | **Type System** | Complex type definitions | Basic types with `as` coercion |
