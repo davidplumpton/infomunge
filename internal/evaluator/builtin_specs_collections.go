@@ -45,6 +45,8 @@ func collectionBuiltinSpecs() []BuiltinSpec {
 		regularBuiltinSpec("__objvalues", builtinCategoryObjects, exactArity(1), callBuiltinObjectValues, "object values"),
 		regularBuiltinSpec("__multival", builtinCategoryObjects, exactArity(2), callBuiltinMultival, "XML multi-value wrapper"),
 		regularBuiltinSpec("__metadata", builtinCategoryObjects, exactArity(2), callBuiltinMetadata, "metadata selector"),
+		regularBuiltinSpec("__presenceSelector", builtinCategoryObjects, exactArity(1), callBuiltinPresenceSelector, "presence selector"),
+		regularBuiltinSpec("__assertSelector", builtinCategoryObjects, exactArity(1), callBuiltinAssertSelector, "assert selector"),
 		regularBuiltinSpec("objectToArray", builtinCategoryObjects, exactArity(1), callBuiltinObjectToArray, "object entries as array"),
 		regularBuiltinSpec("arrayToObject", builtinCategoryObjects, exactArity(1), callBuiltinArrayToObject, "entries array as object"),
 		regularBuiltinSpec("entriesOf", builtinCategoryObjects, exactArity(1), callBuiltinEntriesOf, "object entries"),

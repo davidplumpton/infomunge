@@ -139,6 +139,25 @@ Feature: Selector Features
     When I run the application and it fails
     Then the error should contain "assert selector failed"
 
+  Scenario: Quoted selector punctuation remains part of literal keys
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {
+        "arrayQuestion": [{"score?": 7}]["score?"],
+        "arrayBang": [{"score!": 8}]["score!"],
+        "objectQuestion": {"score?": 9}["score?"],
+        "objectBang": {"score!": 10}["score!"]
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"arrayQuestion":[7],"arrayBang":[8],"objectQuestion":9,"objectBang":10}
+      """
+
   Scenario: Namespace selector returns namespace URI
     Given the following XML input:
       """

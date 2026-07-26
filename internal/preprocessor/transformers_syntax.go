@@ -475,6 +475,11 @@ func replaceDotNotationWithMapping(s string) (string, []int) {
 
 func appendDotNotationSelectorWithMapping(buf *mappedBuffer, src string, dotPos, markerPos, fieldStart, fieldEnd int, fieldName string, suffix rune, suffixPos int, isNamespace bool) {
 	buf.AppendLiteral("[", dotPos)
+	if suffix == '?' {
+		buf.AppendLiteral("__presenceSelector(", dotPos)
+	} else if suffix == '!' {
+		buf.AppendLiteral("__assertSelector(", dotPos)
+	}
 	quotePos := fieldStart
 	if markerPos >= 0 {
 		quotePos = markerPos
@@ -488,9 +493,6 @@ func appendDotNotationSelectorWithMapping(buf *mappedBuffer, src string, dotPos,
 		}
 		buf.AppendOriginal(src, fieldStart, fieldEnd)
 	}
-	if suffix != 0 && suffixPos >= 0 {
-		buf.AppendOriginal(src, suffixPos, suffixPos+1)
-	}
 	closePos := fieldEnd - 1
 	if suffixPos >= 0 {
 		closePos = suffixPos
@@ -499,6 +501,9 @@ func appendDotNotationSelectorWithMapping(buf *mappedBuffer, src string, dotPos,
 		closePos = dotPos
 	}
 	buf.AppendLiteral("\"", closePos)
+	if suffix != 0 {
+		buf.AppendLiteral(")", closePos)
+	}
 	buf.AppendLiteral("]", closePos)
 }
 

@@ -51,6 +51,29 @@ func TestEvalArrayStringIndexReturnsNullWithoutMatches(t *testing.T) {
 	}
 }
 
+func TestEvalArrayStringIndexTreatsSelectorSuffixesAsLiteralKeys(t *testing.T) {
+	input := Array{
+		Object{"score?": 7},
+		Object{"score!": 8},
+	}
+
+	for _, tt := range []struct {
+		key  string
+		want Array
+	}{
+		{key: "score?", want: Array{7}},
+		{key: "score!", want: Array{8}},
+	} {
+		got, err := evalArrayStringIndex(input, tt.key, token.Pos(1))
+		if err != nil {
+			t.Fatalf("evalArrayStringIndex(%q) returned an unexpected error: %v", tt.key, err)
+		}
+		if !reflect.DeepEqual(got, tt.want) {
+			t.Fatalf("evalArrayStringIndex(%q) = %#v, want %#v", tt.key, got, tt.want)
+		}
+	}
+}
+
 func TestEvalArrayPresenceSelectorReportsAnyMatchingField(t *testing.T) {
 	if !evalArrayPresenceSelector(Array{Object{"score": 1}, Object{"other": 2}, 3}, "score") {
 		t.Fatal("evalArrayPresenceSelector() = false, want true")
@@ -80,6 +103,47 @@ func TestEvalArrayAssertSelectorRequiresAtLeastOneMatchingField(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `assert selector failed: missing key "score"`) {
 		t.Fatalf("evalArrayAssertSelector() error = %q, want missing-key context", err)
+	}
+}
+
+func TestEvalIndexUsesExplicitSelectorOperations(t *testing.T) {
+	array := Array{Object{"score": 7}}
+	object := Object{"score": 8}
+
+	got, err := evalArrayIndex(array, selectorOperation{mode: selectorModePresence, key: "score"}, token.Pos(1))
+	if err != nil {
+		t.Fatalf("evalArrayIndex() returned an unexpected error: %v", err)
+	}
+	if got != true {
+		t.Fatalf("evalArrayIndex() = %#v, want true", got)
+	}
+
+	got, err = evalObjectIndex(object, selectorOperation{mode: selectorModeAssert, key: "score"}, token.Pos(1))
+	if err != nil {
+		t.Fatalf("evalObjectIndex() returned an unexpected error: %v", err)
+	}
+	if got != 8 {
+		t.Fatalf("evalObjectIndex() = %#v, want 8", got)
+	}
+}
+
+func TestEvalObjectStringIndexTreatsSelectorSuffixesAsLiteralKeys(t *testing.T) {
+	object := Object{"score?": 7, "score!": 8}
+
+	for _, tt := range []struct {
+		key  string
+		want Value
+	}{
+		{key: "score?", want: 7},
+		{key: "score!", want: 8},
+	} {
+		got, err := evalObjectStringIndex(object, tt.key, token.Pos(1))
+		if err != nil {
+			t.Fatalf("evalObjectStringIndex(%q) returned an unexpected error: %v", tt.key, err)
+		}
+		if got != tt.want {
+			t.Fatalf("evalObjectStringIndex(%q) = %#v, want %#v", tt.key, got, tt.want)
+		}
 	}
 }
 

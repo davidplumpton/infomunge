@@ -18,6 +18,8 @@ func evalArrayIndex(arr Array, idx Value, pos token.Pos) (Value, error) {
 			return nil, newPosError(fmt.Sprintf("array index out of bounds: %d", i), pos)
 		}
 		return arr[i], nil
+	case selectorOperation:
+		return evalArraySelectorOperation(arr, i, pos)
 	case string:
 		return evalArrayStringIndex(arr, i, pos)
 	default:
@@ -25,17 +27,11 @@ func evalArrayIndex(arr Array, idx Value, pos token.Pos) (Value, error) {
 	}
 }
 
-// evalArrayStringIndex handles string-based indexing into arrays, including
-// presence (?) and assert (!) selectors and field extraction. DataWeave array
-// selectors collect matching keys from immediate object elements, skip
-// non-matching elements, and return null when no key matches.
+// evalArrayStringIndex handles literal string-based field extraction from
+// arrays. DataWeave array selectors collect matching keys from immediate
+// object elements, skip non-matching elements, and return null when no key
+// matches.
 func evalArrayStringIndex(arr Array, key string, pos token.Pos) (Value, error) {
-	if strings.HasSuffix(key, "?") {
-		return evalArrayPresenceSelector(arr, strings.TrimSuffix(key, "?")), nil
-	}
-	if strings.HasSuffix(key, "!") {
-		return evalArrayAssertSelector(arr, strings.TrimSuffix(key, "!"), pos)
-	}
 	result := make(Array, 0, len(arr))
 	for _, item := range arr {
 		if itemMap, ok := item.(Object); ok {
@@ -48,6 +44,17 @@ func evalArrayStringIndex(arr Array, key string, pos token.Pos) (Value, error) {
 		return nil, nil
 	}
 	return result, nil
+}
+
+func evalArraySelectorOperation(arr Array, selector selectorOperation, pos token.Pos) (Value, error) {
+	switch selector.mode {
+	case selectorModePresence:
+		return evalArrayPresenceSelector(arr, selector.key), nil
+	case selectorModeAssert:
+		return evalArrayAssertSelector(arr, selector.key, pos)
+	default:
+		return nil, newPosError("unknown array selector operation", pos)
+	}
 }
 
 // evalArrayPresenceSelector reports whether any immediate object element has
@@ -102,11 +109,13 @@ func evalStringIndex(s string, idx Value, pos token.Pos) (Value, error) {
 }
 
 // evalObjectIndex handles indexing into maps/objects, including special keys
-// (#, @), presence/assert selectors, and ordinal indexing.
+// (#, @), explicit selector operations, and ordinal indexing.
 func evalObjectIndex(obj Object, idx Value, pos token.Pos) (Value, error) {
 	switch i := idx.(type) {
 	case string:
 		return evalObjectStringIndex(obj, i, pos)
+	case selectorOperation:
+		return evalObjectSelectorOperation(obj, i, pos)
 	case int:
 		return evalObjectOrdinalIndex(obj, i, pos)
 	default:
@@ -114,8 +123,8 @@ func evalObjectIndex(obj Object, idx Value, pos token.Pos) (Value, error) {
 	}
 }
 
-// evalObjectStringIndex handles string-based object access including special
-// keys (#, @) and presence/assert selectors.
+// evalObjectStringIndex handles literal string-based object access, including
+// the special namespace and attribute keys (#, @).
 func evalObjectStringIndex(obj Object, key string, pos token.Pos) (Value, error) {
 	if key == "#" {
 		return extractNamespaceValue(obj), nil
@@ -129,21 +138,23 @@ func evalObjectStringIndex(obj Object, key string, pos token.Pos) (Value, error)
 		}
 		return attrs, nil
 	}
-	if strings.HasSuffix(key, "?") {
-		trimmed := strings.TrimSuffix(key, "?")
-		_, exists := getObjectValue(obj, trimmed)
-		return exists, nil
-	}
-	if strings.HasSuffix(key, "!") {
-		trimmed := strings.TrimSuffix(key, "!")
-		val, exists := getObjectValue(obj, trimmed)
-		if !exists {
-			return nil, newPosError(fmt.Sprintf("assert selector failed: missing key %q", trimmed), pos)
-		}
-		return val, nil
-	}
 	val, _ := getObjectValue(obj, key)
 	return val, nil
+}
+
+func evalObjectSelectorOperation(obj Object, selector selectorOperation, pos token.Pos) (Value, error) {
+	val, exists := getObjectValue(obj, selector.key)
+	switch selector.mode {
+	case selectorModePresence:
+		return exists, nil
+	case selectorModeAssert:
+		if !exists {
+			return nil, newPosError(fmt.Sprintf("assert selector failed: missing key %q", selector.key), pos)
+		}
+		return val, nil
+	default:
+		return nil, newPosError("unknown object selector operation", pos)
+	}
 }
 
 // evalObjectOrdinalIndex accesses an object by insertion position.

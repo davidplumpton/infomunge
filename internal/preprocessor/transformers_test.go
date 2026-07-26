@@ -57,8 +57,10 @@ func TestReplaceDotNotation(t *testing.T) {
 		{"chained dot", "obj.a.b", `obj["a"]["b"]`},
 		{"dot with @", "obj.@attr", `obj["@attr"]`},
 		{"dot with #", "obj.#", `obj["#"]`},
-		{"dot assert", "obj.field!", `obj["field!"]`},
-		{"dot optional", "obj.field?", `obj["field?"]`},
+		{"dot assert", "obj.field!", `obj[__assertSelector("field")]`},
+		{"dot optional", "obj.field?", `obj[__presenceSelector("field")]`},
+		{"literal bang index", `obj["field!"]`, `obj["field!"]`},
+		{"literal question index", `obj["field?"]`, `obj["field?"]`},
 		{"no replacement in string", `"obj.field"`, `"obj.field"`},
 	}
 
