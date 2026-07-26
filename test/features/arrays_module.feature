@@ -348,20 +348,28 @@ Feature: Arrays Module
       {"l":[1,2],"r":[3,4]}
       """
 
-  Scenario: splitWhere divides the array at the first match
+  Scenario Outline: splitWhere divides at the first match and uses the DataWeave no-match fallback
     Given the following input content:
       """
       %im 0.1
       output application/json
       import * from dw::core::Arrays
       ---
-      splitWhere([1, 2, 3, 4], (x) -> x > 2)
+      <expression>
       """
     When I run the application with this content
     Then the output should be:
       """
-      {"l":[1,2],"r":[3,4]}
+      <expected>
       """
+
+    Examples:
+      | expression                             | expected               |
+      | splitWhere([1, 2, 3, 4], (x) -> x > 0) | {"l":[],"r":[1,2,3,4]} |
+      | splitWhere([1, 2, 3, 4], (x) -> x > 2) | {"l":[1,2],"r":[3,4]}  |
+      | splitWhere([1, 2, 3, 4], (x) -> x > 9) | {"l":[],"r":[1,2,3,4]} |
+      | splitWhere([], (x) -> 1 / 0)           | {"l":[],"r":[]}        |
+      | splitWhere(null, (x) -> 1 / 0)         | null                   |
 
   Scenario: sumBy sums mapped values
     Given the following input content:
@@ -436,7 +444,6 @@ Feature: Arrays Module
       | slice(null, 0, 1)                     | null     |
       | some(null, (x) -> 1 / 0)              | false    |
       | splitAt(null, 1)                      | null     |
-      | splitWhere(null, (x) -> 1 / 0)        | null     |
       | sumBy(null, (x) -> 1 / 0)             | null     |
       | take(null, 1)                         | null     |
       | takeWhile(null, (x) -> 1 / 0)         | null     |

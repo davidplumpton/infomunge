@@ -67,11 +67,7 @@ fun splitAt(array, index) =
 
 fun splitWhere(array, criteria) =
   if (array == null) null
-  else
-    {
-      l: takeWhile(array, (item) -> not criteria(item)),
-      r: dropWhile(array, (item) -> not criteria(item))
-    }
+  else splitAt(array, max([indexWhere(array, criteria), 0]))
 
 fun sumBy(array, mapper) =
   if (array == null) null
