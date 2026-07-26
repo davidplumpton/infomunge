@@ -8,6 +8,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // XML special key constants for attribute and text node representation
@@ -124,11 +125,337 @@ func formatXMLWithOptions(result interface{}, opts XMLOutputOptions) (string, er
 		return "", unifiederrors.ValidationErrorf("invalid XML output options: %v", err)
 	}
 
+	if err := validateXMLOutput(result, renderOpts); err != nil {
+		return "", err
+	}
+
 	xml := toXMLWithOptions(result, "", renderOpts)
 	if renderOpts.writeDeclaration {
 		xml = "<?xml version='1.0' encoding='UTF-8'?>\n" + xml
 	}
 	return xml, nil
+}
+
+const (
+	xmlNamespaceURI      = "http://www.w3.org/XML/1998/namespace"
+	xmlnsNamespaceURI    = "http://www.w3.org/2000/xmlns/"
+	defaultNamespaceName = "#default"
+)
+
+type xmlOutputNamespaceContext map[string]string
+
+func validateXMLOutput(result interface{}, opts xmlRenderOptions) error {
+	root, ok := result.(Object)
+	if !ok {
+		return unifiederrors.ValidationErrorf(
+			"XML output expects an object containing exactly one root element, got %T",
+			result,
+		)
+	}
+
+	rootKeys := extractAndSortChildKeys(root)
+	if len(rootKeys) != 1 {
+		return unifiederrors.ValidationErrorf(
+			"XML output expects exactly one root element, got %d",
+			len(rootKeys),
+		)
+	}
+	if len(root) != 1 {
+		for _, key := range values.ObjectKeys(root) {
+			if key != rootKeys[0] {
+				return unifiederrors.ValidationErrorf(
+					"XML output root wrapper contains unsupported metadata key %q",
+					key,
+				)
+			}
+		}
+	}
+	if root[rootKeys[0]] == nil && opts.skipNullOnElements {
+		return unifiederrors.ValidationError("XML output root element cannot be skipped")
+	}
+
+	namespaceCtx := xmlOutputNamespaceContext{"xml": xmlNamespaceURI}
+	return validateXMLOutputElement(rootKeys[0], root[rootKeys[0]], opts, namespaceCtx, false)
+}
+
+func validateXMLOutputElement(
+	sourceName string,
+	value interface{},
+	opts xmlRenderOptions,
+	parentNamespaces xmlOutputNamespaceContext,
+	isChild bool,
+) error {
+	resolvedName, elementPrefix, elementURI, elementHasPrefix := resolveName(sourceName, opts.namespaceVars)
+	elementName := normalizeTagName(resolvedName)
+	if err := validateXMLQName(elementName); err != nil {
+		return unifiederrors.ValidationErrorf("invalid XML element name %q: %v", elementName, err)
+	}
+
+	namespaceCtx := copyXMLOutputNamespaceContext(parentNamespaces)
+	localNamespaces := make(map[string]struct{})
+	valueObject, isObject := value.(Object)
+	if isObject {
+		if err := addXMLNodeNamespaceDeclarations(namespaceCtx, localNamespaces, valueObject); err != nil {
+			return err
+		}
+	}
+	if !isChild {
+		if err := addXMLOutputNamespacesIfAbsent(namespaceCtx, localNamespaces, opts.rootDeclaredNames); err != nil {
+			return err
+		}
+	}
+	if elementHasPrefix {
+		if elementURI == "" && opts.declaredNamespaces != nil {
+			elementURI = opts.declaredNamespaces[elementPrefix]
+		}
+		if elementURI != "" {
+			if err := addXMLOutputNamespaceIfAbsent(namespaceCtx, localNamespaces, elementPrefix, elementURI); err != nil {
+				return err
+			}
+		}
+	}
+
+	if isObject {
+		renderedAttributeNames := make(map[string]struct{})
+		for _, key := range extractAndSortAttributeKeys(valueObject) {
+			if key == XMLNamespaceKey || opts.skipNullOnAttributes && valueObject[key] == nil {
+				continue
+			}
+			sourceAttrName := key[len(XMLAttrPrefix):]
+			resolvedAttrName, attrPrefix, attrURI, attrHasPrefix := resolveName(sourceAttrName, opts.namespaceVars)
+			attrName := normalizeTagName(resolvedAttrName)
+			if err := validateXMLQName(attrName); err != nil {
+				return unifiederrors.ValidationErrorf("invalid XML attribute name %q: %v", attrName, err)
+			}
+			if _, duplicate := renderedAttributeNames[attrName]; duplicate {
+				return unifiederrors.ValidationErrorf(
+					"XML element %q contains duplicate resolved attribute name %q",
+					elementName,
+					attrName,
+				)
+			}
+			renderedAttributeNames[attrName] = struct{}{}
+			if attrHasPrefix {
+				if attrURI == "" && opts.declaredNamespaces != nil {
+					attrURI = opts.declaredNamespaces[attrPrefix]
+				}
+				if attrURI != "" {
+					if err := addXMLOutputNamespaceIfAbsent(namespaceCtx, localNamespaces, attrPrefix, attrURI); err != nil {
+						return err
+					}
+				}
+			}
+			if err := validateXMLQNamePrefixBinding(attrName, namespaceCtx); err != nil {
+				return unifiederrors.ValidationErrorf("invalid XML attribute name %q: %v", attrName, err)
+			}
+		}
+	}
+
+	if err := validateXMLQNamePrefixBinding(elementName, namespaceCtx); err != nil {
+		return unifiederrors.ValidationErrorf("invalid XML element name %q: %v", elementName, err)
+	}
+	if !isObject {
+		return nil
+	}
+
+	for _, childName := range extractAndSortChildKeys(valueObject) {
+		childValue := valueObject[childName]
+		switch items := childValue.(type) {
+		case XMLMultiValue:
+			for _, item := range items {
+				if item == nil && opts.skipNullOnElements {
+					continue
+				}
+				if err := validateXMLOutputElement(childName, item, opts, namespaceCtx, true); err != nil {
+					return err
+				}
+			}
+		case Array:
+			for _, item := range items {
+				if item == nil && opts.skipNullOnElements {
+					continue
+				}
+				if err := validateXMLOutputElement(childName, item, opts, namespaceCtx, true); err != nil {
+					return err
+				}
+			}
+		default:
+			if childValue == nil && opts.skipNullOnElements {
+				continue
+			}
+			if err := validateXMLOutputElement(childName, childValue, opts, namespaceCtx, true); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func copyXMLOutputNamespaceContext(input xmlOutputNamespaceContext) xmlOutputNamespaceContext {
+	output := make(xmlOutputNamespaceContext, len(input))
+	for prefix, uri := range input {
+		output[prefix] = uri
+	}
+	return output
+}
+
+func addXMLNodeNamespaceDeclarations(
+	namespaceCtx xmlOutputNamespaceContext,
+	localNamespaces map[string]struct{},
+	node Object,
+) error {
+	rawNamespaces, exists := node[XMLNamespaceKey]
+	if !exists {
+		return nil
+	}
+	namespaces, ok := rawNamespaces.(Object)
+	if !ok {
+		return unifiederrors.ValidationErrorf(
+			"XML namespace declarations must be an object, got %T",
+			rawNamespaces,
+		)
+	}
+	for _, sourcePrefix := range values.ObjectKeys(namespaces) {
+		prefix := sourcePrefix
+		if prefix == defaultNamespaceName {
+			prefix = ""
+		}
+		if err := addXMLOutputNamespace(namespaceCtx, prefix, fmt.Sprintf("%v", namespaces[sourcePrefix])); err != nil {
+			return err
+		}
+		localNamespaces[prefix] = struct{}{}
+	}
+	return nil
+}
+
+func addXMLOutputNamespacesIfAbsent(
+	namespaceCtx xmlOutputNamespaceContext,
+	localNamespaces map[string]struct{},
+	namespaces map[string]string,
+) error {
+	for prefix, uri := range namespaces {
+		if err := addXMLOutputNamespaceIfAbsent(namespaceCtx, localNamespaces, prefix, uri); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addXMLOutputNamespaceIfAbsent(
+	namespaceCtx xmlOutputNamespaceContext,
+	localNamespaces map[string]struct{},
+	prefix string,
+	uri string,
+) error {
+	if _, exists := localNamespaces[prefix]; exists {
+		return nil
+	}
+	if err := addXMLOutputNamespace(namespaceCtx, prefix, uri); err != nil {
+		return err
+	}
+	localNamespaces[prefix] = struct{}{}
+	return nil
+}
+
+func addXMLOutputNamespace(namespaceCtx xmlOutputNamespaceContext, prefix, uri string) error {
+	if prefix != "" && !isXMLNCName(prefix) {
+		return unifiederrors.ValidationErrorf("invalid XML namespace prefix %q", prefix)
+	}
+	switch {
+	case prefix == "xmlns":
+		return unifiederrors.ValidationError("XML namespace prefix \"xmlns\" is reserved")
+	case prefix == "xml" && uri != xmlNamespaceURI:
+		return unifiederrors.ValidationErrorf("XML namespace prefix \"xml\" must use URI %q", xmlNamespaceURI)
+	case prefix != "xml" && uri == xmlNamespaceURI:
+		return unifiederrors.ValidationError("the XML namespace URI may only use prefix \"xml\"")
+	case uri == xmlnsNamespaceURI:
+		return unifiederrors.ValidationError("the xmlns namespace URI cannot be declared")
+	case prefix != "" && uri == "":
+		return unifiederrors.ValidationErrorf("XML namespace prefix %q cannot use an empty URI", prefix)
+	}
+	namespaceCtx[prefix] = uri
+	return nil
+}
+
+func validateXMLQNamePrefixBinding(name string, namespaceCtx xmlOutputNamespaceContext) error {
+	prefix, _, hasPrefix := strings.Cut(name, ":")
+	if !hasPrefix {
+		return nil
+	}
+	if _, exists := namespaceCtx[prefix]; !exists {
+		return fmt.Errorf("namespace prefix %q is not declared", prefix)
+	}
+	return nil
+}
+
+func validateXMLQName(name string) error {
+	if !utf8.ValidString(name) {
+		return fmt.Errorf("name is not valid UTF-8")
+	}
+	if strings.Count(name, ":") > 1 {
+		return fmt.Errorf("QName must contain at most one colon")
+	}
+	prefix, local, hasPrefix := strings.Cut(name, ":")
+	if !hasPrefix {
+		if !isXMLNCName(name) {
+			return fmt.Errorf("name must be a valid XML NCName")
+		}
+		return nil
+	}
+	if !isXMLNCName(prefix) || !isXMLNCName(local) {
+		return fmt.Errorf("QName prefix and local name must be valid XML NCNames")
+	}
+	if prefix == "xmlns" {
+		return fmt.Errorf("prefix %q is reserved", prefix)
+	}
+	return nil
+}
+
+func isXMLNCName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for index, r := range name {
+		if index == 0 {
+			if !isXMLNCNameStartRune(r) {
+				return false
+			}
+			continue
+		}
+		if !isXMLNCNameRune(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func isXMLNCNameStartRune(r rune) bool {
+	return r == '_' ||
+		r >= 'A' && r <= 'Z' ||
+		r >= 'a' && r <= 'z' ||
+		r >= 0xC0 && r <= 0xD6 ||
+		r >= 0xD8 && r <= 0xF6 ||
+		r >= 0xF8 && r <= 0x2FF ||
+		r >= 0x370 && r <= 0x37D ||
+		r >= 0x37F && r <= 0x1FFF ||
+		r >= 0x200C && r <= 0x200D ||
+		r >= 0x2070 && r <= 0x218F ||
+		r >= 0x2C00 && r <= 0x2FEF ||
+		r >= 0x3001 && r <= 0xD7FF ||
+		r >= 0xF900 && r <= 0xFDCF ||
+		r >= 0xFDF0 && r <= 0xFFFD ||
+		r >= 0x10000 && r <= 0xEFFFF
+}
+
+func isXMLNCNameRune(r rune) bool {
+	return isXMLNCNameStartRune(r) ||
+		r == '-' ||
+		r == '.' ||
+		r >= '0' && r <= '9' ||
+		r == 0xB7 ||
+		r >= 0x0300 && r <= 0x036F ||
+		r >= 0x203F && r <= 0x2040
 }
 
 // Note: The old validateXMLBrackets and helper functions (handleClosingTag, handleOpeningTag,

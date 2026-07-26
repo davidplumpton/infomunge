@@ -16,7 +16,7 @@ match a registered value exactly.
 | --- | --- | --- | --- | --- | --- | --- |
 | JSON | `application/json` | — | `.json` | Yes | Yes | Structured. Numbers are decoded using Go JSON semantics and output is compact JSON. |
 | YAML | `application/yaml` | — | `.yaml`, `.yml` | Yes | Yes | Structured single-document YAML. |
-| XML | `application/xml` | — | `.xml` | Yes | Yes | Structured object mapping. Attributes use `@`, text uses `#text`, and repeated elements become arrays. Whitespace-only text is discarded, so mixed-content documents are not lossless. |
+| XML | `application/xml` | — | `.xml` | Yes | Yes | Structured object mapping. Output requires an object with exactly one root element; multiple roots are rejected. Attributes use `@`, text uses `#text`, and repeated elements become arrays. Element and attribute names must be valid QNames, and prefixes must be declared. Whitespace-only input text is discarded, so mixed-content documents are not lossless. |
 | CSV | `application/csv` | `text/csv` | `.csv` | Yes | Yes | Structured. The first input row is the header and all input fields are strings. Output requires an array of objects, uses the sorted union of their keys, and renders nested values as compact JSON text. |
 | NDJSON | `application/x-ndjson` | `application/ndjson` | `.ndjson`, `.jsonl` | Yes | Yes | Structured. Blank input lines are skipped; output requires an array and emits one compact JSON value per line. |
 | URL-encoded form | `application/x-www-form-urlencoded` | — | `.urlencoded` | Yes | Yes | Structured object mapping. Repeated keys become arrays; decoded values remain strings. Output requires an object. |

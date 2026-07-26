@@ -1,6 +1,7 @@
 package formats
 
 import (
+	unifiederrors "infomunge/internal/errors"
 	"infomunge/pkg/values"
 	"reflect"
 	"strings"
@@ -159,6 +160,138 @@ func TestFormat_XML(t *testing.T) {
 				t.Errorf("expected %q, got %q", tt.expected, result)
 			}
 		})
+	}
+}
+
+func TestFormat_XMLRejectsUnrepresentableDocuments(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   interface{}
+		options *XMLOutputOptions
+		wantErr string
+	}{
+		{
+			name:    "multiple roots",
+			input:   Object{"a": 1, "b": 2},
+			wantErr: "XML output expects exactly one root element, got 2",
+		},
+		{
+			name:    "non-object document",
+			input:   "text",
+			wantErr: "XML output expects an object containing exactly one root element",
+		},
+		{
+			name:    "invalid element name",
+			input:   Object{"bad key": 1},
+			wantErr: `invalid XML element name "bad key"`,
+		},
+		{
+			name:    "invalid attribute name",
+			input:   Object{"root": Object{"@bad key": 1}},
+			wantErr: `invalid XML attribute name "bad key"`,
+		},
+		{
+			name:    "unbound namespace prefix",
+			input:   Object{"missing:root": 1},
+			wantErr: `namespace prefix "missing" is not declared`,
+		},
+		{
+			name: "invalid resolved namespace prefix",
+			input: Object{
+				"source#root": 1,
+			},
+			options: &XMLOutputOptions{
+				NamespaceVars: map[string]Namespace{
+					"source": {Prefix: "bad prefix", URI: "urn:example"},
+				},
+				WriteDeclaration: true,
+			},
+			wantErr: `invalid XML element name "bad prefix:root"`,
+		},
+		{
+			name: "reserved xml prefix with incorrect URI",
+			input: Object{
+				"source#root": 1,
+			},
+			options: &XMLOutputOptions{
+				NamespaceVars: map[string]Namespace{
+					"source": {Prefix: "xml", URI: "urn:not-the-xml-namespace"},
+				},
+				WriteDeclaration: true,
+			},
+			wantErr: `XML namespace prefix "xml" must use URI`,
+		},
+		{
+			name: "invalid explicit namespace declaration",
+			input: Object{
+				"root": Object{
+					"@xmlns": Object{"bad prefix": "urn:example"},
+				},
+			},
+			wantErr: `invalid XML namespace prefix "bad prefix"`,
+		},
+		{
+			name: "duplicate resolved attribute names",
+			input: Object{
+				"root": Object{
+					"@first#id":  1,
+					"@second#id": 2,
+				},
+			},
+			options: &XMLOutputOptions{
+				NamespaceVars: map[string]Namespace{
+					"first":  {Prefix: "p", URI: "urn:first"},
+					"second": {Prefix: "p", URI: "urn:second"},
+				},
+				WriteDeclaration: true,
+			},
+			wantErr: `XML element "root" contains duplicate resolved attribute name "p:id"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var err error
+			if tt.options == nil {
+				_, err = Format(tt.input, "application/xml")
+			} else {
+				_, err = FormatXMLWithOptions(tt.input, *tt.options)
+			}
+			if err == nil {
+				t.Fatal("Format() error = nil, want validation error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("Format() error = %q, want it to contain %q", err, tt.wantErr)
+			}
+			typedErr, ok := err.(*unifiederrors.Error)
+			if !ok {
+				t.Fatalf("Format() error type = %T, want *errors.Error", err)
+			}
+			if typedErr.Type != unifiederrors.TypeValidate {
+				t.Fatalf("Format() error category = %q, want %q", typedErr.Type, unifiederrors.TypeValidate)
+			}
+		})
+	}
+}
+
+func TestFormat_XMLPreservesOrderedChildrenAndValidNamespaces(t *testing.T) {
+	children := values.NewObject(4)
+	values.SetObjectValue(children, "@xmlns", Object{"p": "urn:example"})
+	values.SetObjectValue(children, "@p:id", "7")
+	values.SetObjectValue(children, "p:b", 2)
+	values.SetObjectValue(children, "p:a", 1)
+
+	document := values.NewObject(1)
+	values.SetObjectValue(document, "p:root", children)
+
+	got, err := Format(document, "application/xml")
+	if err != nil {
+		t.Fatalf("Format() error = %v", err)
+	}
+	want := "<?xml version='1.0' encoding='UTF-8'?>\n" +
+		`<p:root xmlns:p="urn:example" p:id="7"><p:b>2</p:b><p:a>1</p:a></p:root>`
+	if got != want {
+		t.Fatalf("Format() = %q, want %q", got, want)
 	}
 }
 
