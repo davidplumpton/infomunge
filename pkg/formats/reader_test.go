@@ -16,13 +16,41 @@ func TestRead_EmptyMimeType(t *testing.T) {
 	}
 }
 
-func TestRead_EmptyContent(t *testing.T) {
-	result, err := Read("", "application/json")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+func TestRead_EmptyContentUsesSelectedCodec(t *testing.T) {
+	tests := []struct {
+		name     string
+		mimeType string
+		want     interface{}
+		wantErr  string
+	}{
+		{name: "structured CSV", mimeType: "application/csv", want: Array{}},
+		{name: "structured NDJSON", mimeType: "application/x-ndjson", want: Array{}},
+		{name: "structured URL encoded", mimeType: "application/x-www-form-urlencoded", want: Object{}},
+		{name: "structured JSON", mimeType: "application/json", wantErr: "JSON parse error"},
+		{name: "text", mimeType: "text/plain", want: ""},
+		{name: "raw", mimeType: "application/octet-stream", want: ""},
+		{name: "unknown", mimeType: "application/x-unknown", wantErr: "unsupported input mimeType"},
 	}
-	if result != nil {
-		t.Errorf("expected nil for empty content, got %v", result)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Read("", tt.mimeType)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("Read() error = nil, want it to contain %q", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("Read() error = %q, want it to contain %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Read() error = %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("Read() = %#v, want %#v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -328,8 +356,8 @@ func TestRead_CSV_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result != nil {
-		t.Errorf("expected nil for empty CSV, got %v", result)
+	if !reflect.DeepEqual(result, Array{}) {
+		t.Errorf("expected empty array for empty CSV, got %#v", result)
 	}
 }
 
@@ -1338,14 +1366,13 @@ func TestReadAsObject(t *testing.T) {
 		}
 	})
 
-	t.Run("empty content returns nil", func(t *testing.T) {
+	t.Run("empty JSON returns parse error", func(t *testing.T) {
 		r := ReadAsObject("", "application/json")
-		if !r.IsOk() {
-			t.Fatalf("unexpected error: %v", r.Error())
+		if !r.IsErr() {
+			t.Fatal("expected error for empty JSON document")
 		}
-		val, _ := r.Unwrap()
-		if val != nil {
-			t.Errorf("expected nil, got %v", val)
+		if !strings.Contains(r.Error().Error(), "JSON parse error") {
+			t.Fatalf("unexpected error: %v", r.Error())
 		}
 	})
 }

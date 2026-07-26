@@ -14,9 +14,6 @@ func ReadWithOptions(content, mimeType string, options Object) (interface{}, err
 	if mimeType == "" {
 		return nil, unifiederrors.ValidationError("mimeType cannot be empty")
 	}
-	if content == "" {
-		return nil, nil
-	}
 
 	if options != nil {
 		if handler, ok := getReadOptionsHandler(mimeType); ok {

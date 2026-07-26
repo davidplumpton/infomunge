@@ -41,13 +41,39 @@ func TestStructuredWritersPreserveObjectOrder(t *testing.T) {
 	}
 }
 
-func TestFormat_Nil(t *testing.T) {
-	result, err := Format(nil, "application/json")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+func TestFormat_NilUsesSelectedCodec(t *testing.T) {
+	tests := []struct {
+		name     string
+		mimeType string
+		want     string
+		wantErr  string
+	}{
+		{name: "structured JSON", mimeType: "application/json", want: "null"},
+		{name: "text", mimeType: "text/plain", want: "null"},
+		{name: "structured CSV", mimeType: "application/csv", wantErr: "CSV output expects an array of objects"},
+		{name: "raw", mimeType: "application/octet-stream", wantErr: "binary output expects string or []byte"},
+		{name: "unknown", mimeType: "application/x-unknown", wantErr: "unsupported output mimeType"},
 	}
-	if result != "null" {
-		t.Errorf("expected 'null', got %q", result)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Format(nil, tt.mimeType)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("Format() error = nil, want it to contain %q", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("Format() error = %q, want it to contain %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Format() error = %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("Format() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

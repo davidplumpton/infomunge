@@ -15,9 +15,6 @@ func FormatWithOptions(result interface{}, mimeType string, options Object) (str
 	if mimeType == "" {
 		return "", unifiederrors.ValidationError("mimeType cannot be empty")
 	}
-	if result == nil {
-		return "null", nil
-	}
 
 	if options != nil {
 		if handler, ok := getWriteOptionsHandler(mimeType); ok {

@@ -32,6 +32,44 @@ Feature: I/O Functions
       [{"name":"Alice","age":"30"},{"name":"Bob","age":"25"}]
       """
 
+  Scenario: read empty CSV content as an empty array
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("", "application/csv")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      []
+      """
+
+  Scenario: read empty URL-encoded content as an empty object
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("", "application/x-www-form-urlencoded")
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {}
+      """
+
+  Scenario: read empty content with an unknown MIME type fails
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      read("", "application/x-unknown")
+      """
+    Then running the script should fail with error containing "unsupported input mimeType: application/x-unknown"
+
   Scenario: read YAML content
     Given the following script:
       """
@@ -719,6 +757,26 @@ Feature: I/O Functions
       """
     When I run the script
     Then the output should contain "null"
+
+  Scenario: write null as CSV fails codec validation
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write(null, "application/csv")
+      """
+    Then running the script should fail with error containing "CSV output expects an array of objects"
+
+  Scenario: write null with an unknown MIME type fails
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      write(null, "application/x-unknown")
+      """
+    Then running the script should fail with error containing "unsupported output mimeType: application/x-unknown"
 
   Scenario: write string to JSON
     Given the following script:

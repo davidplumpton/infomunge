@@ -67,7 +67,7 @@ Feature: CSV Reading
     When I run the script
     Then the output should be:
       """
-      null
+      []
       """
 
   # Basic Variations
