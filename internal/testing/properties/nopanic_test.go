@@ -73,14 +73,22 @@ func TestEvaluate_NoPanics_Deterministic_AndTypeConsistent(t *testing.T) {
 			t.Fatalf("typeOf evaluation failed\nexpr: %q\nctx: %#v\nerr: %v", typeExpr, tc.Value, typeErr)
 		}
 
-		typeName, ok := typeResult.(string)
+		typeName, ok := runtimeTypeName(typeResult)
 		if !ok {
-			t.Fatalf("typeOf returned non-string\nexpr: %q\nctx: %#v\nresult: %#v (%T)", typeExpr, tc.Value, typeResult, typeResult)
+			t.Fatalf("typeOf returned non-Type value\nexpr: %q\nctx: %#v\nresult: %#v (%T)", typeExpr, tc.Value, typeResult, typeResult)
 		}
 		if _, ok := validTypeNames[typeName]; !ok {
 			t.Fatalf("typeOf returned invalid type name\nexpr: %q\nctx: %#v\ntype: %q", typeExpr, tc.Value, typeName)
 		}
 	})
+}
+
+func runtimeTypeName(value interface{}) (string, bool) {
+	typeValue, ok := value.(evaluator.TypeValue)
+	if !ok {
+		return "", false
+	}
+	return string(typeValue), true
 }
 
 func drawExpression(t *rapid.T, tc exprgen.TestContext) string {

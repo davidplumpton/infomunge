@@ -27,6 +27,8 @@ func callBuiltinSizeOf(args []Value, e *ast.CallExpr) (Value, error) {
 	switch v := args[0].(type) {
 	case string:
 		return utf8.RuneCountInString(v), nil
+	case TypeValue:
+		return utf8.RuneCountInString(string(v)), nil
 	case []byte:
 		return len(v), nil
 	case Array:
@@ -375,7 +377,7 @@ func callBuiltinTypeOf(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("typeOf function requires exactly 1 argument", e.Pos())
 	}
-	return getTypeName(args[0]), nil
+	return TypeValue(getTypeName(args[0])), nil
 }
 
 // callBuiltinIsType implements the __isType(value, typeName) function (is operator).

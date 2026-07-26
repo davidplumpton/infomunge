@@ -85,6 +85,7 @@ func TestFormat_JSON(t *testing.T) {
 		expected string
 	}{
 		{"string", "hello", `"hello"`},
+		{"type value", values.TypeValue("Boolean"), `"Boolean"`},
 		{"int", 42, "42"},
 		{"float", 3.14, "3.14"},
 		{"bool true", true, "true"},
@@ -113,6 +114,7 @@ func TestFormat_TextPlain(t *testing.T) {
 		expected string
 	}{
 		{"string", "hello", "hello"},
+		{"type value", values.TypeValue("Boolean"), "Boolean"},
 		{"int", 42, "42"},
 		{"bool", true, "true"},
 		{"object", Object{"key": "value"}, `{"key":"value"}`},

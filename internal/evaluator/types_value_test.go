@@ -20,6 +20,7 @@ func TestKindOf(t *testing.T) {
 		{"array", Array{1, 2, 3}, KindArray},
 		{"object", Object{"key": "value"}, KindObject},
 		{"lambda", &Lambda{}, KindLambda},
+		{"type value", TypeValue("Boolean"), KindType},
 		{"typedef", &TypeDef{Name: "Test"}, KindTypeDef},
 		{"lazy", &LazyValue{}, KindLazy},
 	}
@@ -148,6 +149,7 @@ func TestValueKindString(t *testing.T) {
 		{KindArray, "Array"},
 		{KindObject, "Object"},
 		{KindLambda, "Lambda"},
+		{KindType, "Type"},
 		{KindTypeDef, "TypeDef"},
 		{KindControlFlow, "ControlFlow"},
 		{KindLazy, "Lazy"},

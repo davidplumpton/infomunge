@@ -231,6 +231,8 @@ func normalizeValue(v interface{}) interface{} {
 		default:
 			return val
 		}
+	case evaluator.TypeValue:
+		return normalizeValue(string(val))
 	case int:
 		return float64(val)
 	case int8:

@@ -8,8 +8,12 @@ import (
 )
 
 // Value is a generic value type that represents any value that can be evaluated in expressions.
-// It can be a nil, bool, string, number (int or float64), array, object, lambda function, TypeDef, or ControlFlowSignal.
+// It can be a nil, bool, string, number (int or float64), array, object, lambda
+// function, TypeValue, TypeDef, or ControlFlowSignal.
 type Value = values.Value
+
+// TypeValue is a DataWeave Type value represented by its display name.
+type TypeValue = values.TypeValue
 
 // Context is a type alias for the evaluation context (namespace mapping).
 type Context = map[string]Value
@@ -45,6 +49,7 @@ const (
 	KindArray
 	KindObject
 	KindLambda
+	KindType
 	KindTypeDef
 	KindNamespace
 	KindControlFlow
@@ -72,6 +77,8 @@ func (k ValueKind) String() string {
 		return "Object"
 	case KindLambda:
 		return "Lambda"
+	case KindType:
+		return "Type"
 	case KindTypeDef:
 		return "TypeDef"
 	case KindNamespace:
@@ -161,6 +168,8 @@ func KindOf(v Value) ValueKind {
 		return KindObject
 	case *Lambda:
 		return KindLambda
+	case TypeValue:
+		return KindType
 	case *TypeDef:
 		return KindTypeDef
 	case Namespace:

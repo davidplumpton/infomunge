@@ -181,6 +181,25 @@ func TestDifferential_ObjectSubtractionMatchesDataWeave(t *testing.T) {
 	}
 }
 
+func TestDifferential_NestedTypeOfMatchesDataWeave(t *testing.T) {
+	if !DWAvailable() {
+		t.Skip("dw CLI not available on PATH")
+	}
+
+	script := exprgen.WrapDWScript(`typeOf(typeOf(false))`)
+	imResult, imErr := safeEvalInfomunge(script, evaluator.Context{})
+	if imErr != nil {
+		t.Fatalf("InfoMunge returned an error: %v", imErr)
+	}
+	dwResult, dwErr := DWEval(script, nil)
+	if dwErr != nil {
+		t.Fatalf("DataWeave returned an error: %v", dwErr)
+	}
+	if err := StructuralCompare(imResult, dwResult); err != nil {
+		t.Fatalf("nested typeOf differs: %v", err)
+	}
+}
+
 func (outcomes *differentialOutcomes) record(imErr, dwErr error) differentialOutcome {
 	outcomes.generated++
 	if imErr != nil && outcomes.firstInfomungeError == "" {

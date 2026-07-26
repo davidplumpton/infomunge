@@ -157,7 +157,7 @@ https://docs.mulesoft.com/dataweave/latest/dataweave-cookbook-define-function-to
 %im 0.1
 output application/json
 fun flattenList(items) =
-  items flatMap (item) -> if (typeOf(item) == "Array") flattenList(item) else [item]
+  items flatMap (item) -> if (item is Array) flattenList(item) else [item]
 ---
 flattenList([[1, [2, 3]], [4], 5])
 ```

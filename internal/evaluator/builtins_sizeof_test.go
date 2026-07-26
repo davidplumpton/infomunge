@@ -28,6 +28,7 @@ func TestSizeOfNumbersUsesDataWeaveRendering(t *testing.T) {
 		{name: "negative maximum float", value: -math.MaxFloat64, want: 24},
 		{name: "smallest nonzero float", value: math.SmallestNonzeroFloat64, want: 6},
 		{name: "negative zero", value: math.Copysign(0, -1), want: 1},
+		{name: "type value", value: TypeValue("Boolean"), want: 7},
 	}
 
 	for _, testCase := range testCases {

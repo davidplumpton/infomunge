@@ -41,6 +41,8 @@ func getTypeName(v Value) string {
 		return "Number"
 	case string:
 		return "String"
+	case TypeValue:
+		return "Type"
 	case Array:
 		return "Array"
 	case Object:
@@ -312,6 +314,8 @@ func coerceToStringValue(value Value, topLevel bool) string {
 	switch typed := value.(type) {
 	case string:
 		return typed
+	case TypeValue:
+		return string(typed)
 	case int:
 		return strconv.Itoa(typed)
 	case float64:

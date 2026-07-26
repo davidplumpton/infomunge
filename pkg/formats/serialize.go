@@ -3,6 +3,8 @@ package formats
 import (
 	"encoding/json"
 	"fmt"
+
+	"infomunge/pkg/values"
 )
 
 // marshalToJSON attempts to marshal a value to JSON format string,
@@ -20,6 +22,9 @@ func marshalToJSON(v interface{}) string {
 func valueToPlainString(v interface{}) string {
 	if s, ok := v.(string); ok {
 		return s
+	}
+	if typeValue, ok := v.(values.TypeValue); ok {
+		return string(typeValue)
 	}
 	bytes, err := json.Marshal(v)
 	if err != nil {

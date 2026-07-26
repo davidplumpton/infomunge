@@ -42,9 +42,9 @@ func FuzzExprEval(f *testing.F) {
 			t.Fatalf("typeOf failed expr=%q err=%v", typeExpr, typeErr)
 		}
 
-		typeName, ok := typeResult.(string)
+		typeName, ok := runtimeTypeName(typeResult)
 		if !ok {
-			t.Fatalf("typeOf returned non-string expr=%q result=%#v (%T)", typeExpr, typeResult, typeResult)
+			t.Fatalf("typeOf returned non-Type value expr=%q result=%#v (%T)", typeExpr, typeResult, typeResult)
 		}
 		if _, ok := validTypeNames[typeName]; !ok {
 			t.Fatalf("typeOf returned invalid type name expr=%q type=%q", typeExpr, typeName)

@@ -170,7 +170,7 @@ func TestStability_ByteIdenticalAcrossRepeatedEvaluation(t *testing.T) {
 		if err != nil {
 			return
 		}
-		exprType, ok := exprTypeRaw.(string)
+		exprType, ok := runtimeTypeName(exprTypeRaw)
 		if !ok {
 			return
 		}

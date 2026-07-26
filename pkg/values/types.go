@@ -12,6 +12,15 @@ import (
 // Value is the shared runtime value shape used by evaluation and format adapters.
 type Value = interface{}
 
+// TypeValue is the runtime result of typeOf. Its string representation is the
+// type name, but it remains distinct from an ordinary String value.
+type TypeValue string
+
+// String returns the represented type name.
+func (value TypeValue) String() string {
+	return string(value)
+}
+
 // Object represents a structured data object with string keys.
 type Object = map[string]Value
 

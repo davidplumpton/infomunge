@@ -127,6 +127,16 @@ func TestStructuralCompare_NumberTolerance(t *testing.T) {
 	}
 }
 
+func TestStructuralCompare_TypeValueUsesSerializedName(t *testing.T) {
+	err := StructuralCompare(evaluator.TypeValue("Boolean"), "Boolean")
+	if err != nil {
+		t.Fatalf("expected TypeValue and serialized name to compare equal: %v", err)
+	}
+	if err := StructuralCompare(evaluator.TypeValue("Null"), nil); err != nil {
+		t.Fatalf("expected serialized Null TypeValue to use null normalization: %v", err)
+	}
+}
+
 func TestStructuralCompare_ObjectKeyOrderAndMissingNull(t *testing.T) {
 	left := evaluator.Object{
 		"a": float64(1),

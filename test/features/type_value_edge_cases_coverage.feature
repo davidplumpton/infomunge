@@ -245,6 +245,20 @@ Feature: Type and value edge case coverage
       "Null"
       """
 
+  Scenario: typeOf returns a Type value rather than a String
+    Given the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [typeOf(typeOf(false)), typeOf(false) == "Boolean", typeOf(false) as String]
+      """
+    When I run the script
+    Then the output should be:
+      """
+      ["Type",false,"Boolean"]
+      """
+
   # --- splitUnion edge cases ---
 
   Scenario: Union with whitespace around pipe is handled correctly
