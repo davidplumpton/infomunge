@@ -4,6 +4,8 @@ import (
 	"gopkg.in/yaml.v3"
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/pkg/values"
+	"io"
+	"strings"
 )
 
 func init() {
@@ -16,11 +18,23 @@ func init() {
 }
 
 func readYAML(content string) (interface{}, error) {
+	decoder := yaml.NewDecoder(strings.NewReader(content))
 	var document yaml.Node
-	err := yaml.Unmarshal([]byte(content), &document)
-	if err != nil {
+	if err := decoder.Decode(&document); err != nil {
+		if err == io.EOF {
+			return nil, nil
+		}
 		return nil, unifiederrors.WrapValidationf(err, "YAML parse error: %v", err)
 	}
+
+	var trailingDocument yaml.Node
+	if err := decoder.Decode(&trailingDocument); err != io.EOF {
+		if err == nil {
+			return nil, unifiederrors.ValidationError("YAML parse error: multiple documents are not supported")
+		}
+		return nil, unifiederrors.WrapValidationf(err, "YAML parse error: %v", err)
+	}
+
 	return decodeYAMLNode(&document)
 }
 
@@ -37,19 +51,32 @@ func formatYAML(result interface{}) (string, error) {
 }
 
 func decodeYAMLNode(node *yaml.Node) (interface{}, error) {
+	return decodeYAMLNodeWithPath(node, make(map[*yaml.Node]struct{}))
+}
+
+func decodeYAMLNodeWithPath(node *yaml.Node, activePath map[*yaml.Node]struct{}) (interface{}, error) {
+	if node == nil {
+		return nil, unifiederrors.ValidationError("YAML parse error: alias has no target")
+	}
+	if _, active := activePath[node]; active {
+		return nil, unifiederrors.ValidationError("YAML parse error: recursive alias cycle detected")
+	}
+	activePath[node] = struct{}{}
+	defer delete(activePath, node)
+
 	switch node.Kind {
 	case yaml.DocumentNode:
 		if len(node.Content) == 0 {
 			return nil, nil
 		}
-		return decodeYAMLNode(node.Content[0])
+		return decodeYAMLNodeWithPath(node.Content[0], activePath)
 	case yaml.MappingNode:
 		object := values.NewObject(len(node.Content) / 2)
 		explicitKeys := make(map[string]struct{}, len(node.Content)/2)
 		for i := 0; i < len(node.Content); i += 2 {
 			key := node.Content[i].Value
 			if key == "<<" {
-				merged, err := decodeYAMLNode(node.Content[i+1])
+				merged, err := decodeYAMLNodeWithPath(node.Content[i+1], activePath)
 				if err != nil {
 					return nil, err
 				}
@@ -66,7 +93,7 @@ func decodeYAMLNode(node *yaml.Node) (interface{}, error) {
 				return nil, unifiederrors.ValidationErrorf("YAML parse error: duplicate key %q", key)
 			}
 			explicitKeys[key] = struct{}{}
-			value, err := decodeYAMLNode(node.Content[i+1])
+			value, err := decodeYAMLNodeWithPath(node.Content[i+1], activePath)
 			if err != nil {
 				return nil, err
 			}
@@ -76,7 +103,7 @@ func decodeYAMLNode(node *yaml.Node) (interface{}, error) {
 	case yaml.SequenceNode:
 		array := make(Array, 0, len(node.Content))
 		for _, child := range node.Content {
-			value, err := decodeYAMLNode(child)
+			value, err := decodeYAMLNodeWithPath(child, activePath)
 			if err != nil {
 				return nil, err
 			}
@@ -84,7 +111,7 @@ func decodeYAMLNode(node *yaml.Node) (interface{}, error) {
 		}
 		return array, nil
 	case yaml.AliasNode:
-		return decodeYAMLNode(node.Alias)
+		return decodeYAMLNodeWithPath(node.Alias, activePath)
 	default:
 		var scalar interface{}
 		if err := node.Decode(&scalar); err != nil {

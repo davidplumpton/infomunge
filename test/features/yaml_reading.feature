@@ -184,7 +184,7 @@ Feature: YAML Reading
       """
 
   # YAML-Specific Features
-  Scenario: Read YAML with multiple documents
+  Scenario: Reject YAML with multiple documents
     Given the following YAML input:
       """
       ---
@@ -197,10 +197,9 @@ Feature: YAML Reading
       %im 0.1
       output application/json
       ---
-      payload[0]
+      payload
       """
-    When I run the script
-    Then the output should contain "first"
+    Then running the script should fail with error containing "multiple documents are not supported"
 
   Scenario: Read YAML with anchors and aliases
     Given the following YAML input:
@@ -224,6 +223,21 @@ Feature: YAML Reading
       """
       "default"
       """
+
+  Scenario: Reject a recursive YAML alias
+    Given the following YAML input:
+      """
+      root: &root
+        self: *root
+      """
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      payload
+      """
+    Then running the script should fail with error containing "recursive alias cycle"
 
   Scenario: Read YAML with literal scalar
     Given the following YAML input:
