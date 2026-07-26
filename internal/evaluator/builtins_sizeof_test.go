@@ -43,3 +43,27 @@ func TestSizeOfNumbersUsesDataWeaveRendering(t *testing.T) {
 		})
 	}
 }
+
+func TestSizeOfBooleansUsesDataWeaveRendering(t *testing.T) {
+	call := &ast.CallExpr{Fun: &ast.Ident{Name: "sizeOf"}}
+	testCases := []struct {
+		name  string
+		value bool
+		want  int
+	}{
+		{name: "true", value: true, want: 4},
+		{name: "false", value: false, want: 5},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, err := callBuiltinSizeOf([]Value{testCase.value}, call)
+			if err != nil {
+				t.Fatalf("callBuiltinSizeOf() error = %v", err)
+			}
+			if got != testCase.want {
+				t.Fatalf("callBuiltinSizeOf(%t) = %v, want %d", testCase.value, got, testCase.want)
+			}
+		})
+	}
+}

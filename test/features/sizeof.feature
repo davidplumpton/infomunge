@@ -1,7 +1,7 @@
 Feature: Size Of Function
   In order to determine the length or count of values
   As a developer
-  I want to use the sizeOf function to get the size of strings, numbers, arrays, and objects
+  I want to use the sizeOf function to get the size of strings, scalar values, arrays, and objects
 
   Scenario: Get length of a string
     Given the following input content:
@@ -242,14 +242,16 @@ Feature: Size Of Function
       [19,23,6]
       """
 
-  Scenario: sizeOf on boolean should fail
+  Scenario: Get the character length of boolean values
     Given the following input content:
       """
       %im 0.1
-      var flag = true
       output application/json
       ---
-      sizeOf(flag)
+      [sizeOf(true), sizeOf(false)]
       """
-    When I run the application and it fails
-    Then the error should contain "unsupported type"
+    When I run the application with this content
+    Then the output should be:
+      """
+      [4,5]
+      """

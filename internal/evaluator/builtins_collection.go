@@ -41,6 +41,8 @@ func callBuiltinSizeOf(args []Value, e *ast.CallExpr) (Value, error) {
 		return len(strconv.Itoa(v)), nil
 	case float64:
 		return len(formatCoercedFloat(v)), nil
+	case bool:
+		return len(strconv.FormatBool(v)), nil
 	case nil:
 		return nil, nil
 	default:

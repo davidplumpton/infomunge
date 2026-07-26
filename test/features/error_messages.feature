@@ -257,7 +257,7 @@ Feature: Error Messages
       """
       %im 0.1
       ---
-      sizeOf(true)
+      sizeOf(/abc/)
       """
     When I run the application and it fails
     Then the error should contain "sizeOf: unsupported type"
