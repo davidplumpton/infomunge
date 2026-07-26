@@ -74,6 +74,29 @@ Feature: Arrays Module
       [[1,2],[3,4],[5]]
       """
 
+  Scenario Outline: divideBy normalizes non-positive and fractional chunk sizes
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      import * from dw::core::Arrays
+      ---
+      divideBy([1, 2, 3], <size>)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      <result>
+      """
+
+    Examples:
+      | size | result        |
+      | 0    | [[1],[2],[3]] |
+      | -1   | [[1],[2],[3]] |
+      | 0.5  | [[1],[2],[3]] |
+      | 1.5  | [[1,2],[3]]   |
+      | 2.9  | [[1,2,3]]     |
+
   Scenario: indexWhere returns the first matching index
     Given the following input content:
       """

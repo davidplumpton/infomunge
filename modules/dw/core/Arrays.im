@@ -6,9 +6,9 @@ fun countBy(array, criteria) =
 
 fun divideBy(array, size) =
   if (array == null) null
-  else if (size <= 0) []
   else if (sizeOf(array) == 0) []
-  else [take(array, size)] ++ divideBy(drop(array, size), size)
+  else if (size <= 1) [take(array, 1)] ++ divideBy(drop(array, 1), 1)
+  else [take(array, ceil(size))] ++ divideBy(drop(array, ceil(size)), ceil(size))
 
 fun drop(array, amount) = __native("drop", array, amount)
 fun dropWhile(array, criteria) = __native("dropWhile", array, criteria)
