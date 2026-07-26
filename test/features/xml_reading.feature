@@ -370,6 +370,32 @@ Feature: XML Reading
       "content"
       """
 
+  Scenario: Read XML with single-quoted attributes, CDATA, comments, and processing instructions
+    Given the following XML input:
+      """
+      <?xml-stylesheet type='text/xsl' href='style.xsl'?>
+      <root marker='greater-than >'>
+        <!-- ignored -->
+        <item><![CDATA[raw <text> & data]]></item>
+        <?audit complete?>
+      </root>
+      """
+    And the following script:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {
+        marker: payload.root.@marker,
+        text: payload.root.item
+      }
+      """
+    When I run the script
+    Then the output should be:
+      """
+      {"marker":"greater-than \u003e","text":"raw \u003ctext\u003e \u0026 data"}
+      """
+
   Scenario: Read empty element vs element with empty text
     Given the following XML input:
       """
@@ -404,7 +430,7 @@ Feature: XML Reading
       ---
       payload
       """
-    Then running the script should fail with error containing "XML validation error"
+    Then running the script should fail with error containing "XML parse error"
 
   Scenario: Error on mismatched XML tags
     Given the following XML input:
@@ -420,7 +446,7 @@ Feature: XML Reading
       ---
       payload
       """
-    Then running the script should fail with error containing "XML validation error"
+    Then running the script should fail with error containing "XML parse error"
 
   Scenario: Error when XML element has too many attributes
     Given the following XML input:

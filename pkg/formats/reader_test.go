@@ -842,6 +842,26 @@ func TestRead_XML(t *testing.T) {
 			"<root><a>1</a><b>2</b></root>",
 			Object{"root": Object{"a": "1", "b": "2"}},
 		},
+		{
+			"single-quoted attribute containing greater-than",
+			"<root marker='greater-than >'><item>value</item></root>",
+			Object{"root": Object{"@marker": "greater-than >", "item": "value"}},
+		},
+		{
+			"CDATA section",
+			"<root><![CDATA[one < two & three > two]]></root>",
+			Object{"root": "one < two & three > two"},
+		},
+		{
+			"comment",
+			"<root><!-- ignored --><item>value</item></root>",
+			Object{"root": Object{"item": "value"}},
+		},
+		{
+			"processing instruction",
+			"<?xml version='1.0'?><root><?target data?><item>value</item></root>",
+			Object{"root": Object{"item": "value"}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -858,6 +878,15 @@ func TestRead_XML(t *testing.T) {
 }
 
 func TestRead_XML_Limits(t *testing.T) {
+	t.Run("element depth limit", func(t *testing.T) {
+		content := strings.Repeat("<n>", MaxXMLDepth+1) + strings.Repeat("</n>", MaxXMLDepth+1)
+
+		_, err := Read(content, "application/xml")
+		if err == nil || !strings.Contains(err.Error(), "nesting depth exceeded") {
+			t.Fatalf("expected XML depth limit error, got: %v", err)
+		}
+	})
+
 	t.Run("attribute count limit", func(t *testing.T) {
 		var b strings.Builder
 		b.WriteString("<root")
@@ -1106,79 +1135,37 @@ func TestShouldSimplifyNode(t *testing.T) {
 	}
 }
 
-func TestValidateXMLBrackets(t *testing.T) {
+func TestRead_XML_MalformedNesting(t *testing.T) {
 	tests := []struct {
 		name    string
 		content string
-		wantErr bool
 	}{
-		{
-			name:    "valid simple XML",
-			content: "<root><child>text</child></root>",
-			wantErr: false,
-		},
-		{
-			name:    "valid nested XML",
-			content: "<root><a><b><c>text</c></b></a></root>",
-			wantErr: false,
-		},
-		{
-			name:    "valid self-closing tag",
-			content: "<root><empty/><child>text</child></root>",
-			wantErr: false,
-		},
 		{
 			name:    "unclosed tag",
 			content: "<root><child>text</root>",
-			wantErr: true,
 		},
 		{
 			name:    "closing tag without opening",
 			content: "<root></child></root>",
-			wantErr: true,
 		},
 		{
 			name:    "mismatched closing tag",
 			content: "<root><child>text</different></root>",
-			wantErr: true,
 		},
 		{
 			name:    "unclosed root",
 			content: "<root><child>text</child>",
-			wantErr: true,
-		},
-		{
-			name:    "with XML declaration",
-			content: `<?xml version="1.0"?><root><child>text</child></root>`,
-			wantErr: false,
-		},
-		{
-			name:    "with comment",
-			content: `<root><!-- comment --><child>text</child></root>`,
-			wantErr: false,
-		},
-		{
-			name:    "with DOCTYPE",
-			content: `<!DOCTYPE root><root><child>text</child></root>`,
-			wantErr: false,
-		},
-		{
-			name:    "empty root element",
-			content: "<root></root>",
-			wantErr: false,
-		},
-		{
-			name:    "multiple root elements (allowed for fragments)",
-			content: "<a></a><b></b>",
-			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateXMLBracketsWithStateMachine(tt.content)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("validateXMLBracketsWithStateMachine() error = %v, wantErr %v", err, tt.wantErr)
+			_, err := Read(tt.content, "application/xml")
+			if err == nil {
+				t.Fatal("expected malformed XML to fail")
+			}
+			if !strings.Contains(err.Error(), "XML parse error") {
+				t.Fatalf("expected encoding/xml parse error, got: %v", err)
 			}
 		})
 	}

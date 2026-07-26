@@ -31,10 +31,6 @@ func init() {
 }
 
 func readXML(content string) (interface{}, error) {
-	if err := validateXMLBracketsWithStateMachine(content); err != nil {
-		return nil, err
-	}
-
 	decoder := xml.NewDecoder(strings.NewReader(content))
 	var stack []Object
 	var textSizes []int
