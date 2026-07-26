@@ -156,6 +156,50 @@ func TestPrepareForParsingPreservesComputedCollectionSourcesInExplicitLambdaBodi
 	}
 }
 
+func TestPrepareForParsingPreservesIdentifierCollectionSourcesInBoundedExplicitLambdaBodies(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "collection callback map",
+			input:    `[0,0] map (ignored) -> xs map sizeOf($)`,
+			expected: `__map([]interface{}{0,0,}, __lambda("ignored",__map(xs, __lambda("__arg", sizeOf(__arg)))))`,
+		},
+		{
+			name:     "function argument filter",
+			input:    `apply([1,2], (xs) -> xs filter ($ > 1))`,
+			expected: `apply([]interface{}{1,2,}, __lambda("xs",__filter(xs, __lambda("__arg", (__arg > 1)))))`,
+		},
+		{
+			name:     "then callback reduce",
+			input:    `values then (xs) -> xs reduce (item, acc = 0) -> acc + item`,
+			expected: `then(values, __lambda("xs",__reduce(xs, __lambda("item, acc = 0", acc + item))))`,
+		},
+		{
+			name:     "onNull callback mapObject",
+			input:    `null onNull () -> xs mapObject (v, k) -> {(k): v}`,
+			expected: `onNull(null, __lambda("",mapObject(xs, __lambda("v, k", map[string]interface{}{(k): v,}))))`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, mapping, err := PrepareForParsing(tt.input, Options{})
+			if err != nil {
+				t.Fatalf("PrepareForParsing returned error: %v", err)
+			}
+			if result != tt.expected {
+				t.Fatalf("result = %q, want %q", result, tt.expected)
+			}
+			if len(mapping) != len(result) {
+				t.Fatalf("mapping length = %d, want %d", len(mapping), len(result))
+			}
+		})
+	}
+}
+
 func TestCollectionSourceOwnsOperatorPreservesOuterChainingCases(t *testing.T) {
 	tests := []struct {
 		name     string

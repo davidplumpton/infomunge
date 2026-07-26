@@ -440,6 +440,29 @@ Feature: Lambda Expression Support
       [[2,2],[4,4]]
       """
 
+  Scenario: Identifier collection pipelines stay inside bounded explicit lambdas
+    Given the following script:
+      """
+      %im 0.1
+      var nested = [[1], [2, 3]]
+      var values = [1, 2, 3, 4]
+      var entries = {a: 1, b: 2}
+      output application/json
+      fun apply(value, callback) = callback(value)
+      ---
+      {
+        mapped: [0, 0] map (ignored) -> nested map sizeOf($),
+        filtered: apply(values, (items) -> items filter ($ > 2)),
+        reduced: values then (items) -> items reduce (item, acc = 0) -> acc + item,
+        objectMapped: null onNull () -> entries mapObject (value, key) -> {(key): value * 10}
+      }
+      """
+    When I execute the script
+    Then the output should be:
+      """
+      {"mapped":[[1,2],[1,2]],"filtered":[3,4],"reduced":10,"objectMapped":{"a":10,"b":20}}
+      """
+
   Scenario Outline: Nested collection expressions remain inside outer lambda bodies
     Given the following script:
       """

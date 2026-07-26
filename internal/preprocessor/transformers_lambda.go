@@ -362,6 +362,7 @@ func replaceArrowFunctions(s string) string {
 					}
 					bodyStart := pos
 					allowUngroupedCollection := isGroupedArrowLambda(s, sc.Pos())
+					allowIdentifierCollection := isBoundedArrowCollectionBody(s, sc.Pos())
 					// Track depth fresh from the body start position
 					var bodyState ScanState
 					for pos < len(s) {
@@ -380,7 +381,9 @@ func replaceArrowFunctions(s string) string {
 								}
 								if isCollectionOperatorWithSpacesAt(s, pos) &&
 									((!allowUngroupedCollection &&
-										!collectionSourceOwnsOperator(s[bodyStart:pos], s, pos)) ||
+										!collectionSourceOwnsOperator(s[bodyStart:pos], s, pos) &&
+										!(allowIdentifierCollection &&
+											isIdentifierLambdaBody(s[bodyStart:pos]))) ||
 										isCompleteGroupedLambdaBody(s[bodyStart:pos])) {
 									break
 								}
@@ -420,6 +423,49 @@ func isGroupedArrowLambda(s string, paramsStart int) bool {
 		return s[i] == '('
 	}
 	return false
+}
+
+// isBoundedArrowCollectionBody reports whether an explicit arrow is already
+// syntactically contained by an expression that consumes a callback. In these
+// contexts a plain identifier can be the source of a collection pipeline
+// without making the collection operator an outer chain on the completed
+// lambda.
+func isBoundedArrowCollectionBody(s string, paramsStart int) bool {
+	runes := []rune(s)
+	pos := runeIndexAtByteOffset(s, paramsStart)
+	previous := pos - 1
+	for previous >= 0 && unicode.IsSpace(runes[previous]) {
+		previous--
+	}
+	if previous >= 0 && (runes[previous] == '(' || runes[previous] == ',') {
+		return true
+	}
+	for _, operator := range CollectionOperators {
+		if precedingIdentifierIs(runes, pos, operator) {
+			return true
+		}
+	}
+	return precedingIdentifierIs(runes, pos, binaryOpThen) ||
+		precedingIdentifierIs(runes, pos, binaryOpOnNull)
+}
+
+func isIdentifierLambdaBody(body string) bool {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return false
+	}
+	for i, ch := range body {
+		if i == 0 {
+			if !unicode.IsLetter(ch) && ch != '_' {
+				return false
+			}
+			continue
+		}
+		if !unicode.IsLetter(ch) && !unicode.IsDigit(ch) && ch != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func isCompleteGroupedLambdaBody(body string) bool {
