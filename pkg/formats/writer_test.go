@@ -340,19 +340,26 @@ func TestFormat_CSV_NonArray(t *testing.T) {
 	}
 }
 
-func TestFormat_CSV_MissingKeys(t *testing.T) {
-	// Test heterogeneous data where items have different keys
-	input := Array{
-		Object{"a": "1", "b": "2"},
-		Object{"a": "3", "c": "4"},
-	}
-	result, err := Format(input, "application/csv")
+func TestFormat_CSVHeterogeneousRowsUseFirstSeenHeaderOrder(t *testing.T) {
+	first := values.NewObject(2)
+	values.SetObjectValue(first, "b", "2")
+	values.SetObjectValue(first, "a", "1")
+
+	second := values.NewObject(2)
+	values.SetObjectValue(second, "c", "4")
+	values.SetObjectValue(second, "b", "3")
+
+	third := values.NewObject(2)
+	values.SetObjectValue(third, "d", "6")
+	values.SetObjectValue(third, "a", "5")
+
+	result, err := Format(Array{first, second, third}, "application/csv")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("Format() error = %v", err)
 	}
-	// Should handle missing keys gracefully
-	if result == "" {
-		t.Error("expected non-empty output")
+	want := "b,a,c,d\n2,1,,\n3,,4,\n,5,,6"
+	if result != want {
+		t.Fatalf("Format() = %q, want %q", result, want)
 	}
 }
 
