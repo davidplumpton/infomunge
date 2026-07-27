@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"math/big"
 	"regexp"
 	"strings"
 )
@@ -126,13 +125,19 @@ func callBuiltinContains(args []Value, e *ast.CallExpr) (Value, error) {
 	switch first := args[0].(type) {
 	case nil:
 		return false, nil
-	case string, int, float64, *big.Int, bool:
+	case Array:
+		for _, item := range first {
+			if isEqual(item, args[1]) {
+				return true, nil
+			}
+		}
+		return false, nil
+	default:
 		text, err := coerceScalarStringArg(first, 1, "contains", e)
 		if err != nil {
-			return nil, err
+			return nil, newPosError(fmt.Sprintf("contains expects a string or array as argument 1, got %T", args[0]), e.Pos())
 		}
 
-		// Check for Regex object
 		if r, ok := args[1].(*Regex); ok {
 			return r.Re.MatchString(text), nil
 		}
@@ -143,15 +148,6 @@ func callBuiltinContains(args []Value, e *ast.CallExpr) (Value, error) {
 		}
 
 		return strings.Contains(text, pattern), nil
-	case Array:
-		for _, item := range first {
-			if isEqual(item, args[1]) {
-				return true, nil
-			}
-		}
-		return false, nil
-	default:
-		return nil, newPosError(fmt.Sprintf("contains expects a string or array as argument 1, got %T", args[0]), e.Pos())
 	}
 }
 

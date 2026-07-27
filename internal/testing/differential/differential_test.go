@@ -200,6 +200,25 @@ func TestDifferential_NestedTypeOfMatchesDataWeave(t *testing.T) {
 	}
 }
 
+func TestDifferential_ContainsTypeOfResultMatchesDataWeave(t *testing.T) {
+	if !DWAvailable() {
+		t.Skip("dw CLI not available on PATH")
+	}
+
+	script := exprgen.WrapDWScript(`contains(typeOf(71 + "877.003"), false)`)
+	imResult, imErr := safeEvalInfomunge(script, evaluator.Context{})
+	if imErr != nil {
+		t.Fatalf("InfoMunge returned an error: %v", imErr)
+	}
+	dwResult, dwErr := DWEval(script, nil)
+	if dwErr != nil {
+		t.Fatalf("DataWeave returned an error: %v", dwErr)
+	}
+	if err := StructuralCompare(imResult, dwResult); err != nil {
+		t.Fatalf("contains typeOf result differs: %v", err)
+	}
+}
+
 func TestDifferential_SizeOfBooleansMatchesDataWeave(t *testing.T) {
 	if !DWAvailable() {
 		t.Skip("dw CLI not available on PATH")

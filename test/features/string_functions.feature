@@ -87,6 +87,20 @@ Feature: String Functions
       [true,true,false,true,true,false,true,true,true,true,false,true,true]
       """
 
+  Scenario: contains composes with typeOf results
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [contains(typeOf(71 + "877.003"), false), contains(typeOf([]), "Arr"), contains(typeOf(1), /umb/), contains("value Number", typeOf(1))]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [false,true,true,true]
+      """
+
   Scenario: joinBy basic usage
     Given the following input content:
       """
