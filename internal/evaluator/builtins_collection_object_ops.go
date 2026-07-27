@@ -119,6 +119,10 @@ func callBuiltinKeysOf(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError("keysOf requires exactly 1 argument: object", e.Pos())
 	}
 
+	if args[0] == nil {
+		return nil, nil
+	}
+
 	if err := assertArg(args[0], beObject(), 1, "keysOf", e); err != nil {
 		return nil, err
 	}
@@ -149,6 +153,10 @@ func callBuiltinKeysOf(args []Value, e *ast.CallExpr) (Value, error) {
 func callBuiltinValuesOf(args []Value, e *ast.CallExpr) (Value, error) {
 	if len(args) != 1 {
 		return nil, newPosError("valuesOf requires exactly 1 argument: object", e.Pos())
+	}
+
+	if args[0] == nil {
+		return nil, nil
 	}
 
 	if err := assertArg(args[0], beObject(), 1, "valuesOf", e); err != nil {

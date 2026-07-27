@@ -279,6 +279,10 @@ func callBuiltinValues(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
+	if args[0] == nil {
+		return nil, nil
+	}
+
 	if err := assertArg(args[0], beObject(), 1, "values", e); err != nil {
 		return nil, err
 	}

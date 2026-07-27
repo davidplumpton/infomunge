@@ -196,15 +196,30 @@ func TestNullArrayValueHelpersPropagateNull(t *testing.T) {
 	}
 }
 
-func TestBuiltinKeysPropagatesNull(t *testing.T) {
-	call := &ast.CallExpr{Fun: &ast.Ident{Name: "keys"}}
-
-	result, err := callBuiltinKeys([]Value{nil}, call)
-	if err != nil {
-		t.Fatalf("callBuiltinKeys() error = %v", err)
+func TestBuiltinObjectKeyAndValueHelpersPropagateNull(t *testing.T) {
+	tests := []struct {
+		name string
+		call func([]Value, *ast.CallExpr) (Value, error)
+	}{
+		{name: "keysOf", call: callBuiltinKeysOf},
+		{name: "valuesOf", call: callBuiltinValuesOf},
+		{name: "namesOf", call: callBuiltinNamesOf},
+		{name: "keys", call: callBuiltinKeys},
+		{name: "values", call: callBuiltinValues},
 	}
-	if result != nil {
-		t.Fatalf("callBuiltinKeys() = %#v, want nil", result)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			call := &ast.CallExpr{Fun: &ast.Ident{Name: tt.name}}
+
+			result, err := tt.call([]Value{nil}, call)
+			if err != nil {
+				t.Fatalf("%s(nil) error = %v", tt.name, err)
+			}
+			if result != nil {
+				t.Fatalf("%s(nil) = %#v, want nil", tt.name, result)
+			}
+		})
 	}
 }
 

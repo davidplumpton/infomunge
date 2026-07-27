@@ -226,6 +226,20 @@ Feature: Object Functions
       []
       """
 
+  Scenario: canonical object key and value functions propagate null
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [keysOf(null), valuesOf(null), namesOf(null)]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [null,null,null]
+      """
+
   Scenario: keysOf on non-object fails
     Given the following input content:
       """
@@ -335,7 +349,7 @@ Feature: Object Functions
       %im 0.1
       output application/json
       ---
-      namesOf(null)
+      namesOf(true)
       """
     When I run the application and it fails
     Then the output should contain "keysOf: argument 1 expected object"

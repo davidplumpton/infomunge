@@ -485,6 +485,20 @@ Feature: Core Collection Functions
       []
       """
 
+  Scenario: values propagates null
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      values(null)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      null
+      """
+
   Scenario: values on non-object fails
     Given the following input content:
       """
