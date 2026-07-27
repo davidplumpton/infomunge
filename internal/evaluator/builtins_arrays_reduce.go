@@ -39,7 +39,7 @@ func reduceInitialAccumulator(array Array, setup reduceSetup) (Value, int) {
 func runReduce(array Array, lambda *Lambda, scope *Scope, depth int, setup reduceSetup) (Value, error) {
 	accumulator, startIdx := reduceInitialAccumulator(array, setup)
 	for i := startIdx; i < len(array); i++ {
-		result, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+		result, err := evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			lambdaContext[lambda.ParamName(0)] = array[i]
 			lambdaContext[lambda.ParamName(1)] = accumulator
 			if lambda.ParamCount() > 2 {

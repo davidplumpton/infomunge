@@ -69,6 +69,27 @@ func TestMergeObjectsKeepsExistingPositionsAndAppendsNewKeys(t *testing.T) {
 	}
 }
 
+func TestMarkInputValueMarksReachableObjectsOnly(t *testing.T) {
+	nested := NewObject(1)
+	SetObjectValue(nested, "value", 1)
+	root := NewObject(2)
+	SetObjectValue(root, "nested", nested)
+	SetObjectValue(root, "items", Array{nested})
+	scriptObject := NewObject(0)
+
+	MarkInputValue(root)
+
+	if !ObjectHasInputOrigin(root) {
+		t.Fatal("root object was not marked as input")
+	}
+	if !ObjectHasInputOrigin(nested) {
+		t.Fatal("nested object was not marked as input")
+	}
+	if ObjectHasInputOrigin(scriptObject) {
+		t.Fatal("unreachable script object was marked as input")
+	}
+}
+
 func TestObjectOrderIdentityExpiresWithObject(t *testing.T) {
 	identity := unreachableObjectOrderIdentity()
 

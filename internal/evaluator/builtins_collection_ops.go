@@ -48,7 +48,7 @@ func executeLambdaOnArrayElementsUntil(
 	callback lambdaElementUntilCallback,
 ) error {
 	for i, elem := range array {
-		value, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+		value, err := evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			bindArrayLambdaParameters(lambdaContext, lambda, elem, i)
 		})
 		if err != nil {
@@ -119,7 +119,7 @@ func callBuiltinFilterSelector(e *ast.CallExpr, scope *Scope, depth int) (Value,
 	result := values.NewObject(len(obj))
 	for idx, key := range keys {
 		val := obj[key]
-		condVal, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+		condVal, err := evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			lambdaContext[lambda.ParamName(0)] = val
 			if lambda.ParamCount() > 1 {
 				lambdaContext[lambda.ParamName(1)] = idx
@@ -218,7 +218,7 @@ func findExtremumByLambda(
 	var extremumValue Value
 
 	for i, elem := range array {
-		value, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+		value, err := evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			bindArrayLambdaParameters(lambdaContext, lambda, elem, i)
 		})
 		if err != nil {
@@ -299,7 +299,7 @@ func callBuiltinOrderBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 
 	elements := make([]elementWithKey, len(array))
 	for i, elem := range array {
-		key, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+		key, err := evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			bindArrayLambdaParameters(lambdaContext, lambda, elem, i)
 		})
 		if err != nil {
@@ -499,7 +499,7 @@ func callBuiltinFilterObject(e *ast.CallExpr, scope *Scope, depth int) (Value, e
 }
 
 func evaluateFilterObjectCond(key string, value Value, index int, isDataWeaveOrder bool, lambda *Lambda, scope *Scope, depth int, e *ast.CallExpr) (bool, error) {
-	condVal, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+	condVal, err := evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 		bindObjectLambdaParameters(lambdaContext, lambda, key, value, index, isDataWeaveOrder)
 	})
 	if err != nil {
@@ -594,7 +594,7 @@ func groupStringBy(source string, lambda *Lambda, scope *Scope, depth int, e *as
 
 	for index, char := range []rune(source) {
 		elem := string(char)
-		key, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+		key, err := evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			bindArrayLambdaParameters(lambdaContext, lambda, elem, index)
 		})
 		if err != nil {
@@ -701,7 +701,7 @@ func pluckObject(obj Object, lambda *Lambda, scope *Scope, depth int, e *ast.Cal
 }
 
 func evaluatePluckLambda(key string, value Value, index int, isDataWeaveOrder bool, lambda *Lambda, scope *Scope, depth int) (Value, error) {
-	return evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+	return evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 		bindObjectLambdaParameters(lambdaContext, lambda, key, value, index, isDataWeaveOrder)
 	})
 }

@@ -169,7 +169,10 @@ func evalObjectStringIndex(obj Object, key string, pos token.Pos) (Value, error)
 		}
 		return attrs, nil
 	}
-	val, _ := getObjectValue(obj, key)
+	val, exists := getObjectValue(obj, key)
+	if !exists && values.ObjectHasInputOrigin(obj) {
+		return newAbsentValue(), nil
+	}
 	return val, nil
 }
 

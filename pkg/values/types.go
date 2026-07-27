@@ -25,8 +25,9 @@ func (value TypeValue) String() string {
 type Object = map[string]Value
 
 type objectOrder struct {
-	mu   sync.RWMutex
-	keys []string
+	mu          sync.RWMutex
+	keys        []string
+	inputOrigin bool
 }
 
 var objectOrders sync.Map
@@ -60,6 +61,18 @@ func installObjectOrderCleanup(object Object, identity objectOrderIdentity, poin
 	runtime.KeepAlive(object)
 }
 
+func loadOrCreateObjectOrder(object Object) *objectOrder {
+	identity, pointer := objectIdentity(object)
+	recordValue, loaded := objectOrders.Load(identity)
+	if !loaded {
+		recordValue, loaded = objectOrders.LoadOrStore(identity, &objectOrder{})
+		if !loaded {
+			installObjectOrderCleanup(object, identity, pointer)
+		}
+	}
+	return recordValue.(*objectOrder)
+}
+
 func sweepDeadObjectOrders() {
 	objectOrders.Range(func(key, _ any) bool {
 		identity := key.(objectOrderIdentity)
@@ -91,18 +104,78 @@ func SetObjectValue(object Object, key string, value Value) {
 	if existed {
 		return
 	}
-	identity, pointer := objectIdentity(object)
-	recordValue, loaded := objectOrders.Load(identity)
-	if !loaded {
-		recordValue, loaded = objectOrders.LoadOrStore(identity, &objectOrder{})
-		if !loaded {
-			installObjectOrderCleanup(object, identity, pointer)
-		}
-	}
-	record := recordValue.(*objectOrder)
+	record := loadOrCreateObjectOrder(object)
 	record.mu.Lock()
 	record.keys = append(record.keys, key)
 	record.mu.Unlock()
+}
+
+// MarkInputValue records that objects reachable from value originated outside
+// the transformation script. DataWeave preserves a distinct missing-field
+// state for input objects, while object literals created by the script yield
+// ordinary null for a missing field.
+func MarkInputValue(value Value) {
+	visitedObjects := make(map[objectOrderIdentity]struct{})
+	visitedArrays := make(map[uintptr]struct{})
+
+	var mark func(Value)
+	mark = func(current Value) {
+		switch typed := current.(type) {
+		case Object:
+			if typed == nil {
+				return
+			}
+			identity, _ := objectIdentity(typed)
+			if _, seen := visitedObjects[identity]; seen {
+				return
+			}
+			visitedObjects[identity] = struct{}{}
+
+			record := loadOrCreateObjectOrder(typed)
+			record.mu.Lock()
+			record.inputOrigin = true
+			record.mu.Unlock()
+			for _, nested := range typed {
+				mark(nested)
+			}
+		case Array:
+			markInputArray(typed, visitedArrays, mark)
+		case XMLMultiValue:
+			markInputArray(Array(typed), visitedArrays, mark)
+		}
+	}
+
+	mark(value)
+}
+
+func markInputArray(array Array, visited map[uintptr]struct{}, mark func(Value)) {
+	if len(array) == 0 {
+		return
+	}
+	identity := reflect.ValueOf(array).Pointer()
+	if _, seen := visited[identity]; seen {
+		return
+	}
+	visited[identity] = struct{}{}
+	for _, nested := range array {
+		mark(nested)
+	}
+}
+
+// ObjectHasInputOrigin reports whether object was marked as external input.
+func ObjectHasInputOrigin(object Object) bool {
+	if object == nil {
+		return false
+	}
+	identity, _ := objectIdentity(object)
+	recordValue, ok := objectOrders.Load(identity)
+	if !ok {
+		return false
+	}
+	record := recordValue.(*objectOrder)
+	record.mu.RLock()
+	defer record.mu.RUnlock()
+	return record.inputOrigin
 }
 
 // CloneObject creates a shallow ordered copy of object.

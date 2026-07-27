@@ -94,7 +94,7 @@ func applyMapObject(obj Object, lambda *Lambda, scope *Scope, depth int, pos tok
 }
 
 func applyAndMerge(value Value, key string, index int, result Object, lambda *Lambda, scope *Scope, dwOrder bool, depth int, pos token.Pos) error {
-	mapResult, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+	mapResult, err := evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 		bindObjectLambdaParameters(lambdaContext, lambda, key, value, index, dwOrder)
 	})
 	if err != nil {

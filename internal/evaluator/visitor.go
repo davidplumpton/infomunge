@@ -115,7 +115,9 @@ func (v *DefaultVisitor) VisitBinaryExpr(expr *ast.BinaryExpr) (Value, error) {
 		return nil, err
 	}
 
-	return evalBinaryOp(left, right, expr.Op, expr.Pos())
+	return evalAbsentAware([]Value{left, right}, func(values []Value) (Value, error) {
+		return evalBinaryOp(values[0], values[1], expr.Op, expr.Pos())
+	})
 }
 
 // VisitUnaryExpr evaluates a unary expression (e.g., -x, !x).
@@ -134,7 +136,9 @@ func (v *DefaultVisitor) VisitUnaryExpr(expr *ast.UnaryExpr) (Value, error) {
 		return nil, err
 	}
 
-	return evalUnaryOp(val, expr.Op, expr.Pos())
+	return evalAbsentAware([]Value{val}, func(values []Value) (Value, error) {
+		return evalUnaryOp(values[0], expr.Op, expr.Pos())
+	})
 }
 
 // VisitCompositeLit evaluates a composite literal (map or array).
@@ -159,8 +163,16 @@ func (v *DefaultVisitor) VisitCompositeLit(expr *ast.CompositeLit) (Value, error
 					if err != nil {
 						return nil, err
 					}
+					key, err = finalizeAbsentValue(key)
+					if err != nil {
+						return nil, err
+					}
 				}
 				val, err := childVisitor.Visit(node.Value)
+				if err != nil {
+					return nil, err
+				}
+				val, err = finalizeAbsentValue(val)
 				if err != nil {
 					return nil, err
 				}
@@ -179,6 +191,10 @@ func (v *DefaultVisitor) VisitCompositeLit(expr *ast.CompositeLit) (Value, error
 				// Handle dynamic object merging: {(payload)} or similar expressions
 				// These must evaluate to Object or Array of Objects
 				val, err := childVisitor.Visit(node)
+				if err != nil {
+					return nil, err
+				}
+				val, err = finalizeAbsentValue(val)
 				if err != nil {
 					return nil, err
 				}
@@ -228,6 +244,10 @@ func (v *DefaultVisitor) VisitCompositeLit(expr *ast.CompositeLit) (Value, error
 			if err != nil {
 				return nil, err
 			}
+			val, err = finalizeAbsentValue(val)
+			if err != nil {
+				return nil, err
+			}
 			res = append(res, val)
 		}
 		return res, nil
@@ -254,7 +274,9 @@ func (v *DefaultVisitor) VisitIndexExpr(expr *ast.IndexExpr) (Value, error) {
 		return nil, err
 	}
 
-	return evalIndex(obj, idx, expr.Pos())
+	return evalAbsentAware([]Value{obj, idx}, func(values []Value) (Value, error) {
+		return evalIndex(values[0], values[1], expr.Pos())
+	})
 }
 
 // VisitCallExpr evaluates a function call expression.
@@ -297,7 +319,9 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 			if err != nil {
 				return nil, err
 			}
-			return handler(args, e)
+			return evalBuiltinAbsentAware(fun.Name, args, func(values []Value) (Value, error) {
+				return handler(values, e)
+			})
 		}
 	}
 
@@ -324,7 +348,9 @@ func evalCallExprWithVisitor(e *ast.CallExpr, visitor *DefaultVisitor) (Value, e
 		if err != nil {
 			return nil, err
 		}
-		return handler(args, e)
+		return evalBuiltinAbsentAware(fun.Name, args, func(values []Value) (Value, error) {
+			return handler(values, e)
+		})
 	}
 
 	return nil, newPosError(fmt.Sprintf("undefined function: %s", fun.Name), fun.Pos())

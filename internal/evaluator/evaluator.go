@@ -164,6 +164,10 @@ func EvaluateWithScopeAndContext(exprStr string, scope *Scope, errCtx *ErrorCont
 	if err != nil {
 		return nil, errCtx.FormatEvalError(err)
 	}
+	result, err = finalizeAbsentValue(result)
+	if err != nil {
+		return nil, errCtx.FormatEvalError(err)
+	}
 	return result, nil
 }
 
@@ -569,6 +573,13 @@ func evalLogicalShortCircuit(left Value, op token.Token) (Value, bool, error) {
 	case token.LOR:
 		operation = "OR"
 	default:
+		return nil, false, nil
+	}
+
+	if absent, ok := asAbsentValue(left); ok {
+		if absent.deferredErr != nil {
+			return absent, true, nil
+		}
 		return nil, false, nil
 	}
 

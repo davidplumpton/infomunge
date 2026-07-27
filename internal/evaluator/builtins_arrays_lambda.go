@@ -20,6 +20,10 @@ func evalCollectionSource(e *ast.CallExpr, scope *Scope, depth int, nullPolicy c
 	if err != nil {
 		return nil, false, err
 	}
+	source, err = finalizeAbsentValue(source)
+	if err != nil {
+		return nil, false, err
+	}
 	if source == nil && nullPolicy == propagateNullCollectionSource {
 		return nil, true, nil
 	}
@@ -161,7 +165,7 @@ func callBuiltinTakeWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, erro
 
 	result := make(Array, 0, len(array))
 	for i, elem := range array {
-		condVal, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+		condVal, err := evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			bindArrayLambdaParameters(lambdaContext, lambda, elem, i)
 		})
 		if err != nil {
@@ -193,7 +197,7 @@ func callBuiltinDropWhile(e *ast.CallExpr, scope *Scope, depth int) (Value, erro
 	result := make(Array, 0, len(array))
 	skip := true
 	for i, elem := range array {
-		condVal, err := evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+		condVal, err := evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			bindArrayLambdaParameters(lambdaContext, lambda, elem, i)
 		})
 		if err != nil {

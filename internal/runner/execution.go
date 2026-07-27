@@ -69,6 +69,7 @@ func executeWithConfig(goCtx context.Context, raw string, additionalContext eval
 		if evaluator.IsReservedBindingName(k) {
 			return ExecutionResult{HasHeader: hasHeader, OutputMimeType: outputMimeType, Context: evalScope.Vars, OutputMetadata: outputMetadata}, unifiederrors.ValidationErrorf("binding name %q is reserved for runtime metadata", k)
 		}
+		evaluator.MarkInputValue(v)
 		evalScope.Vars[k] = v
 	}
 	evalScope = installEvaluationCapabilities(evalScope, opts)

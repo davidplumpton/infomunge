@@ -51,6 +51,9 @@ func callBuiltinDefault(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 	if err != nil {
 		return nil, err
 	}
+	if _, absent := asAbsentValue(left); absent {
+		return evalASTInScopeWithDepth(e.Args[1], scope, depth)
+	}
 	// If left is not nil, return it; otherwise evaluate and return right side
 	if left != nil {
 		return left, nil

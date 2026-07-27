@@ -209,14 +209,14 @@ func LazyReduceInScope(input *LazyValue, lambda *Lambda, initial Value, scope *S
 
 // applyLambda applies a lambda to a single argument.
 func applyLambda(lambda *Lambda, arg Value, scope *Scope, depth int) (Value, error) {
-	return evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+	return evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 		lambdaContext[lambda.ParamName(0)] = arg
 	})
 }
 
 // applyLambdaReduce applies a lambda to accumulator, current value, and optional index for reduce.
 func applyLambdaReduce(lambda *Lambda, acc Value, val Value, index int, scope *Scope, depth int) (Value, error) {
-	return evalLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
+	return evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 		lambdaContext[lambda.ParamName(0)] = acc
 		lambdaContext[lambda.ParamName(1)] = val
 		if lambda.ParamCount() > 2 {

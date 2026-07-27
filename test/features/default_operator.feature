@@ -250,3 +250,56 @@ Feature: Default Operator
       """
     When I run the application and it fails
     Then the error should contain "cannot add int and <nil>"
+
+  Scenario: Default handles composed expressions from missing input fields
+    Given the following input content:
+      """
+      %im 0.1
+      input application/json
+      output application/json
+      fun plusOne(value) = value + 1
+      ---
+      [
+        payload.label default 5,
+        payload.user.name default "missing",
+        -(payload.label) default 6,
+        payload.label + 1 default 7,
+        abs(payload.label) default 8,
+        plusOne(payload.label) default 9,
+        [1, 2] map (x) -> x + payload.label default 10
+      ]
+      """
+    When I run the application with this JSON input:
+      """
+      {"name":-635}
+      """
+    Then the output should be:
+      """
+      [5,"missing",6,7,8,9,[10,10]]
+      """
+
+  Scenario: Default does not hide explicit null arithmetic failures
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      null + 1 default 5
+      """
+    When I run the application and it fails
+    Then the error should contain "cannot add <nil> and int"
+
+  Scenario: Input absence does not hide unrelated division failures
+    Given the following JSON input:
+      """
+      {"name":-635}
+      """
+    And the following script:
+      """
+      %im 0.1
+      input application/json
+      output application/json
+      ---
+      payload.label + (1 / 0) default 5
+      """
+    When running the script should fail with error containing "division by zero"

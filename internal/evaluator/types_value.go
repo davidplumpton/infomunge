@@ -37,6 +37,12 @@ type XMLMultiValue = values.XMLMultiValue
 // Namespace represents an XML namespace with an optional prefix.
 type Namespace = values.Namespace
 
+// MarkInputValue records external-input origin on reachable objects so missing
+// selectors can retain DataWeave's absence semantics.
+func MarkInputValue(value Value) {
+	values.MarkInputValue(value)
+}
+
 // ValueKind represents the discriminated type of a Value.
 // This provides a type-safe way to check what kind of value we have.
 type ValueKind int
