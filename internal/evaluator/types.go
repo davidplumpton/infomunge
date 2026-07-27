@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/token"
 	"math"
+	"math/big"
 	"regexp"
 	"sort"
 	"strconv"
@@ -35,9 +36,7 @@ func getTypeName(v Value) string {
 		return "Null"
 	case bool:
 		return "Boolean"
-	case int:
-		return "Number"
-	case float64:
+	case int, float64, *big.Int:
 		return "Number"
 	case string:
 		return "String"
@@ -229,7 +228,7 @@ func matchesTypeExactly(value Value, typeName string, context Context) bool {
 		return ok
 	case "Number":
 		switch value.(type) {
-		case int, float64:
+		case int, float64, *big.Int:
 			return true
 		}
 		return false
@@ -318,6 +317,11 @@ func coerceToStringValue(value Value, topLevel bool) string {
 		return string(typed)
 	case int:
 		return strconv.Itoa(typed)
+	case *big.Int:
+		if typed != nil {
+			return typed.String()
+		}
+		return "null"
 	case float64:
 		return formatCoercedFloat(typed)
 	case bool:
@@ -620,6 +624,11 @@ func coerceToNumber(value Value, pos token.Pos) (Value, error) {
 	switch v := value.(type) {
 	case int:
 		return v, nil
+	case *big.Int:
+		if v == nil {
+			return nil, newCoercionTypeError(value, "Number", pos)
+		}
+		return new(big.Int).Set(v), nil
 	case float64:
 		return v, nil
 	case string:
@@ -651,6 +660,8 @@ func coerceToBoolean(value Value, pos token.Pos) (Value, error) {
 		return nil, newCoercionError(v, "Boolean", pos)
 	case int:
 		return v != 0, nil
+	case *big.Int:
+		return v != nil && v.Sign() != 0, nil
 	case float64:
 		return v != 0, nil
 	case nil:

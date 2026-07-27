@@ -296,10 +296,14 @@ func evalBasicLit(e *ast.BasicLit) (Value, error) {
 		return v, nil
 	case token.INT:
 		v, err := strconv.Atoi(e.Value)
-		if err != nil {
+		if err == nil {
+			return v, nil
+		}
+		vBig, ok := new(big.Int).SetString(e.Value, 10)
+		if !ok {
 			return nil, newPosError(fmt.Sprintf("invalid integer literal: %s", err), e.Pos())
 		}
-		return v, nil
+		return vBig, nil
 	case token.FLOAT:
 		v, err := strconv.ParseFloat(e.Value, 64)
 		if err != nil {
@@ -432,7 +436,7 @@ func add(left, right Value) (Value, error) {
 
 func isNumber(value Value) bool {
 	switch value.(type) {
-	case int, float64:
+	case int, float64, *big.Int:
 		return true
 	default:
 		return false
@@ -463,7 +467,7 @@ func sub(left, right Value) (Value, error) {
 // instead of converting their display representations into object keys.
 func objectRemovalKey(value Value) (string, bool) {
 	switch typed := value.(type) {
-	case string, int, float64, bool:
+	case string, int, float64, *big.Int, bool:
 		return coerceToString(typed), true
 	case *Regex:
 		if typed != nil {
@@ -517,7 +521,7 @@ func rem(left, right Value) (Value, error) {
 		return l % r, nil
 	}
 
-	if hasInexactFloatInt(left, right) {
+	if hasInexactFloatInt(left, right) || hasBigInteger(left, right) {
 		return exactMixedNumericOp(left, right, "modulo")
 	}
 
@@ -642,6 +646,8 @@ func negate(val Value) (Value, error) {
 			return nil, unifiederrors.EvalError("integer overflow during negation")
 		}
 		return -v, nil
+	case *big.Int:
+		return normalizeInteger(new(big.Int).Neg(v)), nil
 	default:
 		return nil, unifiederrors.EvalErrorf("cannot negate %T", val)
 	}
@@ -660,7 +666,7 @@ func not(val Value) (Value, error) {
 // numericOp performs a float or mixed numeric operation. Integer-only
 // arithmetic is handled separately so it cannot silently wrap.
 func numericOp(left, right Value, floatOp func(float64, float64) float64, opName, verb string) (Value, error) {
-	if hasInexactFloatInt(left, right) {
+	if hasInexactFloatInt(left, right) || hasBigInteger(left, right) {
 		return exactMixedNumericOp(left, right, opName)
 	}
 
@@ -761,11 +767,8 @@ func exactMixedNumericOp(left, right Value, opName string) (Value, error) {
 		return nil, unifiederrors.EvalErrorf("unsupported numeric operation %s", opName)
 	}
 
-	if result.IsInt() && result.Num().IsInt64() {
-		n := result.Num().Int64()
-		if int64(int(n)) == n {
-			return int(n), nil
-		}
+	if result.IsInt() {
+		return normalizeInteger(result.Num()), nil
 	}
 	f, exact := result.Float64()
 	if !exact {
@@ -775,6 +778,15 @@ func exactMixedNumericOp(left, right Value, opName string) (Value, error) {
 		return nil, err
 	}
 	return f, nil
+}
+
+func hasBigInteger(values ...Value) bool {
+	for _, value := range values {
+		if _, ok := value.(*big.Int); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func hasInexactFloatInt(left, right Value) bool {
@@ -797,6 +809,11 @@ func exactNumericRat(value Value) (*big.Rat, bool) {
 	switch n := value.(type) {
 	case int:
 		return new(big.Rat).SetInt64(int64(n)), true
+	case *big.Int:
+		if n == nil {
+			return nil, false
+		}
+		return new(big.Rat).SetInt(n), true
 	case float64:
 		if math.IsNaN(n) || math.IsInf(n, 0) {
 			return nil, false
@@ -805,6 +822,16 @@ func exactNumericRat(value Value) (*big.Rat, bool) {
 	default:
 		return nil, false
 	}
+}
+
+func normalizeInteger(value *big.Int) Value {
+	if value.IsInt64() {
+		asInt64 := value.Int64()
+		if int64(int(asInt64)) == asInt64 {
+			return int(asInt64)
+		}
+	}
+	return new(big.Int).Set(value)
 }
 
 func minInt() int {
@@ -898,7 +925,7 @@ func evalIndex(obj Value, idx Value, pos token.Pos) (Value, error) {
 		return evalArrayIndex(v, idx, pos)
 	case XMLMultiValue:
 		return evalArrayIndex(Array(v), idx, pos)
-	case int, float64:
+	case int, float64, *big.Int:
 		return evalNumberIndex(obj, idx, pos)
 	case string:
 		return evalStringIndex(v, idx, pos)

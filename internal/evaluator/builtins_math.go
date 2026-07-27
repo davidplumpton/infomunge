@@ -20,6 +20,9 @@ func callBuiltinCeil(args []Value, e *ast.CallExpr) (Value, error) {
 	if integer, ok := num.(int); ok {
 		return integer, nil
 	}
+	if integer, ok := num.(*big.Int); ok {
+		return new(big.Int).Set(integer), nil
+	}
 	return math.Ceil(num.(float64)), nil
 }
 
@@ -35,6 +38,9 @@ func callBuiltinFloor(args []Value, e *ast.CallExpr) (Value, error) {
 	if integer, ok := num.(int); ok {
 		return integer, nil
 	}
+	if integer, ok := num.(*big.Int); ok {
+		return new(big.Int).Set(integer), nil
+	}
 	return math.Floor(num.(float64)), nil
 }
 
@@ -49,6 +55,9 @@ func callBuiltinRound(args []Value, e *ast.CallExpr) (Value, error) {
 	}
 	if integer, ok := num.(int); ok {
 		return integer, nil
+	}
+	if integer, ok := num.(*big.Int); ok {
+		return new(big.Int).Set(integer), nil
 	}
 	return math.Round(num.(float64)), nil
 }
@@ -79,6 +88,20 @@ func callBuiltinSqrt(args []Value, e *ast.CallExpr) (Value, error) {
 		}
 		return result, nil
 	}
+	if integer, ok := num.(*big.Int); ok {
+		if integer.Sign() < 0 {
+			return nil, newPosError(fmt.Sprintf("sqrt: cannot take square root of negative number %v", integer), e.Pos())
+		}
+		root := new(big.Int).Sqrt(integer)
+		if new(big.Int).Mul(new(big.Int).Set(root), root).Cmp(integer) == 0 {
+			return normalizeInteger(root), nil
+		}
+		floatValue, accuracy := new(big.Float).SetInt(integer).Float64()
+		if accuracy != big.Exact {
+			return nil, newPosError("sqrt: numeric precision loss converting integer input", e.Pos())
+		}
+		return math.Sqrt(floatValue), nil
+	}
 	floatValue := num.(float64)
 	if floatValue < 0 {
 		return nil, newPosError(fmt.Sprintf("sqrt: cannot take square root of negative number %v", num), e.Pos())
@@ -107,6 +130,9 @@ func callBuiltinAbs(args []Value, e *ast.CallExpr) (Value, error) {
 			return -integer, nil
 		}
 		return integer, nil
+	}
+	if integer, ok := num.(*big.Int); ok {
+		return normalizeInteger(new(big.Int).Abs(integer)), nil
 	}
 	return math.Abs(num.(float64)), nil
 }
@@ -216,6 +242,11 @@ func normalizedBuiltinNumber(val Value, funcName string, e *ast.CallExpr) (Value
 	switch v := val.(type) {
 	case int:
 		return v, nil
+	case *big.Int:
+		if v == nil {
+			return 0, newPosError(fmt.Sprintf("%s: cannot convert %T to number", funcName, val), e.Pos())
+		}
+		return new(big.Int).Set(v), nil
 	case float64:
 		if math.IsNaN(v) || math.IsInf(v, 0) {
 			return nil, newPosError(fmt.Sprintf("%s: expected a finite number", funcName), e.Pos())
@@ -240,6 +271,12 @@ func exactBuiltinFloat(val Value, funcName string, e *ast.CallExpr) (float64, er
 			return 0, newPosError(fmt.Sprintf("%s: numeric precision loss converting integer input", funcName), e.Pos())
 		}
 		return float64(number), nil
+	case *big.Int:
+		result, accuracy := new(big.Float).SetInt(number).Float64()
+		if accuracy != big.Exact {
+			return 0, newPosError(fmt.Sprintf("%s: numeric precision loss converting integer input", funcName), e.Pos())
+		}
+		return result, nil
 	case float64:
 		return number, nil
 	default:
@@ -335,6 +372,7 @@ func aggregateNumbers(arr Array, funcName string, average bool, e *ast.CallExpr)
 	total := new(big.Rat)
 	hasFloat := false
 	hasInexactInteger := false
+	hasBigIntegerInput := false
 	for i, item := range arr {
 		number, ok := exactNumericRat(item)
 		if !ok {
@@ -346,6 +384,10 @@ func aggregateNumbers(arr Array, funcName string, average bool, e *ast.CallExpr)
 			hasFloat = true
 		case int:
 			hasInexactInteger = hasInexactInteger || !intExactlyRepresentableAsFloat(value)
+		case *big.Int:
+			hasBigIntegerInput = true
+			_, accuracy := new(big.Float).SetInt(value).Float64()
+			hasInexactInteger = hasInexactInteger || accuracy != big.Exact
 		}
 	}
 	if average {
@@ -353,13 +395,11 @@ func aggregateNumbers(arr Array, funcName string, average bool, e *ast.CallExpr)
 	}
 
 	if total.IsInt() && (!hasFloat || hasInexactInteger) {
-		if total.Num().IsInt64() {
-			value := total.Num().Int64()
-			if int64(int(value)) == value {
-				return int(value), nil
-			}
+		normalized := normalizeInteger(total.Num())
+		if _, ok := normalized.(*big.Int); ok && !hasBigIntegerInput {
+			return nil, newPosError(fmt.Sprintf("integer overflow during %s", funcName), e.Pos())
 		}
-		return nil, newPosError(fmt.Sprintf("integer overflow during %s", funcName), e.Pos())
+		return normalized, nil
 	}
 
 	result, exact := total.Float64()
@@ -382,7 +422,7 @@ func callBuiltinIsDecimal(args []Value, e *ast.CallExpr) (Value, error) {
 	case float64:
 		// It's a float64 type
 		return true, nil
-	case int:
+	case int, *big.Int:
 		// It's an integer type
 		return false, nil
 	case string, nil:
@@ -404,6 +444,8 @@ func callBuiltinIsInteger(args []Value, e *ast.CallExpr) (Value, error) {
 		return !math.IsNaN(v) && !math.IsInf(v, 0) && math.Trunc(v) == v, nil
 	case int:
 		return true, nil
+	case *big.Int:
+		return v != nil, nil
 	case string, nil:
 		return nil, newPosError(fmt.Sprintf("isInteger expects a number, got %T", args[0]), e.Pos())
 	default:
@@ -426,6 +468,8 @@ func callBuiltinIsEven(args []Value, e *ast.CallExpr) (Value, error) {
 		return math.Mod(v, 2) == 0, nil
 	case int:
 		return v%2 == 0, nil
+	case *big.Int:
+		return v.Bit(0) == 0, nil
 	case string:
 		return nil, newPosError(fmt.Sprintf("isEven expects an integer, got string"), e.Pos())
 	default:
@@ -449,6 +493,8 @@ func callBuiltinIsOdd(args []Value, e *ast.CallExpr) (Value, error) {
 		return math.Mod(v, 2) != 0, nil
 	case int:
 		return v%2 != 0, nil
+	case *big.Int:
+		return v.Bit(0) != 0, nil
 	case string:
 		return nil, newPosError(fmt.Sprintf("isOdd expects an integer, got string"), e.Pos())
 	default:

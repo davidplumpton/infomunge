@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"infomunge/pkg/values"
+	"math/big"
 	"sort"
 	"strconv"
 	"strings"
@@ -39,6 +40,8 @@ func callBuiltinSizeOf(args []Value, e *ast.CallExpr) (Value, error) {
 		return len(v), nil
 	case int:
 		return len(strconv.Itoa(v)), nil
+	case *big.Int:
+		return len(v.String()), nil
 	case float64:
 		return len(formatCoercedFloat(v)), nil
 	case bool:
@@ -180,7 +183,7 @@ func callBuiltinSort(args []Value, e *ast.CallExpr) (Value, error) {
 
 	for _, item := range result {
 		switch item.(type) {
-		case int, float64:
+		case int, float64, *big.Int:
 			allStrings = false
 		case string:
 			allNumbers = false

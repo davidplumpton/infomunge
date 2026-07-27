@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"math/big"
 	"regexp"
 	"strings"
 )
@@ -125,7 +126,7 @@ func callBuiltinContains(args []Value, e *ast.CallExpr) (Value, error) {
 	switch first := args[0].(type) {
 	case nil:
 		return false, nil
-	case string, int, float64, bool:
+	case string, int, float64, *big.Int, bool:
 		text, err := coerceScalarStringArg(first, 1, "contains", e)
 		if err != nil {
 			return nil, err

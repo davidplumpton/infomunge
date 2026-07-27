@@ -40,6 +40,34 @@ Feature: Exact numeric behavior
       -9223372036854775808
       """
 
+  Scenario: Integer literals beyond the runtime int range remain exact
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      9223372036854775808
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      9223372036854775808
+      """
+
+  Scenario: Arithmetic with an out-of-range integer literal remains exact
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [9223372036854775808 + 1, 9223372036854775808 * 2, 9223372036854775808 / 2]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [9223372036854775809,18446744073709551616,4611686018427387904]
+      """
+
   Scenario: Double negation preserves the minimum signed integer
     Given the following input content:
       """

@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"fmt"
+	"math/big"
 	"unicode/utf8"
 
 	unifiederrors "infomunge/internal/errors"
@@ -64,7 +65,7 @@ func beString() Matcher {
 func beNumber() Matcher {
 	return typeMatcherFactory("number", func(v Value) bool {
 		switch v.(type) {
-		case float64, int:
+		case float64, int, *big.Int:
 			return true
 		default:
 			return false

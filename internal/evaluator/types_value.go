@@ -2,13 +2,14 @@ package evaluator
 
 import (
 	"context"
+	"math/big"
 	"sync"
 
 	"infomunge/pkg/values"
 )
 
 // Value is a generic value type that represents any value that can be evaluated in expressions.
-// It can be a nil, bool, string, number (int or float64), array, object, lambda
+// It can be a nil, bool, string, number (int, *big.Int, or float64), array, object, lambda
 // function, TypeValue, TypeDef, or ControlFlowSignal.
 type Value = values.Value
 
@@ -156,7 +157,7 @@ func KindOf(v Value) ValueKind {
 		return KindNil
 	case bool:
 		return KindBool
-	case int:
+	case int, *big.Int:
 		return KindInt
 	case float64:
 		return KindFloat

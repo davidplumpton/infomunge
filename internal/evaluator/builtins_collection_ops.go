@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"infomunge/pkg/values"
+	"math/big"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -548,7 +549,7 @@ func callBuiltinGroupBy(e *ast.CallExpr, scope *Scope, depth int) (Value, error)
 	switch typed := source.(type) {
 	case Array:
 		arraySource = typed
-	case string, int, float64, bool:
+	case string, int, float64, *big.Int, bool:
 		stringSource = coerceToString(typed)
 		isString = true
 	case Object:

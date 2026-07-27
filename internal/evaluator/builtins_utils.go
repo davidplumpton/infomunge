@@ -3,6 +3,7 @@ package evaluator
 import (
 	"fmt"
 	"go/ast"
+	"math/big"
 	"regexp"
 	"strings"
 )
@@ -60,7 +61,7 @@ func requireOneNullableScalarStringArg(args []Value, funcName string, e *ast.Cal
 // type errors instead of inheriting coerceToString's broader display behavior.
 func coerceScalarStringArg(val Value, argIndex int, funcName string, e *ast.CallExpr) (string, error) {
 	switch val.(type) {
-	case string, TypeValue, int, float64, bool:
+	case string, TypeValue, int, float64, *big.Int, bool:
 		return coerceToString(val), nil
 	default:
 		return assertStringArg(val, argIndex, funcName, e)

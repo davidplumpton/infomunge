@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"math/big"
 	"strconv"
 	"strings"
 	"testing"
@@ -83,11 +84,6 @@ func TestEvaluate_MinimumSignedIntegerLiteralRangeSafety(t *testing.T) {
 		want string
 	}{
 		{
-			name: "positive magnitude remains invalid",
-			expr: "9223372036854775808",
-			want: "invalid integer literal",
-		},
-		{
 			name: "computed minimum negation remains overflow",
 			expr: "-(-9223372036854775807 - 1)",
 			want: "integer overflow during negation",
@@ -104,6 +100,74 @@ func TestEvaluate_MinimumSignedIntegerLiteralRangeSafety(t *testing.T) {
 				t.Fatalf("expected error containing %q, got %v", tt.want, err)
 			}
 		})
+	}
+}
+
+func TestEvaluate_OutOfRangeIntegerLiteralsRemainExact(t *testing.T) {
+	if strconv.IntSize != 64 {
+		t.Skip("acceptance values are specific to 64-bit int builds")
+	}
+
+	tests := []struct {
+		name string
+		expr string
+		want string
+	}{
+		{name: "literal", expr: "9223372036854775808", want: "9223372036854775808"},
+		{name: "addition", expr: "9223372036854775808 + 1", want: "9223372036854775809"},
+		{name: "subtraction normalizes in-range result", expr: "9223372036854775808 - 1", want: "9223372036854775807"},
+		{name: "multiplication", expr: "9223372036854775808 * 2", want: "18446744073709551616"},
+		{name: "division", expr: "9223372036854775808 / 2", want: "4611686018427387904"},
+		{name: "modulo", expr: "9223372036854775808 % 3", want: "2"},
+		{name: "negative literal", expr: "-9223372036854775809", want: "-9223372036854775809"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(tt.expr, Context{}, nil, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			switch value := result.(type) {
+			case int:
+				if strconv.Itoa(value) != tt.want {
+					t.Fatalf("expected %s, got %d", tt.want, value)
+				}
+			case *big.Int:
+				if value.String() != tt.want {
+					t.Fatalf("expected %s, got %s", tt.want, value)
+				}
+			default:
+				t.Fatalf("expected exact integer result %s, got %v (%T)", tt.want, result, result)
+			}
+		})
+	}
+
+	result, err := Evaluate("9223372036854775808 > 9223372036854775807", Context{}, nil, 0, "")
+	if err != nil {
+		t.Fatalf("comparison returned an error: %v", err)
+	}
+	if result != true {
+		t.Fatalf("expected out-of-range literal to compare greater, got %v", result)
+	}
+
+	classificationTests := []struct {
+		expr string
+		want Value
+	}{
+		{expr: "typeOf(9223372036854775808)", want: TypeValue("Number")},
+		{expr: "sizeOf(9223372036854775808)", want: 19},
+		{expr: "isInteger(9223372036854775808)", want: true},
+		{expr: "isEven(9223372036854775808)", want: true},
+	}
+	for _, tt := range classificationTests {
+		result, err := Evaluate(tt.expr, Context{}, nil, 0, tt.expr)
+		if err != nil {
+			t.Fatalf("%s returned an error: %v", tt.expr, err)
+		}
+		if result != tt.want {
+			t.Fatalf("%s: expected %v (%T), got %v (%T)", tt.expr, tt.want, tt.want, result, result)
+		}
 	}
 }
 
