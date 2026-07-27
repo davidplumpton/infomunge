@@ -251,6 +251,10 @@ func callBuiltinKeys(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
+	if args[0] == nil {
+		return nil, nil
+	}
+
 	if err := assertArg(args[0], beObject(), 1, "keys", e); err != nil {
 		return nil, err
 	}

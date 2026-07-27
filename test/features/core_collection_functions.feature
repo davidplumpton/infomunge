@@ -395,6 +395,20 @@ Feature: Core Collection Functions
       []
       """
 
+  Scenario: keys propagates literal and missing-selector null values
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [keys(null), keys({}["active"])]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [null,null]
+      """
+
   Scenario: keys on non-object fails
     Given the following input content:
       """

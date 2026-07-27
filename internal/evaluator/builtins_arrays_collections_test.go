@@ -196,6 +196,18 @@ func TestNullArrayValueHelpersPropagateNull(t *testing.T) {
 	}
 }
 
+func TestBuiltinKeysPropagatesNull(t *testing.T) {
+	call := &ast.CallExpr{Fun: &ast.Ident{Name: "keys"}}
+
+	result, err := callBuiltinKeys([]Value{nil}, call)
+	if err != nil {
+		t.Fatalf("callBuiltinKeys() error = %v", err)
+	}
+	if result != nil {
+		t.Fatalf("callBuiltinKeys() = %#v, want nil", result)
+	}
+}
+
 func TestBuiltinArraysSliceClampsDataWeaveBounds(t *testing.T) {
 	tests := []struct {
 		name     string
