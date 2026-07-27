@@ -627,6 +627,91 @@ func TestDefaultKeepsGroupedCollectionOperatorInFallback(t *testing.T) {
 	}
 }
 
+func TestDefaultConsumesCompleteHigherPrecedenceLeftExpression(t *testing.T) {
+	stage := createOperatorProcessingStage(nil)
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "unary negative",
+			input:    `-(payload.label) default 5`,
+			expected: `__default(-(payload.label), 5)`,
+		},
+		{
+			name:     "unary not",
+			input:    `!(payload.label) default true`,
+			expected: `__default(!(payload.label), true)`,
+		},
+		{
+			name:     "multiplicative",
+			input:    `2 * payload.label default 5`,
+			expected: `__default(2 * payload.label, 5)`,
+		},
+		{
+			name:     "additive",
+			input:    `1 + payload.label default 5`,
+			expected: `__default(1 + payload.label, 5)`,
+		},
+		{
+			name:     "comparison",
+			input:    `payload.label > 0 default true`,
+			expected: `__default(payload.label > 0, true)`,
+		},
+		{
+			name:     "logical",
+			input:    `enabled && payload.flag default false`,
+			expected: `__default(enabled && payload.flag, false)`,
+		},
+		{
+			name:     "selector",
+			input:    `payload.user.name default "missing"`,
+			expected: `__default(payload.user.name, "missing")`,
+		},
+		{
+			name:     "builtin call",
+			input:    `upper(payload.label) default "missing"`,
+			expected: `__default(upper(payload.label), "missing")`,
+		},
+		{
+			name:     "explicit collection lambda body",
+			input:    `[1, 2] map (x) -> x + payload.label default 10`,
+			expected: `[1, 2] map (x) ->__default(x + payload.label, 10)`,
+		},
+		{
+			name:     "grouped local fallback",
+			input:    `1 + (payload.label default 5)`,
+			expected: `1 + (__default(payload.label, 5))`,
+		},
+		{
+			name:     "grouped completed collection",
+			input:    `([1] map (x) -> x) default []`,
+			expected: `__default(([1] map (x) -> x), [])`,
+		},
+		{
+			name:     "assignment boundary",
+			input:    `value = 1 + payload.label default 5`,
+			expected: `value =__default(1 + payload.label, 5)`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, mapping, err := stage.Execute(tt.input, identityMapping(len(tt.input)))
+			if err != nil {
+				t.Fatalf("operator stage returned error: %v", err)
+			}
+			if result != tt.expected {
+				t.Fatalf("expected %q, got %q", tt.expected, result)
+			}
+			if len(mapping) != len(result) {
+				t.Fatalf("mapping length = %d, want %d", len(mapping), len(result))
+			}
+		})
+	}
+}
+
 func TestConfiguredBinaryOperatorsComposeAcrossPreprocessingPipeline(t *testing.T) {
 	tests := []struct {
 		name     string

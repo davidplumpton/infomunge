@@ -91,6 +91,89 @@ func findTypedOperatorLeftOperandStartBytes(result []byte) int {
 	return leftStart
 }
 
+// findDefaultLeftOperandStartBytes includes native unary, arithmetic, logical,
+// comparison, selector, and call syntax in default's left operand. Default has
+// lower precedence than those expressions. An ungrouped lambda arrow remains a
+// boundary so default in an explicit collection callback applies to the
+// callback result rather than the collection source.
+func findDefaultLeftOperandStartBytes(result []byte) int {
+	pos := len(result) - 1
+	for pos >= 0 && isWhitespace(result[pos]) {
+		pos--
+	}
+	if pos < 0 {
+		return 0
+	}
+
+	input := string(result)
+	depth := 0
+	for pos >= 0 {
+		ch := result[pos]
+
+		if ch == '"' {
+			pos--
+			for pos >= 0 {
+				if result[pos] == '"' && !stringutils.IsEscapedAt(input, pos) {
+					break
+				}
+				pos--
+			}
+			pos--
+			continue
+		}
+
+		if depth == 0 {
+			if isDefaultLeftStructuralBoundary(ch) {
+				return pos + 1
+			}
+			if ch == '>' && pos > 0 && result[pos-1] == '-' {
+				return pos + 1
+			}
+			if ch == '=' && isStandaloneAssignmentAt(result, pos) {
+				return pos + 1
+			}
+		}
+
+		switch ch {
+		case ')', ']', '}':
+			depth++
+		case '(', '[', '{':
+			depth--
+			if depth < 0 {
+				return pos + 1
+			}
+		}
+		pos--
+	}
+
+	return 0
+}
+
+func isDefaultLeftStructuralBoundary(ch byte) bool {
+	switch ch {
+	case ',', ';', ':':
+		return true
+	default:
+		return false
+	}
+}
+
+func isStandaloneAssignmentAt(input []byte, pos int) bool {
+	if pos > 0 {
+		switch input[pos-1] {
+		case '=', '!', '<', '>':
+			return false
+		}
+	}
+	if pos+1 < len(input) {
+		switch input[pos+1] {
+		case '=', '>':
+			return false
+		}
+	}
+	return true
+}
+
 // findModuloLeftOperandStartBytes includes logical, native comparison, type,
 // additive, and multiplicative expressions in the left operand. DataWeave's
 // infix mod binds less tightly than those operators. Lower-precedence keyword

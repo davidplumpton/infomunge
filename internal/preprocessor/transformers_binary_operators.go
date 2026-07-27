@@ -114,6 +114,9 @@ type binaryOperatorScanOverrides struct {
 }
 
 var binaryOperatorScanOverridesByKey = map[string]binaryOperatorScanOverrides{
+	binaryOpDefault: {
+		leftOperandStart: findDefaultLeftOperandStartBytes,
+	},
 	binaryOpTo: {
 		rightStopPredicate: shouldStopRangeRightOperand,
 	},

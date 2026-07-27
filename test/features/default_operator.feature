@@ -196,3 +196,57 @@ Feature: Default Operator
       """
       [[[1],[2,3]]]
       """
+
+  Scenario: Ungrouped default consumes a complete additive expression
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      var payload = {name: -635}
+      ---
+      1 + payload.label default 5
+      """
+    When I run the application and it fails
+    Then the error should contain "cannot add int and <nil>"
+
+  Scenario: Grouping keeps default local to an additive operand
+    Given the following input content:
+      """
+      %im 0.1
+      input application/json
+      output application/json
+      ---
+      1 + (payload.label default 5)
+      """
+    When I run the application with this JSON input:
+      """
+      {"name":-635}
+      """
+    Then the output should be:
+      """
+      6
+      """
+
+  Scenario: Ungrouped default consumes a complete unary expression
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      var payload = {name: -635}
+      ---
+      [-(payload.label) default 5, !(payload.label) default true]
+      """
+    When I run the application and it fails
+    Then the error should contain "cannot negate <nil>"
+
+  Scenario: Default remains inside an explicit collection lambda body
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      var payload = {name: -635}
+      ---
+      [1, 2] map (x) -> x + payload.label default 10
+      """
+    When I run the application and it fails
+    Then the error should contain "cannot add int and <nil>"
