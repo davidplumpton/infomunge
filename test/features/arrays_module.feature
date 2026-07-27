@@ -228,7 +228,22 @@ Feature: Arrays Module
     When I run the application with this content
     Then the output should be:
       """
-      [{"l":{"id":1},"r":{"ownerId":1}},{"l":{"id":2},"r":null}]
+      [{"l":{"id":1},"r":{"ownerId":1}},{"l":{"id":2}}]
+      """
+
+  Scenario: leftJoin omits the right field from unmatched rows
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      import * from dw::core::Arrays
+      ---
+      [keysOf(leftJoin([{id: 1}], [], (l) -> l.id, (r) -> r.owner)[0]), leftJoin([{id: 1}], [], (l) -> l.id, (r) -> r.owner)[0].r?]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [["l"],false]
       """
 
   Scenario: outerJoin includes unmatched right rows
@@ -243,7 +258,22 @@ Feature: Arrays Module
     When I run the application with this content
     Then the output should be:
       """
-      [{"l":{"id":1},"r":{"ownerId":1}},{"l":{"id":2},"r":null},{"l":null,"r":{"ownerId":3}}]
+      [{"l":{"id":1},"r":{"ownerId":1}},{"l":{"id":2}},{"r":{"ownerId":3}}]
+      """
+
+  Scenario: outerJoin omits the left field from unmatched rows
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      import * from dw::core::Arrays
+      ---
+      [keysOf(outerJoin([], [{owner: 1}], (l) -> l.id, (r) -> r.owner)[0]), outerJoin([], [{owner: 1}], (l) -> l.id, (r) -> r.owner)[0].l?]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [["r"],false]
       """
 
   Scenario: Import a specific Arrays symbol
