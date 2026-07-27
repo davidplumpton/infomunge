@@ -966,6 +966,9 @@ func evalUnaryOp(val Value, op token.Token, pos token.Pos) (Value, error) {
 // evalIndex evaluates index operations: obj[idx]
 func evalIndex(obj Value, idx Value, pos token.Pos) (Value, error) {
 	if obj == nil {
+		if selector, ok := idx.(selectorOperation); ok && selector.mode == selectorModePresence {
+			return false, nil
+		}
 		return nil, nil
 	}
 

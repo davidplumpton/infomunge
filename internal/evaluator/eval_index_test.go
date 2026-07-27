@@ -128,6 +128,37 @@ func TestEvalIndexUsesExplicitSelectorOperations(t *testing.T) {
 	}
 }
 
+func TestEvalIndexPresenceSelectorConsumesMissingInputPath(t *testing.T) {
+	presence := selectorOperation{mode: selectorModePresence, key: "score"}
+	got, err := evalAbsentAware(
+		[]Value{newAbsentValue(), presence},
+		func(values []Value) (Value, error) {
+			return evalIndex(values[0], values[1], token.Pos(1))
+		},
+	)
+	if err != nil {
+		t.Fatalf("presence selector returned an unexpected error: %v", err)
+	}
+	if got != false {
+		t.Fatalf("presence selector on absent input = %#v, want false", got)
+	}
+}
+
+func TestEvalIndexOrdinarySelectorPreservesMissingInputPath(t *testing.T) {
+	got, err := evalAbsentAware(
+		[]Value{newAbsentValue(), "score"},
+		func(values []Value) (Value, error) {
+			return evalIndex(values[0], values[1], token.Pos(1))
+		},
+	)
+	if err != nil {
+		t.Fatalf("ordinary selector returned an unexpected error: %v", err)
+	}
+	if _, ok := asAbsentValue(got); !ok {
+		t.Fatalf("ordinary selector on absent input = %#v, want absent value", got)
+	}
+}
+
 func TestEvalNumberIndexTreatsStringKeysAsMissingFields(t *testing.T) {
 	for _, number := range []Value{7, -80.45} {
 		got, err := evalNumberIndex(number, "score", token.Pos(1))

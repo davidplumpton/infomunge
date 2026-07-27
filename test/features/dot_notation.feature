@@ -149,6 +149,24 @@ Feature: Dot Notation for Field Access
       true
       """
 
+  Scenario: Nested presence selectors remain boolean for missing input paths
+    Given the following input content:
+      """
+      %dw 2.0
+      input application/json
+      output application/json
+      ---
+      payload.items map (item) -> [item.profile.age?, if (item.profile.age?) item.profile.age else 0]
+      """
+    When I run the application with this JSON input:
+      """
+      {"items":[{"profile":{"age":20}},{},{"profile":{}}]}
+      """
+    Then the output should be:
+      """
+      [[true,20],[false,0],[false,0]]
+      """
+
   Scenario: Bracket notation still works
     Given the following input content:
       """
