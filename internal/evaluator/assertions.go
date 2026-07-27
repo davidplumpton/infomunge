@@ -387,7 +387,9 @@ func isEqual(a, b Value) bool {
 func compareValues(a, b Value) (int, error) {
 	// Compare the exact numeric values represented by ints and float64s. This
 	// must stay aligned with relational operators so adjacent integers above
-	// 2^53 do not collapse when an int is converted to float64.
+	// 2^53 do not collapse when an int is converted to float64. Collection
+	// ordering deliberately does not inherit scalar relational numeric-string
+	// coercion: DataWeave rejects mixed Number and String selector keys.
 	aNum, aIsNum := exactNumericRat(a)
 	bNum, bIsNum := exactNumericRat(b)
 	if aIsNum && bIsNum {

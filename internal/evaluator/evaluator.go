@@ -696,15 +696,49 @@ func numericOp(left, right Value, floatOp func(float64, float64) float64, opName
 	return nil, unifiederrors.EvalErrorf("cannot %s %T and %T", verb, left, right)
 }
 
-// numericCompare uses the exact rational values represented by ints and
-// float64s, avoiding lossy int-to-float coercion above 2^53.
+// numericCompare uses the exact rational values represented by ints,
+// arbitrary-precision integers, and float64s, avoiding lossy int-to-float
+// coercion above 2^53. DataWeave also treats a numeric string as a number when
+// the other operand is numeric; string-to-string ordering remains unsupported.
 func numericCompare(left, right Value, op func(int) bool, opName string) (Value, error) {
+	if _, rightIsNumber := exactNumericRat(right); rightIsNumber {
+		if number, ok := parseComparisonNumericString(left); ok {
+			left = number
+		}
+	}
+	if _, leftIsNumber := exactNumericRat(left); leftIsNumber {
+		if number, ok := parseComparisonNumericString(right); ok {
+			right = number
+		}
+	}
+
 	l, okL := exactNumericRat(left)
 	r, okR := exactNumericRat(right)
 	if okL && okR {
 		return op(l.Cmp(r)), nil
 	}
 	return nil, unifiederrors.EvalErrorf("cannot compare %T and %T with %s", left, right, opName)
+}
+
+func parseComparisonNumericString(value Value) (Value, bool) {
+	text, ok := value.(string)
+	if !ok {
+		return nil, false
+	}
+
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil, false
+	}
+	if strings.ContainsAny(text, ".eE") {
+		return values.ParseNumericLiteral(text)
+	}
+
+	integer, ok := new(big.Int).SetString(text, 10)
+	if !ok {
+		return nil, false
+	}
+	return normalizeInteger(integer), true
 }
 
 func checkedIntOp(left, right int, opName string) (Value, error) {

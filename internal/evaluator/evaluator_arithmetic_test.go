@@ -608,3 +608,66 @@ func TestEvaluate_ComparisonErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestEvaluate_RelationalComparisonsCoerceNumericStrings(t *testing.T) {
+	tests := []struct {
+		name string
+		expr string
+		want bool
+	}{
+		{name: "int less than numeric string", expr: `1 < "2"`, want: true},
+		{name: "numeric string greater than int", expr: `"2" > 1`, want: true},
+		{name: "int not less than numeric string", expr: `3 < "2"`, want: false},
+		{name: "int less than or equal to numeric string", expr: `3 <= "3"`, want: true},
+		{name: "numeric string greater than or equal to int", expr: `"3" >= 3`, want: true},
+		{name: "float less than numeric string", expr: `1.5 < "2.25"`, want: true},
+		{
+			name: "big integer numeric string preserves exact ordering",
+			expr: `"9223372036854775808" > 9223372036854775807`,
+			want: true,
+		},
+		{
+			name: "big integers preserve exact ordering in either operand order",
+			expr: `9223372036854775808 < "9223372036854775809"`,
+			want: true,
+		},
+		{
+			name: "integer string and float compare without rounding the integer",
+			expr: `"9007199254740993" > 9007199254740992.0`,
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mapping := make([]int, len(tt.expr))
+			for i := range mapping {
+				mapping[i] = i
+			}
+
+			got, err := Evaluate(tt.expr, Context{}, mapping, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("Evaluate(%q) returned an unexpected error: %v", tt.expr, err)
+			}
+			if got != tt.want {
+				t.Fatalf("Evaluate(%q) returned %#v, want %v", tt.expr, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEvaluate_RelationalComparisonRejectsNonnumericString(t *testing.T) {
+	expr := `1 < "abc"`
+	mapping := make([]int, len(expr))
+	for i := range mapping {
+		mapping[i] = i
+	}
+
+	_, err := Evaluate(expr, Context{}, mapping, 0, expr)
+	if err == nil {
+		t.Fatal("Evaluate returned nil error for a nonnumeric string comparison")
+	}
+	if got, want := err.Error(), "EvalError: cannot compare int and string with <"; got != want {
+		t.Fatalf("Evaluate returned error %q, want %q", got, want)
+	}
+}

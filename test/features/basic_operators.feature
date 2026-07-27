@@ -448,6 +448,41 @@ Feature: Basic Operators
       [true,false]
       """
 
+  Scenario: Numeric strings use DataWeave relational comparison coercion
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [
+        1 <= "2",
+        "2" > 1,
+        3 < "2",
+        "3" >= 3,
+        "9223372036854775808" > 9223372036854775807,
+        9223372036854775808 < "9223372036854775809"
+      ]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [true,true,false,true,true,true]
+      """
+
+  Scenario: Numeric ordinal selector composes with numeric-string comparison
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      "-106.003" + 1.254 <= (0.000001)[2]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      true
+      """
+
   Scenario: Coercion equality operator with ~=
     Given the following input content:
       """
