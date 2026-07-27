@@ -422,6 +422,13 @@ func callBuiltinRemove(args []Value, e *ast.CallExpr) (Value, error) {
 	if !removeMany {
 		valuesToRemove = Array{args[1]}
 	}
+	return removeArrayValues(array, valuesToRemove), nil
+}
+
+// removeArrayValues returns a new array without any item structurally equal to
+// one of the removal candidates. A linear scan supports collection values and
+// preserves the source order without mutating the input array.
+func removeArrayValues(array, valuesToRemove Array) Array {
 	result := make(Array, 0, len(array))
 
 	for _, item := range array {
@@ -437,7 +444,7 @@ func callBuiltinRemove(args []Value, e *ast.CallExpr) (Value, error) {
 		}
 	}
 
-	return result, nil
+	return result
 }
 
 // callBuiltinWith implements the with(value, replacement) function.

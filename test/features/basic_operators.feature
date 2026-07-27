@@ -45,6 +45,26 @@ Feature: Basic Operators
       6
       """
 
+  Scenario: DataWeave array subtraction removes matching values
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [
+        [1, 2, 1] - 1,
+        [1, 2] - 97,
+        [1, null, 2, null] - null,
+        [[1], [2], [1]] - [1],
+        [1, 2] - -97
+      ]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [[2],[1,2],[1,2],[[2]],[1,2]]
+      """
+
   Scenario: Arithmetic Multiplication
     Given the following input content:
       """

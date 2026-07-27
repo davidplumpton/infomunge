@@ -447,7 +447,7 @@ func isNumber(value Value) bool {
 	}
 }
 
-// sub performs subtraction or object key removal.
+// sub performs numeric subtraction, object key removal, or array value removal.
 func sub(left, right Value) (Value, error) {
 	if obj, ok := left.(Object); ok {
 		if key, ok := objectRemovalKey(right); ok {
@@ -455,6 +455,10 @@ func sub(left, right Value) (Value, error) {
 			delete(result, key)
 			return result, nil
 		}
+	}
+
+	if array, ok := left.(Array); ok {
+		return removeArrayValues(array, Array{right}), nil
 	}
 
 	if l, r, ok := BothInts(left, right); ok {

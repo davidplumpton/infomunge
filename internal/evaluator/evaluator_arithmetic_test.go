@@ -145,6 +145,72 @@ func TestEvaluate_ObjectSubtractionUsesScalarKeys(t *testing.T) {
 	}
 }
 
+func TestArraySubtractionRemovesStructurallyEqualValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   Array
+		right    Value
+		expected Array
+	}{
+		{
+			name:     "repeated scalar values",
+			source:   Array{1, 2, 1},
+			right:    1,
+			expected: Array{2},
+		},
+		{
+			name:     "absent value",
+			source:   Array{1, 2},
+			right:    97,
+			expected: Array{1, 2},
+		},
+		{
+			name:     "null values",
+			source:   Array{1, nil, 2, nil},
+			right:    nil,
+			expected: Array{1, 2},
+		},
+		{
+			name:     "nested arrays",
+			source:   Array{Array{1}, Array{2}, Array{1}},
+			right:    Array{1},
+			expected: Array{Array{2}},
+		},
+		{
+			name: "nested objects",
+			source: Array{
+				Object{"id": 1, "nested": Array{"x"}},
+				Object{"id": 2},
+				Object{"nested": Array{"x"}, "id": 1},
+			},
+			right:    Object{"nested": Array{"x"}, "id": 1},
+			expected: Array{Object{"id": 2}},
+		},
+		{
+			name:     "negative absent value",
+			source:   Array{1, 2},
+			right:    -97,
+			expected: Array{1, 2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			original := append(Array(nil), tt.source...)
+			result, err := sub(tt.source, tt.right)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !isEqual(result, tt.expected) {
+				t.Fatalf("expected %#v, got %#v", tt.expected, result)
+			}
+			if !isEqual(tt.source, original) {
+				t.Fatal("array subtraction mutated the source array")
+			}
+		})
+	}
+}
+
 func TestObjectSubtractionRejectsNonKeyOperands(t *testing.T) {
 	tests := []struct {
 		name  string
