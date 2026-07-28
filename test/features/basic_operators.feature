@@ -31,6 +31,34 @@ Feature: Basic Operators
       [3,3,1.0800361132181717,1.0800361132181717]
       """
 
+  Scenario: Numeric strings use arithmetic coercion in composed collection expressions
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      (["2", "3", "4"] map (item) -> item * 2) reduce (item, accumulator = 0) -> accumulator + item
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      18
+      """
+
+  Scenario: Numeric strings use arithmetic coercion across operand directions
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [-"2.5", "2" - 1, 1 - "2", "2" * 3, 3 * "2", "6" / 2, 6 / "2", "7" mod 3]
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [-2.5,1,-1,6,6,3,3,1]
+      """
+
   Scenario: Arithmetic Subtraction
     Given the following input content:
       """

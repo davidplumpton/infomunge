@@ -399,16 +399,7 @@ func add(left, right Value) (Value, error) {
 	// DataWeave coerces a numeric-looking string when the other operand is a
 	// number. Keep InfoMunge's string-concatenation extension as the fallback
 	// for nonnumeric strings.
-	if l, ok := left.(string); ok && isNumber(right) {
-		if number, ok := values.ParseNumericLiteral(l); ok {
-			return add(number, right)
-		}
-	}
-	if r, ok := right.(string); ok && isNumber(left) {
-		if number, ok := values.ParseNumericLiteral(r); ok {
-			return add(left, number)
-		}
-	}
+	left, right = coerceArithmeticNumericStrings(left, right)
 
 	// Special case: string concatenation (supports string + any and any + string)
 	if l, okL := left.(string); okL {
@@ -464,6 +455,7 @@ func sub(left, right Value) (Value, error) {
 		return removeArrayValues(array, Array{right}), nil
 	}
 
+	left, right = coerceArithmeticNumericStrings(left, right)
 	if l, r, ok := BothInts(left, right); ok {
 		return checkedIntOp(l, r, "subtraction")
 	}
@@ -498,6 +490,7 @@ func objectRemovalKey(value Value) (string, bool) {
 
 // mul performs multiplication
 func mul(left, right Value) (Value, error) {
+	left, right = coerceArithmeticNumericStrings(left, right)
 	if l, r, ok := BothInts(left, right); ok {
 		return checkedIntOp(l, r, "multiplication")
 	}
@@ -508,6 +501,7 @@ func mul(left, right Value) (Value, error) {
 
 // quo performs division with zero-check
 func quo(left, right Value) (Value, error) {
+	left, right = coerceArithmeticNumericStrings(left, right)
 	// Check for division by zero before calling numericOp
 	if r, ok := right.(int); ok && r == 0 {
 		return nil, unifiederrors.EvalError("division by zero")
@@ -525,6 +519,7 @@ func quo(left, right Value) (Value, error) {
 // retain an integer result; operands involving a float use floating-point
 // remainder semantics, matching the mod builtin.
 func rem(left, right Value) (Value, error) {
+	left, right = coerceArithmeticNumericStrings(left, right)
 	if l, r, ok := BothInts(left, right); ok {
 		if r == 0 {
 			return nil, unifiederrors.EvalError("modulo by zero")
@@ -656,6 +651,12 @@ func arrayAppend(left, right Value) (Value, error) {
 
 // negate performs unary negation
 func negate(val Value) (Value, error) {
+	if text, ok := val.(string); ok {
+		if number, ok := parseArithmeticNumericString(text); ok {
+			return negate(number)
+		}
+	}
+
 	switch v := val.(type) {
 	case float64:
 		return -v, nil
@@ -705,12 +706,12 @@ func numericOp(left, right Value, floatOp func(float64, float64) float64, opName
 // the other operand is numeric; string-to-string ordering remains unsupported.
 func numericCompare(left, right Value, op func(int) bool, opName string) (Value, error) {
 	if _, rightIsNumber := exactNumericRat(right); rightIsNumber {
-		if number, ok := parseComparisonNumericString(left); ok {
+		if number, ok := parseArithmeticNumericStringValue(left); ok {
 			left = number
 		}
 	}
 	if _, leftIsNumber := exactNumericRat(left); leftIsNumber {
-		if number, ok := parseComparisonNumericString(right); ok {
+		if number, ok := parseArithmeticNumericStringValue(right); ok {
 			right = number
 		}
 	}
@@ -723,12 +724,29 @@ func numericCompare(left, right Value, op func(int) bool, opName string) (Value,
 	return nil, unifiederrors.EvalErrorf("cannot compare %T and %T with %s", left, right, opName)
 }
 
-func parseComparisonNumericString(value Value) (Value, bool) {
+func coerceArithmeticNumericStrings(left, right Value) (Value, Value) {
+	if isNumber(right) {
+		if number, ok := parseArithmeticNumericStringValue(left); ok {
+			left = number
+		}
+	}
+	if isNumber(left) {
+		if number, ok := parseArithmeticNumericStringValue(right); ok {
+			right = number
+		}
+	}
+	return left, right
+}
+
+func parseArithmeticNumericStringValue(value Value) (Value, bool) {
 	text, ok := value.(string)
 	if !ok {
 		return nil, false
 	}
+	return parseArithmeticNumericString(text)
+}
 
+func parseArithmeticNumericString(text string) (Value, bool) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return nil, false

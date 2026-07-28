@@ -33,6 +33,15 @@ func TestEvaluate_Arithmetic(t *testing.T) {
 		{"numeric string + int", `"2" + 3`, 5},
 		{"float + numeric string", `0.08003611321817175 + "1"`, 1.0800361132181717},
 		{"numeric string + float", `"1" + 0.08003611321817175`, 1.0800361132181717},
+		{"negate numeric string", `-"2.5"`, -2.5},
+		{"numeric string minus int", `"2" - 1`, 1},
+		{"int minus numeric string", `1 - "2"`, -1},
+		{"numeric string times int", `"2" * 3`, 6},
+		{"int times numeric string", `3 * "2"`, 6},
+		{"numeric string divided by int", `"6" / 2`, 3},
+		{"int divided by numeric string", `6 / "2"`, 3},
+		{"numeric string percent modulo", `"7" % 3`, 1},
+		{"numeric string keyword modulo implementation", `mod("7", 3)`, 1},
 		{"string concat", `"hello" + " world"`, "hello world"},
 		{"nonnumeric string + number", `"Count: " + 42`, "Count: 42"},
 		{"number + nonnumeric string", `42 + " items"`, "42 items"},
@@ -56,6 +65,72 @@ func TestEvaluate_Arithmetic(t *testing.T) {
 				t.Errorf("expected %v (%T), got %v (%T)", tt.expected, tt.expected, result, result)
 			}
 		})
+	}
+}
+
+func TestArithmeticNumericStringsPreserveExactIntegers(t *testing.T) {
+	tests := []struct {
+		name      string
+		operation func(Value, Value) (Value, error)
+		left      Value
+		right     Value
+		want      string
+	}{
+		{
+			name:      "addition",
+			operation: add,
+			left:      "9223372036854775808",
+			right:     1,
+			want:      "9223372036854775809",
+		},
+		{
+			name:      "subtraction",
+			operation: sub,
+			left:      "9223372036854775808",
+			right:     1,
+			want:      "9223372036854775807",
+		},
+		{
+			name:      "multiplication",
+			operation: mul,
+			left:      "9223372036854775808",
+			right:     2,
+			want:      "18446744073709551616",
+		},
+		{
+			name:      "division",
+			operation: quo,
+			left:      "18446744073709551616",
+			right:     2,
+			want:      "9223372036854775808",
+		},
+		{
+			name:      "modulo",
+			operation: rem,
+			left:      "18446744073709551617",
+			right:     2,
+			want:      "1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.operation(tt.left, tt.right)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if gotText := coerceToString(got); gotText != tt.want {
+				t.Fatalf("result = %s (%T), want %s", gotText, got, tt.want)
+			}
+		})
+	}
+
+	got, err := negate("9223372036854775808")
+	if err != nil {
+		t.Fatalf("negate returned unexpected error: %v", err)
+	}
+	if gotText := coerceToString(got); gotText != "-9223372036854775808" {
+		t.Fatalf("negate result = %s (%T), want -9223372036854775808", gotText, got)
 	}
 }
 
@@ -287,6 +362,11 @@ func TestEvaluate_ArithmeticErrors(t *testing.T) {
 		{"modulo by zero int", "5 % 0"},
 		{"modulo by zero float", "5.0 % 0.0"},
 		{"modulo rejects non-number", "true % 2"},
+		{"negation rejects nonnumeric string", `-"two"`},
+		{"subtraction rejects nonnumeric string", `"two" - 1`},
+		{"multiplication rejects nonnumeric string", `"two" * 1`},
+		{"division rejects nonnumeric string", `"two" / 1`},
+		{"modulo rejects nonnumeric string", `"two" % 1`},
 	}
 
 	ctx := make(Context)

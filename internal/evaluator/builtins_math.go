@@ -647,17 +647,18 @@ func callBuiltinMod(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	if _, ok := exactNumericRat(args[0]); !ok {
+	dividend, divisor := coerceArithmeticNumericStrings(args[0], args[1])
+	if _, ok := exactNumericRat(dividend); !ok {
 		return nil, newPosError(fmt.Sprintf("mod expects dividend to be a number, got %T", args[0]), e.Pos())
 	}
-	if _, ok := exactNumericRat(args[1]); !ok {
+	if _, ok := exactNumericRat(divisor); !ok {
 		return nil, newPosError(fmt.Sprintf("mod expects divisor to be a number, got %T", args[1]), e.Pos())
 	}
-	divisor, _ := exactNumericRat(args[1])
-	if divisor.Sign() == 0 {
+	divisorNumber, _ := exactNumericRat(divisor)
+	if divisorNumber.Sign() == 0 {
 		return nil, newPosError("mod: division by zero", e.Pos())
 	}
-	result, err := rem(args[0], args[1])
+	result, err := rem(dividend, divisor)
 	if err != nil {
 		return nil, newPosError(err.Error(), e.Pos())
 	}

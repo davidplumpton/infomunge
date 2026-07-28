@@ -34,3 +34,17 @@ Feature: Number Indexing
       """
       [null,null]
       """
+
+  Scenario: Number ordinal selector strings support numeric negation
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      -((12.5)[-3])
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      -2
+      """
