@@ -279,6 +279,38 @@ Feature: Update Expression
       {"a":2}
       """
 
+  Scenario: Grouped explicit map callback keeps update in its body
+    Given the following script:
+      """
+      %dw 2.0
+      output application/json
+      ---
+      [{a: 1}, {a: 2}] map ((item) -> item update {
+        case value at .a -> value + 10
+      })
+      """
+    When I execute the script
+    Then the output should be:
+      """
+      [{"a":11},{"a":12}]
+      """
+
+  Scenario: Grouped completed map applies update to the collection
+    Given the following script:
+      """
+      %dw 2.0
+      output application/json
+      ---
+      ([{a: 1}, {a: 2}] map (item) -> item) update {
+        case value at [0].a -> value + 10
+      }
+      """
+    When I execute the script
+    Then the output should be:
+      """
+      [{"a":11},{"a":2}]
+      """
+
   Scenario: Update case inside do block uses the shared nested expression compiler
     Given the following input content:
       """

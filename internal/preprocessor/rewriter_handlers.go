@@ -469,12 +469,14 @@ func (r *rewriter) handleUpdateExprBlock() bool {
 	}
 
 	casesContent := strings.TrimSpace(r.input[braceStart+1 : braceEnd])
-	leftStart := updateLeftOperandStartBytes(r.result)
+	leftStart, leftEnd := updateLeftOperandBoundsBytes(r.result)
 	if leftStart >= len(r.result) {
 		return false
 	}
 
-	leftOp := strings.TrimSpace(string(r.result[leftStart:]))
+	leftOp := strings.TrimSpace(string(r.result[leftStart:leftEnd]))
+	suffix := append([]byte(nil), r.result[leftEnd:]...)
+	suffixMapping := append([]int(nil), r.mapping[leftEnd:]...)
 	r.truncate(leftStart)
 
 	casesQuoted := strconv.Quote(casesContent)
@@ -482,6 +484,7 @@ func (r *rewriter) handleUpdateExprBlock() bool {
 	for i := 0; i < len(output); i++ {
 		r.append(output[i], r.pos)
 	}
+	r.appendMappedString(string(suffix), suffixMapping, r.pos)
 
 	r.pos = braceEnd
 	return true

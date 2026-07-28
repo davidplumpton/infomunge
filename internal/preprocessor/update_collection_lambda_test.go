@@ -97,7 +97,12 @@ func TestPrepareForParsingPreservesParenthesizedOuterUpdate(t *testing.T) {
 		{
 			name:  "grouped callback",
 			input: `source map ((item) -> item) update { case value at .a -> value + 1 }`,
-			want:  `__updateExpr(__map(source, (__lambda("item", item))), "case value at .a -> value + 1")`,
+			want:  `__map(source, (__lambda("item", __updateExpr(item, "case value at .a -> value + 1"))))`,
+		},
+		{
+			name:  "multiply grouped callback",
+			input: `source map (((item) -> item)) update { case value at .a -> value + 1 }`,
+			want:  `__map(source, ((__lambda("item", __updateExpr(item, "case value at .a -> value + 1")))))`,
 		},
 	}
 
@@ -114,5 +119,25 @@ func TestPrepareForParsingPreservesParenthesizedOuterUpdate(t *testing.T) {
 				t.Fatalf("mapping length = %d, want %d", len(mapping), len(result))
 			}
 		})
+	}
+}
+
+func TestPrepareForParsingKeepsUpdateInsideGroupedCallbackWithLiteralSource(t *testing.T) {
+	input := `[{a: 1}, {a: 2}] map ((item) -> item update { case value at .a -> value + 10 })`
+	result, mapping, err := PrepareForParsing(input, Options{})
+	if err != nil {
+		t.Fatalf("PrepareForParsing returned error: %v", err)
+	}
+	if strings.HasPrefix(result, "__updateExpr(__map") {
+		t.Fatalf("result moved update outside grouped callback: %s", result)
+	}
+	if !strings.Contains(
+		result,
+		`__lambda("item", __updateExpr(item, "case value at .a -> value + 10"))`,
+	) {
+		t.Fatalf("result did not keep update in grouped callback: %s", result)
+	}
+	if len(mapping) != len(result) {
+		t.Fatalf("mapping length = %d, want %d", len(mapping), len(result))
 	}
 }

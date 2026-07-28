@@ -24,25 +24,103 @@ func findLeftOperandStartBytes(result []byte) int {
 	return stringutils.FindLeftOperandStartWithStops(runes, stringutils.MinimalStops)
 }
 
-// updateLeftOperandStartBytes keeps an update expression inside an unresolved
+// updateLeftOperandBoundsBytes keeps an update expression inside an unresolved
 // collection callback. Core rewriting runs before collection and arrow
 // transforms, so the generic minimal-stop scan would otherwise consume the
 // collection source and operator as part of the update's left operand.
-func updateLeftOperandStartBytes(result []byte) int {
-	start := findLeftOperandStartBytes(result)
+//
+// The end bound normally reaches the end of result. A grouped explicit
+// callback is different: its closing parentheses have already been emitted,
+// but they belong after the rewritten update expression.
+func updateLeftOperandBoundsBytes(result []byte) (start, end int) {
+	start = findLeftOperandStartBytes(result)
+	end = len(result)
 	bodyStart := collectionLambdaBodyStart(string(result))
 	if bodyStart < 0 {
-		return start
-	}
-	if isCompleteGroupedLambdaBody(string(result[bodyStart:])) {
-		return start
+		return start, end
 	}
 
-	expressionStart := collectionLambdaExpressionStart(result, bodyStart)
-	if expressionStart > start {
-		return expressionStart
+	body := string(result[bodyStart:])
+	expressionStart, expressionEnd, groupedExplicit := groupedExplicitLambdaExpressionBounds(
+		string(result),
+		bodyStart,
+	)
+	if groupedExplicit {
+		return expressionStart, expressionEnd
 	}
-	return start
+	if isCompleteGroupedLambdaBody(body) {
+		return start, end
+	}
+
+	expressionStart = collectionLambdaExpressionStart(result, bodyStart)
+	if expressionStart > start {
+		return expressionStart, end
+	}
+	return start, end
+}
+
+// groupedExplicitLambdaExpressionBounds returns the callback expression inside
+// one or more grouping pairs, including an outer callback group that closes
+// after the update block. For example, the expression bounds in
+// "((item) -> item)" cover only the final "item", leaving the outer ")" to be
+// emitted after a generated wrapper around that expression.
+func groupedExplicitLambdaExpressionBounds(input string, bodyStart int) (start, end int, ok bool) {
+	start = bodyStart
+	for start < len(input) && isWhitespace(input[start]) {
+		start++
+	}
+	end = len(input)
+	for end > start && isWhitespace(input[end-1]) {
+		end--
+	}
+
+	for start < end && input[start] == '(' {
+		sc := stringutils.NewExpressionScanner(input[start:end])
+		closeRel := sc.FindMatchingCloseBracket(0)
+		if closeRel < 0 {
+			// A callback group that closes after the update block is
+			// necessarily incomplete at this point in the byte rewrite.
+			// Unwrap that prefix and continue looking for the complete
+			// parameter group and arrow inside it.
+			start++
+			for start < end && isWhitespace(input[start]) {
+				start++
+			}
+			continue
+		}
+		closePos := start + closeRel
+		afterClose := closePos + 1
+		for afterClose < end && isWhitespace(input[afterClose]) {
+			afterClose++
+		}
+		if afterClose+1 < end && input[afterClose:afterClose+2] == "->" {
+			expressionStart := afterClose + 2
+			for expressionStart < end && isWhitespace(input[expressionStart]) {
+				expressionStart++
+			}
+			expressionEnd := end
+			for expressionEnd > expressionStart && isWhitespace(input[expressionEnd-1]) {
+				expressionEnd--
+			}
+			if expressionStart == expressionEnd {
+				return 0, 0, false
+			}
+			return expressionStart, expressionEnd, true
+		}
+		if closePos != end-1 {
+			return 0, 0, false
+		}
+
+		start++
+		for start < closePos && isWhitespace(input[start]) {
+			start++
+		}
+		end = closePos
+		for end > start && isWhitespace(input[end-1]) {
+			end--
+		}
+	}
+	return 0, 0, false
 }
 
 // collectionLambdaExpressionStart returns the expression after an explicit
@@ -151,7 +229,32 @@ func collectionLambdaBodyStart(input string) int {
 			return candidates[i].start
 		}
 	}
+	for i := len(candidates) - 1; i >= 0; i-- {
+		if candidates[i].paren < state.DepthParen &&
+			candidates[i].brack == state.DepthBrack &&
+			candidates[i].brace == state.DepthBrace &&
+			isIncompleteGroupedExplicitLambda(input[candidates[i].start:]) {
+			return candidates[i].start
+		}
+	}
 	return -1
+}
+
+func isIncompleteGroupedExplicitLambda(body string) bool {
+	start := 0
+	for start < len(body) && isWhitespace(body[start]) {
+		start++
+	}
+	if start >= len(body) || body[start] != '(' {
+		return false
+	}
+
+	sc := stringutils.NewExpressionScanner(body[start:])
+	if sc.FindMatchingCloseBracket(0) >= 0 {
+		return false
+	}
+	_, _, ok := groupedExplicitLambdaExpressionBounds(body, start)
+	return ok
 }
 
 func collectionOperatorBodyStartAt(input string, pos int) (int, bool) {
