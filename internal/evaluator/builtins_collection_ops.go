@@ -120,12 +120,12 @@ func callBuiltinFilterSelector(e *ast.CallExpr, scope *Scope, depth int) (Value,
 	keys := values.ObjectKeys(obj)
 
 	result := values.NewObject(len(obj))
-	for idx, key := range keys {
+	for _, key := range keys {
 		val := obj[key]
 		condVal, err := evalCollectionLambdaWithBindingsAtDepth(lambda, scope, depth+1, func(lambdaContext Context) {
 			lambdaContext[lambda.ParamName(0)] = val
 			if lambda.ParamCount() > 1 {
-				lambdaContext[lambda.ParamName(1)] = idx
+				lambdaContext[lambda.ParamName(1)] = key
 			}
 		})
 		if err != nil {

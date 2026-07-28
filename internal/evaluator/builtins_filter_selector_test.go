@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"infomunge/pkg/values"
 )
 
 func TestFilterSelectorReturnsNullWithoutCollectionMatches(t *testing.T) {
@@ -62,6 +64,40 @@ func TestFilterSelectorPreservesSuccessfulCollectionMatches(t *testing.T) {
 				t.Fatalf("Evaluate(%q) = %#v, want %#v", test.expr, got, test.want)
 			}
 		})
+	}
+}
+
+func TestFilterSelectorBindsObjectKeyAndPreservesOrder(t *testing.T) {
+	expr := `__filter_selector(map[string]interface{}{"c": 3, "a": 1, "b": 2}, __lambda("value, key", key != "a"))`
+
+	got, err := Evaluate(expr, Context{}, nil, 0, expr)
+	if err != nil {
+		t.Fatalf("Evaluate(%q) error = %v", expr, err)
+	}
+
+	want := Object{"c": 3, "b": 2}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Evaluate(%q) = %#v, want %#v", expr, got, want)
+	}
+
+	gotObject, ok := got.(Object)
+	if !ok {
+		t.Fatalf("Evaluate(%q) type = %T, want Object", expr, got)
+	}
+	if gotKeys := values.ObjectKeys(gotObject); !reflect.DeepEqual(gotKeys, []string{"c", "b"}) {
+		t.Fatalf("Evaluate(%q) keys = %#v, want %#v", expr, gotKeys, []string{"c", "b"})
+	}
+}
+
+func TestFilterSelectorKeepsArrayIndexBinding(t *testing.T) {
+	expr := `__filter_selector([]interface{}{10, 20, 30}, __lambda("value, index", index == 1))`
+
+	got, err := Evaluate(expr, Context{}, nil, 0, expr)
+	if err != nil {
+		t.Fatalf("Evaluate(%q) error = %v", expr, err)
+	}
+	if want := (Array{20}); !reflect.DeepEqual(got, want) {
+		t.Fatalf("Evaluate(%q) = %#v, want %#v", expr, got, want)
 	}
 }
 

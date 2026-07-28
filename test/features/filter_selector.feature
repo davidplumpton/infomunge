@@ -31,6 +31,20 @@ Feature: Filter selector
       1
       """
 
+  Scenario: An object filter selector binds double dollar to the key and preserves order
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      ({c: 3, a: 1, b: 2}[?($$ != "a")]) pluck (value, key) -> key ++ ":" ++ (value as String)
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      ["c:3","b:2"]
+      """
+
   Scenario Outline: Filter selectors reject unsupported source types
     Given the following input content:
       """
