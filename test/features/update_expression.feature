@@ -75,6 +75,38 @@ Feature: Update Expression
     And the output should contain "10"
     And the output should contain "30"
 
+  Scenario: Update the last top-level array element with a negative index
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1, 2, 3] update {
+        case x at [-1] -> x * 10
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1,2,30]
+      """
+
+  Scenario: Update the last nested array element with a negative index
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {a: [1, 2, 3]} update {
+        case x at .a[-1] -> x * 10
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"a":[1,2,30]}
+      """
+
   Scenario: Multiple case statements
     Given the following input content:
       """
@@ -249,6 +281,22 @@ Feature: Update Expression
     Then the output should be:
       """
       {"a":[[1]]}
+      """
+
+  Scenario: Update with a negative out-of-bounds selector is a no-op
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {a: [1, 2, 3]} update {
+        case x at .a[-4] -> 99
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"a":[1,2,3]}
       """
 
   Scenario: Update expression used in concatenation

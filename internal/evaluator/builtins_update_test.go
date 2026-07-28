@@ -32,6 +32,61 @@ func TestSetValueAtPath_OutOfBoundsNonTerminalIndexReturnsError(t *testing.T) {
 	}
 }
 
+func TestResolveUpdateArrayIndex(t *testing.T) {
+	tests := []struct {
+		name      string
+		index     int
+		length    int
+		wantIndex int
+		wantOK    bool
+	}{
+		{name: "positive", index: 1, length: 3, wantIndex: 1, wantOK: true},
+		{name: "last", index: -1, length: 3, wantIndex: 2, wantOK: true},
+		{name: "negative length boundary", index: -3, length: 3, wantIndex: 0, wantOK: true},
+		{name: "below negative length", index: -4, length: 3, wantIndex: -1, wantOK: false},
+		{name: "positive length boundary", index: 3, length: 3, wantIndex: 3, wantOK: false},
+		{name: "empty array", index: -1, length: 0, wantIndex: -1, wantOK: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gotIndex, gotOK := resolveUpdateArrayIndex(test.index, test.length)
+			if gotIndex != test.wantIndex || gotOK != test.wantOK {
+				t.Fatalf(
+					"resolveUpdateArrayIndex(%d, %d) = (%d, %t), want (%d, %t)",
+					test.index,
+					test.length,
+					gotIndex,
+					gotOK,
+					test.wantIndex,
+					test.wantOK,
+				)
+			}
+		})
+	}
+}
+
+func TestSetValueAtPath_ResolvesNegativeNonTerminalIndexes(t *testing.T) {
+	value := Array{
+		Array{1, 2},
+	}
+	path := []selectorSegment{
+		{index: -1, isIndex: true},
+		{index: -1, isIndex: true},
+	}
+
+	got, err := setValueAtPath(value, path, 9, 0)
+	if err != nil {
+		t.Fatalf("setValueAtPath returned error: %v", err)
+	}
+	want := Array{
+		Array{1, 9},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("setValueAtPath result = %#v, want %#v", got, want)
+	}
+}
+
 func TestMergeEvaluatedUpdate_UsesAncestorAndFirstIdenticalSelector(t *testing.T) {
 	path := func(selector string) []selectorSegment {
 		t.Helper()

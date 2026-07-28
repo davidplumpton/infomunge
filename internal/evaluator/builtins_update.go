@@ -250,10 +250,11 @@ func getValueAtPath(value Value, path []selectorSegment) (Value, error) {
 			if !ok {
 				return nil, unifiederrors.EvalError("expected array for index selector")
 			}
-			if seg.index < 0 || seg.index >= len(arr) {
+			index, ok := resolveUpdateArrayIndex(seg.index, len(arr))
+			if !ok {
 				return nil, unifiederrors.EvalErrorf("index out of bounds: %d", seg.index)
 			}
-			current = arr[seg.index]
+			current = arr[index]
 		} else {
 			obj, ok := current.(Object)
 			if !ok {
@@ -269,15 +270,23 @@ func getValueAtPath(value Value, path []selectorSegment) (Value, error) {
 	return current, nil
 }
 
+func resolveUpdateArrayIndex(index, length int) (int, bool) {
+	if index < 0 {
+		index += length
+	}
+	return index, index >= 0 && index < length
+}
+
 // setValueAtPath sets a value at the given selector path, returning a new value with the update applied
 // updateArrayElement updates an element in an array at the given index.
 func updateArrayElement(arr Array, index int, newValue Value) (Array, error) {
-	if index < 0 || index >= len(arr) {
+	resolvedIndex, ok := resolveUpdateArrayIndex(index, len(arr))
+	if !ok {
 		return nil, unifiederrors.EvalErrorf("index out of bounds: %d", index)
 	}
 	newArr := make(Array, len(arr))
 	copy(newArr, arr)
-	newArr[index] = newValue
+	newArr[resolvedIndex] = newValue
 	return newArr, nil
 }
 
@@ -308,14 +317,15 @@ func setValueAtPath(value Value, path []selectorSegment, newValue Value, depth i
 		if isTerminal {
 			return updateArrayElement(arr, seg.index, newValue)
 		}
-		if seg.index < 0 || seg.index >= len(arr) {
+		index, ok := resolveUpdateArrayIndex(seg.index, len(arr))
+		if !ok {
 			return nil, unifiederrors.EvalErrorf("index out of bounds: %d", seg.index)
 		}
-		childValue, err := setValueAtPath(arr[seg.index], path[1:], newValue, depth+1)
+		childValue, err := setValueAtPath(arr[index], path[1:], newValue, depth+1)
 		if err != nil {
 			return nil, err
 		}
-		return updateArrayElement(arr, seg.index, childValue)
+		return updateArrayElement(arr, index, childValue)
 	}
 
 	obj, ok := value.(Object)
