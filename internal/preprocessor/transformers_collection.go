@@ -2,9 +2,30 @@ package preprocessor
 
 import (
 	"strings"
+	"unicode"
 
 	"infomunge/internal/stringutils"
 )
+
+var collectionLeftOperandStops = append(
+	append([]rune(nil), stringutils.MinimalStops...),
+	'=', '<', '>',
+)
+
+func findCollectionLeftOperandStart(result []rune) int {
+	start := stringutils.FindLeftOperandStartWithStops(result, collectionLeftOperandStops)
+	if start == 0 || start >= len(result) {
+		return start
+	}
+
+	switch result[start-1] {
+	case '=', '<', '>':
+		for start < len(result) && unicode.IsSpace(result[start]) {
+			start++
+		}
+	}
+	return start
+}
 
 // replaceFilterOperator converts "array filter __lambda(...)" to "__filter(array, __lambda(...))"
 func replaceFilterOperator(s string) string {
@@ -82,9 +103,9 @@ func replaceCollectionOperator(s string, opKey string, funcName string) string {
 			afterOp := sc.Pos() + opLen
 			// Match operator followed by space, newline, or parenthesis
 			if afterOp < len(s) && (s[afterOp] == ' ' || s[afterOp] == '\n' || s[afterOp] == '\r' || s[afterOp] == '\t' || s[afterOp] == '(') {
-				// Collection operators bind less tightly than additive operators,
-				// so include +, -, ++, and -- in the complete source operand.
-				arrayStart := stringutils.FindLeftOperandStartWithStops(result, stringutils.MinimalStops)
+				// Collection operators bind less tightly than additive operators
+				// but more tightly than equality and ordering comparisons.
+				arrayStart := findCollectionLeftOperandStart(result)
 				if arrayStart >= len(result) {
 					result = append(result, []rune(opKey)...)
 					sc.Advance(opLen)

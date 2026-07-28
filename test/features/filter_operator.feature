@@ -45,6 +45,20 @@ Feature: Filter Operator
       ["apple","apple"]
       """
 
+  Scenario: Filter binds before a surrounding comparison
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      null != ["a", -42, -3] filter (right, y) -> y == y
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      true
+      """
+
   Scenario: Filter all elements
     Given the following input content:
       """
