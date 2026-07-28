@@ -58,18 +58,52 @@ func TestEvaluate_MinimumSignedIntegerLiteral(t *testing.T) {
 	}
 }
 
-func TestEvaluate_MinimumSignedIntegerDoubleNegation(t *testing.T) {
+func TestEvaluate_MinimumSignedIntegerNestedNegation(t *testing.T) {
 	if strconv.IntSize != 64 {
 		t.Skip("acceptance value is specific to 64-bit int builds")
 	}
 
-	const expr = "-(-9223372036854775808)"
-	result, err := Evaluate(expr, Context{}, nil, 0, expr)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	tests := []struct {
+		name string
+		expr string
+		want string
+	}{
+		{
+			name: "double negation produces exact positive magnitude",
+			expr: "-(-9223372036854775808)",
+			want: "9223372036854775808",
+		},
+		{
+			name: "triple negation produces minimum integer",
+			expr: "-(-(-9223372036854775808))",
+			want: "-9223372036854775808",
+		},
+		{
+			name: "four negations produce exact positive magnitude",
+			expr: "-(-(-(-9223372036854775808)))",
+			want: "9223372036854775808",
+		},
 	}
-	if result != minInt() {
-		t.Fatalf("expected %d (%T), got %v (%T)", minInt(), minInt(), result, result)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Evaluate(tt.expr, Context{}, nil, 0, tt.expr)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			switch value := result.(type) {
+			case int:
+				if strconv.Itoa(value) != tt.want {
+					t.Fatalf("expected %s, got %d", tt.want, value)
+				}
+			case *big.Int:
+				if value.String() != tt.want {
+					t.Fatalf("expected %s, got %s", tt.want, value)
+				}
+			default:
+				t.Fatalf("expected exact integer result %s, got %v (%T)", tt.want, result, result)
+			}
+		})
 	}
 }
 

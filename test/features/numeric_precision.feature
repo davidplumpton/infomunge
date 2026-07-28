@@ -68,18 +68,18 @@ Feature: Exact numeric behavior
       [9223372036854775809,18446744073709551616,4611686018427387904]
       """
 
-  Scenario: Double negation preserves the minimum signed integer
+  Scenario: Nested negation preserves the exact minimum-integer magnitude
     Given the following input content:
       """
       %im 0.1
       output application/json
       ---
-      contains(null, -(-9223372036854775808))
+      [-(-9223372036854775808), -(-(-9223372036854775808)), -(-(-(-9223372036854775808)))]
       """
     When I run the application with this content
     Then the output should be:
       """
-      false
+      [9223372036854775808,-9223372036854775808,9223372036854775808]
       """
 
   Scenario: Equality preserves integers above float precision

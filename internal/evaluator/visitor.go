@@ -122,10 +122,7 @@ func (v *DefaultVisitor) VisitBinaryExpr(expr *ast.BinaryExpr) (Value, error) {
 
 // VisitUnaryExpr evaluates a unary expression (e.g., -x, !x).
 func (v *DefaultVisitor) VisitUnaryExpr(expr *ast.UnaryExpr) (Value, error) {
-	if value, ok := evalDoubleNegatedMinIntLiteral(expr); ok {
-		return value, nil
-	}
-	if value, ok := evalMinIntLiteral(expr); ok {
+	if value, ok := evalNestedNegatedMinIntLiteral(expr); ok {
 		return value, nil
 	}
 

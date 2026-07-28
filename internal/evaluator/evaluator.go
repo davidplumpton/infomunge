@@ -319,16 +319,43 @@ func evalBasicLit(e *ast.BasicLit) (Value, error) {
 	}
 }
 
-// evalMinIntLiteral handles the one signed integer value whose positive
-// magnitude cannot be represented as an int. The Go parser represents a
-// negative literal as unary minus applied to a positive BasicLit, so evaluating
-// the child first would reject minInt's magnitude before negation can apply.
-func evalMinIntLiteral(expr *ast.UnaryExpr) (Value, bool) {
-	if expr.Op != token.SUB {
-		return nil, false
+// evalNestedNegatedMinIntLiteral evaluates a syntactic chain of unary minuses
+// around the minimum integer magnitude as one exact operation. Normalizing
+// each intermediate result would turn the first negation into minInt and make
+// the next negation trip the ordinary runtime overflow guard, even though the
+// full literal expression is representable by the exact integer model.
+//
+// Keep this recognition syntactic: negating a computed minInt still reports
+// overflow rather than weakening the runtime integer range checks.
+func evalNestedNegatedMinIntLiteral(expr *ast.UnaryExpr) (Value, bool) {
+	var operand ast.Expr = expr
+	negations := 0
+	for {
+		for {
+			paren, ok := operand.(*ast.ParenExpr)
+			if !ok {
+				break
+			}
+			operand = paren.X
+		}
+
+		unary, ok := operand.(*ast.UnaryExpr)
+		if !ok || unary.Op != token.SUB {
+			break
+		}
+		negations++
+		operand = unary.X
 	}
 
-	literal, ok := expr.X.(*ast.BasicLit)
+	for {
+		paren, ok := operand.(*ast.ParenExpr)
+		if !ok {
+			break
+		}
+		operand = paren.X
+	}
+
+	literal, ok := operand.(*ast.BasicLit)
 	if !ok || literal.Kind != token.INT {
 		return nil, false
 	}
@@ -338,35 +365,11 @@ func evalMinIntLiteral(expr *ast.UnaryExpr) (Value, bool) {
 		return nil, false
 	}
 
-	return minInt(), true
-}
-
-// evalDoubleNegatedMinIntLiteral preserves the exact identity -(-x) == x for
-// the minimum signed integer literal. Evaluating the inner expression first
-// would produce minInt and then trip the ordinary single-negation overflow
-// guard, even though the complete double negation is representable.
-//
-// Keep this recognition syntactic: negating a computed minInt still reports
-// overflow rather than weakening the runtime integer range checks.
-func evalDoubleNegatedMinIntLiteral(expr *ast.UnaryExpr) (Value, bool) {
-	if expr.Op != token.SUB {
-		return nil, false
+	value := new(big.Int).SetUint64(magnitude)
+	if negations%2 != 0 {
+		value.Neg(value)
 	}
-
-	operand := expr.X
-	for {
-		paren, ok := operand.(*ast.ParenExpr)
-		if !ok {
-			break
-		}
-		operand = paren.X
-	}
-
-	inner, ok := operand.(*ast.UnaryExpr)
-	if !ok {
-		return nil, false
-	}
-	return evalMinIntLiteral(inner)
+	return normalizeInteger(value), true
 }
 
 // evalIdent evaluates identifiers (variables, constants)
