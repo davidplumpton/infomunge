@@ -103,15 +103,18 @@ func callBuiltinFilterSelector(e *ast.CallExpr, scope *Scope, depth int) (Value,
 		if err != nil {
 			return nil, err
 		}
+		if len(result) == 0 {
+			return nil, nil
+		}
 		return result, nil
 	}
 
 	obj, ok := AsObject(source)
 	if !ok {
-		if source == nil {
-			return nil, nil
-		}
-		return nil, nil
+		return nil, newPosError(
+			fmt.Sprintf("selector filter expects an array or object, got %T", source),
+			e.Args[0].Pos(),
+		)
 	}
 
 	keys := values.ObjectKeys(obj)
@@ -137,6 +140,9 @@ func callBuiltinFilterSelector(e *ast.CallExpr, scope *Scope, depth int) (Value,
 		}
 	}
 
+	if len(result) == 0 {
+		return nil, nil
+	}
 	return result, nil
 }
 

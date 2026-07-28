@@ -42,7 +42,7 @@ Feature: Selector Features
     When I run the application with this content
     Then the output should be:
       """
-      [[2],[]]
+      [[2],null]
       """
 
   Scenario: Range selector stays inside an implicit map lambda
