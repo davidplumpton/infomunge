@@ -95,7 +95,7 @@ func applyUpdateCases(value Value, casesStr string, scope *Scope, depth int) (Va
 	result := deepCopy(value)
 	for _, update := range updates {
 		var err error
-		result, err = setValueAtPath(result, update.path, update.value, 0)
+		result, err = setValueAtPathWithUpsert(result, update.path, update.value, 0, update.upsert)
 		if err != nil {
 			return nil, err
 		}
@@ -105,8 +105,9 @@ func applyUpdateCases(value Value, casesStr string, scope *Scope, depth int) (Va
 }
 
 type evaluatedUpdate struct {
-	path  []selectorSegment
-	value Value
+	path   []selectorSegment
+	value  Value
+	upsert bool
 }
 
 // mergeEvaluatedUpdate applies DataWeave's conflict rules. An update to an
@@ -158,7 +159,7 @@ func selectorPathPrefix(prefix, path []selectorSegment) bool {
 
 func evaluateUpdateCase(value Value, varName, selector, expression string, scope *Scope, depth int) (evaluatedUpdate, bool, error) {
 	// Parse the selector path
-	path, err := parseSelectorPath(selector)
+	path, upsert, err := parseSelectorPathAndUpsert(selector)
 	if err != nil {
 		return evaluatedUpdate{}, false, err
 	}
@@ -170,8 +171,13 @@ func evaluateUpdateCase(value Value, varName, selector, expression string, scope
 	// Get the current value at the selector path
 	currentValue, err := getValueAtPath(value, path)
 	if err != nil {
-		// Path doesn't exist, return original value unchanged
-		return evaluatedUpdate{}, false, nil
+		if !upsert || !canUpsertMissingObjectPath(value, path) {
+			// A non-upsert path, or a path that cannot be created as an object
+			// path, leaves the original value unchanged.
+			return evaluatedUpdate{}, false, nil
+		}
+		// DataWeave binds null when an upsert selector does not match.
+		currentValue = nil
 	}
 
 	// Create local context with the variable binding
@@ -188,7 +194,7 @@ func evaluateUpdateCase(value Value, varName, selector, expression string, scope
 		return evaluatedUpdate{}, false, err
 	}
 
-	return evaluatedUpdate{path: path, value: deepCopy(newValue)}, true, nil
+	return evaluatedUpdate{path: path, value: deepCopy(newValue), upsert: upsert}, true, nil
 }
 
 // selectorSegment represents a part of a selector path
@@ -198,10 +204,21 @@ type selectorSegment struct {
 	isIndex   bool
 }
 
-// parseSelectorPath parses a selector like ".age" or ".address.street" or ".items[0]"
+// parseSelectorPath parses a selector like ".age" or ".address.street" or ".items[0]".
 func parseSelectorPath(selector string) ([]selectorSegment, error) {
+	path, _, err := parseSelectorPathAndUpsert(selector)
+	return path, err
+}
+
+// parseSelectorPathAndUpsert parses an update selector and reports whether its
+// trailing ! marks it as an upsert selector.
+func parseSelectorPathAndUpsert(selector string) ([]selectorSegment, bool, error) {
 	var path []selectorSegment
 	s := strings.TrimSpace(selector)
+	upsert := strings.HasSuffix(s, "!")
+	if upsert {
+		s = strings.TrimSpace(strings.TrimSuffix(s, "!"))
+	}
 
 	i := 0
 	for i < len(s) {
@@ -213,7 +230,7 @@ func parseSelectorPath(selector string) ([]selectorSegment, error) {
 				i++
 			}
 			if start == i {
-				return nil, unifiederrors.EvalErrorf("empty field name in selector: %s", selector)
+				return nil, false, unifiederrors.EvalErrorf("empty field name in selector: %s", selector)
 			}
 			path = append(path, selectorSegment{fieldName: s[start:i], index: -1, isIndex: false})
 		} else if s[i] == '[' {
@@ -224,21 +241,58 @@ func parseSelectorPath(selector string) ([]selectorSegment, error) {
 				i++
 			}
 			if i >= len(s) {
-				return nil, unifiederrors.EvalErrorf("unclosed bracket in selector: %s", selector)
+				return nil, false, unifiederrors.EvalErrorf("unclosed bracket in selector: %s", selector)
 			}
 			indexStr := s[start:i]
 			index, err := strconv.Atoi(indexStr)
 			if err != nil {
-				return nil, unifiederrors.EvalErrorf("invalid index in selector: %s", indexStr)
+				return nil, false, unifiederrors.EvalErrorf("invalid index in selector: %s", indexStr)
 			}
 			path = append(path, selectorSegment{index: index, isIndex: true})
 			i++ // skip the ]
 		} else {
-			return nil, unifiederrors.EvalErrorf("unexpected character in selector: %c at position %d", s[i], i)
+			return nil, false, unifiederrors.EvalErrorf("unexpected character in selector: %c at position %d", s[i], i)
 		}
 	}
 
-	return path, nil
+	return path, upsert, nil
+}
+
+// canUpsertMissingObjectPath reports whether a failed path lookup stopped at
+// an absent object field and the remainder can be created using objects. Array
+// indexes are intentionally not created by this update-expression path.
+func canUpsertMissingObjectPath(value Value, path []selectorSegment) bool {
+	current := value
+	for i, seg := range path {
+		if seg.isIndex {
+			arr, ok := current.(Array)
+			if !ok {
+				return false
+			}
+			index, ok := resolveUpdateArrayIndex(seg.index, len(arr))
+			if !ok {
+				return false
+			}
+			current = arr[index]
+			continue
+		}
+
+		obj, ok := current.(Object)
+		if !ok {
+			return false
+		}
+		child, exists := obj[seg.fieldName]
+		if !exists {
+			for _, remaining := range path[i:] {
+				if remaining.isIndex {
+					return false
+				}
+			}
+			return true
+		}
+		current = child
+	}
+	return false
 }
 
 // getValueAtPath retrieves a value at the given selector path
@@ -298,6 +352,10 @@ func updateObjectField(obj Object, fieldName string, newValue Value) Object {
 }
 
 func setValueAtPath(value Value, path []selectorSegment, newValue Value, depth int) (Value, error) {
+	return setValueAtPathWithUpsert(value, path, newValue, depth, false)
+}
+
+func setValueAtPathWithUpsert(value Value, path []selectorSegment, newValue Value, depth int, upsert bool) (Value, error) {
 	if depth > MaxEvalDepth {
 		return nil, unifiederrors.EvalErrorf("update path depth limit exceeded (max %d)", MaxEvalDepth)
 	}
@@ -321,7 +379,7 @@ func setValueAtPath(value Value, path []selectorSegment, newValue Value, depth i
 		if !ok {
 			return nil, unifiederrors.EvalErrorf("index out of bounds: %d", seg.index)
 		}
-		childValue, err := setValueAtPath(arr[index], path[1:], newValue, depth+1)
+		childValue, err := setValueAtPathWithUpsert(arr[index], path[1:], newValue, depth+1, upsert)
 		if err != nil {
 			return nil, err
 		}
@@ -337,9 +395,12 @@ func setValueAtPath(value Value, path []selectorSegment, newValue Value, depth i
 	}
 	childVal, exists := obj[seg.fieldName]
 	if !exists {
-		return nil, unifiederrors.EvalErrorf("field not found: %s", seg.fieldName)
+		if !upsert {
+			return nil, unifiederrors.EvalErrorf("field not found: %s", seg.fieldName)
+		}
+		childVal = values.NewObject(0)
 	}
-	childValue, err := setValueAtPath(childVal, path[1:], newValue, depth+1)
+	childValue, err := setValueAtPathWithUpsert(childVal, path[1:], newValue, depth+1, upsert)
 	if err != nil {
 		return nil, err
 	}

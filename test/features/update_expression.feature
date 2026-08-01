@@ -238,6 +238,38 @@ Feature: Update Expression
       {"name":"John"}
       """
 
+  Scenario: Upsert missing field with null binding
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {name: "John"} update {
+        case age at .age! -> if (age == null) 30 else age
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"name":"John","age":30}
+      """
+
+  Scenario: Upsert nested field and create missing parents
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      {name: "John"} update {
+        case city at .address.city! -> "New York"
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      {"name":"John","address":{"city":"New York"}}
+      """
+
   Scenario: Update deeply nested field
     Given the following input content:
       """

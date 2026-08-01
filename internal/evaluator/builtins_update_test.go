@@ -66,6 +66,97 @@ func TestResolveUpdateArrayIndex(t *testing.T) {
 	}
 }
 
+func TestParseSelectorPathAndUpsert(t *testing.T) {
+	tests := []struct {
+		name       string
+		selector   string
+		wantUpsert bool
+		wantPath   []selectorSegment
+	}{
+		{
+			name:     "ordinary selector",
+			selector: ".profile.name",
+			wantPath: []selectorSegment{
+				{fieldName: "profile", index: -1},
+				{fieldName: "name", index: -1},
+			},
+		},
+		{
+			name:       "upsert selector",
+			selector:   ".profile.name!",
+			wantUpsert: true,
+			wantPath: []selectorSegment{
+				{fieldName: "profile", index: -1},
+				{fieldName: "name", index: -1},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gotPath, gotUpsert, err := parseSelectorPathAndUpsert(test.selector)
+			if err != nil {
+				t.Fatalf("parse selector: %v", err)
+			}
+			if gotUpsert != test.wantUpsert {
+				t.Fatalf("upsert = %t, want %t", gotUpsert, test.wantUpsert)
+			}
+			if !reflect.DeepEqual(gotPath, test.wantPath) {
+				t.Fatalf("path = %#v, want %#v", gotPath, test.wantPath)
+			}
+		})
+	}
+}
+
+func TestApplyUpdateCases_UpsertsMissingObjectFields(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    Object
+		cases    string
+		wantKeys []string
+		want     Value
+	}{
+		{
+			name:     "missing terminal field binds null",
+			input:    Object{"a": 1},
+			cases:    "case missing at .missing! -> missing",
+			wantKeys: []string{"a", "missing"},
+			want: Object{
+				"a":       1,
+				"missing": nil,
+			},
+		},
+		{
+			name:     "missing parent objects are created",
+			input:    Object{"a": 1},
+			cases:    "case name at .profile.name! -> \"John\"",
+			wantKeys: []string{"a", "profile"},
+			want: Object{
+				"a": 1,
+				"profile": Object{
+					"name": "John",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := applyUpdateCases(test.input, test.cases, NewScope(nil), 0)
+			if err != nil {
+				t.Fatalf("apply update cases: %v", err)
+			}
+			gotObject := got.(Object)
+			if !reflect.DeepEqual(gotObject, test.want) {
+				t.Fatalf("result = %#v, want %#v", gotObject, test.want)
+			}
+			if !reflect.DeepEqual(values.ObjectKeys(gotObject), test.wantKeys) {
+				t.Fatalf("keys = %v, want %v", values.ObjectKeys(gotObject), test.wantKeys)
+			}
+		})
+	}
+}
+
 func TestSetValueAtPath_ResolvesNegativeNonTerminalIndexes(t *testing.T) {
 	value := Array{
 		Array{1, 2},
