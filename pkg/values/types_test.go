@@ -51,6 +51,22 @@ func TestCloneObjectPreservesAlphabeticalFallbackOrder(t *testing.T) {
 	}
 }
 
+func TestCloneObjectPreservesInputOriginPerObject(t *testing.T) {
+	source := NewObject(1)
+	MarkInputValue(source)
+	scriptObject := NewObject(0)
+	SetObjectValue(source, "script", scriptObject)
+
+	clone := CloneObject(source)
+
+	if !ObjectHasInputOrigin(clone) {
+		t.Fatal("clone object was not marked as input")
+	}
+	if ObjectHasInputOrigin(clone["script"].(Object)) {
+		t.Fatal("clone incorrectly marked a newly reachable script object as input")
+	}
+}
+
 func TestMergeObjectsKeepsExistingPositionsAndAppendsNewKeys(t *testing.T) {
 	left := NewObject(2)
 	SetObjectValue(left, "b", 2)

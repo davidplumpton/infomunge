@@ -60,6 +60,46 @@ Feature: Update Expression
     Then the output should contain "35"
     And the output should contain "John"
 
+  Scenario: Update nested external input preserves missing-field defaults
+    Given the following input content:
+      """
+      %im 0.1
+      input application/json
+      output application/json
+      ---
+      payload update {
+        case user at .user -> {value: (user.missing + 1) default 5}
+      }
+      """
+    When I run the application with this JSON input:
+      """
+      {"user": {}}
+      """
+    Then the output should be:
+      """
+      {"user":{"value":5}}
+      """
+
+  Scenario: Update preserves missing input semantics through a collection callback
+    Given the following input content:
+      """
+      %im 0.1
+      input application/json
+      output application/json
+      ---
+      payload update {
+        case users at .users -> users map (user) -> (user.missing + 1) default 5
+      }
+      """
+    When I run the application with this JSON input:
+      """
+      {"users": [{}, {}]}
+      """
+    Then the output should be:
+      """
+      {"users":[5,5]}
+      """
+
   Scenario: Update array element
     Given the following input content:
       """

@@ -276,3 +276,54 @@ func TestApplyUpdateCases_PreservesObjectOrderAndDeepCopyIsolation(t *testing.T)
 		t.Fatalf("source nested value = %v after result mutation, want 1", got)
 	}
 }
+
+func TestApplyUpdateCases_PreservesInputOriginForNestedCase(t *testing.T) {
+	user := values.NewObject(0)
+	input := values.NewObject(1)
+	values.SetObjectValue(input, "user", user)
+	values.MarkInputValue(input)
+
+	got, err := applyUpdateCases(
+		input,
+		"case user at .user -> __default(user[\"missing\"] + 1, 5)",
+		NewScope(nil),
+		0,
+	)
+	if err != nil {
+		t.Fatalf("apply update cases: %v", err)
+	}
+
+	want := Object{"user": 5}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("result = %#v, want %#v", got, want)
+	}
+	if !values.ObjectHasInputOrigin(got.(Object)) {
+		t.Fatal("updated result lost input-origin metadata")
+	}
+}
+
+func TestApplyUpdateCases_PreservesInputOriginThroughCollectionCallback(t *testing.T) {
+	first := values.NewObject(0)
+	second := values.NewObject(0)
+	input := values.NewObject(1)
+	values.SetObjectValue(input, "users", Array{first, second})
+	values.MarkInputValue(input)
+
+	got, err := applyUpdateCases(
+		input,
+		"case users at .users -> __map(users, __lambda(\"user\", __default(user[\"missing\"] + 1, 5)))",
+		NewScope(nil),
+		0,
+	)
+	if err != nil {
+		t.Fatalf("apply update cases: %v", err)
+	}
+
+	want := Object{"users": Array{5, 5}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("result = %#v, want %#v", got, want)
+	}
+	if !values.ObjectHasInputOrigin(got.(Object)) {
+		t.Fatal("updated collection result lost input-origin metadata")
+	}
+}

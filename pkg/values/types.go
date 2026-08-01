@@ -148,6 +148,13 @@ func MarkInputValue(value Value) {
 	mark(value)
 }
 
+func markObjectInputOrigin(object Object) {
+	record := loadOrCreateObjectOrder(object)
+	record.mu.Lock()
+	record.inputOrigin = true
+	record.mu.Unlock()
+}
+
 func markInputArray(array Array, visited map[uintptr]struct{}, mark func(Value)) {
 	if len(array) == 0 {
 		return
@@ -186,6 +193,9 @@ func CloneObject(object Object) Object {
 	clone := NewObject(len(object))
 	for _, key := range ObjectKeys(object) {
 		SetObjectValue(clone, key, object[key])
+	}
+	if ObjectHasInputOrigin(object) {
+		markObjectInputOrigin(clone)
 	}
 	return clone
 }

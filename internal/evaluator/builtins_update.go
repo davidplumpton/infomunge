@@ -411,7 +411,7 @@ func setValueAtPathWithUpsert(value Value, path []selectorSegment, newValue Valu
 func deepCopy(value Value) Value {
 	switch v := value.(type) {
 	case Object:
-		newMap := values.NewObject(len(v))
+		newMap := values.CloneObject(v)
 		for _, key := range values.ObjectKeys(v) {
 			values.SetObjectValue(newMap, key, deepCopy(v[key]))
 		}
