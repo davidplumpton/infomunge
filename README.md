@@ -2,6 +2,8 @@
 
 `InfoMunge` is a Go-based experiment that implements a subset of DataWeave-style data transformations. [DataWeave](https://docs.mulesoft.com/mule-runtime/latest/dataweave) is MuleSoft's language for accessing and transforming data in Mule applications; InfoMunge is an independent project with its own syntax and runtime.
 
+Project version: `0.1.2`
+
 ## Requirements
 
 - The project will be structured so the domain logic can be extracted as a library

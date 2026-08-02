@@ -1,5 +1,7 @@
 # AGENTS.md
 
+Project version: `0.1.2`
+
 # Agent Instructions
 
 This file is the authoritative source for repository-wide agent instructions.

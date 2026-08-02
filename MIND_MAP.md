@@ -1,5 +1,7 @@
 # Mind Map - InfoMunge
 
+Project version: `0.1.2`
+
 > **For AI Agents:** Start with overview nodes [1-5], then follow inline references. Keep this file compact at roughly 20-50 numbered nodes. Update an existing node when possible; do not append a dated incident paragraph for a recurrence.
 >
 > **Memory review:** Before committing a MIND_MAP change, run `awk '/^\\[[0-9]+\\]/{n++} END {exit (n < 20) + (n > 50)}' MIND_MAP.md` and inspect `wc -l -c MIND_MAP.md`. If the check fails or the file grows materially, merge repeated guidance before adding more nodes.
