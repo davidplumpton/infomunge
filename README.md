@@ -93,6 +93,7 @@ Notes:
 - `inputs` are optional. Each input has `name`, `content`, and optional `format`.
 - If `format` is omitted, inputs are treated as `text/plain`.
 - `output` can be a format like `json` or a MIME type like `application/json`.
+- Headerless scripts use the requested output codec (or the script's resolved MIME type), including from the standalone WASM playground; when no output MIME exists, the runner retains its raw text fallback.
 
 ### Size Limits
 

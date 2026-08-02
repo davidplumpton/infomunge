@@ -185,14 +185,7 @@ func (app *App) handleRun(config *Config) http.HandlerFunc {
 			return
 		}
 
-		outputMimeType, err := handlers.ResolveOutputMimeType(payload.Output, execution.OutputMimeType)
-		if err != nil {
-			writeSanitizedBadRequest(w, err)
-			return
-		}
-
-		execution.OutputMimeType = outputMimeType
-		formatted, err := runner.FormatExecutionResult(execution)
+		formatted, outputMimeType, err := handlers.ResolveAndFormatExecutionResult(execution, payload.Output)
 		if err != nil {
 			if isClientFormattingError(err) {
 				writeSanitizedBadRequest(w, err)

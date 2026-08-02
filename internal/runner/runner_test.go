@@ -197,6 +197,29 @@ func TestRunStringDeprecatedWrapperDelegatesToExecuteString(t *testing.T) {
 	}
 }
 
+func TestFormatExecutionResultUsesRawFallbackOnlyWithoutOutputFormat(t *testing.T) {
+	result := ExecutionResult{
+		Value:          evaluator.Array{1, 2},
+		OutputMimeType: "application/json",
+	}
+	formatted, err := FormatExecutionResult(result)
+	if err != nil {
+		t.Fatalf("FormatExecutionResult() with MIME type error = %v", err)
+	}
+	if formatted != "[1,2]" {
+		t.Fatalf("FormatExecutionResult() with MIME type = %q, want %q", formatted, "[1,2]")
+	}
+
+	result.OutputMimeType = ""
+	formatted, err = FormatExecutionResult(result)
+	if err != nil {
+		t.Fatalf("FormatExecutionResult() without MIME type error = %v", err)
+	}
+	if formatted != "[1 2]" {
+		t.Fatalf("FormatExecutionResult() without MIME type = %q, want %q", formatted, "[1 2]")
+	}
+}
+
 func TestRunFromStringWithContextDeprecatedWrapperPrintsFormattedOutput(t *testing.T) {
 	script := `%im 0.1
 output application/json

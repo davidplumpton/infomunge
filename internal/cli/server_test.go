@@ -58,6 +58,53 @@ func TestRunHandlerStopsInFlightEvaluationAfterRequestCancellation(t *testing.T)
 	}
 }
 
+func TestRunHandlerFormatsHeaderlessResultsUsingRequestedOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		script      string
+		requested   string
+		contentType string
+		wantBody    string
+	}{
+		{name: "scalar JSON", script: "42", requested: "json", contentType: "application/json", wantBody: "42"},
+		{name: "array JSON", script: "[1, 2]", requested: "json", contentType: "application/json", wantBody: "[1,2]"},
+		{name: "object JSON", script: `{name: "Alice"}`, requested: "json", contentType: "application/json", wantBody: `{"name":"Alice"}`},
+		{name: "text", script: `"plain text"`, requested: "text/plain", contentType: "text/plain", wantBody: "plain text"},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			payload, err := json.Marshal(map[string]string{
+				"script": test.script,
+				"output": test.requested,
+			})
+			if err != nil {
+				t.Fatalf("json.Marshal() error = %v", err)
+			}
+
+			req := httptest.NewRequest(http.MethodPost, "/run", bytes.NewReader(payload))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			NewApp().ServerHandler(&Config{}).ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("run handler status = %d, want %d; body = %q", rec.Code, http.StatusOK, rec.Body.String())
+			}
+			if got := rec.Header().Get("Content-Type"); got != test.contentType {
+				t.Fatalf("Content-Type = %q, want %q", got, test.contentType)
+			}
+			if got := rec.Body.String(); got != test.wantBody {
+				t.Fatalf("response body = %q, want %q", got, test.wantBody)
+			}
+		})
+	}
+}
+
 func TestIsClientFormattingError(t *testing.T) {
 	t.Parallel()
 

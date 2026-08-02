@@ -66,7 +66,7 @@ func FormatExecutionResult(result ExecutionResult) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !resolved.HasHeader {
+	if !resolved.HasHeader && strings.TrimSpace(resolved.OutputMimeType) == "" {
 		return fmt.Sprint(resolved.Value), nil
 	}
 	return output.FormatResultWithMetadata(resolved.Value, resolved.OutputMimeType, resolved.Context, resolved.OutputMetadata)

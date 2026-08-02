@@ -4,12 +4,7 @@
 package main
 
 import (
-	"context"
-	"strings"
 	"syscall/js"
-
-	"infomunge/internal/handlers"
-	"infomunge/internal/runner"
 )
 
 var infomungeRun js.Func
@@ -27,36 +22,12 @@ func main() {
 }
 
 func runPayload(payload string) js.Value {
-	request, err := handlers.DecodeRunRequest(strings.NewReader(payload))
-	if err != nil {
-		return errorResponse(err)
+	response := executePayload(payload)
+	if !response.ok {
+		return errorResponseString(response.errMessage)
 	}
 
-	evalContext, err := handlers.BuildRunContext(request.Inputs)
-	if err != nil {
-		return errorResponse(err)
-	}
-
-	opts := runner.RunnerOptions{
-		BaseDir: ".",
-	}
-	execution, err := runner.ExecuteString(context.Background(), request.Script, evalContext, opts)
-	if err != nil {
-		return errorResponse(err)
-	}
-
-	outputMimeType, err := handlers.ResolveOutputMimeType(request.Output, execution.OutputMimeType)
-	if err != nil {
-		return errorResponse(err)
-	}
-
-	execution.OutputMimeType = outputMimeType
-	formatted, err := runner.FormatExecutionResult(execution)
-	if err != nil {
-		return errorResponse(err)
-	}
-
-	return successResponse(formatted, outputMimeType)
+	return successResponse(response.result, response.mimeType)
 }
 
 func successResponse(result, mimeType string) js.Value {

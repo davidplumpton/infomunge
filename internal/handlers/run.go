@@ -8,6 +8,7 @@ import (
 	unifiederrors "infomunge/internal/errors"
 	"infomunge/internal/evaluator"
 	inputio "infomunge/internal/io"
+	"infomunge/internal/runner"
 	"infomunge/pkg/formats"
 )
 
@@ -63,6 +64,23 @@ func ResolveOutputMimeType(requested string, headerOutput string) (string, error
 		return NormalizeMimeType(requested, "output")
 	}
 	return NormalizeMimeType(headerOutput, "output")
+}
+
+// ResolveAndFormatExecutionResult applies the adapter's output override and
+// serializes the result through the selected format writer. The server and
+// WASM adapters share this path so headerless scripts have identical output.
+func ResolveAndFormatExecutionResult(execution runner.ExecutionResult, requested string) (string, string, error) {
+	outputMimeType, err := ResolveOutputMimeType(requested, execution.OutputMimeType)
+	if err != nil {
+		return "", "", err
+	}
+
+	execution.OutputMimeType = outputMimeType
+	formatted, err := runner.FormatExecutionResult(execution)
+	if err != nil {
+		return "", "", err
+	}
+	return formatted, outputMimeType, nil
 }
 
 // NormalizeMimeType converts a short format name (e.g. "json") to a full MIME type,
