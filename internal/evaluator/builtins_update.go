@@ -94,6 +94,9 @@ func applyUpdateCases(value Value, casesStr string, scope *Scope, depth int) (Va
 
 	result := deepCopy(value)
 	for _, update := range updates {
+		if update.conflict {
+			continue
+		}
 		var err error
 		result, err = setValueAtPathWithUpsert(result, update.path, update.value, 0, update.upsert)
 		if err != nil {
@@ -105,9 +108,17 @@ func applyUpdateCases(value Value, casesStr string, scope *Scope, depth int) (Va
 }
 
 type evaluatedUpdate struct {
-	path   []selectorSegment
-	value  Value
-	upsert bool
+	// path is resolved against the immutable update source so aliases such as
+	// [-1] and [len-1] compare as the same location and remain stable while
+	// other cases are applied.
+	path []selectorSegment
+	// selectorPath preserves the source spelling. DataWeave treats identical
+	// selector text as first-case-wins, but distinct selector spellings that
+	// resolve to the same location as a conflict.
+	selectorPath []selectorSegment
+	value        Value
+	upsert       bool
+	conflict     bool
 }
 
 // mergeEvaluatedUpdate applies DataWeave's conflict rules. An update to an
@@ -117,7 +128,22 @@ func mergeEvaluatedUpdate(updates []evaluatedUpdate, candidate evaluatedUpdate) 
 	for _, update := range updates {
 		switch {
 		case selectorPathEqual(update.path, candidate.path):
-			return updates
+			if update.conflict || candidate.conflict {
+				return updates
+			}
+			if selectorPathEqual(updateSelectorPath(update), updateSelectorPath(candidate)) {
+				return updates
+			}
+			// Distinct selectors that resolve to the same location conflict.
+			// Keep a marker so later cases cannot revive that location.
+			merged := updates[:0]
+			for _, existing := range updates {
+				if selectorPathEqual(existing.path, candidate.path) {
+					continue
+				}
+				merged = append(merged, existing)
+			}
+			return append(merged, evaluatedUpdate{path: candidate.path, conflict: true})
 		case selectorPathPrefix(update.path, candidate.path):
 			return updates
 		}
@@ -131,6 +157,13 @@ func mergeEvaluatedUpdate(updates []evaluatedUpdate, candidate evaluatedUpdate) 
 		merged = append(merged, update)
 	}
 	return append(merged, candidate)
+}
+
+func updateSelectorPath(update evaluatedUpdate) []selectorSegment {
+	if update.selectorPath != nil {
+		return update.selectorPath
+	}
+	return update.path
 }
 
 func selectorPathEqual(left, right []selectorSegment) bool {
@@ -194,7 +227,54 @@ func evaluateUpdateCase(value Value, varName, selector, expression string, scope
 		return evaluatedUpdate{}, false, err
 	}
 
-	return evaluatedUpdate{path: path, value: deepCopy(newValue), upsert: upsert}, true, nil
+	canonicalPath, err := canonicalizeUpdatePath(value, path)
+	if err != nil {
+		return evaluatedUpdate{}, false, err
+	}
+
+	return evaluatedUpdate{
+		path:         canonicalPath,
+		selectorPath: path,
+		value:        deepCopy(newValue),
+		upsert:       upsert,
+	}, true, nil
+}
+
+// canonicalizeUpdatePath resolves array indexes against the immutable source
+// used to evaluate all update cases. Missing object fields are allowed only for
+// upsert paths; there can be no array indexes after such a field because
+// canUpsertMissingObjectPath rejects those paths.
+func canonicalizeUpdatePath(value Value, path []selectorSegment) ([]selectorSegment, error) {
+	canonical := append([]selectorSegment(nil), path...)
+	current := value
+
+	for i, seg := range path {
+		if seg.isIndex {
+			arr, ok := current.(Array)
+			if !ok {
+				return nil, unifiederrors.EvalError("expected array for index selector")
+			}
+			index, ok := resolveUpdateArrayIndex(seg.index, len(arr))
+			if !ok {
+				return nil, unifiederrors.EvalErrorf("index out of bounds: %d", seg.index)
+			}
+			canonical[i].index = index
+			current = arr[index]
+			continue
+		}
+
+		obj, ok := current.(Object)
+		if !ok {
+			return nil, unifiederrors.EvalError("expected object for field selector")
+		}
+		child, exists := obj[seg.fieldName]
+		if !exists {
+			return canonical, nil
+		}
+		current = child
+	}
+
+	return canonical, nil
 }
 
 // selectorSegment represents a part of a selector path

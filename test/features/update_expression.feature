@@ -147,6 +147,40 @@ Feature: Update Expression
       {"a":[1,2,30]}
       """
 
+  Scenario: Conflicting negative and positive array selectors leave the target unchanged
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1] update {
+        case first at [-1] -> first + 1
+        case second at [0] -> second * 10
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1]
+      """
+
+  Scenario: Reversed conflicting array selectors also leave the target unchanged
+    Given the following input content:
+      """
+      %im 0.1
+      output application/json
+      ---
+      [1] update {
+        case first at [0] -> first * 10
+        case second at [-1] -> second + 1
+      }
+      """
+    When I run the application with this content
+    Then the output should be:
+      """
+      [1]
+      """
+
   Scenario: Multiple case statements
     Given the following input content:
       """

@@ -247,6 +247,46 @@ func TestMergeEvaluatedUpdate_UsesAncestorAndFirstIdenticalSelector(t *testing.T
 	}
 }
 
+func TestApplyUpdateCases_CanonicalizesNegativeIndexesBeforeConflictMerging(t *testing.T) {
+	tests := []struct {
+		name  string
+		input Value
+		cases string
+		want  Value
+	}{
+		{
+			name:  "top-level aliases conflict and leave the target unchanged",
+			input: Array{1},
+			cases: "case first at [-1] -> first + 1\ncase second at [0] -> second * 10",
+			want:  Array{1},
+		},
+		{
+			name:  "nested aliases conflict and leave the target unchanged",
+			input: Object{"a": Array{Array{1, 2}}},
+			cases: "case first at .a[-1][-1] -> first + 1\ncase second at .a[0][1] -> second * 10",
+			want:  Object{"a": Array{Array{1, 2}}},
+		},
+		{
+			name:  "identical negative selectors retain first-case-wins",
+			input: Array{1, 2, 3},
+			cases: "case first at [-1] -> first + 1\ncase second at [-1] -> second * 10",
+			want:  Array{1, 2, 4},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := applyUpdateCases(test.input, test.cases, NewScope(nil), 0)
+			if err != nil {
+				t.Fatalf("apply update cases: %v", err)
+			}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("result = %#v, want %#v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestApplyUpdateCases_PreservesObjectOrderAndDeepCopyIsolation(t *testing.T) {
 	nested := values.NewObject(1)
 	values.SetObjectValue(nested, "value", 1)
