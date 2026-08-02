@@ -899,7 +899,7 @@ output application/json
 | **Multiple Inputs** | `input <name> <format>` | CLI/server input names create variables; `input <name> <format>` headers are compatibility metadata |
 | **Null Literal** | `null` | `null` (preferred), `nil` alias also accepted |
 | **Type System** | Complex type definitions | Basic types with `as` coercion |
-| **Supported Formats** | JSON, XML, CSV, YAML, Properties | JSON, XML, CSV, YAML; Properties input only |
+| **Format coverage in this cookbook** | The examples use JSON and XML | The examples use JSON and XML; see the [supported-format and fidelity matrix](FORMATS.md) for the complete registry and accurate input/output direction, including Java properties as input-only |
 
 ---
 
