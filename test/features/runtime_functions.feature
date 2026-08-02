@@ -160,7 +160,7 @@ Feature: Runtime Functions
     When I run the application with this content
     Then the output should be:
       """
-      {"result":[2,4,6],"success":true}
+      {"success":true,"result":[2,4,6]}
       """
 
   Scenario: try-family lambdas use their captured lexical scope
@@ -282,7 +282,7 @@ Feature: Runtime Functions
     When I run the application with this content
     Then the output should be:
       """
-      {"result":42,"success":true}
+      {"success":true,"result":42}
       """
 
   Scenario: orElseTry evaluates fallback when try fails
@@ -296,7 +296,7 @@ Feature: Runtime Functions
     When I run the application with this content
     Then the output should be:
       """
-      {"result":99,"success":true}
+      {"success":true,"result":99}
       """
 
   Scenario: orElseTry captures fallback failure

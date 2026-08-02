@@ -5,8 +5,11 @@ import (
 	"go/ast"
 	"net"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
+
+	"infomunge/pkg/values"
 )
 
 // callBuiltinParseURI implements parseURI(uri).
@@ -25,21 +28,21 @@ func callBuiltinParseURI(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("parseURI expects a valid URI: %v", err), e.Pos())
 	}
 
-	result := Object{
-		"scheme":   parsed.Scheme,
-		"host":     parsed.Hostname(),
-		"path":     parsed.Path,
-		"fragment": parsed.Fragment,
-		"query":    Object{},
-		"user":     nil,
-		"password": nil,
-		"port":     nil,
-	}
+	query := values.NewObject(0)
+	result := values.NewObject(8)
+	values.SetObjectValue(result, "scheme", parsed.Scheme)
+	values.SetObjectValue(result, "host", parsed.Hostname())
+	values.SetObjectValue(result, "path", parsed.Path)
+	values.SetObjectValue(result, "fragment", parsed.Fragment)
+	values.SetObjectValue(result, "query", query)
+	values.SetObjectValue(result, "user", nil)
+	values.SetObjectValue(result, "password", nil)
+	values.SetObjectValue(result, "port", nil)
 
 	if parsed.User != nil {
-		result["user"] = parsed.User.Username()
+		values.SetObjectValue(result, "user", parsed.User.Username())
 		if pw, hasPw := parsed.User.Password(); hasPw {
-			result["password"] = pw
+			values.SetObjectValue(result, "password", pw)
 		}
 	}
 
@@ -48,7 +51,7 @@ func callBuiltinParseURI(args []Value, e *ast.CallExpr) (Value, error) {
 		if convErr != nil {
 			return nil, newPosError(fmt.Sprintf("parseURI could not parse URI port %q", parsed.Port()), e.Pos())
 		}
-		result["port"] = port
+		values.SetObjectValue(result, "port", port)
 	}
 
 	queryValues, err := url.ParseQuery(parsed.RawQuery)
@@ -56,19 +59,23 @@ func callBuiltinParseURI(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, newPosError(fmt.Sprintf("parseURI failed to parse query: %v", err), e.Pos())
 	}
 
-	query := Object{}
-	for key, values := range queryValues {
-		if len(values) == 1 {
-			query[key] = values[0]
+	queryKeys := make([]string, 0, len(queryValues))
+	for key := range queryValues {
+		queryKeys = append(queryKeys, key)
+	}
+	sort.Strings(queryKeys)
+	for _, key := range queryKeys {
+		queryValuesForKey := queryValues[key]
+		if len(queryValuesForKey) == 1 {
+			values.SetObjectValue(query, key, queryValuesForKey[0])
 			continue
 		}
-		items := make(Array, len(values))
-		for i, value := range values {
+		items := make(Array, len(queryValuesForKey))
+		for i, value := range queryValuesForKey {
 			items[i] = value
 		}
-		query[key] = items
+		values.SetObjectValue(query, key, items)
 	}
-	result["query"] = query
 
 	return result, nil
 }

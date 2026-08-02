@@ -15,7 +15,7 @@ Feature: URL Module
     When I run the application with this content
     Then the output should be:
       """
-      {"fragment":"top","host":"example.com","password":"pass","path":"/a/b","port":8443,"query":{"msg":"hello world","x":["1","2"]},"scheme":"https","user":"user"}
+      {"scheme":"https","host":"example.com","path":"/a/b","fragment":"top","query":{"msg":"hello world","x":["1","2"]},"user":"user","password":"pass","port":8443}
       """
 
   Scenario: compose builds a URI from parts

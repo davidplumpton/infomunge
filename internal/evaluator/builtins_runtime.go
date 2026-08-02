@@ -6,9 +6,11 @@ import (
 	"go/ast"
 	"go/token"
 	"os"
+	"sort"
 	"strings"
 
 	unifiederrors "infomunge/internal/errors"
+	"infomunge/pkg/values"
 )
 
 // UserError represents an error explicitly thrown by the user via fail().
@@ -62,13 +64,12 @@ func callBuiltinEvaluateCompatibilityFlag(args []Value, e *ast.CallExpr) (Value,
 	}
 
 	// Define default compatibility flags
-	compatibilityFlags := Object{
-		"allowUndefinedProperties": true,
-		"allowNullArithmetic":      false,
-		"allowImplicitConversion":  true,
-		"strictTypeChecking":       false,
-		"allowDynamicProperties":   true,
-	}
+	compatibilityFlags := values.NewObject(5)
+	values.SetObjectValue(compatibilityFlags, "allowUndefinedProperties", true)
+	values.SetObjectValue(compatibilityFlags, "allowNullArithmetic", false)
+	values.SetObjectValue(compatibilityFlags, "allowImplicitConversion", true)
+	values.SetObjectValue(compatibilityFlags, "strictTypeChecking", false)
+	values.SetObjectValue(compatibilityFlags, "allowDynamicProperties", true)
 
 	if value, ok := compatibilityFlags[flagName]; ok {
 		return value, nil
@@ -102,11 +103,13 @@ func callBuiltinEnvVars(args []Value, e *ast.CallExpr) (Value, error) {
 		return nil, err
 	}
 
-	envMap := make(Object)
-	for _, env := range os.Environ() {
+	environ := os.Environ()
+	sort.Strings(environ)
+	envMap := values.NewObject(len(environ))
+	for _, env := range environ {
 		parts := strings.SplitN(env, "=", 2)
 		if len(parts) == 2 {
-			envMap[parts[0]] = parts[1]
+			values.SetObjectValue(envMap, parts[0], parts[1])
 		}
 	}
 	return envMap, nil
@@ -198,29 +201,27 @@ func callBuiltinTry(e *ast.CallExpr, scope *Scope, depth int) (Value, error) {
 
 	if err != nil {
 		// Build error object based on error type
-		errorObj := buildErrorObject(err)
-		return Object{
-			"success": false,
-			"error":   errorObj,
-		}, nil
+		return newTryResult(false, "error", buildErrorObject(err)), nil
 	}
 
 	// If result is a zero-argument lambda, invoke it
 	if lambda, ok := result.(*Lambda); ok && lambda.ParamCount() == 0 {
 		result, err = invokeUserLambda(lambda, nil, e.Pos(), scope, depth)
 		if err != nil {
-			errorObj := buildErrorObject(err)
-			return Object{
-				"success": false,
-				"error":   errorObj,
-			}, nil
+			return newTryResult(false, "error", buildErrorObject(err)), nil
 		}
 	}
 
-	return Object{
-		"success": true,
-		"result":  result,
-	}, nil
+	return newTryResult(true, "result", result), nil
+}
+
+// newTryResult constructs the stable service shape used by try and orElseTry.
+// The success discriminator intentionally precedes the result or error payload.
+func newTryResult(success bool, payloadKey string, payload Value) Object {
+	result := values.NewObject(2)
+	values.SetObjectValue(result, "success", success)
+	values.SetObjectValue(result, payloadKey, payload)
+	return result
 }
 
 // callBuiltinOrElse implements the orElse(previous, orElse) function.
@@ -295,58 +296,43 @@ func callBuiltinOrElseTry(e *ast.CallExpr, scope *Scope, depth int) (Value, erro
 	orElseVal, err := evalASTInScopeWithDepth(e.Args[1], scope, depth)
 	if err != nil {
 		// orElse evaluation itself failed
-		errorObj := buildErrorObject(err)
-		return Object{
-			"success": false,
-			"error":   errorObj,
-		}, nil
+		return newTryResult(false, "error", buildErrorObject(err)), nil
 	}
 
 	// If orElse is a zero-argument lambda, invoke it
 	if lambda, ok := orElseVal.(*Lambda); ok && lambda.ParamCount() == 0 {
 		result, err := invokeUserLambda(lambda, nil, e.Pos(), scope, depth)
 		if err != nil {
-			errorObj := buildErrorObject(err)
-			return Object{
-				"success": false,
-				"error":   errorObj,
-			}, nil
+			return newTryResult(false, "error", buildErrorObject(err)), nil
 		}
-		return Object{
-			"success": true,
-			"result":  result,
-		}, nil
+		return newTryResult(true, "result", result), nil
 	}
 
-	return Object{
-		"success": true,
-		"result":  orElseVal,
-	}, nil
+	return newTryResult(true, "result", orElseVal), nil
 }
 
 // buildErrorObject creates the error object structure for TryResult.
 func buildErrorObject(err error) Object {
-	errorObj := Object{
-		"message":  err.Error(),
-		"location": "Unknown location",
-		"stack":    Array{},
-	}
+	kind := "RuntimeException"
+	message := err.Error()
+	location := "Unknown location"
 
 	// Check for UserError (from fail())
 	if userErr, ok := err.(*UserError); ok {
-		errorObj["kind"] = userErr.Kind
-		errorObj["message"] = userErr.Message
-		errorObj["location"] = userErr.Location
+		kind = userErr.Kind
+		message = userErr.Message
+		location = userErr.Location
 	} else if unifiedErr, ok := err.(*unifiederrors.Error); ok && unifiedErr.Position != nil {
-		errorObj["kind"] = "RuntimeException"
-		errorObj["location"] = fmt.Sprintf("%s:%d:%d", unifiedErr.Position.Filename, unifiedErr.Position.Line, unifiedErr.Position.Column)
+		location = fmt.Sprintf("%s:%d:%d", unifiedErr.Position.Filename, unifiedErr.Position.Line, unifiedErr.Position.Column)
 	} else if posErr, ok := err.(interface{ Pos() token.Pos }); ok {
-		errorObj["kind"] = "RuntimeException"
-		errorObj["location"] = fmt.Sprintf("position %d", posErr.Pos())
-	} else {
-		errorObj["kind"] = "RuntimeException"
+		location = fmt.Sprintf("position %d", posErr.Pos())
 	}
 
+	errorObj := values.NewObject(4)
+	values.SetObjectValue(errorObj, "kind", kind)
+	values.SetObjectValue(errorObj, "message", message)
+	values.SetObjectValue(errorObj, "location", location)
+	values.SetObjectValue(errorObj, "stack", Array{})
 	return errorObj
 }
 
